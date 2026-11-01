@@ -83,7 +83,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-01-simple-nav";
+const APP_BUILD = "2026-11-01-rack-face";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -18586,19 +18586,61 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                 className="rack-crate text-left rounded-xl p-2 pt-3.5 relative focus-visible:ring-2"
                                 style={{ "--crate": color, outline: rackPanel === sl.id ? `3px solid ${color}` : "none", outlineOffset: 2 }}>
                           <span className="rack-crate-handle" aria-hidden="true" />
+                          {/* ── Crate face (2026-11-01) ───────────────────────
+                              Read in this order, and only what the rack's own
+                              condition calls for:
+                                1. which rack it is      (model, always)
+                                2. what state it is in   (pill + 4-step bar)
+                                3. which machine         (serial, once filled)
+                                4. what is missing       (parts chip)
+                                5. what happens next     (one short line)
+                              An empty rack shows 1, 2 and a single invitation —
+                              no dash where a serial would be, no parts line for
+                              a machine that is not there. Nothing here changes
+                              rack logic: every value is already computed above
+                              and the whole face is still one button that opens
+                              the existing details panel. */}
                           <div className="rounded-lg bg-white px-2 py-2 text-center shadow-sm">
                             <div className="text-[17px] sm:text-[19px] font-black leading-none" style={{ color }}>{rack.tier}-{f.label}</div>
-                            <div className="text-[9.5px] font-semibold mt-1" style={{ color: "var(--text-muted)" }}>BOM: {rack.bom.primary}</div>
-                            <div className="mt-1.5 inline-flex items-center gap-1 text-[9.5px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: st.bg, color: st.fg }}>
-                              <span className="w-1.5 h-1.5 rounded-full" style={{ background: st.dot }} />{short > 0 && sl.status === "set" ? "Waiting for material" : st.label}
-                            </div>
-                            <div className="text-[10px] font-mono font-bold mt-1 truncate" style={{ color: m ? "var(--text-strong)" : "var(--text-faint, #94a3b8)" }}>{m ? (m.serialNo || "(no serial)") : "—"}</div>
-                            {m && (
-                              <div data-bom-ready={niN} className="text-[9px] font-bold mt-0.5" style={{ color: niN ? "#b45309" : "#15803d" }}>BOM Ready · {niN} Pending</div>
+                            {rack.bom.primary && rack.bom.primary !== `${rack.tier}-${f.label}` && (
+                              <div className="text-[9.5px] font-semibold mt-1" style={{ color: "var(--text-muted)" }}>BOM: {rack.bom.primary}</div>
                             )}
-                            {crateSt && (
-                              <div data-crate-state={crateSt} className="text-[9px] font-bold mt-0.5" style={{ color: crateSt === "filled" ? "#15803d" : crateSt === "pending" ? "#b45309" : "var(--text-dim)" }}>
-                                {crateSt === "filled" ? "✓ R crate filled" : crateSt === "pending" ? "R crate to fill" : "No R components yet"}
+                            <div className="mt-1.5 inline-flex items-center gap-1 text-[9.5px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap"
+                                 style={{ background: st.bg, color: st.fg }}
+                                 title={short > 0 && sl.status === "set" ? `Waiting for material — ${short} line${short === 1 ? "" : "s"} short in store` : st.label}>
+                              <span className="w-1.5 h-1.5 rounded-full" style={{ background: st.dot }} />{short > 0 && sl.status === "set" ? "Waiting for material" : st.short}
+                            </div>
+                            {/* Four steps, filled to where this rack has got
+                                to: Empty → Filled → In assembly → Assembled.
+                                An empty rack has nothing to show progress on. */}
+                            {sl.status !== "empty" && (
+                              <div className="flex gap-0.5 mt-1.5" aria-hidden="true" data-rack-progress={RACK_UNIT_STATUS_ORDER.indexOf(sl.status)}>
+                                {RACK_UNIT_STATUS_ORDER.map((k, i) => (
+                                  <span key={k} className="flex-1 h-1 rounded-full"
+                                        style={{ background: i <= RACK_UNIT_STATUS_ORDER.indexOf(sl.status) ? st.dot : "rgba(17,24,39,0.10)" }} />
+                                ))}
+                              </div>
+                            )}
+                            {m ? (
+                              <>
+                                <div className="text-[11px] font-mono font-black mt-1.5 truncate" style={{ color: "var(--text-strong)" }}
+                                     title={m.serialNo || "(no serial)"}>{m.serialNo || "(no serial)"}</div>
+                                <div data-bom-ready={niN} className="text-[9px] font-bold mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full"
+                                     style={niN ? { background: "rgba(217,119,6,0.12)", color: "#b45309" } : { background: "rgba(21,128,61,0.10)", color: "#15803d" }}
+                                     title={niN ? `BOM Ready · ${niN} Pending — parts still owed on this machine` : "Every BOM part was issued"}>
+                                  {niN ? `⏳ ${niN} part${niN === 1 ? "" : "s"} pending` : "✓ All parts issued"}
+                                </div>
+                              </>
+                            ) : (
+                              <div className="text-[9.5px] font-semibold mt-1.5" style={{ color: "var(--text-dim)" }}>Ready for a BOM</div>
+                            )}
+                            {/* What this rack needs next, in one line. */}
+                            {sl.status !== "empty" && (
+                              <div data-rack-next className="text-[9px] font-bold mt-1.5 truncate" style={{ color: "var(--text-muted)" }}
+                                   title="Tap the rack for the full BOM, stock and actions">
+                                {sl.status === "set"        ? "▸ Start assembly"
+                                 : sl.status === "assembling" ? "▸ Finish on the card"
+                                 : `▸ Transfer to ${(m && machineHandover(m) && machineHandover(m).toDepartment) || nextDepartment("Assembly") || "Mechanical"}`}
                               </div>
                             )}
                           </div>
