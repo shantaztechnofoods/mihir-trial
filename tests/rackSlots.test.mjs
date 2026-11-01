@@ -733,18 +733,19 @@ test("App: machine report, reachable from the card, and popups that always close
   const rep = app.slice(app.indexOf("function AtoZMachineReport("), app.indexOf("function ReportCenterPage("));
 
   // report: letterhead, facts, at-a-glance, numbered sections, red open issues, sign-off
-  assert.match(rep, /MACHINE PRODUCTION REPORT/);
+  assert.match(rep, /<div className="mr-doctitle">Machine production report<\/div>/);  // D1: sentence case, no capitals
   assert.match(rep, /getActiveCompany\(settings\)/);
   assert.match(rep, /data-report-glance/);
-  for (const t of ["1 · Critical parts fitted", "2 · Department journey", "3 · Trial certificate and results",
-                   "4 · Issues and pending jobs", "5 · Stage history", "6 · Attachments", "Release sign-off"])
-    assert.ok(rep.includes(t), t);
+  // 2026-11-01 (D1–D10) — engineering-document layout; numbered sections
+  for (const [n, t] of [["01", "Critical parts fitted"], ["02", "Department journey"], ["03", "Trial certificate and results"],
+                        ["04", "Issues and pending jobs"], ["05", "Stage history"], ["06", "Attachments"], ["07", "Release sign-off"]])
+    assert.match(rep, new RegExp(`n="${n}" title="${t}"`), `${n} ${t}`);
+  assert.match(rep, /Appendix A · Checklist answers/);
   assert.match(rep, /const jobs = \[\.\.\.openJobs\.slice\(\)\.sort\(byTime\), \.\.\.resolvedJobs\.slice\(\)\.sort\(byTime\)\];/);
-  assert.match(rep, /data-report-issue=\{p\.status === "resolved" \? "resolved" : "open"\}/);
-  assert.match(rep, /background: "rgba\(220,38,38,0\.06\)", border: "1\.5px solid rgba\(220,38,38,0\.55\)"/);
+  assert.match(rep, /data-report-issue=\{open \? "open" : "resolved"\} className=\{`mr-issue \$\{open \? "is-open" : "is-done"\}`\}/);
   assert.match(rep, /<JobHistory item=\{p\} users=\{allUsers\} compact \/>/, "how and when each issue was resolved");
-  // the existing evidence sections are still composed
-  for (const s of ["<CriticalParts />", "<Timeline />", "<TrialCertificate />", "<PendingJobsHistory />", "<StageHistory />", "<AttachmentsList />"])
+  // every evidence section is still composed, plus the checklist appendix
+  for (const s of ["<Hdr />", "<CriticalParts />", "<Journey />", "<TrialCertificate />", "<PendingJobsHistory />", "<StageHistory />", "<AttachmentsList />", "<SignOff />", "<ChecklistAppendix />"])
     assert.ok(rep.includes(s), s);
 
   // reachable from the tracker: Ready card + History panel, full-screen viewer with Back / Print / Close
@@ -766,4 +767,62 @@ test("App: machine report, reachable from the card, and popups that always close
   // popups fit the screen and become bottom sheets on phones
   assert.match(css, /\.mt-premium \.modal-backdrop > div \{\s*max-height: calc\(100dvh - 24px\);\s*overflow-y: auto;/);
   assert.match(css, /@media \(max-width: 639\.98px\) \{\s*\.mt-premium \.modal-backdrop \{\s*align-items: flex-end !important;/);
+});
+
+// 2026-11-01 — machine report, engineering-document layout (D1–D10). The
+// redesign must not drop anything the old report printed: every field below
+// was on the previous version and must still be read here. Plus the A4 rules.
+test("Machine report: every recorded field is still printed, and the A4 rules hold", async () => {
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
+  const app = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
+  const css = fs.readFileSync(path.join(root, "src/index.css"), "utf8");
+  const rep = app.slice(app.indexOf("function AtoZMachineReport("), app.indexOf("function ReportCenterPage("));
+
+  const mustRead = [
+    // header + references
+    "company.logo", "company.name", "company.address", "company.gst", "machine.serialNo", "machine.bomLabel",
+    "machine.createdDate", "machine.completedDate", "machine.rackSlot", "machine.issueId", "reportRef",
+    // critical parts
+    "ci.notIssued", "ci.remark", "ci.serials", "ci.confirmed", "r.via", "r.when", "otherLines",
+    // hand-overs
+    "h.sentAt", "h.acceptedAt", "h.acceptTimeoutMinutes", "h.expectedDurationMinutes", "h.actualDurationMinutes",
+    "h.overrunMinutes", "h.overrunNarration", "workerIdsOf(h)", "h.mainEmployeeId", "h.mainEmployeeSignatureSvg",
+    "h.workedBySnapshot", "rating.rating", "h.sentBy", "h.acceptedBy",
+    // checklists (all stages, every answer, remarks)
+    "a.label", "a.checked", "a.required", "a.remark", "cr.templateName", "cr.templateVersion", "cr.submittedAt", "cr.submittedBy",
+    "during_work",
+    // issues
+    "p.description", "p.itemCode", "p.itemName", "p.qty", "p.partSerialNo", "p.critical", "p.raisedInDepartment",
+    "p.raisedAt", "p.assignedDepartment", "p.raisedInHandoverId", "<JobHistory item={p}",
+    // trial certificate, stage history, attachments
+    "<TrialCertificateSheet machine={machine} cert={machine.trialCertificate} />", "h.stage", "h.note", "h.date",
+    "a.name", "a.department", "a.createdAt",
+  ];
+  for (const f of mustRead) assert.ok(rep.includes(f), `report still reads ${f}`);
+  // the Settings → Report Settings toggles still apply
+  for (const t of ["show.showEmployees", "show.showChecklists", "show.showRatings", "show.showPendingJobs"]) assert.ok(rep.includes(t), t);
+
+  // D10: one date style, durations in words, ratings as numbers
+  assert.match(rep, /hour12: false/);
+  assert.match(rep, /\{dur\(h\.actualDurationMinutes\)\} of \{dur\(h\.expectedDurationMinutes\)\}/);
+  assert.match(rep, /const rate = \(r\) =>/);
+  assert.doesNotMatch(rep, /formatRatingBadge\(/, "no star badges");
+  // D7: every captured signature at one size
+  assert.match(css, /\.mr-doc \.mr-sig svg \{ display: block; height: 30px; width: auto; max-width: 130px; \}/);
+
+  // D8: A4, running header via a repeating thead, page numbers, clean breaks, PDF named after the reference
+  assert.match(css, /@page machine-report \{\s*size: A4 portrait;/);
+  assert.match(css, /@bottom-right \{ content: "Page " counter\(page\) " of " counter\(pages\);/);
+  assert.match(css, /\.mr-doc \{ page: machine-report;/);
+  assert.match(rep, /<thead><tr><td><div className="mr-runhead">/);
+  assert.match(css, /\.mr-doc \.mr-appendix \{ break-before: page;/);
+  assert.match(css, /\.mr-doc \.mr-tr, \.mr-doc \.mr-issue, \.mr-doc \.mr-hop/);
+  assert.match(app, /printWithTitle\(machineReportRef\(m\), \{ bodyClass: "print-machine-report" \}\)/);
+  assert.match(app, /if \(tab === "machine"\) \{[\s\S]{0,500}?printWithTitle\(machineReportRef\(m\)\);/);
+
+  // D9: the same sheet in Report Center, labelled rows on a phone
+  assert.match(app, /<div className="mr-paper">\s*\n\s*<AtoZMachineReport/);
+  assert.match(css, /\.mr-doc \.mr-td\[data-l\]::before \{ content: attr\(data-l\);/);
 });
