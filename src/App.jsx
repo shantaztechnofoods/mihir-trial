@@ -83,7 +83,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-01-pending-items";
+const APP_BUILD = "2026-11-01-simple-nav";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -17720,7 +17720,9 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                   </div>
     );
   };
-  const listForTab = () => (mtTab === "pending" ? [] : mtTab === "transfer" ? active : filtered);
+  const listForTab = () => (mtTab === "pending" ? []
+    : mtTab === "transfer" ? (filter === "hold" ? onHold : filter === "pendingAccept" ? pendingAccept : active)
+    : filtered);
   // 2026-10-30 — Pending Jobs: every open job in the factory (a floor login
   // sees only what is assigned to its own departments), grouped by machine.
   const openJobsScoped = (pendingHandoverItems || [])
@@ -17996,36 +17998,6 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
             {bomOpen && <div className="px-4 pb-4">{bomSection}</div>}
           </div>
         )}
-
-        {/* ── Tabs (2026-10-30) ── Production: status tiles, rack, machines.
-            Transfer & Accept: what is waiting to be accepted or picked up,
-            plus every machine still moving through the line. */}
-        {(() => {
-          const waitingN = askableHandovers.length;
-          const tabs = [
-            { id: "production", label: "Production" },
-            { id: "transfer",   label: "Transfer & Accept", badge: waitingN },
-            { id: "pending",    label: "Pending Jobs", badge: openJobsScoped.length, badgeColor: "#dc2626" },
-          ];
-          return (
-            <div className="flex items-center gap-1 border-b overflow-x-auto" style={{ borderColor: "var(--border-subtle)" }} role="tablist">
-              {tabs.map((t) => (
-                <button key={t.id} type="button" role="tab" aria-selected={mtTab === t.id}
-                        onClick={() => setMtTab(t.id)}
-                        className="flex items-center gap-2 px-4 py-2.5 text-[12.5px] font-bold whitespace-nowrap transition-all -mb-px"
-                        style={mtTab === t.id
-                          ? { color: "#8a6a1f", borderBottom: "2px solid var(--mt-gold, #A8842C)", background: "var(--mt-gold-soft, rgba(168,132,44,0.10))" }
-                          : { color: "var(--text-dim)", borderBottom: "2px solid transparent" }}>
-                  {t.label}
-                  {t.badge > 0 && (
-                    <span className="min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-black text-white flex items-center justify-center"
-                          style={{ background: t.badgeColor || "#d97706" }}>{t.badge}</span>
-                  )}
-                </button>
-              ))}
-            </div>
-          );
-        })()}
 
         {/* ── Pending Jobs (2026-10-30) ──
             Every unfinished job and missing part, grouped by machine and serial
@@ -18508,38 +18480,40 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
             works off its own "My Work" buckets above and does not need the
             whole factory's counts — hidden to keep the phone view to the few
             machines that actually need the operator. */}
-        {mtTab === "production" && !isFloorLogin && (() => {
-          // A machine waiting on the rack for a production head to release it
-          // is NOT waiting to be accepted — nobody has been asked yet, so no
-          // acceptance clock runs on it and it is counted separately.
-          const awaitingRelease = pendingHandovers.filter(isAwaitingRelease);
-          const askedFor        = pendingHandovers.filter((h) => !isAwaitingRelease(h));
-          const pendingNotOverdue = askedFor.filter((h) => !isHoldOverdue(h.sentAt, h.acceptTimeoutMinutes, nowTick)).length;
-          // HOLD is derived, not stored: a handover is on hold once the
-          // receiving department has let its acceptance window pass. The old
-          // code showed this under "Overdue" and left a separate HOLD card
-          // hard-coded to 0, which meant the floor saw an alarm it could not
-          // act on and a card that never moved.
-          const holdCount = onHold.length;
+        {/* ── Summary boxes = the navigation (2026-11-01) ──
+            The three top tabs are gone. Each box both counts a bucket and
+            opens the screen where that bucket is worked:
+              Pending Acceptance / On HOLD → Transfer & Accept
+              On Rack / Active Builds / Ready → Production
+              Pending Jobs → Pending Jobs
+            Clicking the box you are already on goes back to all machines, so
+            there is never a filtered list with no way out. Every count comes
+            from the same list its click opens — and from the SCOPED lists, so
+            a floor login sees its own work and an admin sees the factory.
+            Shown to every role: with the tabs gone this is how the floor
+            navigates too. */}
+        {(() => {
           const cards = [
-            { key: "pendingAccept", label: "Pending Acceptance",  value: pendingNotOverdue, sub: "waiting for next dept",  color: "#b45309", bg: "rgba(217, 119, 6,0.08)" },
-            { key: "hold",          label: "On HOLD",            value: holdCount,         sub: "accept deadline passed", color: "#dc2626", bg: "rgba(239,68,68,0.1)"  },
-            { key: "onRack",        label: "On Rack",            value: awaitingRelease.length, sub: "awaiting head release", color: "#4338ca", bg: "rgba(99,102,241,0.08)" },
-            { key: "active",        label: "Active Builds",      value: active.length,       sub: "in production",           color: "#b45309", bg: "rgba(251,191,36,0.08)" },
-            // Ready is the final stage; "Completed" is no longer shown as one.
-            // Pending Jobs is NOT repeated here — it is a primary tab with its
-            // own live badge, and two controls for one list read as a bug.
-            { key: "completed",     label: "Ready",              value: completed.length,    sub: "finished — final stage",  color: "#15803d", bg: "rgba(34,197,94,0.08)" },
+            { key: "pendingAccept", tab: "transfer",   label: "Pending Acceptance", value: pendingAccept.length,   sub: "waiting for next dept",   color: "#b45309", strip: "status-strip-yellow" },
+            { key: "hold",          tab: "transfer",   label: "On HOLD",            value: onHold.length,          sub: "accept deadline passed",  color: "#dc2626", strip: "status-strip-red" },
+            { key: "onRack",        tab: "production", label: "On Rack",            value: onRackMachines.length,  sub: "awaiting head release",   color: "#4338ca", strip: "status-strip-purple" },
+            { key: "active",        tab: "production", label: "Active Builds",      value: active.length,          sub: "in production",           color: "#b45309", strip: "status-strip-blue" },
+            { key: "completed",     tab: "production", label: "Ready",              value: completed.length,       sub: "finished — final stage",  color: "#15803d", strip: "status-strip-green" },
+            { key: "jobs",          tab: "pending",    label: "Pending Jobs",       value: openJobsScoped.length,  sub: "parts & work still open", color: "#b91c1c", strip: "status-strip-red" },
           ];
           return (
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3" data-mt-nav>
               {cards.map((c) => {
-                const active = filter === c.key;
-                const stripCls = c.key === "active" ? "status-strip-blue" : c.key === "completed" ? "status-strip-green" : c.key === "hold" ? "status-strip-red" : c.key === "pendingAccept" ? "status-strip-yellow" : "status-strip-purple";
+                const isOn = mtTab === c.tab && (c.tab === "pending" || filter === c.key);
                 return (
-                  <button key={c.key} data-summary-card={c.key} onClick={() => { if (c.tab) { setMtTab(c.tab); return; } setMtTab("production"); setFilter(filter === c.key ? "all" : c.key); }}
-                          className={`kpi-tile status-strip ${stripCls} text-left`}
-                          style={active ? { borderColor: c.color, boxShadow: `0 0 0 1px ${c.color}, 0 4px 16px -4px ${c.color}55` } : {}}>
+                  <button key={c.key} data-summary-card={c.key} aria-current={isOn ? "page" : undefined}
+                          onClick={() => {
+                            if (isOn) { setMtTab("production"); setFilter("all"); return; }
+                            setMtTab(c.tab);
+                            if (c.tab !== "pending") setFilter(c.key);
+                          }}
+                          className={`kpi-tile status-strip ${c.strip} text-left`}
+                          style={isOn ? { borderColor: c.color, boxShadow: `0 0 0 1px ${c.color}, 0 4px 16px -4px ${c.color}55` } : {}}>
                     <div className="flex items-center justify-between mb-2">
                       <div className="text-[9.5px] font-bold uppercase tracking-[0.08em]" style={{ color: c.color }}>{c.label}</div>
                       <span className="w-2 h-2 rounded-full" style={{ background: c.color }} />
@@ -18988,26 +18962,30 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
         </div>
         )}
 
-        {/* ── Active filter bar ──
-            A summary card above sets the list filter (On HOLD, Active Builds,
-            Ready, …). Clicking the same card again clears it, and so does
-            "All Machines" or the ✕ on the chip — so the floor is never left
-            looking at a filtered list without knowing why. */}
-        {mtTab === "production" && (
-        <div className="flex items-center gap-2 flex-wrap" data-filter-bar>
-          <button type="button" data-filter-all onClick={() => setFilter("all")} aria-pressed={filter === "all"}
-                  className="mt-chip" data-on={filter === "all" ? "1" : "0"}>
-            All Machines ({started.length})
-          </button>
-          {filter !== "all" && (
-            <button type="button" data-filter-clear onClick={() => setFilter("all")}
-                    className="mt-chip mt-chip-active"
-                    title="Clear this filter and show every machine">
-              Showing {MT_FILTER_LABELS[filter] || filter} ({filtered.length}) · Clear ✕
-            </button>
-          )}
-        </div>
-        )}
+        {/* ── Which screen am I on ──
+            The boxes above are the navigation, so the list says plainly what
+            it is showing and how to get back to everything. */}
+        {(() => {
+          const view = mtTab === "transfer"
+            ? { title: "Transfer & Accept", sub: filter === "hold" ? "past the accept deadline" : filter === "pendingAccept" ? "waiting for the next department" : "every machine still moving through the line" }
+            : mtTab === "pending"
+            ? { title: "Pending Jobs", sub: "parts and work still open, by machine" }
+            : { title: MT_FILTER_LABELS[filter] || "All Machines",
+                sub: filter === "active"    ? "in production right now"
+                   : filter === "completed" ? "finished — Ready is the final stage"
+                   : filter === "onRack"    ? "assembled, waiting for a production head to transfer them"
+                   : "every machine that has started production" };
+          return (
+            <div className="flex items-baseline gap-2 flex-wrap" data-view-header>
+              <h2 className="text-[14px] font-black" style={{ color: "var(--text-strong)" }}>{view.title}</h2>
+              <span className="text-[11px]" style={{ color: "var(--text-dim)" }}>{view.sub}</span>
+              {(mtTab !== "production" || filter !== "all") && (
+                <button type="button" data-view-clear onClick={() => { setMtTab("production"); setFilter("all"); }}
+                        className="mt-chip ml-auto">All Machines ({started.length})</button>
+              )}
+            </div>
+          );
+        })()}
 
         {/* ── Empty state ── */}
         {mtTab !== "pending" && listForTab().length === 0 && (
@@ -19190,10 +19168,13 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                     {/* Actions — max-w-full so the row wraps on a phone instead
                         of being clipped by the card's overflow-hidden. */}
                     <div className="flex items-center gap-2 flex-wrap max-w-full">
-                      {/* Phase 1 — admin-only. Update Stage bypasses the entire
-                          handover chain; operators must use Finish & Transfer so
-                          the signature, checklist and rating are always captured. */}
-                      {!isComplete && futureStages.length > 0 && isAdminUser && canDo("machines","updateStage") && (
+                      {/* Phase 1 — admin-only, and only while the card is open
+                          (History). Update Stage bypasses the entire handover
+                          chain; operators must use Finish & Transfer so the
+                          signature, checklist and rating are always captured.
+                          Keeping it behind History takes the select + button
+                          off every card without removing the escape hatch. */}
+                      {isExpanded && !isComplete && futureStages.length > 0 && isAdminUser && canDo("machines","updateStage") && (
                         <>
                           <select value={selStage}
                                   onChange={(e) => setStageMap((p) => ({ ...p, [machine.id]: e.target.value }))}
@@ -19307,7 +19288,11 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                         // Same modal, same checks (checklist, team, password,
                         // hold reason) as Transfer & Accept; the modal and
                         // the accept handler refuse a second acceptance.
-                        const cardCanAccept = !!h && h.status === "pending" && canAcceptHandover(canDo, h.toDepartment) && !!onAcceptHandover;
+                        // 2026-11-01 — one Accept button per hand-over: it
+                        // belongs on Transfer & Accept, which is the screen
+                        // for exactly this. The Production card still shows
+                        // who is waiting and the deadline.
+                        const cardCanAccept = mtTab === "transfer" && !!h && h.status === "pending" && canAcceptHandover(canDo, h.toDepartment) && !!onAcceptHandover;
                         return (
                           <div className="flex items-center gap-2 flex-wrap">
                             {machineOverdue ? (
