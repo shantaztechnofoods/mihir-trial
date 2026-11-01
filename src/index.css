@@ -2800,3 +2800,51 @@ html, body, #root { background: var(--champagne-wash); }
     background-image: none !important;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Machine Tracker — popups that always fit, and a printable report (2026-11-01)
+
+   Every popup's card is held inside the visible screen and scrolls on its
+   own, so its buttons are never pushed out of reach. On a phone the popups
+   become bottom sheets — full width, rounded top, thumb-height buttons —
+   the same pattern the rack panel already uses. Scoped to the tracker.
+   ═══════════════════════════════════════════════════════════════════════ */
+.mt-premium .modal-backdrop > div {
+  max-height: calc(100dvh - 24px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+@media (max-width: 639.98px) {
+  .mt-premium .modal-backdrop {
+    align-items: flex-end !important;
+    padding: 0 !important;
+  }
+  .mt-premium .modal-backdrop > div {
+    width: 100% !important;
+    max-width: none !important;
+    max-height: 92dvh !important;
+    border-radius: 18px 18px 0 0 !important;
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+  /* Thumb-sized actions inside sheets. */
+  .mt-premium .modal-backdrop button { min-height: 40px; }
+  .mt-premium .modal-backdrop [data-modal-close] { min-height: 36px; }
+  /* Report: edge to edge on a phone. */
+  .mt-report-sheet { border-radius: 10px; }
+}
+
+/* The report prints alone: the rest of the tracker page is hidden and the
+   full-screen viewer becomes ordinary page flow. */
+@media print {
+  body.print-machine-report .mt-premium > :not(.mt-report-modal) { display: none !important; }
+  body.print-machine-report .mt-report-modal {
+    position: static !important; inset: auto !important; display: block !important;
+    background: #fff !important; backdrop-filter: none !important;
+  }
+  body.print-machine-report .mt-report-bar { display: none !important; }
+  body.print-machine-report .mt-report-modal > div { overflow: visible !important; padding: 0 !important; }
+  body.print-machine-report .mt-report-sheet {
+    max-width: none !important; box-shadow: none !important; padding: 0 !important; border-radius: 0 !important;
+  }
+  [data-report-issue="open"] { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

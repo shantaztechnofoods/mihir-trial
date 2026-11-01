@@ -414,7 +414,9 @@ test("App: Report Center navigation, seven reports, filters, exports and setting
   assert.match(app, /const departmentRows = DEPARTMENT_SEQUENCE/); assert.match(app, /const monthlyRows = \(\(\) => \{/); assert.match(app, /const ownerRows = \(\(\) => \{/);
   assert.match(app, /signatureImage: "", signatureLabel: "Authorised Signatory", pageSize: "A4", orientation: "portrait"/);
   assert.match(app, /@page \{ size: \$\{rc\.pageSize \|\| "A4"\} \$\{rc\.orientation \|\| "portrait"\}; margin: 12mm; \}/);
-  assert.match(app, /show\.showPendingJobs === false \|\| !machinePending\.length/);
+  // 2026-11-01 — the issues section always prints ("none recorded" when empty)
+  // so a reader can tell "no issues" from "section switched off".
+  assert.match(app, /if \(show\.showPendingJobs === false\) return null;/);
   // customer PDF is printed / saved, never linked
   assert.doesNotMatch(app, /share(able)? link/i);
 });
@@ -718,4 +720,50 @@ test("App: machine card carries no duplicate progress indicators", async () => {
   for (const keep of ["DISPLAY_STAGES.map((stage, idx)", "DELAYED ${formatDuration(t.overrunMinutes)}", "paused — closed day",
                       "Report Issue", "Finish & Transfer →", "data-card-jobs", "data-cert-edit", '{isExpanded ? "Hide" : "History"}'])
     assert.ok(app.includes(keep), `${keep} still present`);
+});
+
+// 2026-11-01 — a company-level machine report reachable from the machine
+// itself, and Machine Tracker popups that fit every screen with a way out.
+test("App: machine report, reachable from the card, and popups that always close", async () => {
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
+  const app = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
+  const css = fs.readFileSync(path.join(root, "src/index.css"), "utf8");
+  const rep = app.slice(app.indexOf("function AtoZMachineReport("), app.indexOf("function ReportCenterPage("));
+
+  // report: letterhead, facts, at-a-glance, numbered sections, red open issues, sign-off
+  assert.match(rep, /MACHINE PRODUCTION REPORT/);
+  assert.match(rep, /getActiveCompany\(settings\)/);
+  assert.match(rep, /data-report-glance/);
+  for (const t of ["1 · Critical parts fitted", "2 · Department journey", "3 · Trial certificate and results",
+                   "4 · Issues and pending jobs", "5 · Stage history", "6 · Attachments", "Release sign-off"])
+    assert.ok(rep.includes(t), t);
+  assert.match(rep, /const jobs = \[\.\.\.openJobs\.slice\(\)\.sort\(byTime\), \.\.\.resolvedJobs\.slice\(\)\.sort\(byTime\)\];/);
+  assert.match(rep, /data-report-issue=\{p\.status === "resolved" \? "resolved" : "open"\}/);
+  assert.match(rep, /background: "rgba\(220,38,38,0\.06\)", border: "1\.5px solid rgba\(220,38,38,0\.55\)"/);
+  assert.match(rep, /<JobHistory item=\{p\} users=\{allUsers\} compact \/>/, "how and when each issue was resolved");
+  // the existing evidence sections are still composed
+  for (const s of ["<CriticalParts />", "<Timeline />", "<TrialCertificate />", "<PendingJobsHistory />", "<StageHistory />", "<AttachmentsList />"])
+    assert.ok(rep.includes(s), s);
+
+  // reachable from the tracker: Ready card + History panel, full-screen viewer with Back / Print / Close
+  assert.match(app, /data-card-report=\{machine\.id\} onClick=\{\(\) => setReportMachineId\(machine\.id\)\}/);
+  assert.match(app, /data-history-report=\{machine\.id\} onClick=\{\(\) => setReportMachineId\(machine\.id\)\}/);
+  assert.match(app, /data-report-back onClick=\{\(\) => setReportMachineId\(null\)\}/);
+  assert.match(app, /data-report-print onClick=\{printMachineReport\}/);
+  assert.match(app, /checklistResponses=\{checklistResponses\}\s*\n?\s*outwardLog=\{outwardLog\}/);
+  assert.match(app, /machines:\s+<MachinePage\s+machineLog=\{machineLog\} checklistResponses=\{checklistResponses\}/);
+  assert.match(css, /body\.print-machine-report \.mt-premium > :not\(\.mt-report-modal\) \{ display: none !important; \}/);
+
+  // every tracker popup that lacked one now has a visible close, disabled while saving
+  for (const close of ["setJobAction(null)} disabled={!!jobAction.busy}", "setFinishModal(null)} disabled={transferBusy}",
+                       "setAcceptModal(null)} disabled={!!busy}", "setDuringWorkModal(null)} disabled={!!busy}",
+                       "<ModalX onClose={() => setRemoveRackConfirm(null)} />", "<ModalX disabled={raiseBusy}"])
+    assert.ok(app.includes(close), close);
+  // Escape closes the top-most popup; declared after the last popup state it reads
+  assert.ok(app.indexOf('if (e.key !== "Escape") return;') > app.indexOf("const [rackPanel, setRackPanel] = useState(null);"));
+  // popups fit the screen and become bottom sheets on phones
+  assert.match(css, /\.mt-premium \.modal-backdrop > div \{\s*max-height: calc\(100dvh - 24px\);\s*overflow-y: auto;/);
+  assert.match(css, /@media \(max-width: 639\.98px\) \{\s*\.mt-premium \.modal-backdrop \{\s*align-items: flex-end !important;/);
 });

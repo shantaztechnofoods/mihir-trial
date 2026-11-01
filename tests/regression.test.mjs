@@ -368,7 +368,8 @@ const USER_FACING_STRINGS = [
   // "One machine"; the report's own heading is unchanged.
   "A-to-Z Machine Report",
   "One machine",
-  "Department Timeline",
+  // 2026-11-01 — formal, numbered report section titles
+  "Department journey",
   "Stage History",
   // 2026-10-29 report rework. "BOM Components" and "Materials Issued" were
   // deliberately removed: the full BOM already lives on the BOM screen, and
@@ -384,7 +385,7 @@ const USER_FACING_STRINGS = [
   "but the quantity to issue is now 0",
   "onWheel",
   "did not leave stores",
-  "Critical Parts Fitted",
+  "Critical parts fitted",
   "Serial numbers / verification",
   "Given later from Pending Stock",
   "Material arrived",
