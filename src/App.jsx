@@ -83,7 +83,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-01-rack-pullback";
+const APP_BUILD = "2026-11-01-declutter";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -18658,11 +18658,11 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                     machine card. */}
                                 {sl.status === "assembling" && (
                                   <div className="mt-1.5" data-rack-progress="assembling">
-                                    <div className="h-1 rounded-full overflow-hidden" style={{ background: "rgba(17,24,39,0.10)" }}>
-                                      <div className="h-full rounded-full" style={{ width: niN ? "60%" : "85%", background: st.dot }} />
-                                    </div>
-                                    <div className="text-[9px] font-bold mt-0.5" style={{ color: "var(--text-dim)" }}>
-                                      Assembly in progress{inAssemblyFor ? ` · ${inAssemblyFor}` : ""}
+                                    {/* 2026-11-01 (C3) — the old bar had a fixed
+                                        width, not measured progress. What is
+                                        measured is the time on the bench. */}
+                                    <div className="text-[9.5px] font-bold" style={{ color: st.fg }}>
+                                      ⏱ {inAssemblyFor || "just started"} on the bench
                                     </div>
                                   </div>
                                 )}
@@ -19168,24 +19168,15 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                       <div className="min-w-0">
                         <div className="text-sm font-bold text-slate-900">{machine.bomLabel}</div>
                         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                          <span className="text-[10px] font-mono text-blue-400 font-bold">S/N: {machine.serialNo}</span>
+                          <span className="text-[11px] font-mono font-black" style={{ color: "var(--text-strong)" }}
+                                title={`Started ${machine.createdDate}${machine.completedDate ? ` · Ready ${machine.completedDate}` : ""}`}>S/N: {machine.serialNo}</span>
                           <span className="text-[9px] font-bold px-2 py-0.5 rounded-full"
                                 style={{ background: stageColor + "18", color: stageColor, border: `1px solid ${stageColor}35` }}>
                             {dispStage}
                           </span>
-                          {/* "4/6 — 60%" read as an arithmetic error, because the
-                              two numbers count different things: 4 of 6 is which
-                              STAGE the machine is at, 60% is how far along the
-                              five GAPS between them it has travelled. Both are
-                              right and 4/6 is not 60%, so side by side they
-                              looked broken. The bar below already carries the
-                              percentage; this chip now carries only the step. */}
-                          {dispIdx >= 0 && (
-                          <span className="text-[9px] font-bold px-2 py-0.5 rounded-full"
-                                style={{ background: "rgba(17,24,39,0.04)", color: "#6b7280", border: "1px solid var(--border-rim)" }}>
-                            Stage {dispIdx + 1} of {DISPLAY_STAGES.length}
-                          </span>
-                          )}
+                          {/* 2026-11-01 — the "Stage X of 4" chip and the % bar
+                              both repeated the stepper beside them; the stepper
+                              alone says where the machine is. */}
                           {arrivedItems.length > 0 && (
                             <span className="text-[9px] font-bold px-2 py-0.5 rounded-full"
                                   title={arrivedItems.map((a) => `${a.itemName || a.itemCode}${a.qty ? ` ×${a.qty}` : ""}`).join(", ")}
@@ -19194,7 +19185,9 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                             </span>
                           )}
                         </div>
-                        <div className="text-[10px] text-slate-600 mt-0.5">Started {machine.createdDate}{machine.completedDate ? ` · Ready ${machine.completedDate}` : ""}</div>
+                        {isComplete && machine.completedDate && (
+                          <div className="text-[10px] font-bold mt-0.5" style={{ color: "#15803d" }}>Ready {machine.completedDate}</div>
+                        )}
                         {/* 2026-10-30 — live department timer: working time only
                             (Tuesdays and holidays pause it), the BOM target, the
                             deadline, and a delay alert once the target is passed. */}
@@ -19208,23 +19201,15 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                           const dueTxt = due ? `${fmtDate(due)} ${due.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "";
                           return (
                             <div className="flex items-center gap-1.5 flex-wrap mt-1 text-[10px]">
-                              <span className="font-bold px-2 py-0.5 rounded-full" title={`Working time in ${dept} · target ${formatDuration(target)}`}
+                              <span className="font-bold px-2 py-0.5 rounded-full" title={`Working time in ${dept} · target ${formatDuration(target)}${due && !t.isOverrun ? ` · due ${dueTxt}` : ""}`}
                                     style={t.isOverrun ? { background: "rgba(239,68,68,0.1)", color: "#b91c1c", border: "1px solid rgba(239,68,68,0.35)" } : { background: "rgba(21,128,61,0.08)", color: "#15803d", border: "1px solid rgba(21,128,61,0.3)" }}>
                                 ⏱ {formatDuration(t.actualMinutes)} / {formatDuration(target)}
                                 {t.isOverrun ? ` · DELAYED ${formatDuration(t.overrunMinutes)}` : ""}
                               </span>
-                              {due && !t.isOverrun && <span className="text-slate-500">due {dueTxt}</span>}
                               {closedToday && <span className="font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(99,102,241,0.1)", color: "#4338ca" }}>⏸ paused — closed day</span>}
                             </div>
                           );
                         })()}
-                        <div className="flex items-center gap-2 mt-1.5">
-                          <div className="w-28 h-1 rounded-full overflow-hidden" style={{ background: "rgba(17,24,39,0.06)" }}>
-                            <div className="h-full rounded-full transition-all duration-500"
-                                 style={{ width: `${pct}%`, background: isComplete ? "#22c55e" : stageColor }} />
-                          </div>
-                          <span className="text-[9px] font-mono font-bold" style={{ color: isComplete ? "#15803d" : stageColor }}>{pct}%</span>
-                        </div>
                       </div>
                     </div>
 

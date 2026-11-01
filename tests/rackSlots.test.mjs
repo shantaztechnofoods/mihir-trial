@@ -629,7 +629,9 @@ test("App: rack crate face is condition-aware and the panel is untouched", async
 
   // assembly progress and missing parts, only where they belong
   assert.match(face, /sl\.status === "assembling" && \([\s\S]{0,420}?data-rack-progress="assembling"/);
-  assert.match(face, /Assembly in progress\{inAssemblyFor/);
+  // 2026-11-01 (C3): measured bench time only — no fixed-width bar
+  assert.match(face, /⏱ \{inAssemblyFor \|\| "just started"\} on the bench/);
+  assert.doesNotMatch(app, /width: niN \? "60%" : "85%"/);
   assert.match(face, /\$\{niN\} part\$\{niN === 1 \? "" : "s"\} missing/);
   assert.match(face, /\(sl\.status === "set" \|\| sl\.status === "assembling"\) && \(/);
 
@@ -697,4 +699,23 @@ test("App: Pull Back is offered in the rack panel and on the card, with no lock"
   assert.match(fn, /type: "handover_pulled_back"/);
   // wasOnHold is an audit fact about the past, not a state that blocks anything
   assert.doesNotMatch(fn.replace(/wasOnHold/g, ""), /locked|blocked|\bonHold:|\bhold:/i, "pull back sets no lock or hold");
+});
+
+// 2026-11-01 — the machine card shows one statement of progress (the stepper).
+// The "Stage X of 4" chip, the % bar and the always-on Started line repeated
+// it; Started/Ready dates live in the serial's tooltip and in History.
+test("App: machine card carries no duplicate progress indicators", async () => {
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
+  const app = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
+  assert.doesNotMatch(app, /Stage \{dispIdx \+ 1\} of \{DISPLAY_STAGES\.length\}/);
+  assert.doesNotMatch(app, /\{pct\}%<\/span>/);
+  assert.doesNotMatch(app, /<span className="text-slate-500">due \{dueTxt\}<\/span>/);
+  assert.match(app, /title=\{`Started \$\{machine\.createdDate\}/);
+  assert.match(app, /· due \$\{dueTxt\}/, "due time kept in the timer tooltip");
+  // the stepper, timer, delay and every action are still there
+  for (const keep of ["DISPLAY_STAGES.map((stage, idx)", "DELAYED ${formatDuration(t.overrunMinutes)}", "paused — closed day",
+                      "Report Issue", "Finish & Transfer →", "data-card-jobs", "data-cert-edit", '{isExpanded ? "Hide" : "History"}'])
+    assert.ok(app.includes(keep), `${keep} still present`);
 });
