@@ -197,7 +197,11 @@ test("App: independent M/R units, BOM Outward rack picker, remove, release scope
   assert.match(app, /if \(!canFinishTransfer\(authCanDo\)\) return \{ success: false/);
   // Not issued with a reason does not block a rack
   assert.match(app, /const rackIncomplete = \(\) => enriched\.filter\(\(i\) => !skippedCodes\.has\(i\.code\) && \(!isItemChecked\(i\.code\) \|\| !i\.inv \|\| i\.pendingQty > 0 \|\| i\.issueQty < i\.required\)\);/);
-  assert.match(app, /BOM Ready · \{niN\} Pending/);
+  // 2026-11-01 — the crate face states the same fact in fewer words; the
+  // count still rides on data-bom-ready and the long form is the tooltip.
+  assert.match(app, /data-bom-ready=\{niN\}/);
+  assert.match(app, /BOM Ready · \$\{niN\} Pending — parts still owed on this machine/);
+  assert.match(app, /\$\{niN\} part\$\{niN === 1 \? "" : "s"\} pending/);
   assert.match(app, /const mv = await handleUpdateStock\(cat, p\.itemCode, -qty, ref\);/);
   assert.match(app, /data-pending-action="issue"/);
 });
@@ -592,4 +596,43 @@ test("App: Machine Tracker navigation is the summary boxes, for staff and admin 
   assert.match(app, /Production Rack View/);
   for (const keep of ["Report Issue", "Finish & Transfer →", "data-card-jobs", "data-open-reports", "✓ Accept Machine"])
     assert.ok(app.includes(keep), `${keep} still present`);
+});
+
+// 2026-11-01 — the rack crate face. Same squares, sizes, colours, names and
+// layout; what is printed on them is now ordered (rack → state → machine →
+// what is missing → what is next) and conditional on the rack's own state.
+test("App: rack crate face is condition-aware and the panel is untouched", async () => {
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
+  const app = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
+  const css = fs.readFileSync(path.join(root, "src/index.css"), "utf8");
+  const face = app.slice(app.indexOf("Crate face (2026-11-01)"), app.indexOf("Rack details panel"));
+
+  // unchanged shell: same button, same crate classes, same name plate, same click
+  assert.match(app, /className="rack-crate text-left rounded-xl p-2 pt-3\.5 relative focus-visible:ring-2"/);
+  assert.match(app, /onClick=\{\(\) => setRackPanel\(sl\.id\)\}/);
+  assert.match(face, /\{rack\.tier\}-\{f\.label\}/);
+  assert.match(app, /w-fit text-\[10px\] font-black px-2 py-0\.5 rounded bg-white\/90[\s\S]{0,120}\{rack\.tier\}-\{f\.label\} \(\{sl\.position\}\)/);
+  assert.match(css, /\.rack-crate \{[\s\S]*?min-height: 132px;/, "crate size unchanged");
+
+  // ordered, conditional content
+  assert.match(face, /data-rack-progress=\{RACK_UNIT_STATUS_ORDER\.indexOf\(sl\.status\)\}/);
+  assert.match(face, /\{m \? \(/, "serial and parts only when a machine is on the rack");
+  assert.match(face, /Ready for a BOM/, "an empty rack says so instead of showing a dash");
+  assert.match(face, /\{sl\.status !== "empty" && \([\s\S]{0,400}?data-rack-next/);
+  for (const action of ["▸ Start assembly", "▸ Finish on the card", "▸ Transfer to \\$\\{\\(m && machineHandover\\(m\\)"])
+    assert.match(face, new RegExp(action), `next action: ${action}`);
+  // the duplicate "BOM: M-10" under a rack called M-10 only prints when it differs
+  assert.match(face, /rack\.bom\.primary !== `\$\{rack\.tier\}-\$\{f\.label\}`/);
+  // status wording and the material warning are the existing ones
+  // same rule as before, with the short status word so every crate is one height
+  assert.match(face, /short > 0 && sl\.status === "set" \? "Waiting for material" : st\.short/);
+  assert.match(face, /title=\{short > 0 && sl\.status === "set" \? `Waiting for material/);
+
+  // logic, handlers and the details panel are untouched
+  for (const keep of ["const handleFillRack", "setRackPanel(sl.id)", "Rack details panel", "rackPanelTab === \"bom\"",
+                      "Stock Status", "notIssuedOpenFor(m)", "pendingForMachine(m)"])
+    assert.ok(app.includes(keep), `${keep} still present`);
+  assert.doesNotMatch(face, /handleUpdateStock|createMachine|onStartProduction|onReleaseHandover/, "the face renders, it does not act");
 });
