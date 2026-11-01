@@ -672,3 +672,29 @@ test("App: itemByCode is page-scoped, so the rack crate face can read stock", as
   assert.equal((app.match(/bomFillCheck\(rack\.bom\.primary, bomDefs, \(c\) => itemByCode\[c\]\)/g) || []).length, 2,
     "both the face and the panel use the same lookup");
 });
+
+// 2026-11-01 — Pull Back from the rack details panel: the same modal, the same
+// admin permission and the same handler as the Production card, which keeps
+// its own button. Pull Back cancels a pending hand-over and locks nothing.
+test("App: Pull Back is offered in the rack panel and on the card, with no lock", async () => {
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
+  const app = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
+  // rack panel
+  assert.match(app, /\{ho && isAdminUser && onPullBackHandover && \(\s*<button type="button" data-action="pullback"/);
+  assert.match(app, /onClick=\{\(\) => \{ setRackPanel\(null\); setPullBack\(\{ handover: ho, reason: "", busy: false, error: "" \}\); \}\}/);
+  // the card keeps its button(s)
+  assert.ok((app.match(/isAdminUser && onPullBackHandover && \(/g) || []).length >= 3, "card + transfer list + rack panel");
+  // one modal, above the rack panel
+  assert.equal((app.match(/\{pullBack && \(\(\) => \{/g) || []).length, 1);
+  assert.match(app, /modal-backdrop fixed inset-0 z-\[72\][\s\S]{0,200}?!pullBack\.busy && setPullBack\(null\)/);
+  // the handler cancels the hand-over and adds history; it sets no lock/hold flag
+  const start = app.indexOf("const handlePullBackHandover");
+  const fn = app.slice(start, app.indexOf("\n  const ", start + 10));
+  assert.match(fn, /status: "cancelled"/);
+  assert.match(fn, /pendingHandoverId: null/);
+  assert.match(fn, /type: "handover_pulled_back"/);
+  // wasOnHold is an audit fact about the past, not a state that blocks anything
+  assert.doesNotMatch(fn.replace(/wasOnHold/g, ""), /locked|blocked|\bonHold:|\bhold:/i, "pull back sets no lock or hold");
+});

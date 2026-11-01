@@ -83,7 +83,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-01-rack-actions-fix";
+const APP_BUILD = "2026-11-01-rack-pullback";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -18941,6 +18941,22 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                         </div>
                       ))}
                     </div>
+                    {/* 2026-11-01 — Pull Back from the rack. The same action,
+                        permission (admin) and modal as the Production card:
+                        it cancels the pending hand-over, keeps the machine on
+                        this rack in Assembly and writes the history + audit.
+                        It locks nothing — the machine can be finished and
+                        sent again straight away, and no department's work,
+                        transfer, acceptance or stage update is held up. */}
+                    {ho && isAdminUser && onPullBackHandover && (
+                      <button type="button" data-action="pullback"
+                              onClick={() => { setRackPanel(null); setPullBack({ handover: ho, reason: "", busy: false, error: "" }); }}
+                              title="Admin: cancel this hand-over and return the machine to Assembly on this rack"
+                              className="w-full rounded-lg px-3 py-2 text-[11.5px] font-bold"
+                              style={{ color: "#b91c1c", border: "1px solid rgba(185,28,28,0.3)", background: "rgba(185,28,28,0.04)" }}>
+                        ↩ Pull Back — return {m && (m.serialNo || m.bomKey)} to Assembly
+                      </button>
+                    )}
                     {canRemove && (
                       <button type="button" data-action="remove"
                               onClick={() => { setRackPanel(null); setRemoveRackConfirm({ machineId: m.id, serialNo: m.serialNo, bomKey: m.bomKey }); }}
