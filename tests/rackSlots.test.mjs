@@ -302,7 +302,9 @@ test("App: Accept Machine on the card reuses the accept modal and refuses duplic
   const path = await import("node:path");
   const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
   const app = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
-  assert.match(app, /const cardCanAccept = !!h && h\.status === "pending" && canAcceptHandover\(canDo, h\.toDepartment\) && !!onAcceptHandover;/);
+  // 2026-11-01 — the card's Accept button now renders only on Transfer &
+  // Accept; the Production card no longer repeats it.
+  assert.match(app, /const cardCanAccept = mtTab === "transfer" && !!h && h\.status === "pending" && canAcceptHandover\(canDo, h\.toDepartment\) && !!onAcceptHandover;/);
   assert.match(app, /data-card-accept=\{h\.id\}\n\s+onClick=\{\(\) => \{ if \(!acceptModal\) openAcceptModal\(h\); \}\}/);
   assert.match(app, /if \(!live \|\| live\.status !== "pending"\) \{ setAcceptModal\(null\); showToast\("Already accepted"/);
   // the Transfer & Accept section still offers its own button
@@ -380,9 +382,10 @@ test("App: trial certificate confirmation-only gate, edit-later path, On Hold fi
   assert.match(app, /onSubmit=\{trialCertModal\.editOnly \? saveTrialCertificate : submitTrialCertificate\}/);
   assert.match(app, /const handleUpdateTrialCertificate = async \(machineId, cert\) => \{/);
   assert.match(app, /data-cert-edit onClick=\{\(\) => setTrialCertModal\(\{ machine, editOnly: true \}\)\}/);
-  // On Hold: card count == filter list; card click switches to the production tab
-  assert.match(app, /const holdCount = onHold\.length;/);
-  assert.match(app, /setMtTab\("production"\); setFilter\(filter === c\.key \? "all" : c\.key\);/);
+  // On Hold: the box counts the same list its click opens (Transfer & Accept,
+  // hold filter), and clicking it again returns to all machines.
+  assert.match(app, /\{ key: "hold",\s+tab: "transfer",\s+label: "On HOLD",\s+value: onHold\.length,/);
+  assert.match(app, /mtTab === "transfer" \? \(filter === "hold" \? onHold : filter === "pendingAccept" \? pendingAccept : active\)/);
   assert.match(app, /h\.status === "pending" && \(h\.id === m\.pendingHandoverId \|\| String\(h\.machineId\) === String\(m\.id\)\)/);
 });
 
@@ -466,17 +469,20 @@ test("App: Machine Tracker — Ready is the final stage, filters clear, cards ar
   // the status column itself is untouched — history and rack guards read it
   assert.match(app, /const isComplete = machine\.status === "completed";/);
 
-  // 2 — three primary tabs; Pending Jobs is a tab, not also a summary box
-  for (const id of ["production", "transfer", "pending"]) assert.match(app, new RegExp(`\\{ id: "${id}",`));
-  assert.doesNotMatch(app, /key: "jobs",\s+label: "Pending Jobs"/, "no duplicate Pending Jobs summary card");
-  assert.match(app, /xl:grid-cols-5 gap-3/, "five summary cards");
-  assert.match(app, /\{ key: "completed",\s+label: "Ready",/);
+  // 2 — the three screens are reached from the summary boxes; no tab row
+  // the page-level tab row is gone (the Rack View panel keeps its own tabs)
+  assert.doesNotMatch(app, /\{ id: "transfer",\s+label: "Transfer & Accept"/, "the Machine Tracker tab row is gone");
+  assert.doesNotMatch(app, /\{ id: "pending",\s+label: "Pending Jobs"/);
+  for (const [key, tab] of [["pendingAccept", "transfer"], ["hold", "transfer"], ["onRack", "production"],
+                            ["active", "production"], ["completed", "production"], ["jobs", "pending"]])
+    assert.match(app, new RegExp(`\\{ key: "${key}",\\s+tab: "${tab}",`), `${key} box opens ${tab}`);
+  assert.match(app, /xl:grid-cols-6 gap-3" data-mt-nav/);
+  assert.match(app, /\{ key: "completed",\s+tab: "production", label: "Ready",/);
 
   // 3 — On Hold (and every other card filter) toggles and can be cleared
-  assert.match(app, /const holdCount = onHold\.length;/);
-  assert.match(app, /setMtTab\("production"\); setFilter\(filter === c\.key \? "all" : c\.key\);/);
-  assert.match(app, /data-filter-all onClick=\{\(\) => setFilter\("all"\)\}/);
-  assert.match(app, /data-filter-clear onClick=\{\(\) => setFilter\("all"\)\}/);
+  assert.match(app, /\{ key: "hold",\s+tab: "transfer",\s+label: "On HOLD",\s+value: onHold\.length,/);
+  assert.match(app, /if \(isOn\) \{ setMtTab\("production"\); setFilter\("all"\); return; \}/);
+  assert.match(app, /data-view-clear onClick=\{\(\) => \{ setMtTab\("production"\); setFilter\("all"\); \}\}/);
   assert.match(app, /const MT_FILTER_LABELS = \{[\s\S]*?hold: "On HOLD"/);
 
   // 4 — one card, no repeated actions; the working ones are all still there
@@ -548,4 +554,42 @@ test("App + migration 052: pending items added at BOM Outward", async () => {
   assert.match(sql, /ADD COLUMN IF NOT EXISTS source\s+text;/);
   for (const forbidden of [/DROP TABLE/, /DELETE FROM/, /TRUNCATE/, /CREATE POLICY/, /ALTER POLICY/, /DROP POLICY/])
     assert.doesNotMatch(sql, forbidden, `migration never ${forbidden}`);
+});
+
+// 2026-11-01 — one way in. The three top tabs are gone; the summary boxes are
+// the navigation for every role, each box opening the screen where its bucket
+// is worked. Accept lives on Transfer & Accept only, and Update Stage (an
+// admin correction) is behind History instead of on every card.
+test("App: Machine Tracker navigation is the summary boxes, for staff and admin alike", async () => {
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
+  const app = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
+
+  // no tab row; boxes carry all three destinations and are shown to every role
+  assert.doesNotMatch(app, /\{ id: "production", label: "Production" \}/);
+  assert.match(app, /data-mt-nav/);
+  const nav = app.slice(app.indexOf("Summary boxes = the navigation"), app.indexOf("data-mt-nav") + 2000);
+  assert.ok(!/isFloorLogin/.test(nav.slice(0, nav.indexOf("data-mt-nav"))), "the nav is not hidden from a floor login");
+  for (const tab of ["transfer", "production", "pending"]) assert.ok(nav.includes(`tab: "${tab}"`), `a box opens ${tab}`);
+
+  // counts come from the same scoped lists the click opens
+  assert.match(app, /value: pendingAccept\.length,/);
+  assert.match(app, /value: onHold\.length,/);
+  assert.match(app, /value: onRackMachines\.length,/);
+  assert.match(app, /value: openJobsScoped\.length,/);
+
+  // the box you are on takes you back to all machines
+  assert.match(app, /const isOn = mtTab === c\.tab && \(c\.tab === "pending" \|\| filter === c\.key\);/);
+  assert.match(app, /aria-current=\{isOn \? "page" : undefined\}/);
+  assert.match(app, /data-view-header/);
+
+  // Accept: Transfer & Accept only
+  assert.match(app, /const cardCanAccept = mtTab === "transfer" &&/);
+  // Update Stage: admin-only AND behind History
+  assert.match(app, /\{isExpanded && !isComplete && futureStages\.length > 0 && isAdminUser && canDo\("machines","updateStage"\)/);
+  // untouched: Rack View and the actions the floor works with
+  assert.match(app, /Production Rack View/);
+  for (const keep of ["Report Issue", "Finish & Transfer →", "data-card-jobs", "data-open-reports", "✓ Accept Machine"])
+    assert.ok(app.includes(keep), `${keep} still present`);
 });
