@@ -225,8 +225,16 @@ export function rackViewLog(machineLog = [], handovers = []) {
   const released = new Set((handovers || [])
     .filter((h) => h && h.releaseRequired && h.releasedAt && h.status !== "cancelled")
     .map((h) => String(h.machineId)));
-  if (released.size === 0) return machineLog || [];
-  return (machineLog || []).map((m) => (m && m.rackSlot && released.has(String(m.id)) && m.stage === "Assembly" ? { ...m, rackSlot: null } : m));
+  // 2026-11-01 — a machine that has left for production frees its rack on
+  // sight, whatever its stored rack_slot still says: a released Assembly
+  // machine as before, and any machine whose stage is past the rack (it is
+  // being worked in Mechanical, Electrical, Trial, or it is Ready). Display
+  // only — nothing is written, and the rack is just shown empty again.
+  const offRack = (m) => m && m.rackSlot && (
+    (released.has(String(m.id)) && m.stage === "Assembly")
+    || (m.stage !== "BOM Issued" && m.stage !== "Assembly")
+    || m.status === "completed");
+  return (machineLog || []).map((m) => (offRack(m) ? { ...m, rackSlot: null } : m));
 }
 
 // Can `bomKey` be issued as one complete crate? The BOM must exist, be live,

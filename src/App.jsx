@@ -83,7 +83,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-01-issues-tracking";
+const APP_BUILD = "2026-11-01-rack-actions";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -18577,6 +18577,33 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                       const color = RACK_UNIT_COLORS[`${rack.tier}-${f.label}`] || f.color;
                       const st = RACK_UNIT_STATUS[sl.status] || RACK_UNIT_STATUS.empty;
                       const short = m ? pendingForMachine(m).length : 0;
+                      // 2026-11-01 — the two actions a rack ever needs are on
+                      // its face: Fill Rack while it is empty, Send to
+                      // Mechanical once the machine on it is assembled. Both
+                      // call the same handlers as the details panel, with the
+                      // same permission checks; the panel keeps every action.
+                      const faceFillChk  = sl.status === "empty" ? bomFillCheck(rack.bom.primary, bomDefs, (c) => itemByCode[c]) : null;
+                      const faceCanFill  = !!faceFillChk && faceFillChk.ok && canDo("outward", "bom") && !!onFillRack;
+                      const faceFillWhy  = !faceFillChk ? "" : !faceFillChk.ok ? faceFillChk.why : !canDo("outward", "bom") ? "You do not have permission to issue a BOM" : "";
+                      const faceHo       = sl.status === "assembled" && m ? (handovers || []).find((h) => h && h.status === "pending" && String(h.machineId) === String(m.id)) : null;
+                      const faceCanSend  = !!faceHo && (canDo("machines", "release") || isAdminUser) && !!onReleaseHandover;
+                      // How long this machine has been in assembly, from the
+                      // department clock the tracker already keeps.
+                      const inAssemblyFor = m && m.departmentEnteredAt
+                        ? formatDuration(computeOverrun(m.departmentEnteredAt, 0, nowTick).actualMinutes) : "";
+                      const faceFill = (e) => {
+                        e.stopPropagation();
+                        const r = onFillRack(sl.id, rack.bom.primary);
+                        if (!r || r.success === false) { showToast("Cannot fill this rack", (r && r.error) || "", "urgent"); return; }
+                        if (!bomOpen) toggleBom();
+                        setTimeout(() => { try { document.getElementById("mt-bom-section")?.scrollIntoView({ behavior: "smooth", block: "start" }); } catch {} }, 60);
+                      };
+                      const faceSend = async (e) => {
+                        e.stopPropagation();
+                        const r = await onReleaseHandover(faceHo.id);
+                        if (r && r.success === false) { showToast("Could not send", r.error || "", "urgent"); return; }
+                        showToast(`${m.bomKey}${m.serialNo ? ` — ${m.serialNo}` : ""}`, `Transferred to ${faceHo.toDepartment}. ${slotLabel(sl.id)} is empty again.`);
+                      };
                       const crateSt = null; // M and R units are independent (2026-10-31)
                       const niN = notIssuedOpenFor(m).length;
                       return (
@@ -18608,40 +18635,58 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                             <div className="mt-1.5 inline-flex items-center gap-1 text-[9.5px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap"
                                  style={{ background: st.bg, color: st.fg }}
                                  title={short > 0 && sl.status === "set" ? `Waiting for material — ${short} line${short === 1 ? "" : "s"} short in store` : st.label}>
-                              <span className="w-1.5 h-1.5 rounded-full" style={{ background: st.dot }} />{short > 0 && sl.status === "set" ? "Waiting for material" : st.short}
+                              <span className="w-1.5 h-1.5 rounded-full" style={{ background: st.dot }} />
+                              {sl.status === "empty"      ? "Empty"
+                               : sl.status === "set"      ? (short > 0 ? "Waiting for material" : "Ready for Assembly")
+                               : sl.status === "assembling" ? "In assembly"
+                               : "Assembly complete"}
                             </div>
-                            {/* Four steps, filled to where this rack has got
-                                to: Empty → Filled → In assembly → Assembled.
-                                An empty rack has nothing to show progress on. */}
-                            {sl.status !== "empty" && (
-                              <div className="flex gap-0.5 mt-1.5" aria-hidden="true" data-rack-progress={RACK_UNIT_STATUS_ORDER.indexOf(sl.status)}>
-                                {RACK_UNIT_STATUS_ORDER.map((k, i) => (
-                                  <span key={k} className="flex-1 h-1 rounded-full"
-                                        style={{ background: i <= RACK_UNIT_STATUS_ORDER.indexOf(sl.status) ? st.dot : "rgba(17,24,39,0.10)" }} />
-                                ))}
-                              </div>
-                            )}
                             {m ? (
                               <>
                                 <div className="text-[11px] font-mono font-black mt-1.5 truncate" style={{ color: "var(--text-strong)" }}
                                      title={m.serialNo || "(no serial)"}>{m.serialNo || "(no serial)"}</div>
-                                <div data-bom-ready={niN} className="text-[9px] font-bold mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full"
-                                     style={niN ? { background: "rgba(217,119,6,0.12)", color: "#b45309" } : { background: "rgba(21,128,61,0.10)", color: "#15803d" }}
-                                     title={niN ? `BOM Ready · ${niN} Pending — parts still owed on this machine` : "Every BOM part was issued"}>
-                                  {niN ? `⏳ ${niN} part${niN === 1 ? "" : "s"} pending` : "✓ All parts issued"}
-                                </div>
+                                {/* Assembly progress — the rack's own work, not
+                                    the production stages, which belong to the
+                                    machine card. */}
+                                {sl.status === "assembling" && (
+                                  <div className="mt-1.5" data-rack-progress="assembling">
+                                    <div className="h-1 rounded-full overflow-hidden" style={{ background: "rgba(17,24,39,0.10)" }}>
+                                      <div className="h-full rounded-full" style={{ width: niN ? "60%" : "85%", background: st.dot }} />
+                                    </div>
+                                    <div className="text-[9px] font-bold mt-0.5" style={{ color: "var(--text-dim)" }}>
+                                      Assembly in progress{inAssemblyFor ? ` · ${inAssemblyFor}` : ""}
+                                    </div>
+                                  </div>
+                                )}
+                                {(sl.status === "set" || sl.status === "assembling") && (
+                                  <div data-bom-ready={niN} className="text-[9px] font-bold mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full"
+                                       style={niN ? { background: "rgba(217,119,6,0.12)", color: "#b45309" } : { background: "rgba(21,128,61,0.10)", color: "#15803d" }}
+                                       title={niN ? `BOM Ready · ${niN} Pending — parts still owed on this machine` : "Every BOM part was issued"}>
+                                    {niN ? `⏳ ${niN} part${niN === 1 ? "" : "s"} missing` : "✓ All parts issued"}
+                                  </div>
+                                )}
+                                {sl.status === "assembled" && (
+                                  <>
+                                    <div className="text-[9px] font-bold mt-1 px-1.5 py-0.5 rounded-full inline-block"
+                                         style={{ background: "rgba(21,128,61,0.10)", color: "#15803d" }}>✓ Assembled{niN ? ` · ${niN} part${niN === 1 ? "" : "s"} owed` : ""}</div>
+                                    {faceCanSend && (
+                                      <button type="button" data-rack-send={sl.id} onClick={faceSend}
+                                              className="mt-1.5 w-full rounded-lg px-2 py-1.5 text-[10px] font-black text-white"
+                                              style={{ background: "#15803d" }}
+                                              title={`Send ${m.serialNo || m.bomKey} to ${faceHo.toDepartment} — this rack becomes empty`}>
+                                        → Send to {faceHo.toDepartment}
+                                      </button>
+                                    )}
+                                  </>
+                                )}
                               </>
                             ) : (
-                              <div className="text-[9.5px] font-semibold mt-1.5" style={{ color: "var(--text-dim)" }}>Ready for a BOM</div>
-                            )}
-                            {/* What this rack needs next, in one line. */}
-                            {sl.status !== "empty" && (
-                              <div data-rack-next className="text-[9px] font-bold mt-1.5 truncate" style={{ color: "var(--text-muted)" }}
-                                   title="Tap the rack for the full BOM, stock and actions">
-                                {sl.status === "set"        ? "▸ Start assembly"
-                                 : sl.status === "assembling" ? "▸ Finish on the card"
-                                 : `▸ Transfer to ${(m && machineHandover(m) && machineHandover(m).toDepartment) || nextDepartment("Assembly") || "Mechanical"}`}
-                              </div>
+                              <button type="button" data-rack-fill={sl.id} onClick={faceFill} disabled={!faceCanFill}
+                                      className="mt-2 w-full rounded-lg px-2 py-1.5 text-[10.5px] font-black text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                                      style={{ background: "#1d4ed8" }}
+                                      title={faceCanFill ? `Issue ${rack.bom.primary} into this rack` : faceFillWhy}>
+                                ＋ Fill Rack
+                              </button>
                             )}
                           </div>
                           <div className="mt-1.5 mx-auto w-fit text-[10px] font-black px-2 py-0.5 rounded bg-white/90" style={{ color: "#111827" }}>{rack.tier}-{f.label} ({sl.position})</div>

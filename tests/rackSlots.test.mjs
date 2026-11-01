@@ -201,7 +201,7 @@ test("App: independent M/R units, BOM Outward rack picker, remove, release scope
   // count still rides on data-bom-ready and the long form is the tooltip.
   assert.match(app, /data-bom-ready=\{niN\}/);
   assert.match(app, /BOM Ready · \$\{niN\} Pending — parts still owed on this machine/);
-  assert.match(app, /\$\{niN\} part\$\{niN === 1 \? "" : "s"\} pending/);
+  assert.match(app, /\$\{niN\} part\$\{niN === 1 \? "" : "s"\} missing/);
   assert.match(app, /const mv = await handleUpdateStock\(cat, p\.itemCode, -qty, ref\);/);
   assert.match(app, /data-pending-action="issue"/);
 });
@@ -258,9 +258,12 @@ test("App: finish Assembly returns a rack machine to its rack; admin transfers f
   // release call left in the page is the Rack View transfer (2026-10-31 —
   // the dead `{false && …}` branch on the card was removed outright).
   assert.doesNotMatch(app, /\{false && canDo\("machines", "release"\)/);
+  // Two release calls, both in the Rack View: the details panel's Transfer
+  // and the same transfer offered on the assembled crate's own face.
   const releaseCalls = app.match(/await onReleaseHandover\(/g) || [];
-  assert.equal(releaseCalls.length, 1, "exactly one release call — the Rack View transfer");
+  assert.equal(releaseCalls.length, 2, "release only from the Rack View (panel + crate face)");
   assert.match(app, /const r = await onReleaseHandover\(ho\.id\);/);
+  assert.match(app, /const r = await onReleaseHandover\(faceHo\.id\);/);
   // workers, signature, checklist and pending-work sections stay in the popup
   assert.match(app, /Anything still pending from \{fromDepartment\}\?/);
   assert.match(app, /The Main Employee must sign to confirm this department's work\./);
@@ -608,32 +611,45 @@ test("App: rack crate face is condition-aware and the panel is untouched", async
   const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
   const app = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
   const css = fs.readFileSync(path.join(root, "src/index.css"), "utf8");
+  const rackSlots = fs.readFileSync(path.join(root, "src/utils/rackSlots.js"), "utf8");
   const face = app.slice(app.indexOf("Crate face (2026-11-01)"), app.indexOf("Rack details panel"));
 
-  // unchanged shell: same button, same crate classes, same name plate, same click
+  // unchanged shell: same button, same crate classes, same name plate, same size
   assert.match(app, /className="rack-crate text-left rounded-xl p-2 pt-3\.5 relative focus-visible:ring-2"/);
   assert.match(app, /onClick=\{\(\) => setRackPanel\(sl\.id\)\}/);
-  assert.match(face, /\{rack\.tier\}-\{f\.label\}/);
-  assert.match(app, /w-fit text-\[10px\] font-black px-2 py-0\.5 rounded bg-white\/90[\s\S]{0,120}\{rack\.tier\}-\{f\.label\} \(\{sl\.position\}\)/);
   assert.match(css, /\.rack-crate \{[\s\S]*?min-height: 132px;/, "crate size unchanged");
 
-  // ordered, conditional content
-  assert.match(face, /data-rack-progress=\{RACK_UNIT_STATUS_ORDER\.indexOf\(sl\.status\)\}/);
-  assert.match(face, /\{m \? \(/, "serial and parts only when a machine is on the rack");
-  assert.match(face, /Ready for a BOM/, "an empty rack says so instead of showing a dash");
-  assert.match(face, /\{sl\.status !== "empty" && \([\s\S]{0,400}?data-rack-next/);
-  for (const action of ["▸ Start assembly", "▸ Finish on the card", "▸ Transfer to \\$\\{\\(m && machineHandover\\(m\\)"])
-    assert.match(face, new RegExp(action), `next action: ${action}`);
-  // the duplicate "BOM: M-10" under a rack called M-10 only prints when it differs
-  assert.match(face, /rack\.bom\.primary !== `\$\{rack\.tier\}-\$\{f\.label\}`/);
-  // status wording and the material warning are the existing ones
-  // same rule as before, with the short status word so every crate is one height
-  assert.match(face, /short > 0 && sl\.status === "set" \? "Waiting for material" : st\.short/);
-  assert.match(face, /title=\{short > 0 && sl\.status === "set" \? `Waiting for material/);
+  // one line per condition, and nothing from the production stage list
+  assert.match(face, /sl\.status === "empty"\s+\? "Empty"/);
+  assert.match(face, /\? \(short > 0 \? "Waiting for material" : "Ready for Assembly"\)/);
+  assert.match(face, /: sl\.status === "assembling" \? "In assembly"/);
+  assert.match(face, /: "Assembly complete"/);
+  assert.doesNotMatch(face, /Mechanical → |DISPLAY_STAGES|Stage \{dispIdx/, "no production stages on a rack card");
+  assert.doesNotMatch(face, /Ready for a BOM/, "the empty rack offers the action instead of a label");
 
-  // logic, handlers and the details panel are untouched
-  for (const keep of ["const handleFillRack", "setRackPanel(sl.id)", "Rack details panel", "rackPanelTab === \"bom\"",
-                      "Stock Status", "notIssuedOpenFor(m)", "pendingForMachine(m)"])
+  // assembly progress and missing parts, only where they belong
+  assert.match(face, /sl\.status === "assembling" && \([\s\S]{0,420}?data-rack-progress="assembling"/);
+  assert.match(face, /Assembly in progress\{inAssemblyFor/);
+  assert.match(face, /\$\{niN\} part\$\{niN === 1 \? "" : "s"\} missing/);
+  assert.match(face, /\(sl\.status === "set" \|\| sl\.status === "assembling"\) && \(/);
+
+  // the two on-face actions call the same handlers, with the same permissions
+  assert.match(face, /data-rack-fill=\{sl\.id\} onClick=\{faceFill\} disabled=\{!faceCanFill\}/);
+  assert.match(face, /data-rack-send=\{sl\.id\} onClick=\{faceSend\}/);
+  assert.match(app, /const faceCanFill  = !!faceFillChk && faceFillChk\.ok && canDo\("outward", "bom"\) && !!onFillRack;/);
+  assert.match(app, /const faceCanSend  = !!faceHo && \(canDo\("machines", "release"\) \|\| isAdminUser\) && !!onReleaseHandover;/);
+  assert.match(app, /const r = onFillRack\(sl\.id, rack\.bom\.primary\);/);
+  assert.match(app, /const r = await onReleaseHandover\(faceHo\.id\);/);
+  assert.match(face, /\{m \? \(/, "serial, progress and parts only when a machine is on the rack");
+  assert.match(face, /→ Send to \{faceHo\.toDepartment\}/);
+
+  // a machine that has left the rack for production frees it on sight
+  assert.match(rackSlots, /const offRack = \(m\) => m && m\.rackSlot && \(/);
+  assert.match(rackSlots, /\|\| \(m\.stage !== "BOM Issued" && m\.stage !== "Assembly"\)/);
+  assert.match(rackSlots, /\|\| m\.status === "completed"\);/);
+
+  // the details panel keeps every action it had
+  for (const keep of ['data-action={b.key}', 'key: "fill", label: "＋ Fill Rack"', 'key: "assemble"', 'key: "send"',
+                      'data-action="remove"', 'Rack details panel', 'rackPanelTab === "bom"', 'Stock Status'])
     assert.ok(app.includes(keep), `${keep} still present`);
-  assert.doesNotMatch(face, /handleUpdateStock|createMachine|onStartProduction|onReleaseHandover/, "the face renders, it does not act");
 });
