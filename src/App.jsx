@@ -83,7 +83,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-01-report-responsive";
+const APP_BUILD = "2026-11-01-report-document";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -14668,6 +14668,22 @@ function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, onCreateB
 // template / user / BOM edits because every row we read either has a
 // denormalized snapshot (checklist_responses, handover_events.worked_by_snapshot)
 // or an immutable append-only history (audit_log).
+// 2026-11-01 (D8) — print a machine report with its reference as the
+// document title, which browsers use as the default PDF file name.
+function printWithTitle(title, { bodyClass = "" } = {}) {
+  const prev = document.title;
+  const done = () => {
+    document.title = prev;
+    if (bodyClass) document.body.classList.remove(bodyClass);
+    window.removeEventListener("afterprint", done);
+  };
+  if (title) document.title = title;
+  if (bodyClass) document.body.classList.add(bodyClass);
+  window.addEventListener("afterprint", done);
+  window.print();
+}
+const machineReportRef = (m) => (m ? `MR-${m.bomKey}-${m.serialNo || m.id}` : "");
+
 function AtoZMachineReport({
   machineId,
   machineLog = [], bomDefs = {}, handovers = [], pendingHandoverItems = [],
@@ -14740,68 +14756,91 @@ function AtoZMachineReport({
     return Number.isFinite(a) && Number.isFinite(b) && b >= a ? Math.max(1, Math.round((b - a) / 86400000)) : null;
   })();
   const isReady = machine.status === "completed";
-  const Fact = ({ k, v, strong }) => (
-    <div className="min-w-0">
-      <div className="text-[9.5px] font-bold uppercase tracking-wider" style={{ color: "var(--text-dim)" }}>{k}</div>
-      <div className={`text-[12.5px] mt-0.5 truncate ${strong ? "font-black" : "font-semibold"}`} style={{ color: "var(--text-strong)" }}>{v || "—"}</div>
-    </div>
+  // ── 2026-11-01 engineering-document layout (D1–D10) ──────────────────
+  // Black ink on white, hairline rules instead of boxes, tables for data,
+  // colour only for status (red open · green done · amber in progress).
+  // One date style, durations in words, ratings as numbers. Every value is
+  // read from records already loaded; nothing is written.
+  const fmtDT = (v) => { if (!v) return ""; const d = new Date(v); return isNaN(d) ? String(v) : d.toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }); };
+  const fmtD  = (v) => { if (!v) return ""; const d = new Date(v); return isNaN(d) ? String(v) : d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }); };
+  const dur = (min) => {
+    const m = Math.max(0, Math.round(Number(min) || 0));
+    if (m < 60) return `${m} min`;
+    if (m < 1440) { const h = Math.floor(m / 60), r = m % 60; return r ? `${h} h ${r} min` : `${h} h`; }
+    const d = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60);
+    return `${d} day${d === 1 ? "" : "s"}${h ? ` ${h} h` : ""}`;
+  };
+  const rate = (r) => (r == null || r === "" ? "" : `${Number(r).toFixed(1)} / 5`);
+  const userName = (id) => { if (!id) return ""; const u = (allUsers || []).find((x) => x.id === id); return u ? (u.fullName || u.username || "") : ""; };
+  const reportRef = `MR-${machine.bomKey}-${machine.serialNo || machine.id}`;
+  const JOURNEY = ["Assembly", "Mechanical", "Electrical", "Trial", "Ready"];
+  const curDept = isReady ? "Ready" : (machine.currentDepartment || machine.stage);
+  const curIdx  = JOURNEY.indexOf(curDept);
+  const deptState = (d, i) => (isReady ? "done" : i < curIdx ? "done" : i === curIdx ? "current" : "pending");
+  const deptsDone = JOURNEY.slice(0, 4).filter((d, i) => deptState(d, i) === "done").length;
+  const STAGE_LABEL = { before_dispatch: "Before dispatch", before_receive: "Before receive", during_work: "During work" };
+  const hopOf = (id) => machineHandovers.find((h) => String(h.id) === String(id));
+
+  const Sec = ({ n, title, count, children, extra, cls = "" }) => (
+    <section className={`mr-sec ${cls}`}>
+      <h3 className="mr-h"><span className="mr-num">{n}</span>{title}{count != null && <span className="mr-count">{count}</span>}{extra}</h3>
+      {children}
+    </section>
   );
+
   const Hdr = () => (
-    <div className="mb-5 print-block" data-report-header>
-      {/* Letterhead */}
-      <div className="flex items-start justify-between gap-4 flex-wrap pb-4" style={{ borderBottom: "2px solid var(--text-strong)" }}>
+    <div data-report-header>
+      {/* D2 — letterhead */}
+      <div className="mr-letterhead">
         <div className="flex items-center gap-3 min-w-0">
-          {company.logo && <img src={company.logo} alt="" className="h-12 w-auto object-contain" />}
+          {company.logo && <img src={company.logo} alt="" className="mr-logo" />}
           <div className="min-w-0">
-            <div className="text-[16px] font-black tracking-tight" style={{ color: "var(--text-strong)" }}>{company.name || "Shantaz Technofoods"}</div>
-            {company.address && <div className="text-[10.5px] mt-0.5" style={{ color: "var(--text-dim)" }}>{company.address}</div>}
-            {company.gst && <div className="text-[10.5px]" style={{ color: "var(--text-dim)" }}>GSTIN {company.gst}</div>}
+            <div className="mr-company">{company.name || "Shantaz Technofoods"}</div>
+            <div className="mr-label">{[company.address, company.gst ? `GSTIN ${company.gst}` : ""].filter(Boolean).join(" · ")}</div>
           </div>
         </div>
-        <div className="text-right">
-          <div className="text-[15px] font-black tracking-wide" style={{ color: "var(--text-strong)" }}>MACHINE PRODUCTION REPORT</div>
-          <div className="text-[10.5px] font-mono mt-0.5" style={{ color: "var(--text-dim)" }}>Ref MR-{machine.bomKey}-{machine.serialNo || machine.id}</div>
-          <div className="text-[10.5px]" style={{ color: "var(--text-dim)" }}>Generated {new Date().toLocaleString("en-IN")}</div>
+        <div className="mr-docid">
+          <div className="mr-doctitle">Machine production report</div>
+          <div className="mr-label mr-mono">{reportRef}</div>
+          <div className="mr-label">Issued {fmtDT(new Date())}</div>
         </div>
       </div>
-      {/* Machine + status */}
-      <div className="flex items-center justify-between gap-3 flex-wrap mt-4">
-        <div>
-          <div className="text-[20px] font-black tracking-tight" style={{ color: "var(--text-strong)" }}>
-            {machine.bomKey}{machine.serialNo ? <span className="font-mono"> · S/N {machine.serialNo}</span> : null}
-          </div>
-          <div className="text-[12px]" style={{ color: "var(--text-dim)" }}>{machine.bomLabel || bom.label || machine.bomKey}</div>
+      {/* D3 — identity and status stamp */}
+      <div className="mr-identity">
+        <div className="min-w-0">
+          <div className="mr-label">Machine</div>
+          <div className="mr-machine">{machine.bomKey} · {machine.bomLabel || bom.label || machine.bomKey}</div>
+          <div className="mr-mono mr-serial">Serial no. {machine.serialNo || "—"}</div>
         </div>
-        <span data-report-status className="text-[12px] font-black px-3 py-1.5 rounded-lg"
-              style={isReady ? { background: "rgba(21,128,61,0.10)", color: "#15803d", border: "1px solid rgba(21,128,61,0.35)" }
-                             : { background: "rgba(217,119,6,0.10)", color: "#b45309", border: "1px solid rgba(217,119,6,0.35)" }}>
-          {isReady ? `✓ READY${machine.completedDate ? ` · ${machine.completedDate}` : ""}` : `In progress · ${displayStageOf(machine) || machine.stage}`}
-        </span>
+        <div data-report-status className={`mr-stamp ${isReady ? "is-done" : "is-progress"}`}>
+          {isReady ? `Ready · ${fmtD(machine.completedDate) || "completed"}` : `In production · ${displayStageOf(machine) || machine.stage}`}
+        </div>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-3 mt-4 p-3 rounded-lg" style={{ background: "var(--surface-highlight, #f6f1e4)" }}>
-        <Fact k="BOM" v={`${machine.bomKey}${bom.label ? ` · ${bom.label}` : ""}`} />
-        <Fact k="Started" v={machine.createdDate} />
-        <Fact k="Ready" v={machine.completedDate} />
-        <Fact k="Build time" v={buildDays ? `${buildDays} day${buildDays === 1 ? "" : "s"}` : null} />
-        <Fact k="Current stage" v={displayStageOf(machine) || machine.stage} />
-        <Fact k="Rack" v={machine.rackSlot ? slotLabel(machine.rackSlot) : (rackCapacityFor(machine.bomKey, bom) > 0 ? "Left the rack" : "Direct production")} />
-        <Fact k="Average rating" v={sum.average !== null ? `${sum.average} / 5` : null} />
-        <Fact k="Issue ID" v={machine.issueId ? String(machine.issueId) : null} />
-      </div>
-      {/* At a glance — the five numbers a reader checks first */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-3" data-report-glance>
+      <div className="mr-facts">
         {[
-          { k: "Departments done", v: acceptedHops.length, c: "#15803d" },
-          { k: "Checklists", v: machineResponses.length, c: "var(--text-strong)" },
-          { k: "Signed hand-overs", v: signedHops.length + (certSigned ? 1 : 0), c: "var(--text-strong)" },
-          { k: "Open issues", v: openJobs.length, c: openJobs.length ? "#b91c1c" : "#15803d", red: openJobs.length > 0 },
-          { k: "Resolved issues", v: resolvedJobs.length, c: "#15803d" },
+          ["BOM", `${machine.bomKey}${bom.label ? ` · ${bom.label}` : ""}`],
+          ["Started", fmtD(machine.createdDate)],
+          ["Ready", fmtD(machine.completedDate) || "Not yet"],
+          ["Build time", buildDays ? `${buildDays} day${buildDays === 1 ? "" : "s"}` : ""],
+          ["Current stage", displayStageOf(machine) || machine.stage],
+          ["Rack", machine.rackSlot ? slotLabel(machine.rackSlot) : (rackCapacityFor(machine.bomKey, bom) > 0 ? "Left the rack" : "Direct production")],
+          ["BOM issue ref", machine.issueId ? String(machine.issueId) : "", true],
+          ["Report ref", reportRef, true],
+        ].map(([k, v, mono]) => (
+          <div key={k} className="min-w-0"><div className="mr-label">{k}</div><div className={`mr-fact ${mono ? "mr-mono" : ""}`}>{v || "—"}</div></div>
+        ))}
+      </div>
+      {/* D4 — summary row */}
+      <div className="mr-summary" data-report-glance>
+        {[
+          { k: "Departments done", v: `${deptsDone} of 4` },
+          { k: "Checklists", v: machineResponses.length },
+          { k: "Signatures", v: signedHops.length + (certSigned ? 1 : 0) },
+          { k: "Open issues", v: openJobs.length, red: openJobs.length > 0 },
+          { k: "Resolved issues", v: resolvedJobs.length },
+          { k: "Average rating", v: sum.average !== null ? rate(sum.average) : "—" },
         ].map((g) => (
-          <div key={g.k} className="rounded-lg px-3 py-2"
-               style={g.red ? { background: "rgba(220,38,38,0.08)", border: "1px solid rgba(220,38,38,0.45)" } : { background: "#fff", border: "1px solid var(--border-subtle)" }}>
-            <div className="text-[20px] font-black leading-none tabular-nums" style={{ color: g.c }}>{g.v}</div>
-            <div className="text-[10px] font-bold mt-1" style={{ color: g.red ? "#b91c1c" : "var(--text-dim)" }}>{g.k}</div>
-          </div>
+          <div key={g.k} className={`mr-sum ${g.red ? "is-red" : ""}`}><div className="mr-sum-v">{g.v}</div><div className="mr-label">{g.k}</div></div>
         ))}
       </div>
     </div>
@@ -14856,393 +14895,248 @@ function AtoZMachineReport({
   const otherLines    = Math.max(0, bomLineCount - criticalCodes.size);
 
   const CriticalParts = () => (
-    <div className="rounded-xl p-4 mb-5 print-block"
-         style={{ background: "rgba(17,24,39,0.03)", border: "1px solid rgba(17,24,39,0.08)" }}>
-      <div className="flex items-baseline gap-2 flex-wrap mb-3">
-        <div className="text-[11px] font-black uppercase tracking-wider text-slate-500">
-          1 · Critical parts fitted ({criticalRows.length})
-        </div>
-        {otherLines > 0 && (
-          <div className="text-[10px] text-slate-500">
-            · plus {otherLines} other part{otherLines === 1 ? "" : "s"} as per BOM {machine.bomKey}
-          </div>
-        )}
-      </div>
-
-      {criticalRows.length === 0 ? (
-        <div className="text-[11px] text-slate-500 italic">
-          No critical parts recorded for this machine.
-        </div>
-      ) : (
-        <div className="rounded-lg overflow-hidden" style={{ border: "1px solid rgba(17,24,39,0.08)" }}>
-          <div className="grid grid-cols-12 gap-2 px-3 py-2 text-[9px] font-bold uppercase tracking-wide text-slate-500"
-               style={{ background: "rgba(17,24,39,0.03)" }}>
-            <div className="col-span-3">Part</div>
-            <div className="col-span-1 text-right">Qty</div>
-            <div className="col-span-5">Serial numbers / verification</div>
-            <div className="col-span-3">When &amp; how</div>
-          </div>
+    <Sec n="01" title="Critical parts fitted" count={criticalRows.length}
+         extra={otherLines > 0 ? <span className="mr-count">· plus {otherLines} other part{otherLines === 1 ? "" : "s"} as per BOM {machine.bomKey}</span> : null}>
+      {criticalRows.length === 0 ? <p className="mr-empty">No critical parts recorded for this machine.</p> : (
+        <div className="mr-table">
+          <div className="mr-tr mr-th" style={{ gridTemplateColumns: "2.2fr 0.5fr 3fr 1.6fr" }}><div>Part</div><div className="text-right">Qty</div><div>Serial numbers / verification</div><div>Issued</div></div>
           {criticalRows.map((r, idx) => {
             const ci = r.criticalInput;
             const serials = ci && ci.type === "serial" ? (ci.serials || []).filter(Boolean) : [];
             return (
-              <div key={`${r.code}-${idx}`} className="grid grid-cols-12 gap-2 items-start px-3 py-2 text-[11px] border-t border-slate-200">
-                <div className="col-span-3">
-                  <div className="text-slate-900 font-semibold truncate">{r.name || r.code}</div>
-                  <div className="text-[9px] font-mono text-blue-300">{r.code}</div>
+              <div key={`${r.code}-${idx}`} className="mr-tr" style={{ gridTemplateColumns: "2.2fr 0.5fr 3fr 1.6fr" }}>
+                <div className="mr-td" data-l="Part"><div><div className="font-semibold">{r.name || r.code}</div><div className="mr-label mr-mono">{r.code}</div></div></div>
+                <div className="mr-td mr-mono md:text-right" data-l="Qty">{r.qty}</div>
+                <div className="mr-td" data-l="Serial / verification">
+                  {ci && ci.notIssued ? <span className="mr-amber">Not issued — {ci.remark || "no reason recorded"}</span>
+                    : serials.length ? <span className="mr-mono">{serials.join(", ")}</span>
+                    : ci && ci.type === "checkbox" ? (ci.confirmed ? <span className="mr-green">Physically verified, all units</span> : <span className="mr-red">Not confirmed</span>)
+                    : <span className="mr-muted">No confirmation recorded</span>}
                 </div>
-                <div className="col-span-1 text-right font-mono text-slate-700">{r.qty}</div>
-                <div className="col-span-5 text-[10px]">
-                  {ci && ci.notIssued ? (
-                    <span className="font-bold" style={{ color: "#b45309" }}>
-                      ✗ Not issued — {ci.remark || "no reason recorded"}
-                    </span>
-                  ) : serials.length > 0 ? (
-                    <div className="flex flex-wrap gap-1">
-                      {serials.map((s) => (
-                        <span key={s} className="font-mono px-1.5 py-0.5 rounded"
-                              style={{ background: "rgba(217, 119, 6,0.10)", color: "#B45309", border: "1px solid rgba(217, 119, 6,0.3)" }}>
-                          {s}
-                        </span>
-                      ))}
-                    </div>
-                  ) : ci && ci.type === "checkbox" ? (
-                    <span className="font-bold" style={{ color: ci.confirmed ? "#15803d" : "#dc2626" }}>
-                      {ci.confirmed ? "✓ Physically verified for all units" : "✗ Not confirmed"}
-                    </span>
-                  ) : (
-                    <span className="text-slate-500 italic">No confirmation recorded</span>
-                  )}
-                </div>
-                <div className="col-span-3 text-[10px] text-slate-500">
-                  <div>{r.when || "—"}</div>
-                  <div className="text-[9px]">{r.via}</div>
-                </div>
+                <div className="mr-td" data-l="Issued"><div><div>{fmtD(r.when) || "—"}</div><div className="mr-label">{r.via}</div></div></div>
               </div>
             );
           })}
         </div>
       )}
-    </div>
+    </Sec>
   );
 
-  // ── Section 4: Department-by-department timeline ──────────────────────
-  const Timeline = () => (
-    <div className="rounded-xl p-4 mb-5"
-         style={{ background: "rgba(17,24,39,0.03)", border: "1px solid rgba(17,24,39,0.08)" }}>
-      <div className="text-[11px] font-black uppercase tracking-wider text-slate-500 mb-3">
-        2 · Department journey — work, team, checklists, signatures ({machineHandovers.length} hand-over{machineHandovers.length === 1 ? "" : "s"})
-      </div>
-      {machineHandovers.length === 0 ? (
-        <div className="text-[11px] text-slate-500 italic">No handovers recorded yet. Machine is still at <strong>{machine.stage}</strong>.</div>
-      ) : (
-        <div className="space-y-3">
-          {machineHandovers.map((h) => {
-            const brReceive  = machineResponses.find((cr) => String(cr.handoverId) === String(h.id) && cr.stage === "before_receive");
-            const bdDispatch = machineResponses.find((cr) => String(cr.handoverId) === String(h.id) && cr.stage === "before_dispatch");
-            const rating     = machineRatings.find((r) => String(r.handoverId) === String(h.id));
-            const relatedPending = machinePending.filter((p) => String(p.raisedInHandoverId) === String(h.id));
-            // Read the SNAPSHOT, not the column — see workerIdsOf. This section
-            // read handover_events.worked_by, a uuid[] that cannot hold factory
-            // workers, so a handover done by a department head plus two fitters
-            // printed as "Workers · 1" with only the head named: the two men who
-            // actually built the machine were missing from its record.
-            // Found 2026-10-29 while running a full trial build through the ERP.
-            const workers = workerIdsOf(h);
-            return (
-              <div key={h.id} className="rounded-lg p-3 print-block"
-                   style={{ background: "rgba(16,185,129,0.04)", border: "1px solid rgba(16,185,129,0.25)" }}>
-                <div className="flex items-center gap-2 flex-wrap mb-2">
-                  <span className="text-[12px] font-black text-slate-900">{h.fromDepartment}</span>
-                  <span className="text-slate-500">→</span>
-                  <span className="text-[12px] font-black" style={{ color: STAGE_COLORS[h.toDepartment] || "#B01218" }}>{h.toDepartment}</span>
-                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
-                        style={{ background: h.status === "accepted" ? "rgba(34,197,94,0.1)" : "rgba(217, 119, 6,0.1)",
-                                 color:      h.status === "accepted" ? "#15803d"              : "#B45309",
-                                 border: `1px solid ${h.status === "accepted" ? "rgba(34,197,94,0.3)" : "rgba(217, 119, 6,0.3)"}` }}>
-                    {h.status === "accepted" ? "✓ Accepted" : h.status === "pending" ? "⏳ Pending" : h.status}
-                  </span>
-                  {(h.overrunMinutes || 0) > 0 && (
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
-                          style={{ background: "rgba(239,68,68,0.1)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.3)" }}>
-                      ⏰ Overrun {formatDuration(h.overrunMinutes || 0)}
-                    </span>
-                  )}
-                  {show.showRatings !== false && rating && (
-                    <span className="text-[10px] font-bold text-yellow-300 ml-1" style={{ letterSpacing: "0.08em" }}>{formatRatingBadge(rating.rating)}</span>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 text-[11px] mb-2">
-                  <div>
-                    <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Finish &amp; Transfer</div>
-                    <div className="text-slate-700 mt-0.5">
-                      {h.sentAt ? new Date(h.sentAt).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}
-                    </div>
-                    <div className="text-[9px] text-slate-500">
-                      Expected: {formatDuration(h.expectedDurationMinutes || 0)} · Actual: {formatDuration(h.actualDurationMinutes || 0)}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Accepted</div>
-                    <div className="text-slate-700 mt-0.5">
-                      {h.acceptedAt ? new Date(h.acceptedAt).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : (h.status === "pending" ? "Waiting…" : "—")}
-                    </div>
-                    <div className="text-[9px] text-slate-500">
-                      Accept timeout: {formatDuration(h.acceptTimeoutMinutes || 0)}
-                    </div>
-                  </div>
-                </div>
-
-                {show.showEmployees !== false && workers.length > 0 && (
-                  <div className="mb-2">
-                    <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1">Workers · {workers.length}</div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {workers.map((uid) => (
-                        <span key={uid} className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
-                              style={{ background: uid === h.mainEmployeeId ? "rgba(234,179,8,0.14)" : "rgba(16,185,129,0.08)",
-                                       border: `1px solid ${uid === h.mainEmployeeId ? "rgba(234,179,8,0.4)" : "rgba(16,185,129,0.3)"}`,
-                                       color: uid === h.mainEmployeeId ? "#fde68a" : "#15803d" }}>
-                          {uid === h.mainEmployeeId ? "⭐ " : ""}{nameFromSnap(uid, h.workedBySnapshot)}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {h.mainEmployeeSignatureSvg && (
-                  <div className="mb-2">
-                    <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                      Main Employee signature · {nameFromSnap(h.mainEmployeeId, h.workedBySnapshot)}
-                    </div>
-                    <div className="rounded px-2 py-1 inline-block"
-                         style={{ background: "#fff", border: "1px solid var(--border-rim)" }}
-                         dangerouslySetInnerHTML={{ __html: h.mainEmployeeSignatureSvg }} />
-                  </div>
-                )}
-
-                {h.overrunNarration && (
-                  <div className="mb-2 rounded px-2 py-1.5 text-[10px]"
-                       style={{ background: "rgba(234,179,8,0.08)", color: "#b45309", border: "1px solid rgba(234,179,8,0.3)" }}>
-                    <strong>Overrun note:</strong> {h.overrunNarration}
-                  </div>
-                )}
-
-                {show.showChecklists !== false && bdDispatch && (
-                  <div className="mb-2">
-                    <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                      Before-Dispatch checklist · {bdDispatch.templateName || "—"} (v{bdDispatch.templateVersion || 1})
-                    </div>
-                    <div className="rounded-lg px-3 py-2 text-[10px] space-y-0.5"
-                         style={{ background: "rgba(215, 25, 32,0.05)", border: "1px solid rgba(215, 25, 32,0.2)" }}>
-                      {(bdDispatch.answers || []).map((a, i) => (
-                        <div key={i} className="flex items-start gap-2">
-                          <span className="text-[11px]">{a.checked ? "✓" : "✗"}</span>
-                          <div className="flex-1">
-                            <span className="text-slate-700">{a.label}</span>
-                            {a.required && <span className="text-amber-700 ml-1 text-[9px]">• must-do</span>}
-                            {!a.checked && a.remark && <div className="text-slate-400 italic mt-0.5">Remark: {a.remark}</div>}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {show.showChecklists !== false && brReceive && (
-                  <div className="mb-2">
-                    <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                      Before-Receive checklist · {brReceive.templateName || "—"} (v{brReceive.templateVersion || 1})
-                    </div>
-                    <div className="rounded-lg px-3 py-2 text-[10px] space-y-0.5"
-                         style={{ background: "rgba(34,197,94,0.05)", border: "1px solid rgba(34,197,94,0.2)" }}>
-                      {(brReceive.answers || []).map((a, i) => (
-                        <div key={i} className="flex items-start gap-2">
-                          <span className="text-[11px]">{a.checked ? "✓" : "✗"}</span>
-                          <div className="flex-1">
-                            <span className="text-slate-700">{a.label}</span>
-                            {a.required && <span className="text-amber-700 ml-1 text-[9px]">• must-do</span>}
-                            {!a.checked && a.remark && <div className="text-slate-400 italic mt-0.5">Remark: {a.remark}</div>}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {relatedPending.length > 0 && (
-                  <div>
-                    <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1">Pending items raised ({relatedPending.length})</div>
-                    <div className="space-y-1">
-                      {relatedPending.map((p) => (
-                        <div key={p.id} className="rounded px-2 py-1.5 text-[10px]"
-                             style={{ background: p.status === "resolved" ? "rgba(34,197,94,0.05)" : "rgba(217, 119, 6,0.07)",
-                                      border: `1px solid ${p.status === "resolved" ? "rgba(34,197,94,0.25)" : "rgba(217, 119, 6,0.3)"}` }}>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className={p.status === "resolved" ? "text-emerald-300 font-bold" : "text-amber-700 font-bold"}>
-                              {p.status === "resolved" ? "✓" : "⏳"}
-                            </span>
-                            <span className="text-slate-700 flex-1">{p.description}</span>
-                            <span className="text-[9px] text-slate-500">raised in {p.raisedInDepartment}</span>
-                          </div>
-                          <JobHistory item={p} users={allUsers} compact />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-
-  // ── Pending jobs · full history (2026-10-30) ──────────────────────────
-  // Every job on the machine — raised at a hand-over, from Report Issue, from
-  // a checklist, or for a part not issued at Outward — with its three
-  // permanent entries: original reason, receive remark, completion.
-  const PendingJobsHistory = () => {
-    if (show.showPendingJobs === false) return null;
-    // 2026-11-01 — open issues first and in red, so nothing outstanding can be
-    // missed; resolved ones after, each with its full history (reported →
-    // part received → work completed, with who, where and when).
-    const byTime = (a, b) => String(a.raisedAt || "").localeCompare(String(b.raisedAt || ""));
-    const jobs = [...openJobs.slice().sort(byTime), ...resolvedJobs.slice().sort(byTime)];
-    return (
-      <div className="rounded-xl p-4 mb-5 print-block" data-report-issues style={{ background: "rgba(17,24,39,0.03)", border: "1px solid rgba(17,24,39,0.08)" }}>
-        <div className="flex items-baseline gap-2 flex-wrap mb-3">
-          <div className="text-[11px] font-black uppercase tracking-wider text-slate-500">4 · Issues and pending jobs ({jobs.length})</div>
-          {openJobs.length > 0
-            ? <span className="text-[10.5px] font-black" style={{ color: "#b91c1c" }}>{openJobs.length} still open</span>
-            : <span className="text-[10.5px] font-bold" style={{ color: "#15803d" }}>{jobs.length ? "all resolved" : "none recorded"}</span>}
-        </div>
-        <div className="space-y-2">
-          {jobs.map((p) => (
-            <div key={p.id} data-report-issue={p.status === "resolved" ? "resolved" : "open"} className="rounded-lg px-3 py-2"
-                 style={p.status === "resolved" ? { background: "#fff", border: "1px solid rgba(17,24,39,0.08)" }
-                                                : { background: "rgba(220,38,38,0.06)", border: "1.5px solid rgba(220,38,38,0.55)", borderLeftWidth: 4 }}>
-              <div className="text-[11px] font-semibold" style={{ color: p.status === "resolved" ? "var(--text-strong)" : "#991b1b" }}>
-                {p.status === "resolved"
-                  ? <span className="font-black" style={{ color: "#15803d" }}>✓ RESOLVED </span>
-                  : <span className="font-black" style={{ color: "#b91c1c" }}>● OPEN </span>}
-                {p.critical ? <span className="font-black" style={{ color: "#b91c1c" }}>CRITICAL · </span> : null}
-                {p.description}
-                {p.itemCode && <span className="font-normal text-slate-500"> · <span className="font-mono">{p.itemCode}</span>{p.itemName ? ` ${p.itemName}` : ""}{p.qty != null ? ` × ${p.qty}` : ""}</span>}
-                <span className="font-normal text-slate-500"> · {p.assignedDepartment || "Unassigned"}</span>
-              </div>
-              <JobHistory item={p} users={allUsers} compact />
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
-
-  // ── Section 5: Stage history (fallback / audit) ───────────────────────
-  const StageHistory = () => (
-    <div className="rounded-xl p-4 mb-5"
-         style={{ background: "rgba(17,24,39,0.03)", border: "1px solid rgba(17,24,39,0.08)" }}>
-      <div className="text-[11px] font-black uppercase tracking-wider text-slate-500 mb-3">
-        5 · Stage history ({(machine.history || []).length})
-      </div>
-      <div className="relative pl-5">
-        <div className="absolute left-2 top-0 bottom-0 w-px" style={{ background: "rgba(17,24,39,0.06)" }} />
-        {(machine.history || []).map((h, i) => {
-          const sc = STAGE_COLORS[h.stage] || "#D71920";
+  // D5 — process strip + one row per hand-over; full checklist answers in Appendix A.
+  const Journey = () => (
+    <Sec n="02" title="Department journey" count={`${machineHandovers.length} hand-over${machineHandovers.length === 1 ? "" : "s"}`}>
+      <div className="mr-strip">
+        {JOURNEY.map((d, i) => {
+          const st = deptState(d, i);
+          const hop = machineHandovers.find((h) => h.fromDepartment === d && h.status === "accepted");
+          const sub = st === "done" ? (d === "Ready" ? fmtD(machine.completedDate) : hop ? `${fmtD(hop.sentAt)} · ${dur(hop.actualDurationMinutes)}` : "Done")
+                    : st === "current" ? "In progress" : "Not started";
           return (
-            <div key={i} className="relative mb-2 last:mb-0">
-              <div className="absolute -left-[13px] top-1 w-2.5 h-2.5 rounded-full"
-                   style={{ background: sc + "22", border: `1.5px solid ${sc}` }} />
-              <div className="flex items-center gap-3 flex-wrap text-[11px]">
-                <span className="font-bold text-slate-900">{h.stage}</span>
-                <span className="text-slate-500">·</span>
-                <span className="text-slate-500 font-mono">{h.date}</span>
-                {h.note && <span className="text-slate-400 italic">— {h.note}</span>}
-              </div>
-            </div>
+            <div key={d} className={`mr-step is-${st}`}><div className="mr-step-name">{d}</div><div className="mr-label">{sub}</div></div>
           );
         })}
       </div>
-    </div>
+      {machineHandovers.length === 0 ? <p className="mr-empty">No hand-overs recorded yet. The machine is at {machine.stage}.</p> : (
+        <div className="mr-table">
+          <div className="mr-tr mr-th" style={{ gridTemplateColumns: "1.35fr 1.1fr 1.1fr 1fr 1.4fr 0.9fr 1.2fr" }}>
+            <div>Hand-over</div><div>Handed over</div><div>Accepted</div><div>Time / target</div>
+            <div>{show.showEmployees !== false ? "Team (lead in bold)" : ""}</div><div>{show.showChecklists !== false ? "Checks" : ""}</div><div>Signed by</div>
+          </div>
+          {machineHandovers.map((h) => {
+            const rating  = machineRatings.find((r) => String(r.handoverId) === String(h.id));
+            const hopResp = machineResponses.filter((cr) => String(cr.handoverId) === String(h.id));
+            const raised  = machinePending.filter((p) => String(p.raisedInHandoverId) === String(h.id));
+            const workers = workerIdsOf(h);
+            const lead = h.mainEmployeeId;
+            const ordered = lead && workers.includes(lead) ? [lead, ...workers.filter((w) => w !== lead)] : workers;
+            const over = (h.overrunMinutes || 0) > 0;
+            return (
+              <div key={h.id} className="mr-hop">
+                <div className="mr-tr" style={{ gridTemplateColumns: "1.35fr 1.1fr 1.1fr 1fr 1.4fr 0.9fr 1.2fr" }}>
+                  <div className="mr-td" data-l="Hand-over"><div>
+                    <div className="font-semibold">{h.fromDepartment} → {h.toDepartment}</div>
+                    <div className={h.status === "accepted" ? "mr-green mr-small" : h.status === "pending" ? "mr-amber mr-small" : "mr-muted mr-small"}>
+                      {h.status === "accepted" ? "Accepted" : h.status === "pending" ? "Waiting for acceptance" : h.status}
+                    </div>
+                    {show.showRatings !== false && rating && <div className="mr-label">Rating {rate(rating.rating)}</div>}
+                  </div></div>
+                  <div className="mr-td" data-l="Handed over"><div><div>{fmtDT(h.sentAt) || "—"}</div>{userName(h.sentBy) && <div className="mr-label">by {userName(h.sentBy)}</div>}</div></div>
+                  <div className="mr-td" data-l="Accepted"><div>
+                    <div>{h.acceptedAt ? fmtDT(h.acceptedAt) : h.status === "pending" ? "Waiting" : "—"}</div>
+                    {userName(h.acceptedBy) && <div className="mr-label">by {userName(h.acceptedBy)}</div>}
+                    <div className="mr-label">Accept window {dur(h.acceptTimeoutMinutes)}</div>
+                  </div></div>
+                  <div className="mr-td" data-l="Time / target"><div>
+                    <div className={over ? "mr-red" : ""}>{dur(h.actualDurationMinutes)} of {dur(h.expectedDurationMinutes)}</div>
+                    {over && <div className="mr-red mr-small">Over by {dur(h.overrunMinutes)}</div>}
+                  </div></div>
+                  <div className="mr-td" data-l="Team">{show.showEmployees !== false && (ordered.length
+                    ? <div>{ordered.map((uid) => <div key={uid} className={uid === lead ? "font-bold" : ""} title={uid === lead ? "Lead / main employee" : undefined}>{nameFromSnap(uid, h.workedBySnapshot)}</div>)}</div>
+                    : <span className="mr-muted">—</span>)}</div>
+                  <div className="mr-td" data-l="Checks">{show.showChecklists !== false && (hopResp.length ? <div>{hopResp.map((cr) => {
+                      const ans = cr.answers || []; const done = ans.filter((a) => a.checked).length; const miss = ans.length - done;
+                      return <div key={cr.id}>{({ before_dispatch: "Dispatch", before_receive: "Receive", during_work: "During work" })[cr.stage] || "Checklist"} {done}/{ans.length}{miss ? <span className="mr-red"> · {miss} not done</span> : null}</div>;
+                    })}<div className="mr-label">Full answers: Appendix A</div></div> : <span className="mr-muted">—</span>)}</div>
+                  <div className="mr-td" data-l="Signed by">{h.mainEmployeeSignatureSvg
+                    ? <div><div className="mr-sig" dangerouslySetInnerHTML={{ __html: h.mainEmployeeSignatureSvg }} /><div className="mr-label">{nameFromSnap(h.mainEmployeeId, h.workedBySnapshot)}</div></div>
+                    : <span className="mr-muted">Not signed</span>}</div>
+                </div>
+                {(h.overrunNarration || raised.length > 0) && (
+                  <div className="mr-hop-note">
+                    {h.overrunNarration && <div><span className="mr-amber font-semibold">Delay reason: </span>{h.overrunNarration}</div>}
+                    {raised.length > 0 && <div className={raised.some((p) => p.status !== "resolved") ? "mr-red" : ""}>{raised.length} issue{raised.length === 1 ? "" : "s"} raised at this hand-over ({raised.filter((p) => p.status !== "resolved").length} open) — see section 04</div>}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Sec>
   );
 
-  // ── Section 6: Attachments ────────────────────────────────────────────
-  const AttachmentsList = () => {
-    if (!machineAttach.length) return null;
+  const TrialCertificate = () => (
+    <Sec n="03" title="Trial certificate and results" cls={machine.trialCertificate ? "mr-cert-sec" : ""}>
+      {machine.trialCertificate
+        ? <div className="mr-cert"><style>{TC_SHEET_CSS}</style><TrialCertificateSheet machine={machine} cert={machine.trialCertificate} /></div>
+        : <p className="mr-empty">{isReady ? "No trial certificate is stored for this machine." : "Not yet issued — the certificate is completed at Trial."}</p>}
+    </Sec>
+  );
+
+  // D6 — open first with a red rule and tint; resolved after, each with its full history.
+  const SOURCE = { bom_outward: "Added at BOM Outward", not_issued: "Part not issued at BOM Outward", checklist_after_acceptance: "From a checklist" };
+  const PendingJobsHistory = () => {
+    if (show.showPendingJobs === false) return null;
+    const byTime = (a, b) => String(a.raisedAt || "").localeCompare(String(b.raisedAt || ""));
+    const jobs = [...openJobs.slice().sort(byTime), ...resolvedJobs.slice().sort(byTime)];
     return (
-      <div className="rounded-xl p-4 mb-5"
-           style={{ background: "rgba(17,24,39,0.03)", border: "1px solid rgba(17,24,39,0.08)" }}>
-        <div className="text-[11px] font-black uppercase tracking-wider text-slate-500 mb-3">6 · Attachments ({machineAttach.length})</div>
-        <ul className="text-[11px] text-slate-700 list-disc list-inside space-y-0.5">
-          {machineAttach.map((a) => (
-            <li key={a.id}>
-              <span className="font-semibold">{a.name || a.kind || "attachment"}</span>
-              <span className="text-slate-500"> · {a.department || "—"}</span>
-              <span className="text-[9px] text-slate-600 ml-1">{a.createdAt ? new Date(a.createdAt).toLocaleDateString("en-IN") : ""}</span>
-            </li>
+      <Sec n="04" title="Issues and pending jobs" count={jobs.length}
+           extra={openJobs.length ? <span className="mr-red mr-count-strong">{openJobs.length} open</span> : <span className="mr-green mr-count-strong">{jobs.length ? "all resolved" : "none recorded"}</span>}>
+        <div data-report-issues>
+          {jobs.length > 0 && (
+            <div className="mr-table">
+              <div className="mr-tr mr-th" style={{ gridTemplateColumns: "0.8fr 3fr 1.5fr 1.2fr" }}><div>Status</div><div>Issue</div><div>Raised</div><div>Assigned to</div></div>
+              {jobs.map((p) => {
+                const open = p.status !== "resolved";
+                const hop = p.raisedInHandoverId ? hopOf(p.raisedInHandoverId) : null;
+                const src = SOURCE[p.source] || (/^Part not issued at BOM Outward/.test(p.description || "") ? SOURCE.not_issued : p.kind === "owed" ? "Owed work" : "Reported issue");
+                return (
+                  <div key={p.id} data-report-issue={open ? "open" : "resolved"} className={`mr-issue ${open ? "is-open" : "is-done"}`}>
+                    <div className="mr-tr" style={{ gridTemplateColumns: "0.8fr 3fr 1.5fr 1.2fr" }}>
+                      <div className="mr-td" data-l="Status"><span className={open ? "mr-red font-semibold" : "mr-green font-semibold"}>{open ? "Open" : "Resolved"}</span></div>
+                      <div className="mr-td" data-l="Issue"><div>
+                        <div className={open ? "mr-red" : ""}>{p.critical ? <span className="mr-tag">Critical</span> : null}{p.description}</div>
+                        {(p.itemCode || p.itemName) && <div className="mr-label">Part {p.itemCode ? <span className="mr-mono">{p.itemCode}</span> : null}{p.itemName ? ` ${p.itemName}` : ""}{p.qty != null ? ` × ${p.qty}` : ""}{p.partSerialNo ? <> · part S/N <span className="mr-mono">{p.partSerialNo}</span></> : null}</div>}
+                        <div className="mr-label">{src}{hop ? ` · at ${hop.fromDepartment} → ${hop.toDepartment} hand-over` : ""}</div>
+                      </div></div>
+                      <div className="mr-td" data-l="Raised"><div><div>{p.raisedInDepartment || "—"}</div><div className="mr-label">{fmtDT(p.raisedAt)}</div></div></div>
+                      <div className="mr-td" data-l="Assigned to">{p.assignedDepartment || "Unassigned"}</div>
+                    </div>
+                    <div className="mr-issue-history"><JobHistory item={p} users={allUsers} compact /></div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {jobs.length === 0 && <p className="mr-empty">No issues or pending jobs were recorded for this machine.</p>}
+        </div>
+      </Sec>
+    );
+  };
+
+  const StageHistory = () => (
+    <Sec n="05" title="Stage history" count={(machine.history || []).length}>
+      {(machine.history || []).length === 0 ? <p className="mr-empty">No stage changes recorded.</p> : (
+        <div className="mr-table">
+          <div className="mr-tr mr-th" style={{ gridTemplateColumns: "1.1fr 1.1fr 4fr" }}><div>Date</div><div>Stage</div><div>Note</div></div>
+          {(machine.history || []).map((h, i) => (
+            <div key={i} className="mr-tr" style={{ gridTemplateColumns: "1.1fr 1.1fr 4fr" }}>
+              <div className="mr-td" data-l="Date">{fmtD(h.date) || h.date || "—"}</div>
+              <div className="mr-td font-semibold" data-l="Stage">{h.stage}</div>
+              <div className="mr-td" data-l="Note">{h.note || "—"}</div>
+            </div>
           ))}
-        </ul>
-        <div className="text-[9px] text-slate-500 mt-2">
-          Attachments are previewed in Machine Tracker's expanded card view (not inlined here to keep print output compact).
         </div>
-      </div>
-    );
-  };
+      )}
+    </Sec>
+  );
 
-  // ── Section 6: Machine Trial Certificate ──────────────────────────────
-  // Trial fills a long parameter sheet and two people sign it before the
-  // machine can go Ready. It was stored on the machine row and shown only in
-  // its own print window, so the one report meant to tell the whole story
-  // stopped just short of the document that proves the machine works.
-  // Reuses TrialCertificateSheet so this page and the standalone print-out can
-  // never drift apart.
-  const TrialCertificate = () => {
-    if (!machine.trialCertificate) return null;
-    return (
-      <div className="rounded-xl p-4 mb-5 print-block"
-           style={{ background: "rgba(17,24,39,0.03)", border: "1px solid rgba(17,24,39,0.08)" }}>
-        <div className="text-[11px] font-black uppercase tracking-wider text-slate-500 mb-3">
-          3 · Trial certificate and results
+  const AttachmentsList = () => (
+    <Sec n="06" title="Attachments" count={machineAttach.length}>
+      {machineAttach.length === 0 ? <p className="mr-empty">No attachments on this machine.</p> : (
+        <div className="mr-table">
+          <div className="mr-tr mr-th" style={{ gridTemplateColumns: "3fr 1.5fr 1.2fr" }}><div>File</div><div>Department</div><div>Added</div></div>
+          {machineAttach.map((a) => (
+            <div key={a.id} className="mr-tr" style={{ gridTemplateColumns: "3fr 1.5fr 1.2fr" }}>
+              <div className="mr-td" data-l="File">{a.name || a.kind || "attachment"}</div>
+              <div className="mr-td" data-l="Department">{a.department || "—"}</div>
+              <div className="mr-td" data-l="Added">{fmtD(a.createdAt) || "—"}</div>
+            </div>
+          ))}
         </div>
-        <div style={{ background: "#fff", borderRadius: 8, padding: 12, border: "1px solid rgba(17,24,39,0.08)" }}>
-          <TrialCertificateSheet machine={machine} cert={machine.trialCertificate} />
-        </div>
-      </div>
-    );
-  };
+      )}
+      {machineAttach.length > 0 && <p className="mr-label mt-1">Files open from the machine card in Machine Tracker.</p>}
+    </Sec>
+  );
 
-  // Sign-off: space for the people who release the machine to sign the paper
-  // copy. The digital signatures already captured are in sections 2 and 3.
+  // D7 — the release sign-off for the paper copy.
   const SignOff = () => (
-    <div className="mt-6 print-block" data-report-signoff>
-      <div className="text-[11px] font-black uppercase tracking-wider text-slate-500 mb-3">Release sign-off</div>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {["Prepared by (Production)", "Checked by (Quality / Trial)", "Approved by (Management)"].map((r) => (
-          <div key={r} className="rounded-lg p-3" style={{ border: "1px solid var(--border-rim)", background: "#fff" }}>
-            <div className="h-12" style={{ borderBottom: "1px solid var(--text-dim)" }} />
-            <div className="text-[10.5px] font-bold mt-1.5" style={{ color: "var(--text-strong)" }}>{r}</div>
-            <div className="text-[9.5px]" style={{ color: "var(--text-dim)" }}>Name · Signature · Date</div>
-          </div>
+    <Sec n="07" title="Release sign-off" cls="mr-avoid">
+      <div data-report-signoff className="mr-signoff">
+        {[["Prepared by", "Production"], ["Checked by", "Quality / trial"], ["Approved by", "Management"]].map(([r, d]) => (
+          <div key={r}><div className="mr-sign-line" /><div className="font-semibold">{r}</div><div className="mr-label">{d} · name, signature, date</div></div>
         ))}
       </div>
-    </div>
+    </Sec>
   );
 
+  // Appendix A — every checklist answer, in full (before dispatch, before
+  // receive and during work), with who submitted it and when.
+  const ChecklistAppendix = () => {
+    if (show.showChecklists === false || machineResponses.length === 0) return null;
+    const list = machineResponses.slice().sort((a, b) => String(a.submittedAt || "").localeCompare(String(b.submittedAt || "")));
+    return (
+      <section className="mr-sec mr-appendix">
+        <h3 className="mr-h"><span className="mr-num">A</span>Appendix A · Checklist answers<span className="mr-count">{list.length}</span></h3>
+        {list.map((cr) => {
+          const ans = cr.answers || []; const done = ans.filter((a) => a.checked).length; const hop = cr.handoverId ? hopOf(cr.handoverId) : null;
+          return (
+            <div key={cr.id} className="mr-check mr-avoid">
+              <div className="mr-check-head">
+                <div className="font-semibold">{cr.department || "—"} · {STAGE_LABEL[cr.stage] || cr.stage || "Checklist"}{hop ? <span className="mr-label"> · {hop.fromDepartment} → {hop.toDepartment}</span> : null}</div>
+                <div className="mr-label">{cr.templateName || "—"} v{cr.templateVersion || 1}{cr.submittedAt ? ` · ${fmtDT(cr.submittedAt)}` : ""}{userName(cr.submittedBy) ? ` · ${userName(cr.submittedBy)}` : ""} · <span className={done < ans.length ? "mr-red" : "mr-green"}>{done}/{ans.length} done</span></div>
+              </div>
+              {ans.map((a, i) => (
+                <div key={i} className="mr-check-row">
+                  <span className={a.checked ? "mr-green" : "mr-red"}>{a.checked ? "✓" : "✗"}</span>
+                  <div className="min-w-0"><span>{a.label}</span>{a.required && <span className="mr-label"> · must-do</span>}{a.remark && <div className="mr-label">Remark: {a.remark}</div>}</div>
+                </div>
+              ))}
+            </div>
+          );
+        })}
+      </section>
+    );
+  };
+
   return (
-    <div className="space-y-0" data-machine-report>
-      <Hdr />
-      <CriticalParts />
-      <Timeline />
-      <TrialCertificate />
-      <PendingJobsHistory />
-      <StageHistory />
-      <AttachmentsList />
-      <SignOff />
-      <div className="text-[9px] text-slate-600 mt-4 text-center">
-        Report generated {new Date().toLocaleString("en-IN")} · all data assembled from existing records · nothing new was written to produce this view.
-      </div>
+    <div className="mr-doc" data-machine-report>
+      {/* D8 — the print frame: the thead repeats on every printed page. */}
+      <table className="mr-frame">
+        <thead><tr><td><div className="mr-runhead"><span>{company.name || "Shantaz Technofoods"} · Machine production report</span><span className="mr-mono">{reportRef}</span></div></td></tr></thead>
+        <tbody><tr><td>
+          <Hdr />
+          <CriticalParts />
+          <Journey />
+          <TrialCertificate />
+          <PendingJobsHistory />
+          <StageHistory />
+          <AttachmentsList />
+          <SignOff />
+          <ChecklistAppendix />
+          <div className="mr-footnote">Generated from ERP records on {fmtDT(new Date())} · {reportRef} · nothing in this report was typed in by hand.</div>
+        </td></tr></tbody>
+      </table>
     </div>
   );
 }
@@ -15334,7 +15228,18 @@ function ReportCenterPage({
   const exportExcel = (rows, filename) => downloadWorkbook(rows, filename.endsWith(".xlsx") ? filename : filename + ".xlsx");
   const printReport = () => {
     // Browser's native print dialog — operator chooses "Save as PDF" or paper.
-    // Print styles come from the <style> at the top of this page.
+    // Print styles come from the <style> at the top of this page. On the
+    // Machine journey tab the PDF is named after the report reference.
+    if (tab === "machine") {
+      const m = (machineLog || []).find((x) => String(x.id) === String(atozMachineId || ""))
+             || (filteredMachines || []).slice().sort((a, b) => {
+                  // same order as the Machine journey picker, so the default pick matches
+                  if ((a.status !== "completed") !== (b.status !== "completed")) return a.status !== "completed" ? -1 : 1;
+                  return (b.createdDate || "").localeCompare(a.createdDate || "");
+                })[0];
+      printWithTitle(machineReportRef(m));
+      return;
+    }
     window.print();
   };
 
@@ -15777,6 +15682,8 @@ function ReportCenterPage({
                   🖨 Print / Save as PDF
                 </button>
               </div>
+              {/* 2026-11-01 (D9) — the same white sheet as the tracker's report view */}
+              <div className="mr-paper">
               <AtoZMachineReport
                 machineId={pickedId}
                 machineLog={machineLog}
@@ -15792,6 +15699,7 @@ function ReportCenterPage({
                 settings={settings}
                 allUsers={allUsers}
               />
+              </div>
             </div>
           );
         })()}
@@ -17148,10 +17056,8 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
   const [reportMachineId, setReportMachineId] = useState(null);
   // Prints only the report: the body class hides the rest of the page.
   const printMachineReport = () => {
-    const done = () => { document.body.classList.remove("print-machine-report"); window.removeEventListener("afterprint", done); };
-    document.body.classList.add("print-machine-report");
-    window.addEventListener("afterprint", done);
-    window.print();
+    const m = machineLog.find((x) => String(x.id) === String(reportMachineId));
+    printWithTitle(machineReportRef(m), { bodyClass: "print-machine-report" });
   };
   // 2026-10-30 — pending jobs: part lookup + receive/complete actions.
   // Item Master by code — the rack crate face and the rack details panel both
@@ -26872,7 +26778,7 @@ export default function App() {
           impossible to navigate away from the screen. pointer-events are off so
           it can never swallow a tap meant for what is underneath. */}
       {!SUPA && (
-        <div className="fixed bottom-0 inset-x-0 z-[200] flex items-center justify-center gap-2 px-4 py-2 text-center pointer-events-none"
+        <div className="no-print fixed bottom-0 inset-x-0 z-[200] flex items-center justify-center gap-2 px-4 py-2 text-center pointer-events-none"
              style={{ background: "linear-gradient(90deg,#7f1d1d,#991b1b)", borderTop: "1px solid rgba(239,68,68,0.5)" }}>
           <span className="text-sm">⚠️</span>
           <span className="text-[11px] font-bold text-red-100">

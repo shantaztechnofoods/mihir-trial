@@ -2848,3 +2848,160 @@ html, body, #root { background: var(--champagne-wash); }
   }
   [data-report-issue="open"] { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Machine production report — engineering-document layout (2026-11-01, D1–D10)
+
+   Black ink on white paper, hairline rules instead of boxes, tables for data,
+   colour only for status: red = open, green = done, amber = in progress.
+   One family, three sizes (22 / 12.5 / 10.5px), monospace for serials and
+   references. The same sheet on screen and on A4.
+   ═══════════════════════════════════════════════════════════════════════ */
+.mr-doc {
+  --mr-ink: #14110d; --mr-mute: #5c5341; --mr-rule: #ddd6c8; --mr-rule-strong: #14110d;
+  --mr-red: #b91c1c; --mr-red-bg: #fdf0f0; --mr-green: #15803d; --mr-amber: #b45309;
+  color: var(--mr-ink); font-size: 12.5px; line-height: 1.5;
+  font-variant-numeric: tabular-nums; background: #fff;
+}
+.mr-doc .mr-frame { width: 100%; border-collapse: collapse; }
+.mr-doc .mr-frame > thead > tr > td, .mr-doc .mr-frame > tbody > tr > td { padding: 0; }
+.mr-doc .mr-runhead { display: none; }
+.mr-doc .mr-label { font-size: 10.5px; color: var(--mr-mute); line-height: 1.45; }
+.mr-doc .mr-mono  { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 0.95em; }
+.mr-doc .mr-small { font-size: 11px; }
+.mr-doc .mr-red   { color: var(--mr-red); }
+.mr-doc .mr-green { color: var(--mr-green); }
+.mr-doc .mr-amber { color: var(--mr-amber); }
+.mr-doc .mr-muted { color: var(--mr-mute); }
+.mr-doc .mr-empty { color: var(--mr-mute); font-size: 12px; margin: 4px 0 0; }
+
+/* Letterhead and identity (D2, D3) */
+.mr-doc .mr-letterhead { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap;
+  padding-bottom: 12px; border-bottom: 2px solid var(--mr-rule-strong); }
+.mr-doc .mr-logo { height: 40px; width: auto; object-fit: contain; }
+.mr-doc .mr-company { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; }
+.mr-doc .mr-docid { text-align: right; }
+.mr-doc .mr-doctitle { font-size: 13px; font-weight: 700; }
+.mr-doc .mr-identity { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-top: 18px; }
+.mr-doc .mr-machine { font-size: 22px; font-weight: 700; letter-spacing: -0.015em; line-height: 1.2; }
+.mr-doc .mr-serial { font-size: 13px; margin-top: 2px; }
+.mr-doc .mr-stamp { border: 1.5px solid currentColor; padding: 5px 12px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.mr-doc .mr-stamp.is-done { color: var(--mr-green); }
+.mr-doc .mr-stamp.is-progress { color: var(--mr-amber); }
+.mr-doc .mr-facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px 20px; margin-top: 16px; }
+.mr-doc .mr-fact { font-size: 12.5px; overflow-wrap: anywhere; }
+
+/* Summary row (D4) */
+.mr-doc .mr-summary { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); margin-top: 16px;
+  border-top: 1px solid var(--mr-rule); border-bottom: 1px solid var(--mr-rule); padding: 10px 0; }
+.mr-doc .mr-sum { padding: 0 12px; border-left: 1px solid var(--mr-rule); }
+.mr-doc .mr-sum:first-child { padding-left: 0; border-left: 0; }
+.mr-doc .mr-sum-v { font-size: 19px; font-weight: 700; line-height: 1.2; }
+.mr-doc .mr-sum.is-red { border-left: 3px solid var(--mr-red); }
+.mr-doc .mr-sum.is-red .mr-sum-v, .mr-doc .mr-sum.is-red .mr-label { color: var(--mr-red); }
+
+/* Sections and tables (D1) */
+.mr-doc .mr-sec { margin-top: 26px; }
+.mr-doc .mr-h { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; font-size: 13.5px; font-weight: 700; margin: 0 0 8px; }
+.mr-doc .mr-num { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 11px; color: var(--mr-mute); font-weight: 500; }
+.mr-doc .mr-count { font-size: 11px; color: var(--mr-mute); font-weight: 500; }
+.mr-doc .mr-count-strong { font-size: 11px; font-weight: 700; }
+.mr-doc .mr-table { border-top: 1px solid var(--mr-rule-strong); }
+.mr-doc .mr-tr { display: grid; gap: 0 12px; padding: 7px 0; border-bottom: 1px solid var(--mr-rule); align-items: start; }
+.mr-doc .mr-th { font-size: 10.5px; font-weight: 700; color: var(--mr-mute); padding: 6px 0; }
+.mr-doc .mr-td { min-width: 0; overflow-wrap: anywhere; }
+.mr-doc .mr-tag { display: inline-block; font-size: 10px; font-weight: 700; color: #fff; background: var(--mr-red); padding: 0 5px; margin-right: 6px; border-radius: 2px; }
+
+/* Journey strip and hand-overs (D5) */
+.mr-doc .mr-strip { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
+.mr-doc .mr-step { border-top: 3px solid var(--mr-rule); padding-top: 6px; }
+.mr-doc .mr-step.is-done { border-top-color: var(--mr-green); }
+.mr-doc .mr-step.is-current { border-top-color: var(--mr-amber); }
+.mr-doc .mr-step.is-pending .mr-step-name { color: var(--mr-mute); }
+.mr-doc .mr-step-name { font-weight: 700; }
+.mr-doc .mr-hop-note { font-size: 11.5px; padding: 0 0 8px; margin-top: -2px; border-bottom: 1px solid var(--mr-rule); }
+.mr-doc .mr-hop .mr-tr:has(+ .mr-hop-note) { border-bottom: 0; }
+
+/* Signatures (D7) — every captured signature at one size, on a line */
+.mr-doc .mr-sig { display: inline-block; border-bottom: 1px solid var(--mr-mute); padding-bottom: 1px; }
+.mr-doc .mr-sig svg { display: block; height: 30px; width: auto; max-width: 130px; }
+.mr-doc .mr-signoff { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; }
+.mr-doc .mr-sign-line { height: 40px; border-bottom: 1px solid var(--mr-ink); margin-bottom: 5px; }
+
+/* Issues (D6) */
+.mr-doc .mr-issue.is-open { background: var(--mr-red-bg); box-shadow: inset 3px 0 0 var(--mr-red); padding-left: 10px; }
+.mr-doc .mr-issue .mr-tr { border-bottom: 0; }
+.mr-doc .mr-issue { border-bottom: 1px solid var(--mr-rule); }
+.mr-doc .mr-issue-history { padding: 0 0 8px; font-size: 11px; }
+
+/* Certificate and appendix */
+.mr-doc .mr-cert { border: 1px solid var(--mr-rule); padding: 10px; }
+.mr-doc .mr-check { border-top: 1px solid var(--mr-rule-strong); padding: 8px 0 6px; margin-bottom: 10px; }
+.mr-doc .mr-check-head { margin-bottom: 4px; }
+.mr-doc .mr-check-row { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 6px; padding: 3px 0; border-bottom: 1px solid var(--mr-rule); font-size: 12px; }
+.mr-doc .mr-footnote { margin-top: 22px; padding-top: 8px; border-top: 1px solid var(--mr-rule); font-size: 10px; color: var(--mr-mute); text-align: center; }
+
+/* D9 — on a phone the tables stack into labelled rows */
+@media (max-width: 639.98px) {
+  .mr-doc .mr-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mr-doc .mr-summary { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 10px; }
+  .mr-doc .mr-sum:nth-child(4) { padding-left: 0; border-left: 0; }
+  .mr-doc .mr-sum.is-red:nth-child(4) { padding-left: 8px; border-left: 3px solid var(--mr-red); }
+  .mr-doc .mr-strip { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
+  .mr-doc .mr-strip .mr-label { display: none; }
+  .mr-doc .mr-step-name { font-size: 11px; }
+  .mr-doc .mr-tr { display: block !important; padding: 8px 0; }
+  .mr-doc .mr-th { display: none !important; }
+  .mr-doc .mr-td { display: flex; gap: 10px; padding: 2px 0; }
+  .mr-doc .mr-td[data-l]::before { content: attr(data-l); flex: 0 0 34%; font-size: 10.5px; color: var(--mr-mute); }
+  .mr-doc .mr-td > :not(:first-child) { min-width: 0; }
+  .mr-doc .mr-signoff { grid-template-columns: 1fr; }
+  .mr-doc .mr-docid { text-align: left; }
+  .mr-doc .mr-machine { font-size: 19px; }
+}
+
+/* D8 — A4 print. A named page scopes the running footer to this report only. */
+@page machine-report {
+  size: A4 portrait;
+  margin: 14mm 12mm 16mm 12mm;
+  @bottom-left  { content: "Machine production report"; font-size: 8pt; color: #5c5341; }
+  @bottom-right { content: "Page " counter(page) " of " counter(pages); font-size: 8pt; color: #5c5341; }
+}
+@media print {
+  .mr-doc { page: machine-report; font-size: 9.5pt; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .mr-doc .mr-runhead { display: flex; justify-content: space-between; gap: 12px; font-size: 8pt; color: #5c5341;
+    border-bottom: 0.5pt solid #ddd6c8; padding-bottom: 3pt; margin-bottom: 8pt; }
+  .mr-doc .mr-machine { font-size: 17pt; }
+  .mr-doc .mr-company { font-size: 13pt; }
+  .mr-doc .mr-label, .mr-doc .mr-th { font-size: 8pt; }
+  .mr-doc .mr-sum-v { font-size: 14pt; }
+  .mr-doc .mr-h { break-after: avoid; page-break-after: avoid; }
+  .mr-doc .mr-tr, .mr-doc .mr-issue, .mr-doc .mr-hop, .mr-doc .mr-check-row, .mr-doc .mr-avoid,
+  .mr-doc .mr-letterhead, .mr-doc .mr-identity, .mr-doc .mr-summary, .mr-doc .mr-strip { break-inside: avoid; page-break-inside: avoid; }
+  .mr-doc .mr-appendix { break-before: page; page-break-before: always; }
+  .mr-doc .mr-sig svg { height: 22pt; }
+}
+/* D9 — the report as a sheet of paper wherever it is shown on screen */
+.mr-paper { background: #fff; border: 1px solid var(--border-subtle, #e5e7eb); border-radius: 6px;
+  padding: 32px 36px; max-width: 900px; margin: 0 auto; box-shadow: 0 10px 30px -18px rgba(60, 45, 15, 0.35); }
+@media (max-width: 639.98px) { .mr-paper { padding: 16px 14px; border-radius: 4px; } }
+@media print { .mr-paper { border: 0; padding: 0; max-width: none; box-shadow: none; border-radius: 0; } }
+/* The print frame is a table only on paper (its thead repeats per page). On
+   screen it is plain blocks, so wide content can never stretch the sheet. */
+@media screen {
+  .mr-doc .mr-frame, .mr-doc .mr-frame > thead, .mr-doc .mr-frame > tbody,
+  .mr-doc .mr-frame > thead > tr, .mr-doc .mr-frame > tbody > tr,
+  .mr-doc .mr-frame > thead > tr > td, .mr-doc .mr-frame > tbody > tr > td { display: block; width: 100%; }
+}
+.mr-doc .mr-cert { overflow-x: auto; }
+/* The trial certificate is drawn as a full A4 page of its own; inside the
+   report it takes the report's width and flows, and on paper it starts on a
+   fresh page so it reads as one document. */
+.mr-doc .mr-cert .tc-sheet { width: 100%; min-height: 0; padding: 4mm 2mm 2mm; margin: 0; }
+.mr-doc .mr-cert .tc-foot { position: static; margin-top: 4mm; }
+@media print {
+  #erp-build-badge { display: none !important; }
+  .mr-doc .mr-cert-sec { break-before: page; page-break-before: always; }
+  .mr-doc .mr-cert { border: 0; padding: 0; overflow: visible; }
+  .mr-doc .mr-cert tr { break-inside: avoid; page-break-inside: avoid; }
+}
