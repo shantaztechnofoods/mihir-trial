@@ -83,7 +83,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-01-declutter";
+const APP_BUILD = "2026-11-01-report-responsive";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -14725,56 +14725,84 @@ function AtoZMachineReport({
   // Rating lookup (sender dept gets rated when the receiver accepts).
   const sum = summarizeMachineRatings(machineRatings);
 
-  // ── Section 1: Header KPIs ────────────────────────────────────────────
+  // ── Header: company letterhead, key facts, report at a glance ─────────
+  // 2026-11-01 — a company-level document: who issued it, which machine,
+  // where it stands, and the five numbers a reader checks first. Every value
+  // comes from records already loaded; nothing is computed into the DB.
+  const company = (() => { try { return getActiveCompany(settings) || {}; } catch { return {}; } })();
+  const openJobs     = machinePending.filter((p) => p.status !== "resolved");
+  const resolvedJobs = machinePending.filter((p) => p.status === "resolved");
+  const acceptedHops = machineHandovers.filter((h) => h.status === "accepted");
+  const signedHops   = machineHandovers.filter((h) => h.mainEmployeeSignatureSvg || h.signatureSvg || h.acceptSignatureSvg);
+  const certSigned   = !!(machine.trialCertificate && (machine.trialCertificate.confirmed || machine.trialCertificate.signedBy || machine.trialCertificate.checkedBy));
+  const buildDays = (() => {
+    const a = Date.parse(machine.createdAt || machine.createdDate || ""); const b = machine.completedDate ? Date.parse(machine.completedDate) : Date.now();
+    return Number.isFinite(a) && Number.isFinite(b) && b >= a ? Math.max(1, Math.round((b - a) / 86400000)) : null;
+  })();
+  const isReady = machine.status === "completed";
+  const Fact = ({ k, v, strong }) => (
+    <div className="min-w-0">
+      <div className="text-[9.5px] font-bold uppercase tracking-wider" style={{ color: "var(--text-dim)" }}>{k}</div>
+      <div className={`text-[12.5px] mt-0.5 truncate ${strong ? "font-black" : "font-semibold"}`} style={{ color: "var(--text-strong)" }}>{v || "—"}</div>
+    </div>
+  );
   const Hdr = () => (
-    <div className="rounded-xl p-5 mb-5"
-         style={{ background: "linear-gradient(135deg,rgba(215, 25, 32,0.08),rgba(176, 18, 24,0.03))",
-                  border: "1px solid rgba(215, 25, 32,0.35)" }}>
-      <div className="flex items-start justify-between flex-wrap gap-3">
-        <div>
-          <div className="text-[9px] font-black text-blue-400 uppercase tracking-[0.14em]">A-to-Z Machine Report</div>
-          <div className="text-xl font-black text-slate-900 mt-1 tracking-tight">
-            {machine.bomKey}
-            {machine.serialNo ? <span className="text-slate-400 font-normal"> · S/N {machine.serialNo}</span> : null}
+    <div className="mb-5 print-block" data-report-header>
+      {/* Letterhead */}
+      <div className="flex items-start justify-between gap-4 flex-wrap pb-4" style={{ borderBottom: "2px solid var(--text-strong)" }}>
+        <div className="flex items-center gap-3 min-w-0">
+          {company.logo && <img src={company.logo} alt="" className="h-12 w-auto object-contain" />}
+          <div className="min-w-0">
+            <div className="text-[16px] font-black tracking-tight" style={{ color: "var(--text-strong)" }}>{company.name || "Shantaz Technofoods"}</div>
+            {company.address && <div className="text-[10.5px] mt-0.5" style={{ color: "var(--text-dim)" }}>{company.address}</div>}
+            {company.gst && <div className="text-[10.5px]" style={{ color: "var(--text-dim)" }}>GSTIN {company.gst}</div>}
           </div>
-          <div className="text-[11px] text-slate-400 mt-0.5">{machine.bomLabel || bom.label || machine.bomKey}</div>
         </div>
-        <div className="flex items-center gap-4 flex-wrap text-right">
-          <div>
-            <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Current Stage</div>
-            <div className="text-[13px] font-black mt-0.5" style={{ color: STAGE_COLORS[machine.stage] || "#D71920" }}>{machine.stage}</div>
-          </div>
-          <div>
-            <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Status</div>
-            <div className="text-[13px] font-black mt-0.5" style={{ color: machine.status === "completed" ? "#15803d" : "#B45309" }}>
-              {machine.status === "completed" ? "Ready ✓" : "In Progress"}
-            </div>
-          </div>
-          {sum.average !== null && (
-            <div>
-              <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Avg Rating</div>
-              <div className="text-[13px] font-black text-yellow-300 mt-0.5" style={{ letterSpacing: "0.08em" }}>{formatRatingBadge(sum.average)}</div>
-            </div>
-          )}
+        <div className="text-right">
+          <div className="text-[15px] font-black tracking-wide" style={{ color: "var(--text-strong)" }}>MACHINE PRODUCTION REPORT</div>
+          <div className="text-[10.5px] font-mono mt-0.5" style={{ color: "var(--text-dim)" }}>Ref MR-{machine.bomKey}-{machine.serialNo || machine.id}</div>
+          <div className="text-[10.5px]" style={{ color: "var(--text-dim)" }}>Generated {new Date().toLocaleString("en-IN")}</div>
         </div>
       </div>
-      <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-[11px]">
+      {/* Machine + status */}
+      <div className="flex items-center justify-between gap-3 flex-wrap mt-4">
         <div>
-          <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Started</div>
-          <div className="text-slate-700 mt-0.5">{machine.createdDate || "—"}</div>
+          <div className="text-[20px] font-black tracking-tight" style={{ color: "var(--text-strong)" }}>
+            {machine.bomKey}{machine.serialNo ? <span className="font-mono"> · S/N {machine.serialNo}</span> : null}
+          </div>
+          <div className="text-[12px]" style={{ color: "var(--text-dim)" }}>{machine.bomLabel || bom.label || machine.bomKey}</div>
         </div>
-        <div>
-          <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Completed</div>
-          <div className="text-slate-700 mt-0.5">{machine.completedDate || "—"}</div>
-        </div>
-        <div>
-          <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Rack Capacity</div>
-          <div className="text-slate-700 mt-0.5">{rackCapacityFor(machine.bomKey, bom) > 0 ? `${rackCapacityFor(machine.bomKey, bom)} slots` : "No rack"}</div>
-        </div>
-        <div>
-          <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Issue ID</div>
-          <div className="text-slate-500 mt-0.5 font-mono">{machine.issueId || "—"}</div>
-        </div>
+        <span data-report-status className="text-[12px] font-black px-3 py-1.5 rounded-lg"
+              style={isReady ? { background: "rgba(21,128,61,0.10)", color: "#15803d", border: "1px solid rgba(21,128,61,0.35)" }
+                             : { background: "rgba(217,119,6,0.10)", color: "#b45309", border: "1px solid rgba(217,119,6,0.35)" }}>
+          {isReady ? `✓ READY${machine.completedDate ? ` · ${machine.completedDate}` : ""}` : `In progress · ${displayStageOf(machine) || machine.stage}`}
+        </span>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-3 mt-4 p-3 rounded-lg" style={{ background: "var(--surface-highlight, #f6f1e4)" }}>
+        <Fact k="BOM" v={`${machine.bomKey}${bom.label ? ` · ${bom.label}` : ""}`} />
+        <Fact k="Started" v={machine.createdDate} />
+        <Fact k="Ready" v={machine.completedDate} />
+        <Fact k="Build time" v={buildDays ? `${buildDays} day${buildDays === 1 ? "" : "s"}` : null} />
+        <Fact k="Current stage" v={displayStageOf(machine) || machine.stage} />
+        <Fact k="Rack" v={machine.rackSlot ? slotLabel(machine.rackSlot) : (rackCapacityFor(machine.bomKey, bom) > 0 ? "Left the rack" : "Direct production")} />
+        <Fact k="Average rating" v={sum.average !== null ? `${sum.average} / 5` : null} />
+        <Fact k="Issue ID" v={machine.issueId ? String(machine.issueId) : null} />
+      </div>
+      {/* At a glance — the five numbers a reader checks first */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-3" data-report-glance>
+        {[
+          { k: "Departments done", v: acceptedHops.length, c: "#15803d" },
+          { k: "Checklists", v: machineResponses.length, c: "var(--text-strong)" },
+          { k: "Signed hand-overs", v: signedHops.length + (certSigned ? 1 : 0), c: "var(--text-strong)" },
+          { k: "Open issues", v: openJobs.length, c: openJobs.length ? "#b91c1c" : "#15803d", red: openJobs.length > 0 },
+          { k: "Resolved issues", v: resolvedJobs.length, c: "#15803d" },
+        ].map((g) => (
+          <div key={g.k} className="rounded-lg px-3 py-2"
+               style={g.red ? { background: "rgba(220,38,38,0.08)", border: "1px solid rgba(220,38,38,0.45)" } : { background: "#fff", border: "1px solid var(--border-subtle)" }}>
+            <div className="text-[20px] font-black leading-none tabular-nums" style={{ color: g.c }}>{g.v}</div>
+            <div className="text-[10px] font-bold mt-1" style={{ color: g.red ? "#b91c1c" : "var(--text-dim)" }}>{g.k}</div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -14832,7 +14860,7 @@ function AtoZMachineReport({
          style={{ background: "rgba(17,24,39,0.03)", border: "1px solid rgba(17,24,39,0.08)" }}>
       <div className="flex items-baseline gap-2 flex-wrap mb-3">
         <div className="text-[11px] font-black uppercase tracking-wider text-slate-500">
-          🔒 Critical Parts Fitted ({criticalRows.length})
+          1 · Critical parts fitted ({criticalRows.length})
         </div>
         {otherLines > 0 && (
           <div className="text-[10px] text-slate-500">
@@ -14903,7 +14931,7 @@ function AtoZMachineReport({
     <div className="rounded-xl p-4 mb-5"
          style={{ background: "rgba(17,24,39,0.03)", border: "1px solid rgba(17,24,39,0.08)" }}>
       <div className="text-[11px] font-black uppercase tracking-wider text-slate-500 mb-3">
-        🏭 Department Timeline ({machineHandovers.length} handover{machineHandovers.length === 1 ? "" : "s"})
+        2 · Department journey — work, team, checklists, signatures ({machineHandovers.length} hand-over{machineHandovers.length === 1 ? "" : "s"})
       </div>
       {machineHandovers.length === 0 ? (
         <div className="text-[11px] text-slate-500 italic">No handovers recorded yet. Machine is still at <strong>{machine.stage}</strong>.</div>
@@ -15076,16 +15104,31 @@ function AtoZMachineReport({
   // a checklist, or for a part not issued at Outward — with its three
   // permanent entries: original reason, receive remark, completion.
   const PendingJobsHistory = () => {
-    if (show.showPendingJobs === false || !machinePending.length) return null;
-    const jobs = machinePending.slice().sort((a, b) => String(a.raisedAt || "").localeCompare(String(b.raisedAt || "")));
+    if (show.showPendingJobs === false) return null;
+    // 2026-11-01 — open issues first and in red, so nothing outstanding can be
+    // missed; resolved ones after, each with its full history (reported →
+    // part received → work completed, with who, where and when).
+    const byTime = (a, b) => String(a.raisedAt || "").localeCompare(String(b.raisedAt || ""));
+    const jobs = [...openJobs.slice().sort(byTime), ...resolvedJobs.slice().sort(byTime)];
     return (
-      <div className="rounded-xl p-4 mb-5" style={{ background: "rgba(17,24,39,0.03)", border: "1px solid rgba(17,24,39,0.08)" }}>
-        <div className="text-[11px] font-black uppercase tracking-wider text-slate-500 mb-3">Pending jobs · history ({jobs.length})</div>
+      <div className="rounded-xl p-4 mb-5 print-block" data-report-issues style={{ background: "rgba(17,24,39,0.03)", border: "1px solid rgba(17,24,39,0.08)" }}>
+        <div className="flex items-baseline gap-2 flex-wrap mb-3">
+          <div className="text-[11px] font-black uppercase tracking-wider text-slate-500">4 · Issues and pending jobs ({jobs.length})</div>
+          {openJobs.length > 0
+            ? <span className="text-[10.5px] font-black" style={{ color: "#b91c1c" }}>{openJobs.length} still open</span>
+            : <span className="text-[10.5px] font-bold" style={{ color: "#15803d" }}>{jobs.length ? "all resolved" : "none recorded"}</span>}
+        </div>
         <div className="space-y-2">
           {jobs.map((p) => (
-            <div key={p.id} className="rounded-lg px-3 py-2" style={{ background: "#fff", border: "1px solid rgba(17,24,39,0.08)" }}>
-              <div className="text-[11px] font-semibold text-slate-800">
-                {p.status === "resolved" ? "✓ " : "⏳ "}{p.description}
+            <div key={p.id} data-report-issue={p.status === "resolved" ? "resolved" : "open"} className="rounded-lg px-3 py-2"
+                 style={p.status === "resolved" ? { background: "#fff", border: "1px solid rgba(17,24,39,0.08)" }
+                                                : { background: "rgba(220,38,38,0.06)", border: "1.5px solid rgba(220,38,38,0.55)", borderLeftWidth: 4 }}>
+              <div className="text-[11px] font-semibold" style={{ color: p.status === "resolved" ? "var(--text-strong)" : "#991b1b" }}>
+                {p.status === "resolved"
+                  ? <span className="font-black" style={{ color: "#15803d" }}>✓ RESOLVED </span>
+                  : <span className="font-black" style={{ color: "#b91c1c" }}>● OPEN </span>}
+                {p.critical ? <span className="font-black" style={{ color: "#b91c1c" }}>CRITICAL · </span> : null}
+                {p.description}
                 {p.itemCode && <span className="font-normal text-slate-500"> · <span className="font-mono">{p.itemCode}</span>{p.itemName ? ` ${p.itemName}` : ""}{p.qty != null ? ` × ${p.qty}` : ""}</span>}
                 <span className="font-normal text-slate-500"> · {p.assignedDepartment || "Unassigned"}</span>
               </div>
@@ -15102,7 +15145,7 @@ function AtoZMachineReport({
     <div className="rounded-xl p-4 mb-5"
          style={{ background: "rgba(17,24,39,0.03)", border: "1px solid rgba(17,24,39,0.08)" }}>
       <div className="text-[11px] font-black uppercase tracking-wider text-slate-500 mb-3">
-        🧾 Stage History ({(machine.history || []).length})
+        5 · Stage history ({(machine.history || []).length})
       </div>
       <div className="relative pl-5">
         <div className="absolute left-2 top-0 bottom-0 w-px" style={{ background: "rgba(17,24,39,0.06)" }} />
@@ -15131,7 +15174,7 @@ function AtoZMachineReport({
     return (
       <div className="rounded-xl p-4 mb-5"
            style={{ background: "rgba(17,24,39,0.03)", border: "1px solid rgba(17,24,39,0.08)" }}>
-        <div className="text-[11px] font-black uppercase tracking-wider text-slate-500 mb-3">📎 Attachments ({machineAttach.length})</div>
+        <div className="text-[11px] font-black uppercase tracking-wider text-slate-500 mb-3">6 · Attachments ({machineAttach.length})</div>
         <ul className="text-[11px] text-slate-700 list-disc list-inside space-y-0.5">
           {machineAttach.map((a) => (
             <li key={a.id}>
@@ -15161,7 +15204,7 @@ function AtoZMachineReport({
       <div className="rounded-xl p-4 mb-5 print-block"
            style={{ background: "rgba(17,24,39,0.03)", border: "1px solid rgba(17,24,39,0.08)" }}>
         <div className="text-[11px] font-black uppercase tracking-wider text-slate-500 mb-3">
-          🧾 Machine Trial Certificate
+          3 · Trial certificate and results
         </div>
         <div style={{ background: "#fff", borderRadius: 8, padding: 12, border: "1px solid rgba(17,24,39,0.08)" }}>
           <TrialCertificateSheet machine={machine} cert={machine.trialCertificate} />
@@ -15170,8 +15213,25 @@ function AtoZMachineReport({
     );
   };
 
+  // Sign-off: space for the people who release the machine to sign the paper
+  // copy. The digital signatures already captured are in sections 2 and 3.
+  const SignOff = () => (
+    <div className="mt-6 print-block" data-report-signoff>
+      <div className="text-[11px] font-black uppercase tracking-wider text-slate-500 mb-3">Release sign-off</div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {["Prepared by (Production)", "Checked by (Quality / Trial)", "Approved by (Management)"].map((r) => (
+          <div key={r} className="rounded-lg p-3" style={{ border: "1px solid var(--border-rim)", background: "#fff" }}>
+            <div className="h-12" style={{ borderBottom: "1px solid var(--text-dim)" }} />
+            <div className="text-[10.5px] font-bold mt-1.5" style={{ color: "var(--text-strong)" }}>{r}</div>
+            <div className="text-[9.5px]" style={{ color: "var(--text-dim)" }}>Name · Signature · Date</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
   return (
-    <div className="space-y-0">
+    <div className="space-y-0" data-machine-report>
       <Hdr />
       <CriticalParts />
       <Timeline />
@@ -15179,7 +15239,8 @@ function AtoZMachineReport({
       <PendingJobsHistory />
       <StageHistory />
       <AttachmentsList />
-      <div className="text-[9px] text-slate-600 mt-2 text-center">
+      <SignOff />
+      <div className="text-[9px] text-slate-600 mt-4 text-center">
         Report generated {new Date().toLocaleString("en-IN")} · all data assembled from existing records · nothing new was written to produce this view.
       </div>
     </div>
@@ -16927,6 +16988,18 @@ const cleanPendingJobs = (rows) => (Array.isArray(rows) ? rows : []).map(normali
     partSerialNo: (j.partSerialNo || "").trim(),
   }));
 
+// 2026-11-01 — every Machine Tracker popup gets a visible close control in
+// its top-right corner. Several closed only by tapping outside or by a Cancel
+// at the very bottom, which on a phone sat below the screen and left people
+// stuck. Disabled while the popup is saving, exactly like its Cancel.
+function ModalX({ onClose, disabled = false, label = "Close" }) {
+  return (
+    <button type="button" aria-label={label} title={label} data-modal-close onClick={onClose} disabled={disabled}
+            className="absolute top-2.5 right-2.5 z-10 w-9 h-9 rounded-full flex items-center justify-center text-[15px] font-black transition-colors disabled:opacity-40"
+            style={{ background: "rgba(17,24,39,0.07)", color: "var(--text-dim)" }}>✕</button>
+  );
+}
+
 function PendingJobRows({ rows, onChange, inventory = [], accent = "#b45309", addLabel = "+ Add pending job", disabled = false }) {
   const list = (Array.isArray(rows) ? rows : []).map(normalizePendingJob);
   const set = (i, patch) => onChange(list.map((r, idx) => idx === i ? { ...r, ...patch } : r));
@@ -17022,6 +17095,8 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
   handovers = [], settings = {}, onFinishTransfer, onAcceptHandover, onRegisterSignature, currentUser = null,
   // Phase B props (optional — fall back to [] when migrations not applied)
   checklistTemplates = [], pendingHandoverItems = [], attachments = [], deptRatings = [],
+  // 2026-11-01 — for the full machine report opened from a card.
+  checklistResponses = [],
   // 2026-10-30 — Item Master, so a pending job can name the missing part by code.
   items = {},
   onUploadAttachment, onDeleteAttachment, onResolvePendingItem, onReceivePendingItem, onPullBackHandover,
@@ -17069,6 +17144,15 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
   const isAdminUser = currentUser?.role === "super_admin" || currentUser?.role === "Admin";
   // Phase 1 — raise-issue modal: { machine } while open.
   const [raiseModal, setRaiseModal] = useState(null);
+  // 2026-11-01 — machine whose full report is open (id), or null.
+  const [reportMachineId, setReportMachineId] = useState(null);
+  // Prints only the report: the body class hides the rest of the page.
+  const printMachineReport = () => {
+    const done = () => { document.body.classList.remove("print-machine-report"); window.removeEventListener("afterprint", done); };
+    document.body.classList.add("print-machine-report");
+    window.addEventListener("afterprint", done);
+    window.print();
+  };
   // 2026-10-30 — pending jobs: part lookup + receive/complete actions.
   // Item Master by code — the rack crate face and the rack details panel both
   // ask it for stock when they run bomFillCheck. It used to live inside the
@@ -17815,6 +17899,35 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
   // 2026-10-31 rack units — the unit whose details panel is open, and its tab.
   const [rackPanel, setRackPanel] = useState(null);
   const [rackPanelTab, setRackPanelTab] = useState("bom");
+  // 2026-11-01 — Escape closes the top-most popup, in the same order they
+  // stack on screen; a popup that is saving ignores it, like its Cancel.
+  // Declared after every popup's state so its dependency list is initialised.
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key !== "Escape") return;
+      const steps = [
+        [jobAction,          () => !jobAction?.busy && setJobAction(null)],
+        [reportMachineId,    () => setReportMachineId(null)],
+        [trialCertModal,     () => setTrialCertModal(null)],
+        [trialCertViewModal, () => setTrialCertViewModal(null)],
+        [finishModal,        () => !transferBusy && setFinishModal(null)],
+        [acceptModal,        () => !acceptModal?.busy && setAcceptModal(null)],
+        [duringWorkModal,    () => !duringWorkModal?.busy && setDuringWorkModal(null)],
+        [removeRackConfirm,  () => setRemoveRackConfirm(null)],
+        [pullBack,           () => !pullBack?.busy && setPullBack(null)],
+        [raiseModal,         () => !raiseBusy && setRaiseModal(null)],
+        [jobsDrawer,         () => setJobsDrawer(null)],
+        [rackPanel,          () => setRackPanel(null)],
+        [issuePopup,         () => setIssuePopup(null)],
+        [showCalled,         () => setShowCalled(false)],
+      ];
+      const top = steps.find(([open]) => !!open);
+      if (top) { e.stopPropagation(); top[1](); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [jobAction, reportMachineId, trialCertModal, trialCertViewModal, finishModal, transferBusy, acceptModal, duringWorkModal,
+      removeRackConfirm, pullBack, raiseModal, raiseBusy, jobsDrawer, rackPanel, issuePopup, showCalled]);
   // Pending part awaiting "Confirm issue" in the rack panel, and the one in flight.
   const [pendIssueAsk, setPendIssueAsk] = useState(null);
   const [pendIssueBusy, setPendIssueBusy] = useState(null);
@@ -19427,6 +19540,14 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                           📋 Certificate
                         </button>
                       )}
+                      {isComplete && (
+                        <button type="button" data-card-report={machine.id} onClick={() => setReportMachineId(machine.id)}
+                                className="text-[11px] font-black px-3 py-1.5 rounded-lg border transition-all"
+                                style={{ background: "rgba(21,128,61,0.08)", border: "1px solid rgba(21,128,61,0.35)", color: "#15803d" }}
+                                title="Complete production report — BOM to Ready">
+                          📄 Report
+                        </button>
+                      )}
                       <button onClick={() => setExpanded(isExpanded ? null : machine.id)}
                               className="text-[10px] font-bold text-slate-500 hover:text-slate-700 px-2 py-1.5 rounded-lg border border-slate-200 hover:border-white/20 transition-all">
                         {isExpanded ? "Hide" : "History"}
@@ -19455,6 +19576,11 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                       <div className="md:col-span-2">
                         <div className="flex items-baseline gap-3 flex-wrap mb-3">
                           <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Production report</div>
+                          <button type="button" data-history-report={machine.id} onClick={() => setReportMachineId(machine.id)}
+                                  className="text-[11px] font-bold px-2.5 py-1 rounded-lg border ml-auto"
+                                  style={{ borderColor: "var(--border-rim)", color: "var(--text-strong)", background: "var(--surface-card)" }}>
+                            📄 Open full machine report
+                          </button>
                           {ratingSummary.average != null && (
                             <span className="text-[12px] font-black" style={{ color: ratingSummary.average >= 4.5 ? "#15803d" : ratingSummary.average >= 3.5 ? "#b45309" : "#dc2626" }}>
                               {formatRatingBadge(Math.round(ratingSummary.average))} {ratingSummary.average} / 5
@@ -19791,6 +19917,39 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
       </div>
 
       {/* ── Admin Pull Back (2026-10-30) ── */}
+      {/* ── Full machine report (2026-11-01) ──
+          Full screen on every device: a fixed bar with Back, the title, Print
+          and Close; the report sheet scrolls under it. Print shows only the
+          report (see .print-machine-report in index.css). */}
+      {reportMachineId && (
+        <div className="mt-report-modal fixed inset-0 z-[95] flex flex-col" role="dialog" aria-label="Machine report"
+             style={{ background: "rgba(17,24,39,0.55)", backdropFilter: "blur(6px)" }}>
+          <div className="mt-report-bar flex items-center gap-2 px-3 sm:px-5 py-2.5 flex-shrink-0"
+               style={{ background: "var(--surface-card)", borderBottom: "1px solid var(--border-subtle)" }}>
+            <button type="button" data-report-back onClick={() => setReportMachineId(null)}
+                    className="h-9 px-3 rounded-lg text-[12px] font-black flex items-center gap-1.5"
+                    style={{ border: "1px solid var(--border-rim)", color: "var(--text-strong)" }}>← Back</button>
+            <div className="text-[13px] font-black truncate flex-1 min-w-0" style={{ color: "var(--text-strong)" }}>
+              Machine report{(() => { const m = machineLog.find((x) => String(x.id) === String(reportMachineId)); return m ? ` · ${m.bomKey}${m.serialNo ? ` · ${m.serialNo}` : ""}` : ""; })()}
+            </div>
+            <button type="button" data-report-print onClick={printMachineReport}
+                    className="h-9 px-3 rounded-lg text-[12px] font-black text-white flex items-center gap-1.5"
+                    style={{ background: "#B01218" }}>🖨 <span className="hidden sm:inline">Print / PDF</span></button>
+            <button type="button" aria-label="Close report" onClick={() => setReportMachineId(null)}
+                    className="w-9 h-9 rounded-full flex items-center justify-center text-[15px] font-black"
+                    style={{ background: "rgba(17,24,39,0.07)", color: "var(--text-dim)" }}>✕</button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-2 sm:p-6" onClick={(e) => e.target === e.currentTarget && setReportMachineId(null)}>
+            <div className="mt-report-sheet mx-auto w-full max-w-4xl rounded-xl p-4 sm:p-8" style={{ background: "#fff", boxShadow: "0 24px 60px rgba(17,24,39,0.25)" }}>
+              <AtoZMachineReport machineId={reportMachineId} machineLog={machineLog} bomDefs={bomDefs} handovers={handovers}
+                                 pendingHandoverItems={pendingHandoverItems} deptRatings={deptRatings} checklistResponses={checklistResponses}
+                                 outwardLog={outwardLog} items={items} attachments={attachments} settings={settings}
+                                 auditLog={auditLog} allUsers={allUsers} />
+            </div>
+          </div>
+        </div>
+      )}
+
       {pullBack && (() => {
         const h = pullBack.handover;
         const submit = async () => {
@@ -19914,8 +20073,9 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                   inline value beats both stylesheets. */
                style={{ background: "rgba(17,24,39,0.45)", backdropFilter: "blur(12px)", zIndex: 96 }}
                onClick={(e) => e.target === e.currentTarget && !jobAction.busy && setJobAction(null)}>
-            <div className="w-full max-w-md rounded-2xl p-5"
+            <div className="relative w-full max-w-md rounded-2xl p-5"
                  style={{ background: "var(--surface-raised)", border: `1px solid ${isReceive ? "rgba(37,99,235,0.35)" : "rgba(22,163,74,0.35)"}`, boxShadow: "0 24px 70px rgba(17,24,39,0.2)" }}>
+              <ModalX onClose={() => setJobAction(null)} disabled={!!jobAction.busy} />
               <h3 className="text-base font-black text-slate-800 mb-1">{isReceive ? "Part received" : "Work completed"}</h3>
               <p className="text-[11px] text-slate-500 mb-3">
                 {m?.bomKey || "Machine"}{m?.serialNo ? ` · S/N ${m.serialNo}` : ""}{p.assignedDepartment ? ` · ${p.assignedDepartment}` : ""}
@@ -20026,8 +20186,9 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
         <div className="modal-backdrop fixed inset-0 z-[70] flex items-center justify-center p-4"
              style={{ background: "rgba(17,24,39,0.45)", backdropFilter: "blur(12px)" }}
              onClick={(e) => { if (e.target === e.currentTarget && !raiseBusy) { if (voiceRecRef.current) { voiceRecRef.current.stop(); voiceRecRef.current = null; setVoiceActive(false); } setRaiseModal(null); } }}>
-          <div className="w-full max-w-lg rounded-2xl p-6"
+          <div className="relative w-full max-w-lg rounded-2xl p-6"
                style={{ background: "var(--surface-raised)", border: "1px solid rgba(239,68,68,0.35)", boxShadow: "0 24px 70px rgba(17,24,39,0.2)" }}>
+            <ModalX disabled={raiseBusy} onClose={() => { if (voiceRecRef.current) { voiceRecRef.current.stop(); voiceRecRef.current = null; setVoiceActive(false); } setRaiseModal(null); }} />
             <h3 className="text-base font-black text-slate-800 mb-1">Report an issue</h3>
             <p className="text-[11px] text-slate-500 mb-4">
               {m.bomKey}{m.serialNo ? ` · S/N ${m.serialNo}` : ""} · in {here}
@@ -20328,8 +20489,9 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
         <div className="modal-backdrop fixed inset-0 z-[80] flex items-center justify-center p-4"
              style={{ background: "rgba(17,24,39,0.45)", backdropFilter: "blur(12px)" }}
              onClick={(e) => e.target === e.currentTarget && setRemoveRackConfirm(null)}>
-          <div className="w-full max-w-sm rounded-2xl overflow-hidden"
+          <div className="relative w-full max-w-sm rounded-2xl overflow-hidden"
                style={{ background: "var(--surface-elevated)", border: "1px solid rgba(239,68,68,0.4)", boxShadow: "0 40px 80px rgba(17,24,39,0.22)" }}>
+            <ModalX onClose={() => setRemoveRackConfirm(null)} />
             <div className="px-5 py-4 border-b border-slate-200" style={{ background: "rgba(239,68,68,0.06)" }}>
               <div className="text-sm font-black text-red-400">🗑 Remove Machine From Rack?</div>
               <div className="text-[10px] text-slate-500 mt-0.5">
@@ -20393,8 +20555,9 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
           <div className="modal-backdrop fixed inset-0 z-[90] flex items-center justify-center p-4"
                style={{ background: "rgba(17,24,39,0.45)", backdropFilter: "blur(10px)" }}
                onClick={(e) => e.target === e.currentTarget && !transferBusy && setFinishModal(null)}>
-            <div className="w-full max-w-md rounded-2xl overflow-hidden flex flex-col bg-white"
+            <div className="relative w-full max-w-md rounded-2xl overflow-hidden flex flex-col bg-white"
                  style={{ border: "1px solid #e2e8f0", boxShadow: "0 25px 60px rgba(0,0,0,0.18)", maxHeight: "90vh" }}>
+              <ModalX onClose={() => setFinishModal(null)} disabled={transferBusy} />
               <div className="px-6 py-5 border-b border-slate-100 flex-shrink-0 bg-white">
                 <div className="text-sm font-black text-slate-900">{rackReturn ? "Finish Assembly · Return to Rack" : "Finish & Transfer"}</div>
                 <div className="text-[11px] text-slate-500 mt-0.5">{machine.bomKey}{machine.serialNo ? ` · S/N ${machine.serialNo}` : ""}{rackReturn ? ` · back to ${slotLabel(machine.rackSlot)}` : ""}</div>
@@ -20724,8 +20887,9 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
           <div className="modal-backdrop fixed inset-0 z-[90] flex items-center justify-center p-4"
                style={{ background: "rgba(17,24,39,0.45)", backdropFilter: "blur(10px)" }}
                onClick={(e) => e.target === e.currentTarget && !busy && setAcceptModal(null)}>
-            <div className="w-full max-w-md rounded-2xl overflow-hidden flex flex-col"
+            <div className="relative w-full max-w-md rounded-2xl overflow-hidden flex flex-col"
                  style={{ background: "var(--surface-elevated)", border: "1px solid rgba(34,197,94,0.4)", boxShadow: "0 40px 80px rgba(17,24,39,0.22)", maxHeight: "90vh" }}>
+              <ModalX onClose={() => setAcceptModal(null)} disabled={!!busy} />
               <div className="px-6 py-5 border-b border-slate-200 flex-shrink-0"
                    style={{ background: "linear-gradient(90deg,rgba(34,197,94,0.10),rgba(22,163,74,0.05))" }}>
                 <div className="text-sm font-black text-slate-900">Accept into {handover.toDepartment}</div>
@@ -20911,8 +21075,9 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
           <div className="modal-backdrop fixed inset-0 z-[90] flex items-center justify-center p-4"
                style={{ background: "rgba(17,24,39,0.45)", backdropFilter: "blur(10px)" }}
                onClick={(e) => e.target === e.currentTarget && !busy && setDuringWorkModal(null)}>
-            <div className="w-full max-w-md rounded-2xl overflow-hidden flex flex-col"
+            <div className="relative w-full max-w-md rounded-2xl overflow-hidden flex flex-col"
                  style={{ background: "var(--surface-elevated)", border: "1px solid rgba(215, 25, 32,0.4)", boxShadow: "0 40px 80px rgba(17,24,39,0.22)", maxHeight: "90vh" }}>
+              <ModalX onClose={() => setDuringWorkModal(null)} disabled={!!busy} />
               <div className="px-6 py-4 border-b border-slate-200 flex-shrink-0"
                    style={{ background: "linear-gradient(90deg,rgba(215, 25, 32,0.12),rgba(176, 18, 24,0.05))" }}>
                 <div className="text-sm font-black text-slate-900">📋 During-Work Checks</div>
@@ -26482,7 +26647,7 @@ export default function App() {
                               isSuperAdmin={currentUser?.role === "super_admin"}
                               onReverseReceive={handleReverseReceive}
                               onSetItemDefaultRate={handleSetItemDefaultRate} />,
-    machines:  <MachinePage   machineLog={machineLog} outwardLog={outwardLog} onUpdateTrialCertificate={handleUpdateTrialCertificate} canView={canView} onUpdateStage={handleUpdateMachineStage} onNavigate={setActivePage} canDo={canDo}
+    machines:  <MachinePage   machineLog={machineLog} checklistResponses={checklistResponses} outwardLog={outwardLog} onUpdateTrialCertificate={handleUpdateTrialCertificate} canView={canView} onUpdateStage={handleUpdateMachineStage} onNavigate={setActivePage} canDo={canDo}
                               items={items}
                               /* 2026-10-30 — BOM Outward, embedded at the top. Shown
                                  only to roles that may issue a BOM, same as Outward. */
