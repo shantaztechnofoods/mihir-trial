@@ -28,6 +28,12 @@ const toRow = (p) => {
   if (p.itemName) row.item_name = String(p.itemName).trim();
   if (p.qty !== undefined && p.qty !== null && p.qty !== "" && !Number.isNaN(Number(p.qty))) row.qty = Number(p.qty);
   if (p.reason)   row.reason    = String(p.reason).trim();
+  // Migration 052 — items added at BOM Outward: the operator's critical /
+  // normal classification, the part's own serial, and where the job came
+  // from. Only set when given, so the missing-column retry path still works.
+  if (p.critical !== undefined)     row.critical       = !!p.critical;
+  if (p.partSerialNo)               row.part_serial_no = String(p.partSerialNo).trim();
+  if (p.source)                     row.source         = String(p.source).trim();
   return row;
 };
 const fromRow = (r) => ({
@@ -60,6 +66,10 @@ const fromRow = (r) => ({
   receivedNotes:        r.received_notes || "",
   // Migration 043 — department that recorded the receipt.
   receivedInDepartment: r.received_in_department || "",
+  // Migration 052 — added at BOM Outward.
+  critical:             r.critical === true,
+  partSerialNo:         r.part_serial_no || "",
+  source:               r.source || "",
 });
 
 // The job's permanent history, oldest first: Reported → Part received →
@@ -105,6 +115,7 @@ function isMissingColumnError(error) {
     || msg.includes("kind")
     || msg.includes("item_code") || msg.includes("item_name") || msg.includes("qty")
     || msg.includes("reason") || msg.includes("received_at")
+    || msg.includes("critical") || msg.includes("part_serial_no") || msg.includes("source")
     || (msg.includes("column") && msg.includes("does not exist"))
     || msg.includes("schema cache");
 }
@@ -134,9 +145,19 @@ export async function createPendingItem(p) {
   // Migration 033 may not have been applied yet. Strip the new column and
   // retry once so the deployed build keeps working against a pre-033 schema —
   // the assignment is simply not recorded until the migration runs.
+  // Migration 052 may not have been applied yet. Drop only its three columns
+  // and retry: the job is still recorded, it just does not carry the
+  // critical / part-serial / source attributes until the migration runs.
+  if (error && isMissingColumnError(error) && ("critical" in row || "part_serial_no" in row || "source" in row)) {
+    console.warn("[pending_items:create] 052 columns not in schema yet — retrying without them");
+    const { critical: _cr, part_serial_no: _ps, source: _src, ...pre052 } = row;
+    ({ data, error } = await c.from("pending_handover_items").insert(pre052).select().single());
+    if (!error) return { success: true, item: fromRow(data) };
+  }
   if (error && isMissingColumnError(error) && ("assigned_department" in row || "kind" in row || "item_code" in row || "item_name" in row || "qty" in row || "reason" in row)) {
     console.warn("[pending_items:create] 033/034/039 columns not in schema yet — retrying without them");
-    const { assigned_department: _a, kind: _k, item_code: _c, item_name: _n, qty: _q, reason: _r, ...legacyRow } = row;
+    const { assigned_department: _a, kind: _k, item_code: _c, item_name: _n, qty: _q, reason: _r,
+            critical: _cr2, part_serial_no: _ps2, source: _src2, ...legacyRow } = row;
     ({ data, error } = await c.from("pending_handover_items").insert(legacyRow).select().single());
   }
   if (error) { console.error("[pending_items:create] failed", error); return { success: false, error: error.message }; }

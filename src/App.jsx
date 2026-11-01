@@ -83,7 +83,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-10-31-champagne";
+const APP_BUILD = "2026-11-01-pending-items";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -11888,6 +11888,10 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
   const [addBaseQty,   setAddBaseQty]   = useState("1");
   const [addErr,       setAddErr]       = useState("");
   const [issueNote,    setIssueNote]    = useState("");
+  // 2026-11-01 — parts owed on this machine that are NOT BOM lines. They are
+  // raised as pending jobs against the machine's serial when the BOM is
+  // issued; no stock moves and nothing is added to the Item Master.
+  const [extraPending, setExtraPending] = useState([]);
   const [confirmIssue, setConfirmIssue] = useState(false);
   // Feature 1 (2026-06-01h, refined 2026-06-02c): destination for the issued
   // build. Default "rack" preserves the existing workflow. "direct" skips the
@@ -12393,7 +12397,8 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
     // payload. Only emitted when a serial is present (= machine will be
     // created). Non-serial manual outward sends nothing, matching legacy flow.
     const deptDurations = serialNo ? buildDeptDurations() : null;
-    onIssue({ bomKey, label: bom.label, units, issued, pending, note: issueNote, date: fmtDate(new Date()), serialNo, destination: finalDest, deptDurations, rackSet: rackSet || null, rackSlot: finalDest === "rack" ? (rackSet ? rackSet.slotId : slot) : null });
+    onIssue({ bomKey, label: bom.label, units, issued, pending, note: issueNote, date: fmtDate(new Date()), serialNo, destination: finalDest, deptDurations, rackSet: rackSet || null, rackSlot: finalDest === "rack" ? (rackSet ? rackSet.slotId : slot) : null,
+              extraPending: cleanPendingJobs(extraPending) });
     onClose();
   };
 
@@ -12903,6 +12908,37 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
             <input value={issueNote} onChange={(e) => setIssueNote(e.target.value)}
                    placeholder="Issue reference / note (optional)..."
                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-xs text-slate-700 placeholder-slate-400 outline-none focus:border-blue-500/30" />
+            {/* ── Pending items (2026-11-01) ──
+                A part owed on this machine that is not a BOM line: ordered
+                separately, promised later, or not in the Item Master at all.
+                Each one becomes a pending job on the machine's serial when
+                the BOM is issued, tracked across departments until it is
+                completed. Nothing is deducted from stock and no Item Master
+                record is created. Needs a serial — the job hangs off the
+                machine, so there must be a machine. */}
+            {serialNo && !rackSet && (
+              <div className="mt-2" data-extra-pending>
+                {extraPending.length === 0 ? (
+                  <button type="button" data-add-pending-item onClick={() => setExtraPending([emptyPendingJob()])}
+                          className="text-[11px] font-bold px-3 py-1.5 rounded-lg border transition-all"
+                          style={{ background: "rgba(180,83,9,0.08)", border: "1px solid rgba(180,83,9,0.4)", color: "#b45309" }}
+                          title="Record a part owed on this machine that is not part of the BOM">
+                    + Add Pending Item
+                  </button>
+                ) : (
+                  <div className="rounded-xl p-2.5" style={{ background: "rgba(180,83,9,0.05)", border: "1px solid rgba(180,83,9,0.28)" }}>
+                    <div className="flex items-baseline justify-between gap-2 mb-1.5 flex-wrap">
+                      <div className="text-[11px] font-black" style={{ color: "#b45309" }}>
+                        Pending items for S/N {serialNo}
+                      </div>
+                      <div className="text-[10px] text-slate-500">No stock is deducted · nothing is added to Item Master</div>
+                    </div>
+                    <PendingJobRows rows={extraPending} onChange={setExtraPending} inventory={allFlat}
+                                    addLabel="+ Add Pending Item" />
+                  </div>
+                )}
+              </div>
+            )}
             {/* The inline destination radio was removed (2026-06-02c) because
                 operators couldn't see it. The destination choice now appears as
                 a dedicated popup at commit time — see "Destination popup" below
@@ -13651,7 +13687,7 @@ function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, onCreateB
         .map((it) => ({ code: it.code, name: it.name, unit: it.unit,
                         qty: Number(it.criticalInput.requiredQty) || Number(it.required) || 0,
                         remark: it.criticalInput.remark || "" }));
-      onCreateMachine(data.bomKey, data.label, data.serialNo, data.date, id, data.destination || "rack", data.deptDurations || null, notIssued, data.rackSlot || null);
+      onCreateMachine(data.bomKey, data.label, data.serialNo, data.date, id, data.destination || "rack", data.deptDurations || null, notIssued, data.rackSlot || null, data.extraPending || []);
     }
     const destSuffix = data.destination === "direct" ? " · direct production" : "";
     showToast(data.rackSet ? `${data.rackSet.unit} filled · ${data.bomKey}` : `${data.bomKey} × ${data.units} issued${destSuffix}`, data.serialNo ? `S/N: ${data.serialNo}` : data.label);
@@ -16873,9 +16909,12 @@ function JobHistory({ item, users = [], compact = false }) {
 // what the job is (required); part code, quantity and reason are optional and
 // make the job traceable in Pending Jobs. Rows that are entirely empty are
 // dropped by the caller. Accepts legacy string rows and upgrades them.
-const emptyPendingJob = () => ({ description: "", itemCode: "", itemName: "", qty: "", reason: "" });
+// 2026-11-01 (migration 052) — a pending row can name a part that is not in
+// the Item Master, and carries the operator's Critical / Normal call plus the
+// part's own (optional) serial number.
+const emptyPendingJob = () => ({ description: "", itemCode: "", itemName: "", qty: "", reason: "", critical: false, partSerialNo: "" });
 const normalizePendingJob = (r) => typeof r === "string" ? { ...emptyPendingJob(), description: r } : { ...emptyPendingJob(), ...(r || {}) };
-const pendingJobIsBlank = (r) => { const j = normalizePendingJob(r); return !j.description.trim() && !j.itemCode.trim() && !j.reason.trim(); };
+const pendingJobIsBlank = (r) => { const j = normalizePendingJob(r); return !j.description.trim() && !j.itemCode.trim() && !j.itemName.trim() && !j.reason.trim(); };
 // Rows worth saving, with a description guaranteed (a part alone is enough).
 const cleanPendingJobs = (rows) => (Array.isArray(rows) ? rows : []).map(normalizePendingJob)
   .filter((j) => !pendingJobIsBlank(j))
@@ -16884,12 +16923,15 @@ const cleanPendingJobs = (rows) => (Array.isArray(rows) ? rows : []).map(normali
     itemCode: j.itemCode.trim(), itemName: j.itemName.trim(),
     qty: j.qty === "" || j.qty == null ? null : Number(j.qty),
     reason: j.reason.trim(),
+    critical: !!j.critical,
+    partSerialNo: (j.partSerialNo || "").trim(),
   }));
 
 function PendingJobRows({ rows, onChange, inventory = [], accent = "#b45309", addLabel = "+ Add pending job", disabled = false }) {
   const list = (Array.isArray(rows) ? rows : []).map(normalizePendingJob);
   const set = (i, patch) => onChange(list.map((r, idx) => idx === i ? { ...r, ...patch } : r));
   const codes = inventory.slice(0, 2000);
+  const invHit = (code) => !!(code || "").trim() && codes.some((it) => it.code.toLowerCase() === code.trim().toLowerCase());
   const listId = "pending-job-codes";
   const inp = "min-w-0 w-full rounded-lg px-2.5 py-2 text-[12px] text-slate-800 outline-none";
   const bd = { background: "var(--surface-elevated)", border: `1px solid ${accent}66` };
@@ -16928,7 +16970,34 @@ function PendingJobRows({ rows, onChange, inventory = [], accent = "#b45309", ad
                    placeholder="Reason — e.g. not in store, on order, damaged"
                    className={`col-span-2 sm:col-span-1 ${inp}`} style={bd} />
           </div>
-          {r.itemName && <div className="text-[10px] text-slate-500 px-0.5">{r.itemName}</div>}
+          {/* An item that is not in the Item Master is named here. Nothing is
+              created in Inventory and no stock moves — the name lives on the
+              job. The field fills itself when the code matches an item. */}
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_150px] gap-1.5">
+            <input value={r.itemName} disabled={disabled} data-job-name
+                   onChange={(e) => set(i, { itemName: e.target.value })}
+                   placeholder={invHit(r.itemCode) ? "Item name" : "Item name — type it if the part is not in Item Master"}
+                   className={inp} style={bd} />
+            <input value={r.partSerialNo} disabled={disabled} data-job-serial
+                   onChange={(e) => set(i, { partSerialNo: e.target.value })}
+                   placeholder="Part serial no. (optional)" className={`${inp} font-mono`} style={bd} />
+          </div>
+          <div className="flex items-center gap-1.5" data-job-class>
+            {[["normal", "Normal"], ["critical", "Critical"]].map(([k, label]) => {
+              const on = (k === "critical") === !!r.critical;
+              const col = k === "critical" ? "#dc2626" : "#15803d";
+              return (
+                <button key={k} type="button" disabled={disabled} data-job-critical={k}
+                        aria-pressed={on} onClick={() => set(i, { critical: k === "critical" })}
+                        className="text-[10.5px] font-bold px-2.5 py-1 rounded-lg border transition-all disabled:opacity-50"
+                        style={on ? { background: `${col}1a`, borderColor: `${col}66`, color: col }
+                                  : { background: "var(--surface-elevated)", borderColor: "var(--border-subtle)", color: "var(--text-dim)" }}>
+                  {label}
+                </button>
+              );
+            })}
+            {invHit(r.itemCode) && <span className="text-[10px] text-slate-500">in Item Master · no stock is deducted</span>}
+          </div>
         </div>
       ))}
       <button type="button" disabled={disabled} onClick={() => onChange([...list, emptyPendingJob()])}
@@ -17585,6 +17654,13 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(99,102,241,0.1)", color: "#4338ca" }}>
                         now in {m?.status === "completed" ? "Ready" : (m?.currentDepartment || m?.stage || "—")}
                       </span>
+                      {m?.status === "completed" && list.some((p) => p.status === "open") && (
+                        <span data-job-after-ready className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                              style={{ background: "rgba(217,119,6,0.12)", color: "#b45309", border: "1px solid rgba(217,119,6,0.35)" }}
+                              title="This machine has reached Ready but still has outstanding items">
+                          still outstanding after Ready
+                        </span>
+                      )}
                       <span className="text-[10px] text-slate-500 ml-auto">{list.length} job{list.length === 1 ? "" : "s"}</span>
                     </div>
                     <div className="divide-y" style={{ borderColor: "rgba(17,24,39,0.06)" }}>
@@ -17599,9 +17675,14 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                           <div key={p.id} className="px-3 py-2.5 flex items-start gap-3 flex-wrap">
                             <div className="flex-1 min-w-[200px]">
                               <div className="text-[12px] text-slate-800 font-semibold">{p.description}</div>
-                              {p.itemCode && (
-                                <div className="mt-1 text-[10.5px] text-slate-500">
-                                  Part <span className="font-mono font-bold text-slate-700">{p.itemCode}</span>{p.itemName ? ` · ${p.itemName}` : ""}{p.qty != null ? ` · qty ${p.qty}` : ""}
+                              {(p.itemCode || p.itemName) && (
+                                <div className="mt-1 text-[10.5px] text-slate-500" data-job-part>
+                                  Part {p.itemCode
+                                    ? <><span className="font-mono font-bold text-slate-700">{p.itemCode}</span>{p.itemName ? ` · ${p.itemName}` : ""}</>
+                                    : <span className="font-bold text-slate-700">{p.itemName}</span>}
+                                  {p.qty != null ? ` × ${p.qty}` : ""}
+                                  {p.partSerialNo ? <> · part S/N <span className="font-mono font-bold text-slate-700">{p.partSerialNo}</span></> : null}
+                                  {!p.itemCode && p.itemName ? " · not in Item Master" : ""}
                                 </div>
                               )}
                               {/* Permanent history: original reason, receive remark, completion. */}
@@ -17611,6 +17692,11 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(239,68,68,0.1)", color: "#b91c1c" }}>
                                 {p.assignedDepartment || "Unassigned"}
                               </span>
+                              {p.critical && (
+                                <span data-job-critical-chip className="text-[10px] font-black px-2 py-0.5 rounded-full"
+                                      style={{ background: "rgba(220,38,38,0.12)", color: "#b91c1c", border: "1px solid rgba(220,38,38,0.4)" }}
+                                      title="Classified critical when it was raised">CRITICAL</span>
+                              )}
                               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: chip.bg, color: chip.fg }}>{chip.label}</span>
                               {canAct && onReceivePendingItem && p.status === "open" && !p.receivedAt && (
                                 <button type="button" onClick={() => setJobAction({ item: p, action: "receive", notes: "", busy: false, error: "" })}
@@ -24746,7 +24832,7 @@ export default function App() {
   // quantity still owed, reason, the machine (serial) and — for a rack
   // machine — the rack it sits on. No stock moves for it. Used by a new
   // machine (M BOM / direct) and by an R crate filled for an existing one.
-  const raiseNotIssuedJobs = ({ machineId, notIssued = [], bomKey, serialNo, issueId = null, rackSlot = null }) => {
+  const raiseNotIssuedJobs = ({ machineId, notIssued = [], bomKey, serialNo, issueId = null, rackSlot = null, extraPending = [] }) => {
     for (const it of (Array.isArray(notIssued) ? notIssued : [])) {
       if (!it || !it.code) continue;
       const qtyTxt = it.qty ? ` × ${it.qty}${it.unit ? ` ${it.unit}` : ""}` : "";
@@ -24771,8 +24857,41 @@ export default function App() {
         });
       });
     }
+    // 2026-11-01 (migration 052) — items the operator added at BOM Outward.
+    // Same pending-job record as everything else, so they move with the
+    // machine across departments and keep their own history; they carry the
+    // Critical / Normal call, the part's serial and source 'bom_outward'.
+    // No stock is deducted and no Item Master row is created for them.
+    for (const j of (Array.isArray(extraPending) ? extraPending : [])) {
+      if (!j || (!j.description && !j.itemCode && !j.itemName)) continue;
+      const partName = j.itemName || j.itemCode || "part";
+      const qtyTxt   = j.qty ? ` × ${j.qty}` : "";
+      const snTxt    = j.partSerialNo ? ` · part S/N ${j.partSerialNo}` : "";
+      createPendingItem({
+        machineId,
+        raisedInHandoverId: null,
+        raisedInDepartment: "Stores",
+        assignedDepartment: "Stores",
+        raisedBy: currentUser?.id || null,
+        description: j.description || `Pending item added at BOM Outward: ${partName}${qtyTxt}`,
+        kind: "owed",
+        itemCode: j.itemCode || "", itemName: j.itemName || "", qty: j.qty ?? null, reason: j.reason || "",
+        critical: !!j.critical, partSerialNo: j.partSerialNo || "", source: "bom_outward",
+      }).then((pr) => {
+        if (!pr.success) { console.warn("[App] outward pending item save failed", pr.error); return; }
+        setPendingHandoverItems((prev) => [pr.item, ...prev]);
+        logAudit({
+          type: "pending_item_raised", module: "Machine",
+          action: `${j.critical ? "Critical" : "Normal"} pending item added at Outward: ${partName}${qtyTxt}${snTxt} — ${bomKey}${serialNo ? ` [${serialNo}]` : ""}`,
+          ref: bomKey, serialNo: serialNo || "",
+          details: { machineId, itemId: pr.item?.id, kind: "owed", assignedDepartment: "Stores", source: "bom_outward",
+                     itemCode: j.itemCode || "", itemName: j.itemName || "", qty: j.qty ?? null, reason: j.reason || "",
+                     critical: !!j.critical, partSerialNo: j.partSerialNo || "", issueId },
+        });
+      });
+    }
   };
-  const handleCreateMachine = (bomKey, bomLabel, serialNo, date, issueId, destination = "rack", deptDurations = null, notIssued = [], preferredSlot = null) => {
+  const handleCreateMachine = (bomKey, bomLabel, serialNo, date, issueId, destination = "rack", deptDurations = null, notIssued = [], preferredSlot = null, extraPending = []) => {
     const dateStr = date || fmtDate(new Date());
     // Feature 1: direct production lands the machine in Assembly immediately,
     // skipping the BOM Issued / rack waiting stage. Used for R&D, prototypes,
@@ -24840,7 +24959,7 @@ export default function App() {
     // store operator wrote. Kind 'owed': the machine may move through the
     // departments but cannot be marked Ready until the part is received and
     // the work completed. Raised once the machine's real id is known.
-    const raiseNotIssued = (machineId) => raiseNotIssuedJobs({ machineId, notIssued, bomKey, serialNo, issueId, rackSlot });
+    const raiseNotIssued = (machineId) => raiseNotIssuedJobs({ machineId, notIssued, bomKey, serialNo, issueId, rackSlot, extraPending });
     if (!isSupabaseEnabled()) raiseNotIssued(newMachine.id);
     // Adopt the id Postgres assigned.
     //

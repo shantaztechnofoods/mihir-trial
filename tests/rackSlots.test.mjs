@@ -498,3 +498,54 @@ test("App: Machine Tracker — Ready is the final stage, filters clear, cards ar
   assert.match(app, /data-open-reports[\s\S]{0,200}h-9 px-3 rounded-lg/);
   assert.match(app, /tabular-nums hidden sm:flex/, "clock visible from small screens up");
 });
+
+// 2026-11-01 — "+ Add Pending Item" at BOM Outward (migration 052). A part
+// owed on a machine that is not a BOM line: an Item Master code or a name
+// typed by hand, Critical or Normal, an optional part serial. It is raised as
+// a pending job on the machine's serial, moves with it across departments,
+// keeps its own history, and never touches stock or the Item Master.
+test("App + migration 052: pending items added at BOM Outward", async () => {
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
+  const app = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
+  const sql = fs.readFileSync(path.join(root, "supabase/migrations/052_pending_item_outward.sql"), "utf8");
+  const store = fs.readFileSync(path.join(root, "src/stores/pendingItemsStore.js"), "utf8");
+
+  // 1 — the option exists in BOM Outward, and only where a machine exists
+  assert.match(app, /data-add-pending-item onClick=\{\(\) => setExtraPending\(\[emptyPendingJob\(\)\]\)\}/);
+  assert.match(app, /\{serialNo && !rackSet && \([\s\S]{0,400}?data-extra-pending/);
+  assert.match(app, /<PendingJobRows rows=\{extraPending\} onChange=\{setExtraPending\} inventory=\{allFlat\}\s*\n\s*addLabel="\+ Add Pending Item" \/>/);
+
+  // 2/3 — Item Master code or a hand-typed name; Critical / Normal; part serial
+  assert.match(app, /const emptyPendingJob = \(\) => \(\{ description: "", itemCode: "", itemName: "", qty: "", reason: "", critical: false, partSerialNo: "" \}\);/);
+  assert.match(app, /data-job-name[\s\S]{0,260}?not in Item Master/);
+  assert.match(app, /data-job-serial[\s\S]{0,200}?Part serial no\. \(optional\)/);
+  assert.match(app, /data-job-critical=\{k\}/);
+  assert.match(app, /critical: !!j\.critical,\s*\n\s*partSerialNo: \(j\.partSerialNo \|\| ""\)\.trim\(\),/);
+
+  // 4 — raised against the machine, one job per row, carried to the store
+  assert.match(app, /onCreateMachine\(data\.bomKey, data\.label, data\.serialNo, data\.date, id, data\.destination \|\| "rack", data\.deptDurations \|\| null, notIssued, data\.rackSlot \|\| null, data\.extraPending \|\| \[\]\)/);
+  assert.match(app, /const raiseNotIssued = \(machineId\) => raiseNotIssuedJobs\(\{ machineId, notIssued, bomKey, serialNo, issueId, rackSlot, extraPending \}\);/);
+  assert.match(app, /critical: !!j\.critical, partSerialNo: j\.partSerialNo \|\| "", source: "bom_outward",/);
+  assert.match(app, /type: "pending_item_raised", module: "Machine",\s*\n\s*action: `\$\{j\.critical \? "Critical" : "Normal"\} pending item added at Outward/);
+  assert.match(store, /if \(p\.critical !== undefined\)\s+row\.critical\s+= !!p\.critical;/);
+  assert.match(store, /partSerialNo:\s+r\.part_serial_no \|\| "",/);
+  // no Item Master write and no stock move on this path
+  const raiseFn = app.slice(app.indexOf("const raiseNotIssuedJobs ="), app.indexOf("const handleCreateMachine ="));
+  for (const forbidden of ["handleUpdateStock", "onUpdateBOM", "setItems", "stockMovement", "deductStock"])
+    assert.ok(!raiseFn.includes(forbidden), `pending items never ${forbidden}`);
+
+  // 5 — outstanding items stay visible once the machine is Ready
+  assert.match(app, /data-job-after-ready[\s\S]{0,520}?still outstanding after Ready/);
+  assert.match(app, /const allJobsScoped = \(pendingHandoverItems \|\| \[\]\)\s*\n\s*\.filter\(\(p\) => !scopeMine \|\| myDepartments\.includes\(p\.assignedDepartment\)\);/);
+  assert.ok(!/allJobsScoped[\s\S]{0,200}status !== "completed"/.test(app), "the jobs list is not filtered by machine status");
+  assert.match(app, /data-job-critical-chip/);
+
+  // migration: additive only, no table or policy rewrite
+  assert.match(sql, /ADD COLUMN IF NOT EXISTS critical\s+boolean NOT NULL DEFAULT false,/);
+  assert.match(sql, /ADD COLUMN IF NOT EXISTS part_serial_no text,/);
+  assert.match(sql, /ADD COLUMN IF NOT EXISTS source\s+text;/);
+  for (const forbidden of [/DROP TABLE/, /DELETE FROM/, /TRUNCATE/, /CREATE POLICY/, /ALTER POLICY/, /DROP POLICY/])
+    assert.doesNotMatch(sql, forbidden, `migration never ${forbidden}`);
+});
