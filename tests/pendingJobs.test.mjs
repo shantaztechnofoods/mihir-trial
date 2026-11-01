@@ -94,14 +94,23 @@ test("READY is final and reached only through Trial", () => {
   assert.match(app, /MACHINE_STAGES\.filter\(\(s, i\) => i > curIdx && s !== "Ready"\)/);
 });
 
-test("every path to Ready asks the pending-jobs gate", () => {
-  // Finish & Transfer (Trial → Ready), Accept into Ready, admin stage change.
-  const n = (app.match(/readyBlockedError\(/g) || []).length;
-  // Finish & Transfer to Ready and Accept into Ready; the admin stage change
-  // can no longer set Ready at all (see the READY test below).
-  assert.ok(n >= 2, `expected the gate on both Ready paths, found ${n} calls`);
-  assert.match(app, /if \(toDepartment === "Ready"\) \{[\s\S]{0,400}?const blocked = readyBlockedError\(machineId\)/);
-  assert.match(app, /handover\.toDepartment === "Ready"\) \{[\s\S]{0,300}?const blocked = readyBlockedError\(handover\.machineId\)/);
+// 2026-11-01 — the gate is gone on purpose: issues and pending jobs are
+// tracking, never a block. No path to Ready consults an open-item count, and
+// no card renders a disabled "Blocked" / "Cannot be Ready" button. What is
+// outstanding stays visible and resolvable; the Trial Certificate rule and
+// every permission check are untouched.
+test("open jobs and issues never gate Ready, transfer, accept or a stage change", () => {
+  assert.equal((app.match(/readyBlockedError\(/g) || []).length, 0, "no Ready gate left");
+  assert.doesNotMatch(app, /Cannot mark Ready — \$\{open\.length\}/);
+  assert.doesNotMatch(app, /Blocked · \{machineOpenItems\.length\}/);
+  assert.doesNotMatch(app, /Cannot be Ready · \{machineOpenAll\.length\}/);
+  // the READY hop still needs the Trial Certificate, and permissions still apply
+  assert.match(app, /if \(fromDepartment !== "Trial" \|\| !trialCertificate\) \{/);
+  assert.match(app, /if \(handover\.fromDepartment !== "Trial"\) \{/);
+  assert.match(app, /if \(!canAcceptHandover\(authCanDo, handover\.toDepartment\)\)/);
+  // an open item is still recorded and still reachable from the card
+  assert.match(app, /data-card-jobs=\{machine\.id\} data-card-issues=\{machineOpenItems\.length \|\| undefined\}/);
+  assert.match(app, /onClick=\{\(\) => setJobsDrawer\(machine\.id\)\}/);
 });
 
 test("racks are the fixed floor racks only — no capacity from the BOM", () => {

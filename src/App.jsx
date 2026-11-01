@@ -83,7 +83,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-01-rack-face";
+const APP_BUILD = "2026-11-01-issues-tracking";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -18031,7 +18031,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                 <span className="sp-pill sp-pill-red">{openJobsScoped.length} open</span>
                 {partsN > 0 && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(217,119,6,0.12)", color: "#b45309" }}>{partsN} missing part{partsN === 1 ? "" : "s"}</span>}
                 {receivedN > 0 && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(37,99,235,0.1)", color: "#1d4ed8" }}>{receivedN} part{receivedN === 1 ? "" : "s"} received · work to finish</span>}
-                <span className="text-[10px]" style={{ color: "var(--text-dim)" }}>a machine cannot be marked Ready while any job here is open</span>
+                <span className="text-[10px]" style={{ color: "var(--text-dim)" }}>tracked until completed — an open job never stops a machine moving on</span>
                 <div className="ml-auto flex items-center gap-1 rounded-lg p-0.5" style={{ background: "rgba(17,24,39,0.05)" }} role="group" aria-label="Show jobs">
                   {[["open", "Open"], ["done", "Completed"], ["all", "All"]].map(([k, l]) => (
                     <button key={k} type="button" onClick={() => setJobsView(k)} aria-pressed={jobsView === k}
@@ -19264,41 +19264,22 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                           Report Issue
                         </button>
                       )}
+                      {/* 2026-11-01 — issues and pending jobs are TRACKING, not
+                          gates. The disabled "Blocked · N open issues" and
+                          "Cannot be Ready · N pending jobs" buttons are gone:
+                          an open item never freezes Finish & Transfer, accept,
+                          a stage update or any other workflow. What is
+                          outstanding is still shown — as the clickable chip
+                          below, which opens the same drawer where an
+                          authorised user reads the detail and marks it
+                          resolved. */}
                       {!isComplete && nextDepartment(machine.currentDepartment || machine.stage) && !machine.pendingHandoverId && canFinishTransfer(canDo) && onFinishTransfer && (
-                        /* A floor login is never blocked from moving a machine on:
-                           the shop floor must not stall at a button. Open faults
-                           still show as the "Go and fix" bucket + a heads-up, but
-                           they no longer freeze Finish & Transfer. Office/admin
-                           views keep the explicit block so a supervisor can see
-                           why a machine should not have moved. */
-                        (!isFloorLogin && machineOpenItems.length > 0) ? (
-                          /* Phase 1 — blocked while faults are open. Disabled rather
-                             than hidden, so the operator can see WHY the machine
-                             cannot move and how many items remain. */
-                          <button type="button" disabled
-                                  className="text-[11px] font-black px-3 py-1.5 rounded-lg border cursor-not-allowed"
-                                  style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.3)", color: "#dc2626" }}
-                                  title={`${machineOpenItems.length} open issue${machineOpenItems.length === 1 ? "" : "s"} must be resolved before this machine can move on. Open History to resolve them.`}>
-                            Blocked · {machineOpenItems.length} open issue{machineOpenItems.length === 1 ? "" : "s"}
-                          </button>
-                        ) : (nextDepartment(machine.currentDepartment || machine.stage) === "Ready" && machineOpenAll.length > 0) ? (
-                          /* Phase 1 — a machine may move between departments with
-                             work still owed on it, but it must not be presented as
-                             ready for delivery while anything is outstanding. */
-                          <button type="button" disabled
-                                  className="text-[11px] font-black px-3 py-1.5 rounded-lg border cursor-not-allowed"
-                                  style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.3)", color: "#dc2626" }}
-                                  title={`${machineOpenAll.length} pending job${machineOpenAll.length === 1 ? "" : "s"} still open on this machine (${[...new Set(machineOpenAll.map((p) => p.assignedDepartment).filter(Boolean))].join(", ") || "unassigned"}). It cannot be marked Ready until they are completed in Pending Jobs.`}>
-                            Cannot be Ready · {machineOpenAll.length} pending job{machineOpenAll.length === 1 ? "" : "s"}
-                          </button>
-                        ) : (
-                          <button onClick={() => openFinishModal(machine)}
-                                  className={`font-black text-white rounded-lg transition-all ${isFloorLogin ? "text-[14px] px-5 py-2.5" : "text-[11px] px-3 py-1.5"}`}
-                                  style={{ background: "#15803d", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}
-                                  title={`Finish ${machine.currentDepartment || machine.stage} → ${nextDepartment(machine.currentDepartment || machine.stage)}`}>
-                            {isFloorLogin ? `✓ Send to → ${nextDepartment(machine.currentDepartment || machine.stage)}` : "Finish & Transfer →"}
-                          </button>
-                        )
+                        <button onClick={() => openFinishModal(machine)}
+                                className={`font-black text-white rounded-lg transition-all ${isFloorLogin ? "text-[14px] px-5 py-2.5" : "text-[11px] px-3 py-1.5"}`}
+                                style={{ background: "#15803d", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}
+                                title={`Finish ${machine.currentDepartment || machine.stage} → ${nextDepartment(machine.currentDepartment || machine.stage)}`}>
+                          {isFloorLogin ? `✓ Send to → ${nextDepartment(machine.currentDepartment || machine.stage)}` : "Finish & Transfer →"}
+                        </button>
                       )}
                       {machine.pendingHandoverId && (() => {
                         const h = (handovers || []).find((x) => x.id === machine.pendingHandoverId && x.status === "pending");
@@ -19361,13 +19342,20 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                           </div>
                         );
                       })()}
-                      {/* 2026-10-31 — direct pending-job tracking from the card */}
+                      {/* 2026-10-31 / 2026-11-01 — the one chip for everything
+                          still open on this machine. It opens the drawer with
+                          the full detail and the Part received / Work completed
+                          actions, so an open issue can be read and resolved
+                          from the card without ever gating the workflow. */}
                       {machineOpenAll.length > 0 && (
-                        <button type="button" data-card-jobs={machine.id} onClick={() => setJobsDrawer(machine.id)}
+                        <button type="button" data-card-jobs={machine.id} data-card-issues={machineOpenItems.length || undefined}
+                                onClick={() => setJobsDrawer(machine.id)}
                                 className="text-[10px] font-black px-2.5 py-1.5 rounded-lg border transition-all"
                                 style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.35)", color: "#b91c1c" }}
-                                title={`${machineOpenAll.length} pending job${machineOpenAll.length === 1 ? "" : "s"} on ${machine.serialNo || machine.bomKey} — open to record Part received / Work completed`}>
-                          ⏳ Pending Jobs · {machineOpenAll.length}
+                                title={`${machineOpenItems.length ? `${machineOpenItems.length} open issue${machineOpenItems.length === 1 ? "" : "s"} · ` : ""}${machineOpenAll.length} item${machineOpenAll.length === 1 ? "" : "s"} open on ${machine.serialNo || machine.bomKey} — tap to see the detail and mark them resolved. Tracking only: nothing is blocked.`}>
+                          {machineOpenItems.length > 0
+                            ? `⚠ ${machineOpenItems.length} open issue${machineOpenItems.length === 1 ? "" : "s"}${machineOpenAll.length > machineOpenItems.length ? ` · ${machineOpenAll.length - machineOpenItems.length} owed` : ""}`
+                            : `⏳ Pending Jobs · ${machineOpenAll.length}`}
                         </button>
                       )}
                       {/* Migration 032 — Certificate view button for Trial-completed machines */}
@@ -20625,7 +20613,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                     Anything still pending from {fromDepartment}?
                   </div>
                   <div className="text-[10px] text-slate-500 mb-2.5">
-                    Leave empty if the work is complete. Anything listed here stays on {fromDepartment}&apos;s list and the machine cannot be marked Ready until it is done.
+                    Leave empty if the work is complete. Anything listed here stays on {fromDepartment}&apos;s list until it is done — it is tracked, and it does not stop the machine moving on.
                   </div>
                   <PendingJobRows rows={finishModal.owedItems || []} inventory={inventoryFlat} disabled={transferBusy}
                                   onChange={(rows) => setFinishModal((prev) => prev ? { ...prev, owedItems: rows } : prev)} />
@@ -25019,17 +25007,13 @@ export default function App() {
     }
   };
 
-  // 2026-10-30 — a machine is never Ready while a pending job on it is open
-  // (a part still to be received, work still to be completed). Every path to
-  // Ready — Finish & Transfer, Accept, the admin stage change — asks this.
-  const openJobsBlockingReady = (machineId) =>
-    (pendingHandoverItems || []).filter((p) => String(p.machineId) === String(machineId) && p.status === "open");
-  const readyBlockedError = (machineId) => {
-    const open = openJobsBlockingReady(machineId);
-    if (open.length === 0) return null;
-    const depts = [...new Set(open.map((p) => p.assignedDepartment).filter(Boolean))].join(", ");
-    return `Cannot mark Ready — ${open.length} pending job${open.length === 1 ? "" : "s"} still open${depts ? ` (${depts})` : ""}. Complete them in Pending Jobs first.`;
-  };
+  // 2026-11-01 — issues and pending jobs are TRACKING, not gates. The Ready
+  // hop used to be refused while any item was open (and the card showed a
+  // disabled "Cannot be Ready" button); both are gone. An open item is
+  // recorded, shown on the machine card, in Pending Jobs and in the reports,
+  // and resolved when the work is done — it never stops a transfer, an
+  // acceptance or a stage change. The Trial Certificate rule for READY and
+  // every permission check are unchanged.
 
   const handleUpdateMachineStage = (machineId, newStage) => {
     const dateStr = fmtDate(new Date());
@@ -25380,8 +25364,6 @@ export default function App() {
       if (fromDepartment !== "Trial" || !trialCertificate) {
         return { success: false, error: "READY needs the Trial Certificate — finish Trial first." };
       }
-      const blocked = readyBlockedError(machineId);
-      if (blocked) return { success: false, error: blocked };
     }
     // Race guard: a second click within the same tick still sees
     // pendingHandoverId as null. The ref flips synchronously, so the duplicate
@@ -25635,8 +25617,6 @@ export default function App() {
       if (handover.fromDepartment !== "Trial") {
         return { success: false, error: "READY can only be accepted from Trial." };
       }
-      const blocked = readyBlockedError(handover.machineId);
-      if (blocked) return { success: false, error: blocked };
     }
 
     // Permission check (receiving dept role; auto-mapped from updateStage).
