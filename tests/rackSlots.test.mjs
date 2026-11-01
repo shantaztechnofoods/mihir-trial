@@ -817,7 +817,13 @@ test("Machine report: every recorded field is still printed, and the A4 rules ho
   assert.match(css, /@bottom-right \{ content: "Page " counter\(page\) " of " counter\(pages\);/);
   assert.match(css, /\.mr-doc \{ page: machine-report;/);
   assert.match(rep, /<thead><tr><td><div className="mr-runhead">/);
-  assert.match(css, /\.mr-doc \.mr-appendix \{ break-before: page;/);
+  // Pagination: no forced page breaks (they left pages 2 and 5 nearly empty);
+  // headings stay with their content and blocks are kept whole instead.
+  assert.doesNotMatch(css, /break-before: page/);
+  assert.match(css, /\.mr-doc \.mr-appendix \{ margin-top: 16pt; padding-top: 8pt; border-top:/);
+  assert.match(css, /\.mr-doc \.mr-sec > \.mr-h \+ \* \{ break-before: avoid;/);
+  assert.match(css, /\.mr-doc \.mr-cert table, \.mr-doc \.mr-cert \.tc-note, \.mr-doc \.mr-cert \.tc-sigs \{ break-inside: avoid;/);
+  assert.match(css, /\.mr-doc \.mr-check \{[^}]*break-inside: avoid;/);
   assert.match(css, /\.mr-doc \.mr-tr, \.mr-doc \.mr-issue, \.mr-doc \.mr-hop/);
   assert.match(app, /printWithTitle\(machineReportRef\(m\), \{ bodyClass: "print-machine-report" \}\)/);
   assert.match(app, /if \(tab === "machine"\) \{[\s\S]{0,500}?printWithTitle\(machineReportRef\(m\)\);/);

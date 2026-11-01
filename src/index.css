@@ -2978,8 +2978,26 @@ html, body, #root { background: var(--champagne-wash); }
   .mr-doc .mr-h { break-after: avoid; page-break-after: avoid; }
   .mr-doc .mr-tr, .mr-doc .mr-issue, .mr-doc .mr-hop, .mr-doc .mr-check-row, .mr-doc .mr-avoid,
   .mr-doc .mr-letterhead, .mr-doc .mr-identity, .mr-doc .mr-summary, .mr-doc .mr-strip { break-inside: avoid; page-break-inside: avoid; }
-  .mr-doc .mr-appendix { break-before: page; page-break-before: always; }
+  /* 2026-11-01 — no forced page breaks: the appendix and the certificate flow
+     on after the content before them, and a ruled heading marks where each
+     starts. Splits are prevented inside rows, issues, hand-overs, checklist
+     blocks and certificate tables, and a heading never ends a page alone. */
+  .mr-doc .mr-appendix { margin-top: 16pt; padding-top: 8pt; border-top: 1.5pt solid #14110d; }
   .mr-doc .mr-sig svg { height: 22pt; }
+  .mr-doc .mr-sec { margin-top: 14pt; }
+  .mr-doc .mr-identity { margin-top: 10pt; }
+  .mr-doc .mr-facts { margin-top: 8pt; gap: 5pt 14pt; }
+  .mr-doc .mr-summary { margin-top: 9pt; padding: 6pt 0; }
+  .mr-doc .mr-tr { padding: 4pt 0; }
+  .mr-doc .mr-th { padding: 3pt 0; }
+  .mr-doc .mr-strip { margin-bottom: 7pt; }
+  .mr-doc .mr-issue-history { padding-bottom: 5pt; }
+  .mr-doc .mr-check { padding: 5pt 0 3pt; margin-bottom: 6pt; break-inside: avoid; page-break-inside: avoid; }
+  .mr-doc .mr-check-row { padding: 2pt 0; }
+  .mr-doc .mr-sign-line { height: 30pt; }
+  .mr-doc .mr-footnote { margin-top: 12pt; }
+  /* Keep a section heading with what follows it, and a short section whole. */
+  .mr-doc .mr-sec > .mr-h + * { break-before: avoid; page-break-before: avoid; }
 }
 /* D9 — the report as a sheet of paper wherever it is shown on screen */
 .mr-paper { background: #fff; border: 1px solid var(--border-subtle, #e5e7eb); border-radius: 6px;
@@ -3001,7 +3019,20 @@ html, body, #root { background: var(--champagne-wash); }
 .mr-doc .mr-cert .tc-foot { position: static; margin-top: 4mm; }
 @media print {
   #erp-build-badge { display: none !important; }
-  .mr-doc .mr-cert-sec { break-before: page; page-break-before: always; }
+  .mr-doc .mr-cert .tc-title, .mr-doc .mr-cert .tc-rule, .mr-doc .mr-cert .tc-head, .mr-doc .mr-cert .tc-sec { break-after: avoid; page-break-after: avoid; }
+  .mr-doc .mr-cert table, .mr-doc .mr-cert .tc-note, .mr-doc .mr-cert .tc-sigs { break-inside: avoid; page-break-inside: avoid; }
+  .mr-doc .mr-cert .tc-title { font-size: 13pt; margin-bottom: 1.5mm; }
+  /* Same type sizes, tighter cell padding and gaps, so the certificate sits
+     on one page instead of spilling its remarks and signatures onto the next. */
+  .mr-doc .mr-cert .tc-sheet th, .mr-doc .mr-cert .tc-sheet td { padding: 0.3mm 1.8mm; }
+  .mr-doc .mr-cert .tc-rule { margin-bottom: 2.5mm; }
+  .mr-doc .mr-cert .tc-sec { margin-top: 1.8mm; padding: 0.8mm 2.5mm; }
+  .mr-doc .mr-cert .tc-note { min-height: 6mm; }
+  .mr-doc .mr-cert .tc-sigs { margin-top: 2mm; }
+  .mr-doc .mr-cert .tc-head { gap: 2mm 10mm; }
+  .mr-doc .mr-cert .tc-sigimg { height: 10mm; }
+  .mr-doc .mr-cert .tc-sigs { break-after: avoid; page-break-after: avoid; }
+  .mr-doc .mr-cert .tc-foot { margin-top: 1.5mm; break-before: avoid; page-break-before: avoid; }
   .mr-doc .mr-cert { border: 0; padding: 0; overflow: visible; }
   .mr-doc .mr-cert tr { break-inside: avoid; page-break-inside: avoid; }
 }
