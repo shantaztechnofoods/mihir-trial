@@ -83,7 +83,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-01-rack-actions";
+const APP_BUILD = "2026-11-01-rack-actions-fix";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -17070,6 +17070,14 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
   // Phase 1 — raise-issue modal: { machine } while open.
   const [raiseModal, setRaiseModal] = useState(null);
   // 2026-10-30 — pending jobs: part lookup + receive/complete actions.
+  // Item Master by code — the rack crate face and the rack details panel both
+  // ask it for stock when they run bomFillCheck. It used to live inside the
+  // panel's own block, where the crate face could not see it (2026-11-01).
+  const itemByCode = useMemo(() => {
+    const by = {};
+    Object.values(items || {}).forEach((l) => (Array.isArray(l) ? l : []).forEach((i) => { if (i && i.code) by[i.code] = i; }));
+    return by;
+  }, [items]);
   const inventoryFlat = useMemo(() => Object.entries(items || {}).flatMap(([cat, list]) => (list || []).map((i) => ({ code: i.code, name: i.name, unit: i.unit, category: cat }))), [items]);
   const [jobAction, setJobAction] = useState(null); // { item, action: "receive"|"complete", notes, busy, error }
   // 2026-10-31 — machine whose pending jobs are open in the card drawer.
@@ -18712,8 +18720,6 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
             const color = RACK_UNIT_COLORS[`${rack.tier}-${f.label}`] || f.color;
             const st = RACK_UNIT_STATUS[sl.status] || RACK_UNIT_STATUS.empty;
             const bi = rackBomInfo(rack);
-            const itemByCode = {};
-            Object.values(items || {}).forEach((l) => (Array.isArray(l) ? l : []).forEach((i) => { if (i && i.code) itemByCode[i.code] = i; }));
             const lines = bi.exists ? (bi.def.items || []).filter((l) => l && l.code).map((l, i) => {
               const inv = itemByCode[l.code]; const need = Number(l.qty) || 0; const have = inv ? (Number(inv.stock) || 0) : 0;
               return { n: i + 1, code: l.code, name: inv ? inv.name : l.code, unit: inv ? (inv.unit || "") : "", need, have, ok: !!inv && have >= need, unknown: !inv };

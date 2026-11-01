@@ -653,3 +653,22 @@ test("App: rack crate face is condition-aware and the panel is untouched", async
                       'data-action="remove"', 'Rack details panel', 'rackPanelTab === "bom"', 'Stock Status'])
     assert.ok(app.includes(keep), `${keep} still present`);
 });
+
+// 2026-11-01 hotfix — the crate face runs bomFillCheck against the Item
+// Master, so the lookup must live in the page's own scope, not inside the
+// details-panel block where only the panel could see it. Referencing it from
+// the face threw "itemByCode is not defined" and the whole page error-boundaried.
+test("App: itemByCode is page-scoped, so the rack crate face can read stock", async () => {
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
+  const app = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
+  assert.equal((app.match(/const itemByCode\b/g) || []).length, 1, "exactly one definition");
+  assert.match(app, /const itemByCode = useMemo\(\(\) => \{[\s\S]{0,260}?\}, \[items\]\);/);
+  // defined before both readers: the crate face and the details panel
+  const def = app.indexOf("const itemByCode = useMemo");
+  assert.ok(def > 0 && def < app.indexOf("bomFillCheck(rack.bom.primary, bomDefs, (c) => itemByCode[c])"),
+    "declared above the crate face that uses it");
+  assert.equal((app.match(/bomFillCheck\(rack\.bom\.primary, bomDefs, \(c\) => itemByCode\[c\]\)/g) || []).length, 2,
+    "both the face and the panel use the same lookup");
+});
