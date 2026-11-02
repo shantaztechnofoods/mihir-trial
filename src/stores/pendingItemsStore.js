@@ -34,6 +34,8 @@ const toRow = (p) => {
   if (p.critical !== undefined)     row.critical       = !!p.critical;
   if (p.partSerialNo)               row.part_serial_no = String(p.partSerialNo).trim();
   if (p.source)                     row.source         = String(p.source).trim();
+  // Migration 056 — critical check points ticked at Outward (no serial).
+  if (p.criticalChecks && Array.isArray(p.criticalChecks.points) && p.criticalChecks.points.length) row.critical_checks = p.criticalChecks;
   return row;
 };
 const fromRow = (r) => ({
@@ -70,6 +72,8 @@ const fromRow = (r) => ({
   critical:             r.critical === true,
   partSerialNo:         r.part_serial_no || "",
   source:               r.source || "",
+  // Migration 056 — critical check points ticked at BOM Outward, or null.
+  criticalChecks:       (r.critical_checks && Array.isArray(r.critical_checks.points)) ? r.critical_checks : null,
   // Migration 054 — running total received across all receipts. Remaining
   // pending = qty − receivedQty (see pendingItemRemaining). Receipts
   // themselves are attached by fetchPendingItems as `receipts`.
@@ -156,7 +160,7 @@ function isMissingColumnError(error) {
     || msg.includes("kind")
     || msg.includes("item_code") || msg.includes("item_name") || msg.includes("qty")
     || msg.includes("reason") || msg.includes("received_at")
-    || msg.includes("critical") || msg.includes("part_serial_no") || msg.includes("source")
+    || msg.includes("critical") || msg.includes("critical_checks") || msg.includes("part_serial_no") || msg.includes("source")
     || (msg.includes("column") && msg.includes("does not exist"))
     || msg.includes("schema cache");
 }
@@ -191,7 +195,7 @@ export async function createPendingItem(p) {
     return { success: true, item: row };
   }
   const c = getSupabase(); if (!c) return { success: false, error: "no client" };
-  const row = toRow(p);
+  let row = toRow(p);
   let { data, error } = await c.from("pending_handover_items").insert(row).select().single();
   // Migration 033 may not have been applied yet. Strip the new column and
   // retry once so the deployed build keeps working against a pre-033 schema —
@@ -199,6 +203,14 @@ export async function createPendingItem(p) {
   // Migration 052 may not have been applied yet. Drop only its three columns
   // and retry: the job is still recorded, it just does not carry the
   // critical / part-serial / source attributes until the migration runs.
+  // Migration 056 not applied yet: drop only critical_checks and retry.
+  if (error && isMissingColumnError(error) && "critical_checks" in row) {
+    console.warn("[pending_items:create] 056 column not in schema yet — retrying without it");
+    const { critical_checks: _cc, ...pre056 } = row;
+    ({ data, error } = await c.from("pending_handover_items").insert(pre056).select().single());
+    if (!error) return { success: true, item: fromRow(data) };
+    row = pre056;
+  }
   if (error && isMissingColumnError(error) && ("critical" in row || "part_serial_no" in row || "source" in row)) {
     console.warn("[pending_items:create] 052 columns not in schema yet — retrying without them");
     const { critical: _cr, part_serial_no: _ps, source: _src, ...pre052 } = row;

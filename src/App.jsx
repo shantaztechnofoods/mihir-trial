@@ -84,7 +84,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-02-transfer-main-fix";
+const APP_BUILD = "2026-11-02-pending-critical-checks";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -16869,6 +16869,7 @@ const cleanPendingJobs = (rows) => (Array.isArray(rows) ? rows : []).map(normali
     reason: j.reason.trim(),
     critical: !!j.critical,
     partSerialNo: (j.partSerialNo || "").trim(),
+    criticalChecks: (j.critical && !(j.partSerialNo || "").trim() && j.criticalChecks && Array.isArray(j.criticalChecks.points) && j.criticalChecks.points.length) ? j.criticalChecks : null,
   }));
 
 // 2026-11-01 — every Machine Tracker popup gets a visible close control in
@@ -16912,6 +16913,7 @@ function PendingJobRows({ rows, onChange, inventory = [], accent = "#b45309", ad
               {r.critical ? "Critical" : "Not critical"}
             </span>
             {r.partSerialNo && <span className="text-[10.5px] font-mono text-slate-600">S/N {r.partSerialNo}</span>}
+            {r.criticalChecks && <span data-pending-item-checks className="text-[10.5px] text-slate-600">{r.criticalChecks.points.filter((x) => x.ok).length}/{r.criticalChecks.points.length} check points ticked</span>}
             <span className="ml-auto flex gap-1.5">
               <button type="button" disabled={disabled} data-pending-item-edit onClick={() => set(i, { saved: false })}
                       className="text-[11px] font-bold text-slate-600 px-2 rounded-lg border border-slate-200">Edit</button>
@@ -16948,11 +16950,45 @@ function PendingJobRows({ rows, onChange, inventory = [], accent = "#b45309", ad
                      onChange={(e) => set(i, { partSerialNo: e.target.value })}
                      placeholder="Part serial no. (optional)" className={`${inp} font-mono flex-1 min-w-[140px]`} style={bd} />
             </div>
+            {/* Critical = Yes and no serial typed: the Item Master check points
+                for this item (matched by its name) as a checklist. A serial
+                number, when entered, replaces it. Serial stays optional. */}
+            {r.critical && !r.partSerialNo.trim() && (() => {
+              const nm = r.itemName.trim().toLowerCase();
+              const hit = nm ? codes.find((it) => (it.name || "").trim().toLowerCase() === nm || (it.code || "").trim().toLowerCase() === nm) : null;
+              const pts = hit && Array.isArray(hit.checkPoints) ? hit.checkPoints.filter(Boolean) : [];
+              const ticks = r.ticks || {};
+              return (
+                <div data-critical-checks className="rounded-lg px-2.5 py-2 space-y-1" style={{ background: "rgba(239,68,68,0.05)", border: "1px solid rgba(239,68,68,0.28)" }}>
+                  <div className="text-[10.5px] font-black" style={{ color: "#b91c1c" }}>Critical item check points</div>
+                  {pts.length === 0 ? (
+                    <div data-critical-checks-none className="text-[10.5px] text-slate-500">
+                      {hit ? "No check points are set for this item in Item Master." : "No Item Master item with this name — no check points to show. Type a serial number or save without."}
+                    </div>
+                  ) : pts.map((cp, k) => (
+                    <label key={k} className="flex items-start gap-2 text-[11.5px] text-slate-800 cursor-pointer">
+                      <input type="checkbox" data-critical-check checked={!!ticks[cp]} disabled={disabled}
+                             onChange={(e) => set(i, { ticks: { ...ticks, [cp]: e.target.checked } })}
+                             className="w-4 h-4 mt-0.5 accent-emerald-600" />
+                      <span>{cp}</span>
+                    </label>
+                  ))}
+                </div>
+              );
+            })()}
             <div className="flex gap-2 items-center">
               <button type="button" disabled={disabled} data-pending-item-save
                       onClick={() => {
                         if (!r.itemName.trim() || !(Number(r.qty) > 0)) return;
-                        set(i, { saved: true });
+                        // Snapshot the check points with their ticks (critical, no serial only).
+                        let criticalChecks = null;
+                        if (r.critical && !r.partSerialNo.trim()) {
+                          const nm = r.itemName.trim().toLowerCase();
+                          const hit = codes.find((it) => (it.name || "").trim().toLowerCase() === nm || (it.code || "").trim().toLowerCase() === nm);
+                          const pts = hit && Array.isArray(hit.checkPoints) ? hit.checkPoints.filter(Boolean) : [];
+                          if (pts.length) criticalChecks = { points: pts.map((t) => ({ text: t, ok: !!(r.ticks || {})[t] })) };
+                        }
+                        set(i, { saved: true, criticalChecks });
                       }}
                       className="text-[11px] font-black text-white px-4 py-1.5 rounded-lg transition-all disabled:opacity-50"
                       style={{ background: (r.itemName.trim() && Number(r.qty) > 0) ? "#15803d" : "#94a3b8", color: "#ffffff" }}
@@ -17722,6 +17758,12 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                   {p.qty != null && (Number(p.receivedQty) || 0) > 0 ? <span data-job-qty> · {p.receivedQty} received · <b>{pendingItemRemaining(p)} pending</b></span> : null}
                                   {p.partSerialNo ? <> · part S/N <span className="font-mono font-bold text-slate-700">{p.partSerialNo}</span></> : null}
                                   {!p.itemCode && p.itemName ? " · not in Item Master" : ""}
+                                </div>
+                              )}
+                              {p.criticalChecks && Array.isArray(p.criticalChecks.points) && (
+                                <div data-job-checks className="mt-1 text-[10.5px] text-slate-600">
+                                  Check points at Outward: {p.criticalChecks.points.filter((x) => x.ok).length}/{p.criticalChecks.points.length} ticked
+                                  {" — "}{p.criticalChecks.points.map((x) => `${x.ok ? "✓" : "☐"} ${x.text}`).join(" · ")}
                                 </div>
                               )}
                               {/* Permanent history: original reason, receive remark, completion. */}
@@ -20436,6 +20478,11 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                   {checkPoints.length > 0 && (
                     <ul className="text-[11px] text-slate-700 space-y-0.5">
                       {checkPoints.map((cp, i) => <li key={i} className="flex gap-1.5"><span className="text-slate-400">•</span>{cp}</li>)}
+                    </ul>
+                  )}
+                  {checkPoints.length === 0 && p.criticalChecks && Array.isArray(p.criticalChecks.points) && (
+                    <ul data-receive-saved-checks className="text-[11px] text-slate-700 space-y-0.5">
+                      {p.criticalChecks.points.map((cp, i) => <li key={i} className="flex gap-1.5"><span className="text-slate-400">{cp.ok ? "✓" : "☐"}</span>{cp.text}</li>)}
                     </ul>
                   )}
                   {critical && inputType === "serial" ? (
@@ -25334,6 +25381,7 @@ export default function App() {
         kind: "owed",
         itemCode: j.itemCode || "", itemName: j.itemName || "", qty: j.qty ?? null, reason: j.reason || "",
         critical: !!j.critical, partSerialNo: j.partSerialNo || "", source: "bom_outward",
+        criticalChecks: j.criticalChecks || null,
       }).then((pr) => {
         if (!pr.success) {
           console.warn("[App] outward pending item save failed", pr.error);
