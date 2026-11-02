@@ -47,12 +47,12 @@ test("store: before migration 056 the job is still saved (only the checks column
 });
 
 test("App: manual check points for Critical = Yes only; no Item Master lookup; serial optional; carried through issue", () => {
-  assert.match(app, /\{r\.critical && \(\(\) => \{\s*\n\s*const pts = Array\.isArray\(r\.cpList\)/);
+  assert.match(app, /\{r\.critical && critModeOf\(r\) !== "serial" && \(\(\) => \{\s*\n\s*const pts = Array\.isArray\(r\.cpList\)/);
   assert.match(app, /data-critical-check-input/);
   assert.match(app, /data-critical-check-add/);
   const form = app.slice(app.indexOf("data-pending-item-form>"), app.indexOf("{codes.length > 0 && ("));
   assert.doesNotMatch(form, /checkPoints|hit\.|codes\.find/);   // no Item Master matching in the manual form
-  assert.match(app, /criticalChecks: \(j\.critical && j\.criticalChecks/);
+  assert.match(app, /criticalChecks: j\.critical\s*\n\s*\? \{ mode: critModeOf\(j\), points:/);
   assert.match(app, /criticalChecks: j\.criticalChecks \|\| null,/);
   assert.match(app, /data-receive-saved-checks/);
   assert.match(app, /data-job-checks/);

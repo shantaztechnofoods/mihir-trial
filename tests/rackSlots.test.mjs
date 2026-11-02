@@ -550,7 +550,7 @@ test("App + migration 052: pending items added at BOM Outward", async () => {
   assert.match(app, /<PendingJobRows rows=\{extraPending\} onChange=\{setExtraPending\} inventory=\{allFlat\}\s*\n\s*addLabel="\+ Add Pending Item" mode="item" \/>/);
 
   // 2/3 — Item Master code or a hand-typed name; Critical / Normal; part serial
-  assert.match(app, /const emptyPendingJob = \(\) => \(\{ description: "", itemCode: "", itemName: "", qty: "", reason: "", critical: false, partSerialNo: "" \}\);/);
+  assert.match(app, /const emptyPendingJob = \(\) => \(\{ description: "", itemCode: "", itemName: "", qty: "", reason: "", critical: false, partSerialNo: "", criticalMode: "both" \}\);/);
   // 2026-11-02 — slim form: no item code / inventory list / reason / note in item mode
   const itemForm = app.slice(app.indexOf("data-pending-item-form>"), app.indexOf("{codes.length > 0 && ("));
   assert.match(itemForm, /Item name \*/);
@@ -559,7 +559,7 @@ test("App + migration 052: pending items added at BOM Outward", async () => {
   assert.doesNotMatch(itemForm, /Part \/ item code|Reason|Note \(optional\)|datalist|list=\{/);
   assert.match(app, /data-job-serial[\s\S]{0,200}?Part serial no\. \(optional\)/);
   assert.match(app, /data-job-critical=\{k\}/);
-  assert.match(app, /critical: !!j\.critical,\s*\n\s*partSerialNo: \(j\.partSerialNo \|\| ""\)\.trim\(\),/);
+  assert.match(app, /critical: !!j\.critical,\s*\n\s*partSerialNo: \(j\.critical && critModeOf\(j\) === "checks"\) \? "" : \(j\.partSerialNo \|\| ""\)\.trim\(\),/);
 
   // 4 — raised against the machine, one job per row, carried to the store
   assert.match(app, /onCreateMachine\(data\.bomKey, data\.label, data\.serialNo, data\.date, id, data\.destination \|\| "rack", data\.deptDurations \|\| null, notIssued, data\.rackSlot \|\| null, data\.extraPending \|\| \[\]\)/);
