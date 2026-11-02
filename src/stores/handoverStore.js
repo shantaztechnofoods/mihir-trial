@@ -190,6 +190,12 @@ export async function createHandover(h) {
     console.error("[handovers:create] failed", error);
     // Specific CHECK-constraint hints
     const msg = String(error.message || "");
+    // Migration 053 — one pending handover per machine, enforced by a unique
+    // partial index. A racing second Finish & Transfer (two tablets, or a
+    // double click that beat the optimistic lock) lands here as 23505.
+    if (error.code === "23505" || /handover_events_one_pending|duplicate key value/i.test(msg)) {
+      return { success: false, error: "Handover already in progress for this machine." };
+    }
     if (/handover_narration_when_over/i.test(msg)) {
       return { success: false, error: "Narration required when work time exceeds the configured duration." };
     }

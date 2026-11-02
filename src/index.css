@@ -2924,7 +2924,7 @@ html, body, #root { background: var(--champagne-wash); }
 
 /* Signatures (D7) — every captured signature at one size, on a line */
 .mr-doc .mr-sig { display: inline-block; border-bottom: 1px solid var(--mr-mute); padding-bottom: 1px; }
-.mr-doc .mr-sig svg { display: block; height: 30px; width: auto; max-width: 130px; }
+.mr-doc .mr-sig svg, .mr-doc .mr-sig img { display: block; height: 30px; width: auto; max-width: 130px; }
 .mr-doc .mr-signoff { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; }
 .mr-doc .mr-sign-line { height: 40px; border-bottom: 1px solid var(--mr-ink); margin-bottom: 5px; }
 
@@ -2983,7 +2983,7 @@ html, body, #root { background: var(--champagne-wash); }
      starts. Splits are prevented inside rows, issues, hand-overs, checklist
      blocks and certificate tables, and a heading never ends a page alone. */
   .mr-doc .mr-appendix { margin-top: 16pt; padding-top: 8pt; border-top: 1.5pt solid #14110d; }
-  .mr-doc .mr-sig svg { height: 22pt; }
+  .mr-doc .mr-sig svg, .mr-doc .mr-sig img { height: 22pt; }
   .mr-doc .mr-sec { margin-top: 14pt; }
   .mr-doc .mr-identity { margin-top: 10pt; }
   .mr-doc .mr-facts { margin-top: 8pt; gap: 5pt 14pt; }

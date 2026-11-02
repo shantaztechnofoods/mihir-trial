@@ -10,7 +10,7 @@
 //     ...
 //   });
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { isSupabaseEnabled } from "../config/env.js";
 import { getSupabase } from "../supabase/client.js";
 
@@ -24,7 +24,46 @@ export function useRealtimeTables({
   onMachinesChange,
   onPendingChange,
   onHandoversChange,
+  // Migration 053 — the four Machine Tracker side tables are in the realtime
+  // publication too. Each callback refetches its own list.
+  onPendingItemsChange,
+  onChecklistResponsesChange,
+  onRatingsChange,
+  onAttachmentsChange,
 } = {}) {
+  // Catch-up refetch. A tablet that slept through a shift, or dropped off
+  // WiFi, missed every realtime event in between and the channel does not
+  // replay them. When the page becomes visible again, or the browser comes
+  // back online, refetch every subscribed table once (debounced, so the two
+  // events firing together — the usual case — cost one round of fetches).
+  const cbRef = useRef({});
+  cbRef.current = { onItemsChange, onMovementsChange, onPosChange, onInwardChange, onOutwardChange, onMachinesChange, onPendingChange, onHandoversChange, onPendingItemsChange, onChecklistResponsesChange, onRatingsChange, onAttachmentsChange };
+  useEffect(() => {
+    if (!isSupabaseEnabled()) return;
+    if (typeof document === "undefined" || typeof window === "undefined") return;
+    let timer = null;
+    const catchUp = (why) => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        timer = null;
+        console.info(`[realtime] catch-up refetch (${why})`);
+        for (const [name, cb] of Object.entries(cbRef.current)) {
+          if (typeof cb !== "function") continue;
+          try { cb({ eventType: "CATCH_UP", why }); } catch (e) { console.error(`[realtime] catch-up ${name} threw`, e); }
+        }
+      }, 400);
+    };
+    const onVis = () => { if (document.visibilityState === "visible") catchUp("visible"); };
+    const onOnline = () => catchUp("online");
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("online", onOnline);
+    return () => {
+      if (timer) clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("online", onOnline);
+    };
+  }, []);
+
   useEffect(() => {
     if (!isSupabaseEnabled()) return;
     const c = getSupabase();
@@ -59,6 +98,12 @@ export function useRealtimeTables({
     // cannot see. Wiring it is the difference between a shared tablet being a
     // live queue and being a stale screenshot.
     wire("handover_events",  onHandoversChange);
+    // Migration 053 — pending jobs, checklist responses, ratings and
+    // attachments: raised on one tablet, read on the next department's.
+    wire("pending_handover_items", onPendingItemsChange);
+    wire("checklist_responses",    onChecklistResponsesChange);
+    wire("department_ratings",     onRatingsChange);
+    wire("machine_attachments",    onAttachmentsChange);
 
     ch.subscribe((status) => {
       if (status === "SUBSCRIBED")   console.info(`[realtime] subscribed to ${wired.length} tables:`, wired.join(", "));
@@ -66,5 +111,5 @@ export function useRealtimeTables({
     });
 
     return () => { try { c.removeChannel(ch); } catch {} };
-  }, [onItemsChange, onMovementsChange, onPosChange, onInwardChange, onOutwardChange, onAuditChange, onMachinesChange, onPendingChange, onHandoversChange]);
+  }, [onItemsChange, onMovementsChange, onPosChange, onInwardChange, onOutwardChange, onAuditChange, onMachinesChange, onPendingChange, onHandoversChange, onPendingItemsChange, onChecklistResponsesChange, onRatingsChange, onAttachmentsChange]);
 }
