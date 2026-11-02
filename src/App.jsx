@@ -84,7 +84,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-02-slim-pending-item";
+const APP_BUILD = "2026-11-02-pending-item-session";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -11884,10 +11884,13 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
   const hasOverIssue   = checkedE.some((i) => (i.overQty || 0) > 0);
   // 2026-11-02 — a pending item added at BOM Outward needs an item name and a
   // pending quantity (Critical / Normal is always set). Blank rows are ignored.
-  const extraPendingProblem = (Array.isArray(extraPending) ? extraPending : []).map(normalizePendingJob).filter((j) => !pendingJobIsBlank(j))
-    .some((j) => !(j.itemName.trim() || j.itemCode.trim()) || !(Number(j.qty) > 0))
+  // A row counts as started as soon as anything is typed in it (name, quantity
+  // or part serial), so a half-filled row can never be dropped silently.
+  const startedPending = (Array.isArray(extraPending) ? extraPending : []).map(normalizePendingJob)
+    .filter((j) => j.itemName.trim() || j.itemCode.trim() || String(j.qty).trim() || j.partSerialNo.trim() || j.saved);
+  const extraPendingProblem = startedPending.some((j) => !j.itemName.trim() || !(Number(j.qty) > 0))
     ? "Each pending item needs an item name and a quantity."
-    : (Array.isArray(extraPending) ? extraPending : []).map(normalizePendingJob).filter((j) => !pendingJobIsBlank(j)).some((j) => !j.saved)
+    : startedPending.some((j) => !j.saved)
       ? "Press Save on each pending item before issuing." : "";
   const canSubmit      = checkedE.some((i) => i.issueQty > 0) && !extraPendingProblem;
 
