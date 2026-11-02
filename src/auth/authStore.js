@@ -77,6 +77,26 @@ export const DEFAULT_ROLES = {
       roles:     { view: false, create: false, edit: false, delete: false },
     },
   },
+  // Department Staff: what a Super Admin gets by choosing a department in the
+  // short "Add New User" form (migration 059). The floor permissions of
+  // Production — Accept, Finish & Transfer, Part Received, Work Completed —
+  // but no BOM issuing, no stage skipping, nothing administrative. Which
+  // machines they see is decided by users.departments, in the database.
+  dept_staff: {
+    label: "Department Staff", icon: "🛠️", color: "#0f766e", badge: "Department Staff",
+    pages: ["machines"],
+    actions: {
+      inventory: { add: false, edit: false, delete: false, adjust: false },
+      pipeline:  { create: false, approve: false, reject: false, ordered: false, receive: false, delete: false },
+      outward:   { bom: false, manual: false, editBOM: false },
+      machines:  { updateStage: false, finishTransfer: true,  accept: true,  configDept: false },
+      vendors:   { add: false, edit: false, delete: false },
+      inward:    { submit: false },
+      pending:   { fulfill: true,  clear: false },
+      users:     { view: false, create: false, edit: false, delete: false },
+      roles:     { view: false, create: false, edit: false, delete: false },
+    },
+  },
   // The production head runs the line but does not work it. They see every
   // machine and every department, and they decide when a machine comes off
   // the rack and into Mechanical — that call is theirs, not the floor's.

@@ -78,6 +78,9 @@ serve(async (req: Request) => {
     ? Array.from(new Set(body.departments.map((d) => String(d)))) : [];
   const badDept = departments.find((d) => !WORK_DEPTS.includes(d));
   if (badDept) return json(400, { error: `Unknown department "${badDept}"` });
+  // A Department Staff login is meaningless without exactly one department.
+  if (roleKey === "dept_staff" && departments.length !== 1)
+    return json(400, { error: "Pick exactly one department for Department Staff" });
 
   // Synthesize internal email (never exposed to user)
   const email = `${cleanUsername}@${INTERNAL_EMAIL_DOMAIN}`;
@@ -111,6 +114,8 @@ serve(async (req: Request) => {
   };
   const { error: upsertErr } = await service.from("users").upsert(profilePayload, { onConflict: "id" });
   if (upsertErr) {
+    // Do not leave a half-made login behind (auth user with a locked profile).
+    await service.auth.admin.deleteUser(authData.user.id);
     return json(500, {
       error: `Profile upsert failed: ${upsertErr.message}`,
       hint: /unique constraint .*username/i.test(upsertErr.message || "")
