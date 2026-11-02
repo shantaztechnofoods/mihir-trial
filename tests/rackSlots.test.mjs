@@ -273,8 +273,8 @@ test("App: finish Assembly returns a rack machine to its rack; admin transfers f
   assert.match(app, /mainEmployeeSignatureSvg: null,   \/\/ Transfer needs no signature/);
   assert.match(app, /mainEmployeeName: transferrerName,/);
   // Accept keeps its mandatory signature
-  assert.match(app, /Please register your signature first\./);
-  assert.match(app, /Register your signature before accepting a handover/);
+  assert.match(app, /Draw your signature and press Save Signature before confirming\./);
+  assert.match(app, /A digital signature is required to accept a handover\./);
 });
 
 // 2026-10-31 live bug (M-10 (2), S/N 123456789): a pulled-back (cancelled)
