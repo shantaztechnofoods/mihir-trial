@@ -3066,3 +3066,77 @@ body label[style*="rgb(38, 64, 176)"], body label[style*="rgb(46, 80, 214)"] { c
   .mr-doc .mr-cert { border: 0; padding: 0; overflow: visible; }
   .mr-doc .mr-cert tr { break-inside: avoid; page-break-inside: avoid; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   COBALT INK v2 — industrial control-room skin. Visual only; layers on the
+   v1 tokens above. Sidebar identity block, instrument-style numerals, KPI
+   tiles with a status edge, calmer tables, tactile controls, icon set.
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root {
+  --v2-grid: rgba(46, 80, 214, 0.045);
+  --v2-edge: rgba(15, 23, 42, 0.08);
+  --v2-lift: 0 1px 2px rgba(11, 18, 32, .05), 0 8px 24px -12px rgba(11, 18, 32, .14);
+  --v2-ease: cubic-bezier(.2, .7, .2, 1);
+}
+
+/* Blueprint paper behind the content area */
+main, .app-main, #root > div > .flex-1 {
+  background-image:
+    linear-gradient(var(--v2-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--v2-grid) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+/* Instrument numerals */
+.hero-tile-value, .tabular, td.text-right, .font-mono, [class*="tabular"] {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+.hero-tile-value { font-family: 'JetBrains Mono', 'Inter', ui-monospace, monospace; letter-spacing: -0.03em; }
+
+/* Sidebar identity: the real logo sits on its own plate, large enough to read */
+.sidebar-slate .sb-brand { display: flex; align-items: center; gap: 12px; padding: 4px 2px 2px; }
+.sidebar-slate .brand-logo { box-shadow: 0 0 0 1px rgba(255,255,255,.14), 0 10px 24px -8px rgba(0,0,0,.55); transition: transform .25s var(--v2-ease); }
+.sidebar-slate .brand-logo:hover { transform: scale(1.04); }
+.sidebar-slate .sb-tagline { margin-top: 7px; font-size: 9.5px; font-weight: 600; letter-spacing: .08em; color: #E8505B; text-transform: uppercase; white-space: nowrap; }
+.sidebar-slate .sb-indicator { background: linear-gradient(180deg, #7C93FF, #E10E1A); width: 3px; box-shadow: 0 0 12px rgba(124,147,255,.6); }
+.sidebar-slate .sb-item { transition: background .18s var(--v2-ease), transform .18s var(--v2-ease), color .18s; }
+.sidebar-slate .sb-item:hover { transform: translateX(2px); }
+.sidebar-slate .sb-item.is-active { box-shadow: inset 0 0 0 1px rgba(124,147,255,.22); }
+.sidebar-slate .sb-search, .sidebar-slate .sb-iconbtn { transition: background .18s, box-shadow .18s, transform .18s var(--v2-ease); }
+.sidebar-slate .sb-iconbtn:hover { transform: translateY(-1px); }
+
+/* Icons replacing emoji glyphs: sit on the text baseline, inherit colour */
+.lead-icon { display: inline-block; vertical-align: -0.2em; margin-right: .45em; flex-shrink: 0; }
+
+/* KPI tiles: status edge + lift on hover */
+.hero-tile { position: relative; border: 1px solid var(--v2-edge); box-shadow: var(--v2-lift); transition: transform .22s var(--v2-ease), box-shadow .22s var(--v2-ease), border-color .22s; }
+.hero-tile::before { content: ""; position: absolute; left: 0; top: 12px; bottom: 12px; width: 3px; border-radius: 0 3px 3px 0; background: linear-gradient(180deg, #5A78EA, #2E50D6); }
+.hero-tile:hover { transform: translateY(-2px); border-color: rgba(46,80,214,.3); box-shadow: 0 2px 4px rgba(11,18,32,.06), 0 16px 32px -14px rgba(46,80,214,.28); }
+
+/* Tables: quiet header, row hover, selectable feel */
+table thead th { letter-spacing: .06em; font-weight: 700; }
+table tbody tr { transition: background .15s; }
+table tbody tr:hover { background: rgba(46, 80, 214, 0.045); }
+
+/* Buttons & fields: tactile press, visible keyboard focus */
+button { transition: transform .12s var(--v2-ease), box-shadow .18s, background-color .18s, border-color .18s, color .18s; }
+button:not(:disabled):active { transform: translateY(1px) scale(.992); }
+:focus-visible { outline: 2px solid #5A78EA; outline-offset: 2px; border-radius: 6px; }
+input:focus, select:focus, textarea:focus { box-shadow: 0 0 0 3px rgba(46,80,214,.16); }
+
+/* Modals & drawers: deeper scrim, softer entrance */
+.modal-panel { box-shadow: 0 30px 80px -20px rgba(11,18,32,.45), 0 0 0 1px rgba(15,23,42,.06); animation: v2-pop .22s var(--v2-ease); }
+@keyframes v2-pop { from { opacity: 0; transform: translateY(8px) scale(.985); } to { opacity: 1; transform: none; } }
+
+/* Settings tabs: no clipping on narrow screens — they wrap into pills */
+.settings-tabs { flex-wrap: wrap; overflow-x: visible !important; row-gap: 2px; }
+@media (max-width: 767px) {
+  .settings-tabs { border-bottom: 0; gap: 6px; }
+  .settings-tabs > button { margin-bottom: 0 !important; white-space: normal; text-align: left; border: 1px solid var(--v2-edge); border-radius: 10px; padding: 8px 12px; line-height: 1.25; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+  .sidebar-slate .sb-item:hover, .hero-tile:hover { transform: none; }
+}

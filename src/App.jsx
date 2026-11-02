@@ -20,6 +20,8 @@ import { useAuth } from "./auth/AuthContext.jsx";
 // the dept roster in the Finish & Transfer worker picker.
 import { fetchDeptRoster, updateUserDepartments } from "./auth/authStore.js";
 import LoginPage from "./pages/LoginPage.jsx";
+import BrandLogo from "./components/BrandLogo.jsx";
+import { LeadIcon, LeadLabel } from "./components/LeadIcon.jsx";
 import UserManagementPage from "./pages/UserManagementPage.jsx";
 import RoleManagementPage from "./pages/RoleManagementPage.jsx";
 import AccessDeniedPage from "./components/AccessDeniedPage.jsx";
@@ -84,7 +86,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-02-cobalt-ui";
+const APP_BUILD = "2026-11-02-cobalt-ink-v2";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -545,17 +547,16 @@ function Sidebar({ activePage, setActivePage, collapsed, setCollapsed, badges = 
               const line2  = spaceI > 0 ? name.slice(spaceI + 1).toUpperCase() : "";
               const initial = name[0]?.toUpperCase() || "S";
               return (
-                <div className="flex items-center gap-2.5 mb-3">
-                  <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-[13px] font-black overflow-hidden sb-logo">
-                    {settings.logo ? <img src={settings.logo} alt="logo" className="w-full h-full object-contain" /> : initial}
-                  </div>
+                <div className="sb-brand mb-3">
+                  <BrandLogo logo={settings.logo} size={64} rounded={14} />
                   <div className="min-w-0">
-                    <div className="text-[12px] font-extrabold leading-none tracking-widest truncate sb-logo-name">{line1}</div>
+                    <div className="text-[13px] font-extrabold leading-none tracking-widest truncate sb-logo-name">{line1}</div>
                     {line2 && (
                       <div className="text-[9px] font-semibold leading-none tracking-widest mt-1.5 truncate sb-logo-sub">
                         {line2}
                       </div>
                     )}
+                    <div className="sb-tagline">Innovation for Life</div>
                   </div>
                 </div>
               );
@@ -563,12 +564,12 @@ function Sidebar({ activePage, setActivePage, collapsed, setCollapsed, badges = 
             <div className="flex items-center gap-1.5">
               <button onClick={onSearchOpen}
                 className="flex-1 flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-[11px] transition-all sb-search">
-                <span className="text-xs opacity-70">🔍</span><span className="flex-1 text-left">Search</span>
+                <Search size={14} aria-hidden="true" className="opacity-70" /><span className="flex-1 text-left">Search</span>
                 <kbd className="text-[9px] px-1.5 py-0.5 rounded sb-kbd">⌘K</kbd>
               </button>
               <button onClick={onNotifsOpen}
                 className="relative w-9 h-9 rounded-lg flex items-center justify-center transition-all flex-shrink-0 sb-iconbtn">
-                🔔
+                <Bell size={16} aria-hidden="true" />
                 {notifCount > 0 && (
                   <span className="absolute -top-1 -right-1 text-[9px] font-black rounded-full flex items-center justify-center"
                         style={{ background: "#ef4444", color: "#ffffff", minWidth: 16, height: 16, padding: "0 3px", boxShadow: "0 2px 8px rgba(239,68,68,0.5)" }}>
@@ -580,11 +581,9 @@ function Sidebar({ activePage, setActivePage, collapsed, setCollapsed, badges = 
           </>
         ) : (
           <div className="flex flex-col items-center gap-2">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center text-[13px] font-black overflow-hidden sb-logo">
-              {settings.logo ? <img src={settings.logo} alt="logo" className="w-full h-full object-contain" /> : (settings.companyName?.[0]?.toUpperCase() || "S")}
-            </div>
+            <BrandLogo logo={settings.logo} size={44} rounded={10} />
             <button onClick={onNotifsOpen} className="relative w-9 h-9 rounded-lg flex items-center justify-center transition-all sb-iconbtn">
-              🔔
+              <Bell size={16} aria-hidden="true" />
               {notifCount > 0 && (
                 <span className="absolute -top-1 -right-1 text-[9px] font-black rounded-full flex items-center justify-center"
                       style={{ background: "#ef4444", color: "#ffffff", minWidth: 15, height: 15, padding: "0 2px", boxShadow: "0 2px 6px rgba(239,68,68,0.5)" }}>
@@ -592,7 +591,7 @@ function Sidebar({ activePage, setActivePage, collapsed, setCollapsed, badges = 
                 </span>
               )}
             </button>
-            <button onClick={onSearchOpen} className="w-9 h-9 rounded-lg flex items-center justify-center transition-all sb-iconbtn">🔍</button>
+            <button onClick={onSearchOpen} className="w-9 h-9 rounded-lg flex items-center justify-center transition-all sb-iconbtn"><Search size={16} aria-hidden="true" /></button>
           </div>
         )}
       </div>
@@ -953,8 +952,8 @@ function DashboardPage({ items = {}, pos = [], vendorList = [], machineLog = [],
   return (
     <div className="flex-1 overflow-y-auto">
       <Topbar title={`${greeting} 👋`} subtitle={`${settings.companyName || "Shantaz Technofoods"} — real-time overview`}>
-        {settings.whatsappAlerts && <Btn variant="wa" size="sm">📱 WhatsApp Alert</Btn>}
-        {settings.emailAlerts    && <Btn variant="mail" size="sm">✉️ Send Report</Btn>}
+        {settings.whatsappAlerts && <Btn variant="wa" size="sm"><LeadIcon e="📱" />WhatsApp Alert</Btn>}
+        {settings.emailAlerts    && <Btn variant="mail" size="sm"><LeadIcon e="✉️" />Send Report</Btn>}
         <Btn variant="primary" size="sm" onClick={() => onNavigate?.("pipeline")}>+ New PO</Btn>
       </Topbar>
 
@@ -2132,8 +2131,8 @@ function ItemDetailModal({ item, category, onClose, onDelete, onUpdateStock, onE
         {/* Footer */}
         <div className="px-6 py-4 border-t border-slate-200 flex items-center gap-2 flex-wrap flex-shrink-0"
              style={{ background: "#f8f9fb" }}>
-          {onEdit   && <Btn variant="ghost" size="sm" onClick={onEdit}>✏️ Edit</Btn>}
-          {onDelete && <Btn variant="danger" size="sm" onClick={() => { setAdjustMode(null); onDelete(); }}>🗑️ Delete</Btn>}
+          {onEdit   && <Btn variant="ghost" size="sm" onClick={onEdit}><LeadIcon e="✏️" />Edit</Btn>}
+          {onDelete && <Btn variant="danger" size="sm" onClick={() => { setAdjustMode(null); onDelete(); }}><LeadIcon e="🗑️" />Delete</Btn>}
           <div className="flex-1" />
           {/* 2b71bbc — removed stray setConfirmDelete(false); ItemDetailModal doesn't
               own that state, so Add/Remove Stock used to throw a ReferenceError. */}
@@ -3142,7 +3141,7 @@ function ClearDemoDataModal({ items = {}, bomDefs = {}, onDeleteItem, onDeleteBO
 
         <div className="px-6 py-5 border-b border-slate-200"
              style={{ background: "linear-gradient(90deg,rgba(239,68,68,0.10),rgba(239,68,68,0.04))" }}>
-          <div className="text-[15px] font-semibold text-slate-900">🧹 Clear Demo Data</div>
+          <div className="text-[15px] font-semibold text-slate-900"><LeadIcon e="🧹" />Clear Demo Data</div>
           <div className="text-[11px] text-slate-500 mt-0.5">Remove old demo data before starting the trial</div>
         </div>
 
@@ -3168,7 +3167,7 @@ function ClearDemoDataModal({ items = {}, bomDefs = {}, onDeleteItem, onDeleteBO
               </label>
 
               <div className="px-4 py-3 rounded-xl" style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.25)" }}>
-                <div className="text-[11px] font-bold text-red-700">⚠️ This cannot be undone</div>
+                <div className="text-[11px] font-bold text-red-700"><LeadIcon e="⚠️" />This cannot be undone</div>
                 <div className="text-[11px] text-slate-600 mt-1">Type <b>DELETE</b> below to confirm.</div>
               </div>
 
@@ -3192,7 +3191,7 @@ function ClearDemoDataModal({ items = {}, bomDefs = {}, onDeleteItem, onDeleteBO
           {result && (
             <div className="space-y-3">
               <div className="px-4 py-3 rounded-xl" style={{ background: "rgba(16,185,129,0.07)", border: "1px solid rgba(16,185,129,0.3)" }}>
-                <div className="text-[13px] font-bold text-emerald-700">✅ Done</div>
+                <div className="text-[13px] font-bold text-emerald-700"><LeadIcon e="✅" />Done</div>
                 <div className="text-[12px] text-slate-700 mt-1">
                   {result.boms} BOMs and {result.items} items deleted.
                 </div>
@@ -3538,7 +3537,7 @@ function InventoryPage({ items, setItems, handleUpdateStock, pos = [], inwardLog
 
             {/* Header */}
             <div className="px-5 py-4 border-b border-slate-200" style={{ background: "rgba(239,68,68,0.06)" }}>
-              <div className="text-sm font-black text-red-600">🗑️ Delete Item</div>
+              <div className="text-sm font-black text-red-600"><LeadIcon e="🗑️" />Delete Item</div>
               <div className="text-[10px] text-slate-500 mt-0.5">{deleteModal.item.name} · {deleteModal.item.code}</div>
             </div>
 
@@ -3546,7 +3545,7 @@ function InventoryPage({ items, setItems, handleUpdateStock, pos = [], inwardLog
             <div className="px-5 py-4 space-y-3">
               {deleteModal.blocks.length > 0 && (
                 <div className="space-y-1.5">
-                  <div className="text-[10px] font-bold text-yellow-400 uppercase tracking-[0.06em] mb-2">⚠ Warning — this item has active data</div>
+                  <div className="text-[10px] font-bold text-yellow-400 uppercase tracking-[0.06em] mb-2"><LeadIcon e="⚠" />Warning — this item has active data</div>
                   {deleteModal.blocks.map((b, i) => (
                     <div key={i} className="flex items-start gap-2.5 px-3 py-2 rounded-xl"
                          style={{ background: "rgba(234,179,8,0.05)", border: "1px solid rgba(234,179,8,0.15)" }}>
@@ -3593,7 +3592,7 @@ function InventoryPage({ items, setItems, handleUpdateStock, pos = [], inwardLog
       )}
 
       <Topbar title="Item Master" subtitle="Unified inventory across all categories">
-        <Btn variant="ghost" size="sm">⬇️ Export</Btn>
+        <Btn variant="ghost" size="sm"><LeadIcon e="⬇️" />Export</Btn>
         {canDo("inventory","add") && (
           <button onClick={() => setShowImport(true)}
                   className="text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-900 hover:border-slate-300 transition-all flex items-center gap-1.5">
@@ -3657,7 +3656,7 @@ function InventoryPage({ items, setItems, handleUpdateStock, pos = [], inwardLog
                 aria-controls="erp-attention-body"
                 className="w-full flex items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-transparent rounded-xl"
                 style={{ minHeight: 48 }}>
-                <span className="text-[10px] font-black text-red-600 uppercase tracking-[0.08em] flex-shrink-0">⚠ Attention</span>
+                <span className="text-[10px] font-black text-red-600 uppercase tracking-[0.08em] flex-shrink-0"><LeadIcon e="⚠" />Attention</span>
                 <span className="text-[11px] font-bold" style={{ color: "var(--text-strong)" }}>({summary})</span>
                 {/* Preview: first 10 chips inline when collapsed, +N more badge */}
                 {!attentionOpen && (
@@ -4631,17 +4630,17 @@ function PODetailModal({ po, onClose, onApprove, onMarkOrdered, onMarkReceived, 
 
           {po.status === "received" && po.receivedDate && (
             <div className="px-3.5 py-3 rounded-xl" style={{ background: "rgba(34,197,94,0.05)", border: "1px solid rgba(34,197,94,0.25)" }}>
-              <div className="text-[9px] font-black text-green-700 uppercase tracking-[0.06em] mb-1">✅ Received</div>
+              <div className="text-[9px] font-black text-green-700 uppercase tracking-[0.06em] mb-1"><LeadIcon e="✅" />Received</div>
               <div className="text-xs text-slate-400">Stock updated on {po.receivedDate}. GRN recorded.</div>
             </div>
           )}
 
           {confirmReceive && (
             <div className="p-4 rounded-xl" style={{ background: "rgba(34,197,94,0.05)", border: "1px solid rgba(34,197,94,0.35)" }}>
-              <div className="text-xs font-bold text-green-700 mb-1">📦 Confirm GRN — Mark as Received?</div>
+              <div className="text-xs font-bold text-green-700 mb-1"><LeadIcon e="📦" />Confirm GRN — Mark as Received?</div>
               <div className="text-[10px] text-slate-500 mb-3">All line item quantities will be added to inventory stock automatically.</div>
               <div className="flex gap-2">
-                <button onClick={onMarkReceived} className="px-4 py-1.5 rounded-lg text-xs font-bold text-slate-900" style={{ background: "rgba(34,197,94,0.8)", border: "1px solid rgba(34,197,94,0.5)", color: "#fff" }}>✅ Confirm Received</button>
+                <button onClick={onMarkReceived} className="px-4 py-1.5 rounded-lg text-xs font-bold text-slate-900" style={{ background: "rgba(34,197,94,0.8)", border: "1px solid rgba(34,197,94,0.5)", color: "#fff" }}><LeadIcon e="✅" />Confirm Received</button>
                 <button onClick={() => setConfirmReceive(false)} className="px-4 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-50 border border-slate-200 transition-all">Cancel</button>
               </div>
             </div>
@@ -4662,17 +4661,17 @@ function PODetailModal({ po, onClose, onApprove, onMarkOrdered, onMarkReceived, 
         <div className="px-6 py-4 border-t border-slate-200 flex items-center gap-2 flex-wrap flex-shrink-0"
              style={{ background: "#f8f9fb" }}>
           {["draft","pending","review"].includes(po.status) && (
-            <Btn variant="ghost" size="sm" onClick={onEdit}>✏️ Edit</Btn>
+            <Btn variant="ghost" size="sm" onClick={onEdit}><LeadIcon e="✏️" />Edit</Btn>
           )}
           {["draft","pending"].includes(po.status) && (
-            <Btn variant="red" size="sm" onClick={() => { setConfirmDelete(true); setConfirmReceive(false); }}>🗑️ Delete</Btn>
+            <Btn variant="red" size="sm" onClick={() => { setConfirmDelete(true); setConfirmReceive(false); }}><LeadIcon e="🗑️" />Delete</Btn>
           )}
           <div className="flex-1" />
           {["pending","review"].includes(po.status) && (
-            <Btn variant="green" size="sm" onClick={onApprove}>✅ Approve</Btn>
+            <Btn variant="green" size="sm" onClick={onApprove}><LeadIcon e="✅" />Approve</Btn>
           )}
           {po.status === "approved" && (
-            <Btn variant="primary" size="sm" onClick={onMarkOrdered}>📦 Mark Ordered</Btn>
+            <Btn variant="primary" size="sm" onClick={onMarkOrdered}><LeadIcon e="📦" />Mark Ordered</Btn>
           )}
           {["approved","ordered"].includes(po.status) && (
             <button onClick={() => { setConfirmReceive(true); setConfirmDelete(false); }}
@@ -4771,7 +4770,7 @@ function PurchasePage({ pos, vendorList, items, onCreatePO, onUpdatePO, onReceiv
       )}
 
       <Topbar title="Purchase Orders" subtitle="Full PO register & tracking">
-        <Btn variant="wa" size="sm">📱 WA Reminder</Btn>
+        <Btn variant="wa" size="sm"><LeadIcon e="📱" />WA Reminder</Btn>
         <Btn variant="primary" size="sm" onClick={() => { setEditingPO(null); setShowModal(true); }}>+ Create PO</Btn>
       </Topbar>
 
@@ -4835,7 +4834,7 @@ function PurchasePage({ pos, vendorList, items, onCreatePO, onUpdatePO, onReceiv
                     <td className="px-4 py-3 text-[11px] font-mono text-slate-500 whitespace-nowrap">{po.delivery || "—"}</td>
                     <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                       <div className="flex gap-1">
-                        <Btn variant="ghost" size="xs" onClick={() => setDetailPO(po)}>📄 View</Btn>
+                        <Btn variant="ghost" size="xs" onClick={() => setDetailPO(po)}><LeadIcon e="📄" />View</Btn>
                         {["pending","review"].includes(po.status) && (
                           <Btn variant="green" size="xs" onClick={() => { onUpdatePO(po.id, { status: "approved" }); showToast("PO Approved", po.id); }}>✅</Btn>
                         )}
@@ -5458,7 +5457,7 @@ function VendorsPage({ vendorList, pos, items, onAddVendor, onEditVendor, onDele
 
                   {/* Action buttons */}
                   <div className="flex gap-1.5 pt-2.5 border-t border-slate-100" onClick={(e) => e.stopPropagation()}>
-                    <Btn variant="wa"    size="xs" onClick={() => { const r = openVendorWhatsApp(v); if (!r.ok) showToast(waErrorToast(r.error)); }}>📱 WA</Btn>
+                    <Btn variant="wa"    size="xs" onClick={() => { const r = openVendorWhatsApp(v); if (!r.ok) showToast(waErrorToast(r.error)); }}><LeadIcon e="📱" />WA</Btn>
                     <Btn variant="mail"  size="xs">✉️</Btn>
                     {canDo("vendors","edit")   && <Btn variant="ghost" size="xs" onClick={() => { setEditingVendor(v); setShowModal(true); }}>✏️</Btn>}
                     {canDo("vendors","delete") && <Btn variant="red"   size="xs" onClick={() => setConfirmDelete(v)}>🗑</Btn>}
@@ -5735,7 +5734,7 @@ function ApprovalsPage({ pos, onUpdatePO }) {
   return (
     <div className="flex-1 overflow-y-auto">
       <Topbar title="Approval Workflow" subtitle={`${pendingItems.length} pending your action`}>
-        {pendingItems.length > 0 && <Btn variant="green" size="sm" onClick={handleApproveAll}>✅ Approve All</Btn>}
+        {pendingItems.length > 0 && <Btn variant="green" size="sm" onClick={handleApproveAll}><LeadIcon e="✅" />Approve All</Btn>}
       </Topbar>
 
       <div className="p-6 space-y-6">
@@ -5746,7 +5745,7 @@ function ApprovalsPage({ pos, onUpdatePO }) {
         </div>
 
         <div className="section-card p-5">
-          <SectionHeader>📋 Pending Approvals</SectionHeader>
+          <SectionHeader><LeadIcon e="📋" />Pending Approvals</SectionHeader>
           {displayList.length === 0 ? (
             <div className="py-14 text-center">
               <div className="text-4xl mb-3">✅</div>
@@ -5787,8 +5786,8 @@ function ApprovalsPage({ pos, onUpdatePO }) {
                     <StatusBadge status={po.status} />
                     {isPending && (
                       <>
-                        <Btn variant="green" size="xs" onClick={() => handleApprove(po.id)}>✅ Approve</Btn>
-                        <Btn variant="red"   size="xs" onClick={() => handleReject(po.id)}>❌ Reject</Btn>
+                        <Btn variant="green" size="xs" onClick={() => handleApprove(po.id)}><LeadIcon e="✅" />Approve</Btn>
+                        <Btn variant="red"   size="xs" onClick={() => handleReject(po.id)}><LeadIcon e="❌" />Reject</Btn>
                       </>
                     )}
                   </div>
@@ -5799,7 +5798,7 @@ function ApprovalsPage({ pos, onUpdatePO }) {
         </div>
 
         <div className="section-card p-5">
-          <SectionHeader>⚙️ Approval Rules</SectionHeader>
+          <SectionHeader><LeadIcon e="⚙️" />Approval Rules</SectionHeader>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
@@ -5900,9 +5899,9 @@ function AnalyticsPage({ items, pos, vendorList, settings = SETTINGS_DEFAULTS })
   return (
     <div className="flex-1 overflow-y-auto">
       <Topbar title="Analytics & Reports" subtitle={`${pos.length} POs · ${totalItems} SKUs tracked`}>
-        <Btn variant="ghost" size="sm">📅 All time</Btn>
-        <Btn variant="mail" size="sm">✉️ Email Report</Btn>
-        <Btn variant="ghost" size="sm">⬇️ Download PDF</Btn>
+        <Btn variant="ghost" size="sm"><LeadIcon e="📅" />All time</Btn>
+        <Btn variant="mail" size="sm"><LeadIcon e="✉️" />Email Report</Btn>
+        <Btn variant="ghost" size="sm"><LeadIcon e="⬇️" />Download PDF</Btn>
       </Topbar>
 
       <div className="p-6 space-y-6">
@@ -5915,7 +5914,7 @@ function AnalyticsPage({ items, pos, vendorList, settings = SETTINGS_DEFAULTS })
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="section-card p-5">
-            <SectionHeader>📊 PO Value by Month (₹K)</SectionHeader>
+            <SectionHeader><LeadIcon e="📊" />PO Value by Month (₹K)</SectionHeader>
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={monthlyPOTrend.length > 0 ? monthlyPOTrend : monthlyPOData} barSize={28}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(17,24,39,0.08)" />
@@ -5928,7 +5927,7 @@ function AnalyticsPage({ items, pos, vendorList, settings = SETTINGS_DEFAULTS })
           </div>
 
           <div className="section-card p-5">
-            <SectionHeader>📈 Inventory Turnover Rate</SectionHeader>
+            <SectionHeader><LeadIcon e="📈" />Inventory Turnover Rate</SectionHeader>
             <ResponsiveContainer width="100%" height={220}>
               <AreaChart data={turnoverData}>
                 <defs>
@@ -5949,7 +5948,7 @@ function AnalyticsPage({ items, pos, vendorList, settings = SETTINGS_DEFAULTS })
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="section-card p-5">
-            <SectionHeader>🥧 Spend by Category</SectionHeader>
+            <SectionHeader><LeadIcon e="🥧" />Spend by Category</SectionHeader>
             {spendByCat.length > 0 ? (
               <>
                 <ResponsiveContainer width="100%" height={180}>
@@ -5978,7 +5977,7 @@ function AnalyticsPage({ items, pos, vendorList, settings = SETTINGS_DEFAULTS })
           </div>
 
           <div className="section-card p-5">
-            <SectionHeader>🏭 Vendor-wise PO Count</SectionHeader>
+            <SectionHeader><LeadIcon e="🏭" />Vendor-wise PO Count</SectionHeader>
             {vendorPOData.length > 0 ? (
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={vendorPOData} layout="vertical" barSize={14}>
@@ -5998,7 +5997,7 @@ function AnalyticsPage({ items, pos, vendorList, settings = SETTINGS_DEFAULTS })
           </div>
 
           <div className="section-card p-5">
-            <SectionHeader>📉 Stock Status</SectionHeader>
+            <SectionHeader><LeadIcon e="📉" />Stock Status</SectionHeader>
             <ResponsiveContainer width="100%" height={180}>
               <PieChart>
                 <Pie data={stockDist} cx="50%" cy="50%" innerRadius={45} outerRadius={70} dataKey="value" stroke="none">
@@ -6115,8 +6114,8 @@ function AIPage({ items, pos, vendorList = [], bomDefs = {}, machineLog = [], pe
   return (
     <div className="flex-1 overflow-y-auto">
       <Topbar title="🤖 AI Inventory Assistant" subtitle={`Analyzing ${allItems.length} SKUs in real-time`}>
-        <Btn variant="ghost" size="sm">🔄 Reset</Btn>
-        <Btn variant="purple" size="sm">📊 Generate Report</Btn>
+        <Btn variant="ghost" size="sm"><LeadIcon e="🔄" />Reset</Btn>
+        <Btn variant="purple" size="sm"><LeadIcon e="📊" />Generate Report</Btn>
       </Topbar>
 
       <div className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -6147,7 +6146,7 @@ function AIPage({ items, pos, vendorList = [], bomDefs = {}, machineLog = [], pe
             {sending && (
               <div className="flex justify-start">
                 <div className="max-w-[85%] text-[13px] leading-relaxed rounded-2xl px-4 py-2.5" style={{ background: "var(--surface-card)", color: "var(--text-dim)", border: "1px solid var(--border-subtle)" }}>
-                  <span className="animate-pulse">🤖 Thinking…</span>
+                  <span className="animate-pulse"><LeadIcon e="🤖" />Thinking…</span>
                 </div>
               </div>
             )}
@@ -6175,7 +6174,7 @@ function AIPage({ items, pos, vendorList = [], bomDefs = {}, machineLog = [], pe
         {/* Sidebar */}
         <div className="space-y-4">
           <div className="section-card p-5">
-            <SectionHeader>🎯 AI Confidence Scores</SectionHeader>
+            <SectionHeader><LeadIcon e="🎯" />AI Confidence Scores</SectionHeader>
             <div className="space-y-3">
               {aiStats.map((s) => (
                 <div key={s.label}>
@@ -6192,7 +6191,7 @@ function AIPage({ items, pos, vendorList = [], bomDefs = {}, machineLog = [], pe
           </div>
 
           <div className="section-card p-5">
-            <SectionHeader>📊 Live Inventory Stats</SectionHeader>
+            <SectionHeader><LeadIcon e="📊" />Live Inventory Stats</SectionHeader>
             <div className="space-y-3">
               {[
                 { label: "Total SKUs",    value: allItems.length,    color: "#2E50D6" },
@@ -6210,12 +6209,12 @@ function AIPage({ items, pos, vendorList = [], bomDefs = {}, machineLog = [], pe
           </div>
 
           <div className="section-card p-5">
-            <SectionHeader>⚡ Quick Actions</SectionHeader>
+            <SectionHeader><LeadIcon e="⚡" />Quick Actions</SectionHeader>
             <div className="space-y-2">
-              <Btn variant="primary" size="sm" className="w-full justify-center">📦 Auto-create all POs</Btn>
-              <Btn variant="wa" size="sm" className="w-full justify-center">📱 WA alert to vendors</Btn>
-              <Btn variant="mail" size="sm" className="w-full justify-center">✉️ Email daily report</Btn>
-              <Btn variant="ghost" size="sm" className="w-full justify-center">📊 Generate analytics PDF</Btn>
+              <Btn variant="primary" size="sm" className="w-full justify-center"><LeadIcon e="📦" />Auto-create all POs</Btn>
+              <Btn variant="wa" size="sm" className="w-full justify-center"><LeadIcon e="📱" />WA alert to vendors</Btn>
+              <Btn variant="mail" size="sm" className="w-full justify-center"><LeadIcon e="✉️" />Email daily report</Btn>
+              <Btn variant="ghost" size="sm" className="w-full justify-center"><LeadIcon e="📊" />Generate analytics PDF</Btn>
             </div>
           </div>
         </div>
@@ -8759,7 +8758,7 @@ function EmployeeMembersPanel({ members = [], canConfig = false, onSave }) {
 function AdminCleanupPanel({ machineLog = [], currentUser = null, onDone }) { // eslint-disable-line no-unused-vars
   return (
     <div data-admin-cleanup data-cleanup-disabled className="mt-4 p-4 rounded-xl border" style={{ borderColor: "rgba(17,24,39,0.10)", background: "rgba(17,24,39,0.02)" }}>
-      <div className="text-[13px] font-semibold text-slate-900">🧹 Admin Data Cleanup — test machines</div>
+      <div className="text-[13px] font-semibold text-slate-900"><LeadIcon e="🧹" />Admin Data Cleanup — test machines</div>
       <div className="mt-1 text-[12px] font-semibold" style={{ color: "#b45309" }}>Data Cleanup is disabled.</div>
       <div className="text-[11px] text-slate-500 mt-0.5">
         Bulk deletion of machines and their linked records is switched off for production. Remove a single rack set with
@@ -8937,7 +8936,7 @@ function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, onSave, i
 
       {/* Tab bar */}
       <div className="px-6 pt-4 max-w-5xl">
-        <div className="flex gap-1 border-b border-slate-200 overflow-x-auto">
+        <div className="settings-tabs flex gap-1 border-b border-slate-200 overflow-x-auto">
           {visibleTabs.map((t) => {
             const sel = t.id === tab;
             return (
@@ -8948,7 +8947,7 @@ function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, onSave, i
                         background:  sel ? "rgba(46, 80, 214,0.07)" : "transparent",
                         borderBottom: `2px solid ${sel ? "#2E50D6" : "transparent"}`,
                       }}>
-                {t.label}
+                <LeadLabel text={t.label} />
               </button>
             );
           })}
@@ -9069,7 +9068,7 @@ function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, onSave, i
                 </div>
                 {canEdit && isDirty && !saved && (
                   <div className="px-3 py-2 rounded-lg text-[11px] font-semibold" style={{ background: "rgba(217, 119, 6,0.10)", color: "#B45309", border: "1px solid rgba(217, 119, 6,0.4)" }}>
-                    ● Unsaved changes — click <strong>💾 Save Changes</strong> at the top to apply.
+                    ● Unsaved changes — click <strong><LeadIcon e="💾" />Save Changes</strong> at the top to apply.
                   </div>
                 )}
               </div>
@@ -9088,7 +9087,7 @@ function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, onSave, i
               ))}
             </select>
             <div className="mt-3 px-3.5 py-3 rounded-xl" style={{ background: "rgba(46, 80, 214,0.06)", border: "1px solid rgba(46, 80, 214,0.18)" }}>
-              <div className="text-[11px] text-blue-300 font-semibold">ℹ️ Low Stock Alerts</div>
+              <div className="text-[11px] text-blue-300 font-semibold"><LeadIcon e="ℹ️" />Low Stock Alerts</div>
               <div className="text-[11px] text-slate-400 mt-1">
                 Low stock thresholds are set per item in <span className="text-slate-900 font-semibold">Item Master → Minimum Stock</span>.
                 Items below their individual minimum are shown in Inventory and Order Pipeline automatically.
@@ -9118,7 +9117,7 @@ function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, onSave, i
               {canConfig && isDirty && !saved && (
                 <div className="mb-4 px-3 py-2 rounded-lg text-[11px] font-semibold"
                      style={{ background: "rgba(217, 119, 6,0.10)", color: "#B45309", border: "1px solid rgba(217, 119, 6,0.4)" }}>
-                  ● Unsaved changes — click <strong>💾 Save Changes</strong> at the top to apply.
+                  ● Unsaved changes — click <strong><LeadIcon e="💾" />Save Changes</strong> at the top to apply.
                 </div>
               )}
               <div className="space-y-6">
@@ -9275,13 +9274,13 @@ function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, onSave, i
                     {canConfig && totalAssigned === 0 && (
                       <div className="mb-3 px-3 py-2.5 rounded-lg text-[11px] font-semibold"
                            style={{ background: "rgba(217, 119, 6,0.1)", color: "#B45309", border: "1px solid rgba(217, 119, 6,0.4)" }}>
-                        ⚠ No one is assigned to any department yet. Add workers below so operators see them on <strong>Machine Tracker → Finish &amp; Transfer</strong>.
+                        <LeadIcon e="⚠" />No one is assigned to any department yet. Add workers below so operators see them on <strong>Machine Tracker → Finish &amp; Transfer</strong>.
                       </div>
                     )}
                     {active.length === 0 && (
                       <div className="mb-3 px-3 py-2.5 rounded-lg text-[11px] font-semibold"
                            style={{ background: "rgba(239,68,68,0.08)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.3)" }}>
-                        ⚠ Could not load the user roster. If you don't see users here, apply migration <code>030_dept_roster_view.sql</code> or ask a super-admin to assign departments on your behalf.
+                        <LeadIcon e="⚠" />Could not load the user roster. If you don't see users here, apply migration <code>030_dept_roster_view.sql</code> or ask a super-admin to assign departments on your behalf.
                       </div>
                     )}
                     <div className="space-y-2">
@@ -10097,11 +10096,11 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
                   <div className="flex gap-1 mb-1.5">
                     {canDo("pipeline","approve") && (
                       <button onClick={() => onUpdatePO(po.id, { status:"approved", rejectReason:null })}
-                              className="flex-1 text-[10px] font-bold py-1.5 rounded-lg text-green-400 border border-green-500/30 bg-green-500/10 hover:bg-green-500/20 transition-all">✅ Approve</button>
+                              className="flex-1 text-[10px] font-bold py-1.5 rounded-lg text-green-400 border border-green-500/30 bg-green-500/10 hover:bg-green-500/20 transition-all"><LeadIcon e="✅" />Approve</button>
                     )}
                     {canDo("pipeline","reject") && (
                       <button onClick={() => { setRejectModal(po.id); setRejectReason(""); setRejectErr(false); }}
-                              className="flex-1 text-[10px] font-bold py-1.5 rounded-lg text-red-400 border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 transition-all">❌ Reject</button>
+                              className="flex-1 text-[10px] font-bold py-1.5 rounded-lg text-red-400 border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 transition-all"><LeadIcon e="❌" />Reject</button>
                     )}
                   </div>
                   <ViewBtn po={po} />
@@ -10127,8 +10126,8 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
                     <div className="text-[9px] text-slate-500 mb-0.5">₹{(po.amount||0).toLocaleString("en-IN")} · {po.lineItems?.length||0} items</div>
                     <div className="text-[9px] text-slate-500 mb-2">ETA: {po.delivery||"—"}</div>
                     <div className="flex gap-1 mb-1.5">
-                      {v?.phone && <a href={`tel:${v.phone}`} className="flex-1 text-center text-[9px] font-bold py-1.5 rounded-lg text-blue-400 border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 transition-all">📞 Call</a>}
-                      <button onClick={() => sendWA(po)} className="flex-1 text-center text-[9px] font-bold py-1.5 rounded-lg text-green-400 border border-green-500/30 bg-green-500/10 hover:bg-green-500/20 transition-all">💬 WA</button>
+                      {v?.phone && <a href={`tel:${v.phone}`} className="flex-1 text-center text-[9px] font-bold py-1.5 rounded-lg text-blue-400 border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 transition-all"><LeadIcon e="📞" />Call</a>}
+                      <button onClick={() => sendWA(po)} className="flex-1 text-center text-[9px] font-bold py-1.5 rounded-lg text-green-400 border border-green-500/30 bg-green-500/10 hover:bg-green-500/20 transition-all"><LeadIcon e="💬" />WA</button>
                     </div>
                     {canDo("pipeline","ordered") && (
                       <button onClick={() => { setMoModal(po); setEta(""); setEtaCustom(""); }}
@@ -10185,8 +10184,8 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
                       )}
                     </div>
                     <div className="flex gap-1 mb-1.5">
-                      {v?.phone && <a href={`tel:${v.phone}`} className="flex-1 text-center text-[9px] font-bold py-1.5 rounded-lg text-blue-400 border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 transition-all">📞 Call</a>}
-                      <button onClick={() => sendWA(po || { id: f.poId, vendor: f.vendor })} className="flex-1 text-center text-[9px] font-bold py-1.5 rounded-lg text-green-400 border border-green-500/30 bg-green-500/10 hover:bg-green-500/20 transition-all">💬 WA</button>
+                      {v?.phone && <a href={`tel:${v.phone}`} className="flex-1 text-center text-[9px] font-bold py-1.5 rounded-lg text-blue-400 border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 transition-all"><LeadIcon e="📞" />Call</a>}
+                      <button onClick={() => sendWA(po || { id: f.poId, vendor: f.vendor })} className="flex-1 text-center text-[9px] font-bold py-1.5 rounded-lg text-green-400 border border-green-500/30 bg-green-500/10 hover:bg-green-500/20 transition-all"><LeadIcon e="💬" />WA</button>
                     </div>
                     <button onClick={() => { setFuModal(f); setFuFreq(1); setFuCustom(""); }}
                             className="w-full text-[9px] font-bold py-1.5 rounded-lg text-purple-400 border border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 transition-all mb-1.5">
@@ -10224,7 +10223,7 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
                   <div className="text-[9px] text-slate-500 mb-1">₹{(po.amount||0).toLocaleString("en-IN")} · {po.lineItems?.length||0} item{(po.lineItems?.length||0)!==1?"s":""}</div>
                   {po.receivedDate && (
                     <div className="flex items-center gap-1.5 mb-2">
-                      <span className="text-[9px] font-bold text-green-500">📦 Received</span>
+                      <span className="text-[9px] font-bold text-green-500"><LeadIcon e="📦" />Received</span>
                       <span className="text-[9px] text-slate-500">{po.receivedDate}</span>
                     </div>
                   )}
@@ -10360,8 +10359,8 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
                   <div className="text-[10px] text-slate-500 mt-1">{viewPO.vendor} · {viewPO.date}</div>
                 </div>
                 <div className="flex items-center gap-1.5 flex-shrink-0">
-                  {vnd?.phone && <a href={`tel:${vnd.phone}`} className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg text-blue-400 border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 transition-all">📞 Call</a>}
-                  <button onClick={() => sendWA(viewPO)} className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg text-green-400 border border-green-500/30 bg-green-500/10 hover:bg-green-500/20 transition-all">💬 WhatsApp</button>
+                  {vnd?.phone && <a href={`tel:${vnd.phone}`} className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg text-blue-400 border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 transition-all"><LeadIcon e="📞" />Call</a>}
+                  <button onClick={() => sendWA(viewPO)} className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg text-green-400 border border-green-500/30 bg-green-500/10 hover:bg-green-500/20 transition-all"><LeadIcon e="💬" />WhatsApp</button>
                   <button onClick={() => generatePOPdf(viewPO, vnd, settings)}
                           className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg text-amber-700 border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 transition-all">
                     📄 PDF
@@ -10475,7 +10474,7 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
               {/* Received */}
               {viewPO.receivedDate && (
                 <div className="px-4 py-3 rounded-xl" style={{ background:"rgba(34,197,94,0.05)", border:"1px solid rgba(34,197,94,0.25)" }}>
-                  <div className="text-[9px] font-black text-green-400 uppercase tracking-[0.06em] mb-1">✅ Goods Received</div>
+                  <div className="text-[9px] font-black text-green-400 uppercase tracking-[0.06em] mb-1"><LeadIcon e="✅" />Goods Received</div>
                   <div className="text-[11px] text-slate-400">Stock updated on {viewPO.receivedDate}. GRN recorded.</div>
                 </div>
               )}
@@ -10519,10 +10518,10 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
               <Btn variant="ghost" size="sm" onClick={() => setViewPO(null)}>Close</Btn>
               <div className="flex-1" />
               {["pending","review","draft"].includes(viewPO.status) && canDo("pipeline","approve") && (
-                <Btn variant="green" size="sm" onClick={() => { onUpdatePO(viewPO.id, { status:"approved" }); setViewPO(null); }}>✅ Approve</Btn>
+                <Btn variant="green" size="sm" onClick={() => { onUpdatePO(viewPO.id, { status:"approved" }); setViewPO(null); }}><LeadIcon e="✅" />Approve</Btn>
               )}
               {["pending","review","draft"].includes(viewPO.status) && canDo("pipeline","reject") && (
-                <Btn variant="red" size="sm" onClick={() => { setRejectModal(viewPO.id); setViewPO(null); setRejectReason(""); setRejectErr(false); }}>❌ Reject</Btn>
+                <Btn variant="red" size="sm" onClick={() => { setRejectModal(viewPO.id); setViewPO(null); setRejectReason(""); setRejectErr(false); }}><LeadIcon e="❌" />Reject</Btn>
               )}
               {viewPO.status === "approved" && canDo("pipeline","ordered") && (
                 <button onClick={() => { setMoModal(viewPO); setViewPO(null); setEta(""); setEtaCustom(""); }}
@@ -10617,7 +10616,7 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
              style={{ background:"rgba(17,24,39,0.45)", backdropFilter:"blur(12px)" }}
              onClick={e => e.target===e.currentTarget && (setRejectModal(null),setRejectReason(""),setRejectErr(false))}>
           <div className="w-full max-w-sm rounded-2xl p-6 space-y-4" style={{ background:"var(--surface-elevated)", border:"1px solid rgba(239,68,68,0.4)", boxShadow:"0 40px 80px rgba(17,24,39,0.22)", animation:"slideUp 0.25s ease both" }}>
-            <div className="text-sm font-black text-slate-900">❌ Reject PO</div>
+            <div className="text-sm font-black text-slate-900"><LeadIcon e="❌" />Reject PO</div>
             <div>
               <div className="text-[10px] font-medium text-slate-500 uppercase tracking-[0.08em] mb-1.5">Rejection Reason <span className="text-red-600">*</span></div>
               <textarea value={rejectReason} onChange={e=>{setRejectReason(e.target.value);setRejectErr(false);}} rows={3}
@@ -10640,7 +10639,7 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
              onClick={e=>e.target===e.currentTarget&&(setMoModal(null),setEta(""),setEtaCustom(""))}>
           <div className="w-full max-w-sm rounded-2xl p-6 space-y-4" style={{ background:"var(--surface-elevated)", border:"1px solid rgba(46, 80, 214,0.4)", boxShadow:"0 40px 80px rgba(17,24,39,0.22)", animation:"slideUp 0.25s ease both" }}>
             <div>
-              <div className="text-sm font-black text-slate-900">📋 Confirm Order</div>
+              <div className="text-sm font-black text-slate-900"><LeadIcon e="📋" />Confirm Order</div>
               <div className="text-[10px] text-slate-500 mt-1">{moModal.id} · {moModal.vendor} · ₹{(moModal.amount||0).toLocaleString("en-IN")}</div>
             </div>
             <div>
@@ -10721,7 +10720,7 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
                  style={{ background: "var(--surface-elevated)", border: "1px solid rgba(99,130,246,0.4)", boxShadow: "0 40px 80px rgba(17,24,39,0.22)", animation: "slideUp 0.25s ease both" }}>
               {/* Header */}
               <div className="px-5 py-4 border-b border-slate-200" style={{ background: "rgba(99,130,246,0.06)" }}>
-                <div className="text-sm font-black text-slate-900">🛒 Create Purchase Order</div>
+                <div className="text-sm font-black text-slate-900"><LeadIcon e="🛒" />Create Purchase Order</div>
                 <div className="text-[10px] text-slate-500 mt-0.5 truncate">{item.name} · {item.code}</div>
               </div>
               {/* Stats grid */}
@@ -10850,7 +10849,7 @@ function InwardPage({ items, handleUpdateStock, vendorList, onInwardComplete, on
       )}
 
       <Topbar title="Inward" subtitle="Goods receipt & stock addition">
-        <Btn variant="ghost" size="sm">⬇️ Export Log</Btn>
+        <Btn variant="ghost" size="sm"><LeadIcon e="⬇️" />Export Log</Btn>
       </Topbar>
 
       <div className="p-6 space-y-6">
@@ -10987,7 +10986,7 @@ function InwardPage({ items, handleUpdateStock, vendorList, onInwardComplete, on
           return (
             <div className="section-card p-5" style={{ animation: "slideUp 0.4s ease both" }}>
               <div className="flex items-center gap-2 mb-4">
-                <SectionHeader>📋 Inward Log</SectionHeader>
+                <SectionHeader><LeadIcon e="📋" />Inward Log</SectionHeader>
                 {combined.filter(e => e.fromPO).length > 0 && (
                   <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-green-500/10 text-green-400 border border-green-500/20">
                     {combined.filter(e => e.fromPO).length} auto-received
@@ -12889,7 +12888,7 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
           </div>
           {confirmIssue && hasOverIssue && (
             <div className="mx-6 mt-2 px-4 py-2.5 rounded-xl" style={{ background: "rgba(251,191,36,0.07)", border: "1px solid rgba(251,191,36,0.28)" }}>
-              <div className="text-[10px] font-black mb-1.5" style={{color:"#b45309"}}>⚠ Over-Issue Warning — issuing more than BOM requires:</div>
+              <div className="text-[10px] font-black mb-1.5" style={{color:"#b45309"}}><LeadIcon e="⚠" />Over-Issue Warning — issuing more than BOM requires:</div>
               <div className="flex flex-wrap gap-3">
                 {checkedE.filter((i) => i.overQty > 0).map((i) => (
                   <span key={i.code} className="text-[9px] font-bold font-mono" style={{color:"#b45309"}}>
@@ -12939,7 +12938,7 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
             ) : (
               <div className="flex items-center gap-2">
                 {hasOverIssue
-                  ? <span className="text-[10px] font-bold" style={{color:"#b45309"}}>⚠ Confirm over-issue?</span>
+                  ? <span className="text-[10px] font-bold" style={{color:"#b45309"}}><LeadIcon e="⚠" />Confirm over-issue?</span>
                   : <span className="text-[10px] font-bold text-amber-700">Confirm issue?</span>
                 }
                 <button onClick={() => setConfirmIssue(false)} className="text-xs font-bold text-slate-500 px-3 py-2 rounded-lg border border-slate-200 hover:text-slate-900 transition-all">No</button>
@@ -13003,7 +13002,7 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
             <div className="px-6 py-5 border-b border-slate-200 flex items-start justify-between gap-3 flex-shrink-0"
                  style={{ background: "linear-gradient(90deg,rgba(217,119,6,0.12),rgba(217,119,6,0.05))" }}>
               <div>
-                <div className="text-[15px] font-semibold text-slate-900">📋 Check these before issuing</div>
+                <div className="text-[15px] font-semibold text-slate-900"><LeadIcon e="📋" />Check these before issuing</div>
                 <div className="text-[11px] text-slate-500 mt-0.5">
                   {bom.label || bomKey}{serialNo ? ` · S/N ${serialNo}` : ""} · {verifyLines.length} item{verifyLines.length === 1 ? "" : "s"} to check
                   {criticalLines.length > 0 && ` · ${criticalLines.length} critical`}
@@ -13194,7 +13193,7 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
              onClick={(e) => e.target === e.currentTarget && setMaterialBlock(false)}>
           <div role="alertdialog" aria-label="Materials short" className="w-full max-w-md rounded-2xl p-6 space-y-3"
                style={{ background: "var(--surface-elevated)", border: "1px solid rgba(185,28,28,0.4)", boxShadow: "0 40px 80px rgba(17,24,39,0.22)" }}>
-            <div className="text-sm font-black" style={{ color: "#b91c1c" }}>⚠ Cannot issue</div>
+            <div className="text-sm font-black" style={{ color: "#b91c1c" }}><LeadIcon e="⚠" />Cannot issue</div>
             <div className="text-[12px] leading-relaxed" style={{ color: "var(--text-muted)" }}>{destError}</div>
             <div className="flex justify-end">
               <button onClick={() => setMaterialBlock(false)} className="text-xs font-bold px-4 py-2 rounded-lg border border-slate-200">OK</button>
@@ -13425,7 +13424,7 @@ function BomLineCheckPointsModal({ code, itemName = "", bomLabel = "", current =
 
         <div className="px-6 py-5 border-b border-slate-200 flex-shrink-0"
              style={{ background: "linear-gradient(90deg,rgba(217,119,6,0.10),rgba(217,119,6,0.04))" }}>
-          <div className="text-[15px] font-semibold text-slate-900">✅ Check Points</div>
+          <div className="text-[15px] font-semibold text-slate-900"><LeadIcon e="✅" />Check Points</div>
           <div className="text-[11px] text-slate-500 mt-0.5">
             {itemName || code}{bomLabel ? <> — only for the <b>{bomLabel}</b> BOM</> : null}
           </div>
@@ -13970,7 +13969,7 @@ function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, onCreateB
           <div className="w-full max-w-sm rounded-2xl overflow-hidden"
                style={{ background: "var(--surface-elevated)", border: "1px solid rgba(239,68,68,0.4)", boxShadow: "0 40px 80px rgba(17,24,39,0.22)" }}>
             <div className="px-5 py-4 border-b border-slate-200" style={{ background: "rgba(239,68,68,0.06)" }}>
-              <div className="text-sm font-black text-red-400">🗑 Remove Machine From Rack?</div>
+              <div className="text-sm font-black text-red-400"><LeadIcon e="🗑" />Remove Machine From Rack?</div>
               <div className="text-[10px] text-slate-500 mt-0.5">
                 {removeRackConfirm.bomKey}{removeRackConfirm.serialNo ? ` · S/N ${removeRackConfirm.serialNo}` : ""}
               </div>
@@ -14261,7 +14260,7 @@ function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, onCreateB
         {/* ── BOM Cards ── */}
         <div>
           <div className="flex items-center gap-2 mb-4">
-            <h2 className="text-sm font-extrabold text-slate-900">📤 BOM Outward</h2>
+            <h2 className="text-sm font-extrabold text-slate-900"><LeadIcon e="📤" />BOM Outward</h2>
             <span className="text-[10px] font-bold text-amber-700 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full">{boms.length} BOMs</span>
             <div className="flex-1" />
             {canDo("outward","editBOM") && onCreateBOM && (
@@ -14456,7 +14455,7 @@ function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, onCreateB
         {!embedded && (
         <div className="bg-white border border-slate-200 rounded-xl p-6">
           <div className="flex items-center gap-2 mb-5">
-            <h2 className="text-sm font-extrabold text-slate-900">✋ Manual Outward</h2>
+            <h2 className="text-sm font-extrabold text-slate-900"><LeadIcon e="✋" />Manual Outward</h2>
             <span className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">Ad-hoc Issue</span>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -14541,7 +14540,7 @@ function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, onCreateB
         {/* ── Outward History ── */}
         {!embedded && outwardLog && outwardLog.length > 0 && (
           <div className="section-card p-5">
-            <SectionHeader>📋 Outward History</SectionHeader>
+            <SectionHeader><LeadIcon e="📋" />Outward History</SectionHeader>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead><tr className="border-b border-slate-200">
@@ -18291,7 +18290,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                             <div className="text-[13px] mt-0.5" style={{ color: "var(--text-dim)" }}>
                               {m?.bomLabel ? `${m.bomLabel} · ` : ""}from {h.fromDepartment} → {h.toDepartment}{waited ? ` · waiting ${waited}` : ""}
                             </div>
-                            {late && <div className="text-[13px] font-black mt-1" style={{ color: "#dc2626" }}>🚦 ON HOLD — accept deadline passed</div>}
+                            {late && <div className="text-[13px] font-black mt-1" style={{ color: "#dc2626" }}><LeadIcon e="🚦" />ON HOLD — accept deadline passed</div>}
                           </div>
                           {canAccept && (
                             <button type="button" data-staff-accept={h.id} className={btn} style={{ background: "#15803d", color: "#fff" }}
@@ -20937,7 +20936,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                style={{ background: "var(--surface-elevated)", border: "1px solid rgba(239,68,68,0.4)", boxShadow: "0 40px 80px rgba(17,24,39,0.22)" }}>
             <ModalX onClose={() => setRemoveRackConfirm(null)} />
             <div className="px-5 py-4 border-b border-slate-200" style={{ background: "rgba(239,68,68,0.06)" }}>
-              <div className="text-sm font-black text-red-400">🗑 Remove Machine From Rack?</div>
+              <div className="text-sm font-black text-red-400"><LeadIcon e="🗑" />Remove Machine From Rack?</div>
               <div className="text-[10px] text-slate-500 mt-0.5">
                 {removeRackConfirm.bomKey}{removeRackConfirm.serialNo ? ` · S/N ${removeRackConfirm.serialNo}` : ""}
               </div>
@@ -21217,7 +21216,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                     {/* Phase B — carry-forward: show previously unresolved items for this machine */}
                     {(pendingHandoverItems || []).filter((p) => p.machineId === handover.machineId && pendingItemIsOpen(p)).length > 0 && (
                       <div className="rounded-lg px-3 py-2" style={{ background: "rgba(217, 119, 6,0.07)", border: "1px solid rgba(217, 119, 6,0.3)" }}>
-                        <div className="text-[10px] font-bold text-amber-700 uppercase tracking-wide mb-1">⏳ Pending items carried forward from previous departments</div>
+                        <div className="text-[10px] font-bold text-amber-700 uppercase tracking-wide mb-1"><LeadIcon e="⏳" />Pending items carried forward from previous departments</div>
                         <ul className="list-disc list-inside text-[11px] text-amber-800 space-y-0.5">
                           {(pendingHandoverItems || []).filter((p) => p.machineId === handover.machineId && pendingItemIsOpen(p)).map((p) => (
                             <li key={p.id}><span className="font-semibold">{p.raisedInDepartment}:</span> {p.description}</li>
@@ -21280,7 +21279,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                     {acceptDeptEmps.length > 0 && (
                       <div className="rounded-lg px-3 py-2.5" style={{ background: "rgba(99,102,241,0.05)", border: "1px solid rgba(99,102,241,0.25)" }}>
                         <div className="text-[10px] font-bold text-indigo-200 uppercase tracking-wide mb-1.5">
-                          👥 Receiving employees <span className="text-red-500">*</span>
+                          <LeadIcon e="👥" />Receiving employees <span className="text-red-500">*</span>
                         </div>
                         <div className="text-[10px] text-slate-400 mb-2">
                           Select the employees receiving this machine into {handover.toDepartment}. Recorded on the acceptance.
@@ -21305,7 +21304,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                     {/* 2026-11-02 — mandatory Digital Signature for every acceptance */}
                     <div data-accept-signature className="rounded-lg px-3 py-2.5" style={{ background: "rgba(17,24,39,0.02)", border: `1px solid ${sigSvg ? "rgba(34,197,94,0.4)" : "rgba(17,24,39,0.15)"}` }}>
                       <div className="text-[10px] font-bold text-slate-600 uppercase tracking-wide mb-1.5">
-                        ✍ Digital signature <span className="text-red-500">*</span>
+                        <LeadIcon e="✍" />Digital signature <span className="text-red-500">*</span>
                       </div>
                       {sigSvg ? (
                         <div>
@@ -21369,7 +21368,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
               <ModalX onClose={() => setDuringWorkModal(null)} disabled={!!busy} />
               <div className="px-6 py-4 border-b border-slate-200 flex-shrink-0"
                    style={{ background: "linear-gradient(90deg,rgba(46, 80, 214,0.12),rgba(38, 64, 176,0.05))" }}>
-                <div className="text-sm font-black text-slate-900">📋 During-Work Checks</div>
+                <div className="text-sm font-black text-slate-900"><LeadIcon e="📋" />During-Work Checks</div>
                 <div className="text-[11px] text-slate-400 mt-0.5">{machine.bomKey}{machine.serialNo ? ` · S/N ${machine.serialNo}` : ""} · {machine.currentDepartment || machine.stage}</div>
                 <div className="text-[10px] text-slate-500 mt-0.5">{template?.name || "Checks"}</div>
               </div>
@@ -22824,7 +22823,7 @@ function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, machine
               <HRExportBar onCSV={()=>hrExportCSV(lowStockExport,lowStockCols,"low-stock")} onExcel={()=>hrExportExcel(lowStockExport,lowStockCols,"low-stock")} onPDF={()=>hrExportPDF("Low Stock Report",lowStockExport,lowStockCols)} />
             </div>
             {lowStockRows.length === 0 ? (
-              <div className="text-center py-20 text-green-400 text-sm">✅ All stock levels are healthy.</div>
+              <div className="text-center py-20 text-green-400 text-sm"><LeadIcon e="✅" />All stock levels are healthy.</div>
             ) : (
               <div className="rounded-xl overflow-x-auto" style={{ border:"1px solid rgba(17,24,39,0.06)" }}>
                 <table className="w-full text-xs">
@@ -22967,7 +22966,7 @@ function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, machine
             {/* ── Auto Monthly Report ── */}
             <div className="flex items-center justify-between rounded-xl p-4" style={CARD_STYLE}>
               <div>
-                <div className="text-sm font-bold text-slate-900">📊 Auto Monthly Report</div>
+                <div className="text-sm font-bold text-slate-900"><LeadIcon e="📊" />Auto Monthly Report</div>
                 <div className="text-[10px] text-slate-500 mt-0.5">One-click download — purchase, production, inventory summary</div>
               </div>
               <button onClick={() => {
