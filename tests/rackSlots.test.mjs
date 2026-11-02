@@ -421,40 +421,37 @@ test("App: Report Center navigation, seven reports, filters, exports and setting
   assert.doesNotMatch(app, /share(able)? link/i);
 });
 
-// 2026-10-31 — Admin Data Cleanup (migration 051): admin-only panel in
-// Settings → Data & Backup; keep-list selection; server preview; password
-// re-auth + typed DELETE; single-transaction DB function guarded by the
-// previewed id set; master data and the immutable audit log untouched.
-test("App + migration 051: Admin Data Cleanup is admin-gated, previewed, password-verified and atomic", async () => {
+// 2026-10-31 — Admin Data Cleanup (migration 051) was an admin-only panel in
+// Settings → Data & Backup that deleted test machines through the
+// admin_cleanup_machines function.
+// 2026-11-02 (migration 053, go-live) — DISABLED. The function is revoked for
+// everyone; the panel stays mounted at the same gate but renders only the
+// "Data Cleanup is disabled" notice: no keep-list, no preview, no password,
+// no execute button, and no RPC call anywhere in the app.
+test("App + migration 053: Admin Data Cleanup is disabled — notice only, no RPC path", async () => {
   const fs = await import("node:fs");
   const path = await import("node:path");
   const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
   const app = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
-  const sql = fs.readFileSync(path.join(root, "supabase/migrations/051_admin_cleanup.sql"), "utf8");
-  const audit = fs.readFileSync(path.join(root, "src/auth/auditStore.js"), "utf8");
-  // UI gate + wiring
+  // still mounted at the same admin gate, still wired (symbol kept for the regression inventory)
   assert.match(app, /\(isSuperAdmin \|\| canDo\("machines", "configDept"\)\) && \(\s*<AdminCleanupPanel machineLog=\{machineLog\} currentUser=\{currentUser\} onDone=\{onAdminCleanup\} \/>/);
   assert.match(app, /machineLog=\{machineLog\} onAdminCleanup=\{handleAdminCleanupDone\}/);
-  // preview is read-only; execute needs password + DELETE + the previewed ids
-  assert.match(app, /rpc\("admin_cleanup_machines", \{ p_keep_ids: keepIds\(\), p_execute: false \}\)/);
-  assert.match(app, /const re = await reauthenticateByPassword\(authEmail, password\);\s*if \(!re\.success\) throw/);
-  assert.match(app, /if \(typed\.trim\(\) !== "DELETE"\)/);
-  assert.match(app, /rpc\("admin_cleanup_machines", \{ p_keep_ids: keepIds\(\), p_execute: true, p_expected_ids: expected \}\)/);
-  assert.match(app, /if \(!supa\) \{ setError\("Data cleanup needs the live database/, "local mode fails closed");
-  for (const h of ["data-cleanup-preview", "data-cleanup-password", "data-cleanup-typed", "data-cleanup-execute", "data-cleanup-summary", "data-keep-all", "data-keep-none"]) assert.match(app, new RegExp(h), h);
-  // local state follow-up: local-only audit entry (DB row written by the function)
-  assert.match(app, /appendAuditWithUser\(\{ type: "admin_cleanup", module: "Machine",[\s\S]*?\}, \{ mirror: false \}\);/);
-  assert.match(audit, /if \(opts\.mirror !== false\) tryWriteToSupabase\(full\);/);
-  // DB function: admin-only, preview mode, expected-id guard, cascade delete, audit insert, never touches master data
-  assert.match(sql, /v_user\.role_key = 'super_admin' OR public\.has_permission\('machines', 'configDept'\)/);
-  assert.match(sql, /IF NOT p_execute THEN\s*RETURN jsonb_build_object\('mode', 'preview'/);
-  assert.match(sql, /IF p_expected_ids IS NULL THEN\s*RAISE EXCEPTION 'Preview required before cleanup'/);
-  assert.match(sql, /Machine list changed since the preview/);
-  assert.match(sql, /DELETE FROM public\.outward_log WHERE serial_no = ANY\(v_serials\);\s*DELETE FROM public\.machine_log WHERE id = ANY\(v_ids\);/);
-  assert.match(sql, /INSERT INTO public\.audit_log \(user_id, user_name, user_role, type, module, action, details\)/);
-  for (const t of ["items", "stock", "bom_definitions", "users", "settings", "vendors", "purchase_orders", "inward_log"]) assert.doesNotMatch(sql, new RegExp(`DELETE FROM public\\.${t}\\b`), `never deletes ${t}`);
-  assert.doesNotMatch(sql, /DELETE FROM public\.audit_log|ALTER TABLE public\.audit_log|DISABLE TRIGGER/, "audit log stays immutable");
-  assert.match(sql, /GRANT EXECUTE ON FUNCTION public\.admin_cleanup_machines\(bigint\[\], boolean, bigint\[\]\) TO authenticated;/);
+  assert.match(app, /function AdminCleanupPanel\(/);
+  const panel = app.slice(app.indexOf("function AdminCleanupPanel("), app.indexOf("function SettingsPage("));
+  assert.match(panel, /data-cleanup-disabled/);
+  assert.match(panel, /Data Cleanup is disabled\./);
+  // nothing in the panel can reach the database
+  for (const forbidden of ["rpc(", "getSupabase", "reauthenticateByPassword", "functions.invoke", "fetch("])
+    assert.ok(!panel.includes(forbidden), `panel never calls ${forbidden}`);
+  for (const h of ["data-cleanup-preview", "data-cleanup-password", "data-cleanup-typed", "data-cleanup-execute", "data-cleanup-summary", "data-keep-all", "data-keep-none"])
+    assert.doesNotMatch(app, new RegExp(h), `${h} control is gone`);
+  // the function name appears nowhere in src/ except comments
+  const srcDir = path.join(root, "src");
+  const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]);
+  for (const f of walk(srcDir).filter((f) => /\.(js|jsx)$/.test(f))) {
+    const code = fs.readFileSync(f, "utf8").split("\n").filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).join("\n");
+    assert.ok(!/admin_cleanup_machines/.test(code), `${path.relative(root, f)} does not call admin_cleanup_machines`);
+  }
 });
 
 // 2026-10-31 — Machine Tracker redesign: four production stages ending at
@@ -580,6 +577,9 @@ test("App: Machine Tracker navigation is the summary boxes, for staff and admin 
   assert.doesNotMatch(app, /\{ id: "production", label: "Production" \}/);
   assert.match(app, /data-mt-nav/);
   const nav = app.slice(app.indexOf("Summary boxes = the navigation"), app.indexOf("data-mt-nav") + 2000);
+  // 2026-11-01 — the boxes are the admin tracker's navigation. Non-admins now
+  // get the department dashboard (staffMode, see tests/staffMode.test.mjs),
+  // so the boxes are gated by staffMode there — never by isFloorLogin.
   assert.ok(!/isFloorLogin/.test(nav.slice(0, nav.indexOf("data-mt-nav"))), "the nav is not hidden from a floor login");
   for (const tab of ["transfer", "production", "pending"]) assert.ok(nav.includes(`tab: "${tab}"`), `a box opens ${tab}`);
 
@@ -810,7 +810,8 @@ test("Machine report: every recorded field is still printed, and the A4 rules ho
   assert.match(rep, /const rate = \(r\) =>/);
   assert.doesNotMatch(rep, /formatRatingBadge\(/, "no star badges");
   // D7: every captured signature at one size
-  assert.match(css, /\.mr-doc \.mr-sig svg \{ display: block; height: 30px; width: auto; max-width: 130px; \}/);
+  // 2026-11-02 — the signature is an <img> data URI (no markup injection); same box.
+  assert.match(css, /\.mr-doc \.mr-sig svg, \.mr-doc \.mr-sig img \{ display: block; height: 30px; width: auto; max-width: 130px; \}/);
 
   // D8: A4, running header via a repeating thead, page numbers, clean breaks, PDF named after the reference
   assert.match(css, /@page machine-report \{\s*size: A4 portrait;/);

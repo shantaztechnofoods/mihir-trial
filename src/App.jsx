@@ -59,6 +59,7 @@ import { computeDepartmentRating, formatRatingBadge, summarizeMachineRatings, bu
 import { startChecklistResponse, toggleAnswer, setAnswerRemark, validateChecklistAnswers, checklistProblemText, incompleteChecklistJobs, snapshotResponse, pickTemplate, duplicateTemplateItems, setAllAnswers, countChecked } from "./utils/checklistLogic.js";
 import { reconcileTeam, pickRememberedMain, readTeamMemory, writeTeamMemory } from "./utils/teamMemory.js";
 import { useRealtimeTables } from "./realtime/useRealtimeTables.js";
+import { monthIndex, parseDisplayDate } from "./utils/parseDate.js";
 import { fetchRecentMovements, MOVEMENT_META } from "./stores/stockMovementsStore.js";
 import { sendPOWhatsApp, openVendorWhatsApp, waErrorToast } from "./utils/whatsapp.js";
 import { uploadItemMedia, MAX_UPLOAD_BYTES } from "./utils/storage.js";
@@ -83,7 +84,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-01-report-pagination";
+const APP_BUILD = "2026-11-02-go-live";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -398,11 +399,20 @@ const getCurrSymbol = (currency) => {
 const fmtDate = (d) =>
   d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 
+// User-drawn signature SVG text is rendered through an <img> data URI, never
+// injected as markup: an <img> does not run scripts or load external
+// resources, so an SVG stored by any user cannot execute in another user's
+// session (the report is read by every department).
+const svgDataUri = (svg) => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(String(svg || ""))}`;
+
 const parseDate = (str) => {
   if (!str) return new Date();
-  const mMap = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+  // Month matched on its first three letters (utils/parseDate.js): en-IN
+  // writes September as "Sept", which the old exact map read as January.
+  const parsed = parseDisplayDate(str);
+  if (parsed) return parsed;
   const [d, m, y] = str.split(" ");
-  return new Date(+y, mMap[m] ?? 0, +d);
+  return new Date(+y, monthIndex(m) ?? 0, +d);
 };
 
 const buildInitialHistory = (trend) => {
@@ -1930,11 +1940,10 @@ function ItemDetailModal({ item, category, onClose, onDelete, onUpdateStock, onE
               if (!str) return null;
               let d = new Date(str);
               if (!isNaN(d.getTime())) return d;
-              const mo = { Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11 };
               const p = str.trim().split(/\s+/);
               if (p.length >= 3) {
-                const day = parseInt(p[0]), m = mo[p[1]], yr = parseInt(p[2]);
-                if (!isNaN(day) && m !== undefined && !isNaN(yr)) return new Date(yr, m, day);
+                const day = parseInt(p[0]), m = monthIndex(p[1]), yr = parseInt(p[2]);
+                if (!isNaN(day) && m != null && !isNaN(yr)) return new Date(yr, m, day);
               }
               return null;
             };
@@ -8738,144 +8747,22 @@ function EmployeeMembersPanel({ members = [], canConfig = false, onSave }) {
 }
 
 // ─── Admin Data Cleanup ──────────────────────────────────────────────────────
-// Super Admin / Admin (machines.configDept) only. Deletes test machines and
-// their linked operational records (handovers, pending jobs, checklist
-// responses, ratings, attachments, outward issues) in ONE database
-// transaction via admin_cleanup_machines (migration 051). Flow:
-//   1. Select which machines to RETAIN (everything unticked is deleted)
-//   2. Preview — the server counts exactly what would go
-//   3. Confirm — admin password + typed DELETE, then execute
-// Master data (items, stock, BOMs, users, settings) is never touched; the
-// immutable audit_log keeps every old entry and gains one cleanup record.
-// Local (non-Supabase) mode fails closed: there is no transaction or auth.
-function AdminCleanupPanel({ machineLog = [], currentUser = null, onDone }) {
-  const [keep, setKeep]         = useState(() => new Set(machineLog.filter((m) => m.status !== "completed" && m.rackSlot).map((m) => Number(m.id))));
-  const [preview, setPreview]   = useState(null);   // server preview result
-  const [busy, setBusy]         = useState(false);
-  const [error, setError]       = useState("");
-  const [password, setPassword] = useState("");
-  const [typed, setTyped]       = useState("");
-  const [result, setResult]     = useState(null);
-  const supa = isSupabaseEnabled();
-  const machines = [...machineLog].sort((a, b) => Number(b.id) - Number(a.id));
-  const toDelete = machines.filter((m) => !keep.has(Number(m.id)));
-  const toggle = (id) => { setPreview(null); setKeep((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; }); };
-  const keepAll  = () => { setPreview(null); setKeep(new Set(machines.map((m) => Number(m.id)))); };
-  const keepNone = () => { setPreview(null); setKeep(new Set()); };
-  const keepIds  = () => [...keep].map(Number).filter((n) => Number.isFinite(n));
-
-  const runPreview = async () => {
-    setError(""); setResult(null);
-    if (!supa) { setError("Data cleanup needs the live database (Supabase mode)."); return; }
-    setBusy(true);
-    try {
-      const { data, error: e } = await getSupabase().rpc("admin_cleanup_machines", { p_keep_ids: keepIds(), p_execute: false });
-      if (e) throw new Error(e.message);
-      setPreview(data);
-    } catch (e) { setError(e.message || "Preview failed."); }
-    setBusy(false);
-  };
-
-  const runExecute = async () => {
-    setError("");
-    if (!preview || preview.mode !== "preview") { setError("Run the preview first."); return; }
-    if (typed.trim() !== "DELETE") { setError('Type DELETE to confirm.'); return; }
-    if (!password) { setError("Enter your admin password."); return; }
-    setBusy(true);
-    try {
-      const authEmail = currentUser?.email || `${currentUser?.username}@users.shantaz.local`;
-      const re = await reauthenticateByPassword(authEmail, password);
-      if (!re.success) throw new Error(re.error || "Password verification failed.");
-      const expected = (preview.machines || []).map((m) => Number(m.id));
-      const { data, error: e } = await getSupabase().rpc("admin_cleanup_machines", { p_keep_ids: keepIds(), p_execute: true, p_expected_ids: expected });
-      if (e) throw new Error(e.message);
-      setResult(data); setPreview(null); setPassword(""); setTyped("");
-      if (onDone) onDone(data);
-    } catch (e) { setError(e.message || "Cleanup failed — nothing was deleted."); }
-    setBusy(false);
-  };
-
-  const counts = preview?.counts || {};
-  const countRows = [
-    ["machine_log", "Machines"], ["handover_events", "Handovers (incl. On Hold / Completed)"], ["pending_handover_items", "Pending jobs"],
-    ["checklist_responses", "Checklist responses"], ["department_ratings", "Department ratings"], ["machine_attachments", "Attachments"], ["outward_log", "BOM outward issues"],
-  ];
-  const stageOf = (m) => m.status === "completed" ? "Completed" : (m.stage || "—");
-
+// DISABLED for go-live (migration 053). The panel used to delete test
+// machines and every linked record through admin_cleanup_machines (migration
+// 051); that function is revoked for everyone from 053 on, and this panel no
+// longer calls it — or anything else. The component is kept (Settings → Data
+// & Backup still shows the entry, and the regression inventory names it) and
+// renders the disabled notice only. There is deliberately no preview, no
+// execute button and no RPC path left to re-enable by accident.
+function AdminCleanupPanel({ machineLog = [], currentUser = null, onDone }) { // eslint-disable-line no-unused-vars
   return (
-    <div data-admin-cleanup className="mt-4 p-4 rounded-xl border" style={{ borderColor: "rgba(215,25,32,0.28)", background: "rgba(215,25,32,0.03)" }}>
+    <div data-admin-cleanup data-cleanup-disabled className="mt-4 p-4 rounded-xl border" style={{ borderColor: "rgba(17,24,39,0.10)", background: "rgba(17,24,39,0.02)" }}>
       <div className="text-[13px] font-semibold text-slate-900">🧹 Admin Data Cleanup — test machines</div>
+      <div className="mt-1 text-[12px] font-semibold" style={{ color: "#b45309" }}>Data Cleanup is disabled.</div>
       <div className="text-[11px] text-slate-500 mt-0.5">
-        Deletes the unticked machines with their handovers, pending jobs, checklist responses, ratings, attachments and BOM outward entries in one transaction.
-        Items, stock, BOMs, users, settings and the audit trail are never touched.
+        Bulk deletion of machines and their linked records is switched off for production. Remove a single rack set with
+        Remove From Rack on the Machine Tracker; anything else goes through the database administrator.
       </div>
-      {!supa && <div className="mt-2 text-[11px] font-semibold" style={{ color: "#b45309" }}>Available only when connected to the live database.</div>}
-
-      <div className="mt-3 flex items-center justify-between">
-        <div className="text-[11px] font-semibold text-slate-700">Tick the machines to <u>keep</u> ({keep.size} kept · {toDelete.length} to delete)</div>
-        <div className="flex gap-2">
-          <button data-keep-all onClick={keepAll} className="text-[11px] font-bold px-2.5 py-1 rounded-lg border border-slate-200 bg-white">Keep all</button>
-          <button data-keep-none onClick={keepNone} className="text-[11px] font-bold px-2.5 py-1 rounded-lg border border-slate-200 bg-white">Keep none</button>
-        </div>
-      </div>
-      <div className="mt-2 max-h-64 overflow-y-auto rounded-lg border border-slate-200 bg-white">
-        {machines.length === 0 && <div className="p-3 text-[11px] text-slate-400">No machines.</div>}
-        {machines.map((m) => {
-          const id = Number(m.id); const kept = keep.has(id);
-          return (
-            <label key={m.id} data-cleanup-row={m.id} data-kept={kept ? "1" : "0"} className="flex items-center gap-3 px-3 py-1.5 border-b border-slate-100 text-[12px] cursor-pointer">
-              <input type="checkbox" checked={kept} onChange={() => toggle(id)} disabled={busy} />
-              <span className="font-semibold text-slate-800 w-16">{m.bomKey || "—"}</span>
-              <span className="font-mono text-slate-700 w-28 truncate">{m.serialNo || "no serial"}</span>
-              <span className="text-slate-500">{stageOf(m)}{m.rackSlot ? ` · ${m.rackSlot}` : ""}</span>
-              <span className="ml-auto text-[10px] font-bold" style={{ color: kept ? "#15803d" : "#d71920" }}>{kept ? "KEEP" : "DELETE"}</span>
-            </label>
-          );
-        })}
-      </div>
-
-      <div className="mt-3 flex items-center gap-2">
-        <button data-cleanup-preview onClick={runPreview} disabled={busy || !supa}
-                className="text-[12px] font-bold px-4 py-2 rounded-xl border border-slate-300 bg-white disabled:opacity-50">
-          {busy && !preview ? "Checking…" : "Preview deletion"}
-        </button>
-        {preview && <span className="text-[11px] text-slate-500">Preview from the live database — nothing deleted yet.</span>}
-      </div>
-
-      {preview && (
-        <div data-cleanup-summary className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
-          <div className="text-[12px] font-semibold text-slate-900 mb-1">Will be deleted</div>
-          <table className="text-[11px] w-full"><tbody>
-            {countRows.map(([k, label]) => (
-              <tr key={k} data-count={k}><td className="py-0.5 text-slate-600">{label}</td><td className="py-0.5 text-right font-bold text-slate-900">{counts[k] ?? 0}</td></tr>
-            ))}
-          </tbody></table>
-          <div className="text-[11px] text-slate-500 mt-1">
-            {(preview.machines || []).length === 0
-              ? "No machines selected for deletion."
-              : `Machines: ${(preview.machines || []).map((m) => `${m.bom || "?"} ${m.serial || "(no serial)"}`).join(", ")}`}
-          </div>
-          {(preview.machines || []).length > 0 && (
-            <div className="mt-3 grid gap-2" style={{ gridTemplateColumns: "1fr 1fr auto" }}>
-              <input data-cleanup-password type="password" autoComplete="current-password" placeholder="Admin password" value={password} onChange={(e) => setPassword(e.target.value)}
-                     className="text-[12px] px-3 py-2 rounded-lg border border-slate-300" disabled={busy} />
-              <input data-cleanup-typed placeholder='Type DELETE to confirm' value={typed} onChange={(e) => setTyped(e.target.value)}
-                     className="text-[12px] px-3 py-2 rounded-lg border border-slate-300" disabled={busy} />
-              <button data-cleanup-execute onClick={runExecute} disabled={busy || typed.trim() !== "DELETE" || !password}
-                      className="text-[12px] font-bold px-4 py-2 rounded-xl text-white disabled:opacity-50" style={{ background: "#d71920" }}>
-                {busy ? "Deleting…" : `Delete ${(preview.machines || []).length} machine(s)`}
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {error && <div data-cleanup-error className="mt-2 text-[11px] font-semibold" style={{ color: "#d71920" }}>{error}</div>}
-      {result && (
-        <div data-cleanup-result className="mt-2 text-[11px] font-semibold" style={{ color: "#15803d" }}>
-          Cleanup complete — {result.counts?.machine_log ?? 0} machine(s) and linked records deleted; {(result.keep_ids || []).length} kept. Recorded in the audit trail.
-        </div>
-      )}
     </div>
   );
 }
@@ -11830,7 +11717,7 @@ function BomCostPanel({ lines, findInv, pos = [], units = 1, canSetRate = false,
   );
 }
 
-function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock, onClose, onIssue, onUpdateBOM, onRenameBOM, allBomKeys = [], onAfterRename, serialNo = "", rackReady = 0, settings = {}, checklistTemplates = [], onCreateChecklistTemplate, onUpdateChecklistTemplate, onDeleteChecklistTemplate, canConfigChecklist = false,
+function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock, onClose, onIssue, onCreateMachineFirst = null, onAbortMachine = null, onUpdateBOM, onRenameBOM, allBomKeys = [], onAfterRename, serialNo = "", rackReady = 0, settings = {}, checklistTemplates = [], onCreateChecklistTemplate, onUpdateChecklistTemplate, onDeleteChecklistTemplate, canConfigChecklist = false,
   // Feature 2 — Req 2: history of outward issues for serial-number deduplication.
   outwardLog = [],
   // 2026-10-22 — navigate to another page (e.g. Inventory from the Critical
@@ -12371,6 +12258,34 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
       if (item.pendingQty > 0) pending.push({ ...item });
     });
 
+    // Migration 027 — carry the per-machine duration overrides into the issue
+    // payload. Only emitted when a serial is present (= machine will be
+    // created). Non-serial manual outward sends nothing, matching legacy flow.
+    const deptDurations = serialNo ? buildDeptDurations() : null;
+    const issueId = Date.now();
+    const issueRackSlot = finalDest === "rack" ? (rackSet ? rackSet.slotId : slot) : null;
+    const extraJobs = cleanPendingJobs(extraPending);
+
+    // 2026-11-02 — the machine record FIRST, before any stock moves. In
+    // Supabase mode handleCreateMachine awaits the insert; if it is refused
+    // nothing has left the store and nothing else is written. An R crate
+    // (rackSet.mode "crate") fills an existing machine and creates none.
+    const needsMachine = !!serialNo && !(rackSet && rackSet.mode === "crate");
+    let createdMachine = null;
+    if (needsMachine && onCreateMachineFirst) {
+      let mr = null;
+      try {
+        mr = await onCreateMachineFirst({ bomKey, label: bom.label, serialNo, date: fmtDate(new Date()), issueId, destination: finalDest, deptDurations, issued, rackSlot: issueRackSlot, extraPending: extraJobs });
+      } catch (err) { mr = { success: false, error: err?.message || String(err) }; }
+      if (!mr || mr.success === false) {
+        setIssuing(false);
+        setCriticalErr(`Issue aborted — the machine record could not be saved: ${(mr && mr.error) || "unknown error"}. Nothing has been issued.`);
+        setShowCPBrief(true);
+        return;
+      }
+      createdMachine = mr.machine || null;
+    }
+
     // Run the deductions and wait for every answer.
     const results = await Promise.all(moves.map((m) =>
       Promise.resolve(handleUpdateStock(m.category, m.code, -m.qty, `BOM: ${bomKey}`))
@@ -12385,6 +12300,12 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
       await Promise.all(results.filter((r) => r.ok).map((r) =>
         Promise.resolve(handleUpdateStock(r.m.category, r.m.code, +r.m.qty, `BOM rollback: ${bomKey}`)).catch(() => {})
       ));
+      // The machine row already exists (created above, before the moves). It
+      // is taken back out so the rack never shows a set with no materials
+      // behind it; a failed delete is reported by the handler itself.
+      if (createdMachine && onAbortMachine) {
+        try { await onAbortMachine(createdMachine.id, `stock movement refused: ${failures.map((f) => f.m.name).join(", ")}`); } catch (err) { console.error("[BOMDrawer] abort machine failed", err); }
+      }
       setIssuing(false);
       const msg = `Issue aborted — stock movement failed:\n${failures.map((f) => `${f.m.name}: ${f.err || "rejected"}`).join("\n")}`;
       onStockIssueFailed?.(bomKey, failures.map((f) => `${f.m.name}: ${f.err || "rejected"}`));
@@ -12393,12 +12314,8 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
       return;
     }
 
-    // Migration 027 — carry the per-machine duration overrides into the issue
-    // payload. Only emitted when a serial is present (= machine will be
-    // created). Non-serial manual outward sends nothing, matching legacy flow.
-    const deptDurations = serialNo ? buildDeptDurations() : null;
     onIssue({ bomKey, label: bom.label, units, issued, pending, note: issueNote, date: fmtDate(new Date()), serialNo, destination: finalDest, deptDurations, rackSet: rackSet || null, rackSlot: finalDest === "rack" ? (rackSet ? rackSet.slotId : slot) : null,
-              extraPending: cleanPendingJobs(extraPending) });
+              extraPending: extraJobs, issueId, machineId: createdMachine ? createdMachine.id : null });
     onClose();
   };
 
@@ -13541,7 +13458,7 @@ function BomLineCheckPointsModal({ code, itemName = "", bomLabel = "", current =
 // Last "Fill Rack" request the embedded Outward section has acted on.
 let __lastFillRequestN = 0;
 
-function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, onCreateBOM, onRenameBOM, outwardLog, onAddOutward, pendingLog, onClearPending, onCreateMachine, onRaiseNotIssued = null, machineLog = [], canDo = () => true, onRemoveRackMachine, onDuplicateBOM, onDeleteBOM, computeBOMDeletionInfo, settings = {},
+function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, onCreateBOM, onRenameBOM, outwardLog, onAddOutward, pendingLog, onClearPending, onCreateMachine, onAbortMachine = null, onRaiseNotIssued = null, machineLog = [], canDo = () => true, onRemoveRackMachine, onDuplicateBOM, onDeleteBOM, computeBOMDeletionInfo, settings = {},
   // 2026-10-30 — embedded: render only the BOM Outward section (with every
   // modal it opens) so Machine Tracker can issue a BOM through this exact
   // component — same BOM data, serial check, popups and issue logic. The
@@ -13655,8 +13572,24 @@ function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, onCreateB
     setSerialErr("");
   };
 
+  // notIssued lines for the pending jobs a new machine starts with: critical
+  // items left unverified (with a reason) at this outward.
+  const notIssuedOf = (issued) => (issued || [])
+    .filter((it) => it && it.criticalInput && it.criticalInput.notIssued)
+    .map((it) => ({ code: it.code, name: it.name, unit: it.unit,
+                    qty: Number(it.criticalInput.requiredQty) || Number(it.required) || 0,
+                    remark: it.criticalInput.remark || "" }));
+  // 2026-11-02 — BOMDrawer calls this BEFORE it moves any stock (Supabase
+  // mode: the row is awaited; a refused insert aborts the issue with nothing
+  // deducted). The drawer then passes the created machine's id in the issue
+  // payload so handleBOMIssue does not create it a second time.
+  const handleCreateMachineFirst = async (data) => {
+    if (!onCreateMachine) return { success: true, machine: null };
+    return onCreateMachine(data.bomKey, data.label, data.serialNo, data.date, data.issueId, data.destination || "rack", data.deptDurations || null, notIssuedOf(data.issued), data.rackSlot || null, data.extraPending || []);
+  };
+
   const handleBOMIssue = (data) => {
-    const id  = Date.now();
+    const id  = data.issueId || Date.now();
     const entry = {
       id, type: "bom", date: data.date,
       ref: data.bomKey, label: data.label, units: data.units,
@@ -13674,7 +13607,10 @@ function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, onCreateB
         .map((it) => ({ code: it.code, name: it.name, unit: it.unit, qty: Number(it.criticalInput.requiredQty) || Number(it.required) || 0, remark: it.criticalInput.remark || "" }));
       if (notIssuedCrate.length) onRaiseNotIssued({ machineId: data.rackSet.machineId, notIssued: notIssuedCrate, bomKey: data.bomKey, serialNo: data.serialNo, issueId: id, rackSlot: data.rackSet.slotId || null });
     }
-    if (data.serialNo && onCreateMachine && !(data.rackSet && data.rackSet.mode === "crate")) {
+    // data.machineId is set when the drawer already created the machine
+    // through handleCreateMachineFirst (the normal path); this branch is the
+    // legacy order for a caller that did not.
+    if (data.serialNo && onCreateMachine && data.machineId == null && !(data.rackSet && data.rackSet.mode === "crate")) {
       // Feature 1: forward the destination so the machine can skip the rack
       // stage when the operator picked Direct Production (R&D / one-off builds).
       // Migration 027 — forward the per-machine duration overrides captured
@@ -13682,11 +13618,7 @@ function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, onCreateB
       // skipped the popup (shouldn't happen for serial path, but defensive).
       // 2026-10-30 — critical items left unverified at this outward follow the
       // machine as pending jobs (part missing), so they are not forgotten.
-      const notIssued = (data.issued || [])
-        .filter((it) => it && it.criticalInput && it.criticalInput.notIssued)
-        .map((it) => ({ code: it.code, name: it.name, unit: it.unit,
-                        qty: Number(it.criticalInput.requiredQty) || Number(it.required) || 0,
-                        remark: it.criticalInput.remark || "" }));
+      const notIssued = notIssuedOf(data.issued);
       onCreateMachine(data.bomKey, data.label, data.serialNo, data.date, id, data.destination || "rack", data.deptDurations || null, notIssued, data.rackSlot || null, data.extraPending || []);
     }
     const destSuffix = data.destination === "direct" ? " · direct production" : "";
@@ -14077,6 +14009,8 @@ function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, onCreateB
           handleUpdateStock={handleUpdateStock}
           onClose={() => { setOpenBOM(null); setActiveSerial(""); setFillTarget(null); }}
           onIssue={handleBOMIssue}
+          onCreateMachineFirst={handleCreateMachineFirst}
+          onAbortMachine={onAbortMachine}
           onUpdateBOM={onUpdateBOM}
           onRenameBOM={onRenameBOM}
           allBomKeys={Object.keys(bomDefs || {})}
@@ -14978,7 +14912,7 @@ function AtoZMachineReport({
                       return <div key={cr.id}>{({ before_dispatch: "Dispatch", before_receive: "Receive", during_work: "During work" })[cr.stage] || "Checklist"} {done}/{ans.length}{miss ? <span className="mr-red"> · {miss} not done</span> : null}</div>;
                     })}<div className="mr-label">Full answers: Appendix A</div></div> : <span className="mr-muted">—</span>)}</div>
                   <div className="mr-td" data-l="Signed by">{h.mainEmployeeSignatureSvg
-                    ? <div><div className="mr-sig" dangerouslySetInnerHTML={{ __html: h.mainEmployeeSignatureSvg }} /><div className="mr-label">{nameFromSnap(h.mainEmployeeId, h.workedBySnapshot)}</div></div>
+                    ? <div><div className="mr-sig"><img src={svgDataUri(h.mainEmployeeSignatureSvg)} alt="Main Employee signature" /></div><div className="mr-label">{nameFromSnap(h.mainEmployeeId, h.workedBySnapshot)}</div></div>
                     : <span className="mr-muted">Not signed</span>}</div>
                 </div>
                 {(h.overrunNarration || raised.length > 0) && (
@@ -15150,8 +15084,12 @@ function ReportCenterPage({
   // handleFulfillPending moves stock and writes an audit row, nothing else. The
   // A-to-Z report needs those rows or a machine's critical parts come out short.
   auditLog = [],
+  // 2026-11-01 — the full per-machine history (Machine journey) is admin-only.
+  // Staff never see another department's timings or ratings here.
+  currentUser = null,
 }) {
-  const [tab, setTab] = useState("machine");
+  const isAdminUser = currentUser?.role === "super_admin" || currentUser?.role === "Admin";
+  const [tab, setTab] = useState(isAdminUser ? "machine" : "factory");
   const [dateFrom,    setDateFrom]    = useState("");
   const [dateTo,      setDateTo]      = useState("");
   const [machineFilter,  setMachineFilter]  = useState("");
@@ -15173,7 +15111,7 @@ function ReportCenterPage({
     { id: "machine",    label: "Machine journey", hint: "BOM to Ready, one machine" },
     { id: "monthly",    label: "Monthly",         hint: "month by month" },
     { id: "customer",   label: "Customer",        hint: "progress PDF to send" },
-  ];
+  ].filter((t) => t.id !== "machine" || isAdminUser);
   const [serialFilter, setSerialFilter] = useState("");
 
   // ── Filters ──
@@ -15648,7 +15586,7 @@ function ReportCenterPage({
           </div>
         )}
 
-        {tab === "machine" && (() => {
+        {tab === "machine" && isAdminUser && (() => {
           // Picker candidates: honour the shared Machine / dept / date filters
           // (filteredMachines already applies them). Operator picks one.
           const options = filteredMachines.slice().sort((a, b) => {
@@ -17520,7 +17458,11 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
       }
     }
     setAcceptModal((prev) => prev ? { ...prev, busy: true, error: "" } : prev);
-    if (needSig && sigSvg) {
+    // 2026-11-02 — a signature drawn in this modal is registered before the
+    // accept. The pad's onSave clears needSig, so the old `needSig && sigSvg`
+    // guard never ran and every first-time acceptor was refused with
+    // "Register your signature before accepting a handover."
+    if (sigSvg) {
       const sr = await onRegisterSignature(sigSvg);
       if (!sr || sr.success === false) {
         setAcceptModal((prev) => prev ? { ...prev, busy: false, error: sr?.error || "Signature save failed." } : prev);
@@ -17564,6 +17506,17 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
   // is easy to cause by forgetting one click.
   const isFloorLogin = !isAdminUser
     && (canDo("machines", "accept") || canDo("machines", "finishTransfer"));
+  // 2026-11-01 — department-wise staff experience. Anyone who is not an admin
+  // gets the compact department dashboard below (staffMode) instead of the
+  // full tracker: their own departments, the machines waiting on them, their
+  // pending jobs, and only the actions their role allows. Machine history,
+  // ratings and the full machine report are admin-only. The Production Head
+  // has no department: they get the rack view plus the machines awaiting
+  // release, nothing else. Every button in that layout opens the SAME modal
+  // and calls the SAME handler as the admin tracker — nothing is duplicated.
+  const staffMode  = !isAdminUser;
+  const isProdHead = staffMode && (currentUser?.role === "Production Head" || (canDo("machines", "release") && !isFloorLogin));
+  const canReleaseFromRack = canDo("machines", "release") || isAdminUser;
   // The first department that actually does work — machines are started onto
   // it from the rack. Derived, so adding a stage ahead of Assembly keeps this
   // correct.
@@ -17929,10 +17882,10 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
     setStartProd(null); setStartErr("");
   };
 
-  const handleStageUpdate = (machine) => {
+  const handleStageUpdate = async (machine) => {
     const newStage = stageMap[machine.id];
     if (!newStage || newStage === machine.stage) return;
-    const r = onUpdateStage(machine.id, newStage);
+    const r = await onUpdateStage(machine.id, newStage);
     if (r && r.success === false) { showToast("Stage not changed", r.error || "", "urgent"); return; }
     showToast(`${machine.bomKey} — ${machine.serialNo}`, `Stage: ${machine.stage} → ${newStage}`);
     setStageMap((p) => ({ ...p, [machine.id]: "" }));
@@ -17975,7 +17928,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
         )}
         {/* Departments Called, behind a bell. Same count and same scope as the
             panel it opens; hidden for a floor login, as the panel always was. */}
-        {!isFloorLogin && (() => {
+        {!staffMode && (() => {
           const calledN = (pendingHandoverItems || [])
             .filter((p) => p.status === "open")
             .filter((p) => !scopeMine || myDepartments.includes(p.assignedDepartment)).length;
@@ -18026,12 +17979,263 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
           </div>
         )}
 
+        {/* ── Department-wise staff dashboard (2026-11-01) ──
+            Everyone who is not an admin works from this compact view instead of
+            the factory tracker: their own departments, the machines waiting
+            on them, their open jobs, and only the actions their role allows.
+            Every button opens the same modal the admin tracker opens
+            (openAcceptModal / openFinishModal / openDuringWorkModal /
+            setRaiseModal / setJobsDrawer / setJobAction) — the handlers,
+            signatures and checklists are untouched. No machine history,
+            ratings or reports: those stay admin-only. */}
+        {staffMode && (() => {
+          const btn = "min-h-[48px] w-full sm:w-auto px-5 rounded-xl text-[15px] font-black transition-all active:scale-[0.98]";
+          const canAccept  = canAcceptHandover(canDo) && !!onAcceptHandover;
+          const canFinish  = canFinishTransfer(canDo) && !!onFinishTransfer;
+          const canJobs    = canFinishTransfer(canDo);
+          const canReport  = !!onRaisePendingItem && canDo("machines", "accept");
+          const machineOf  = (h) => (machineLog || []).find((m) => String(m.id) === String(h.machineId)) || null;
+          const titleOf    = (m, h) => `${(m && m.bomKey) || (h && h.bomKey) || "Machine"}${(m && m.serialNo) || (h && h.serialNo) ? ` · S/N ${(m && m.serialNo) || h.serialNo}` : ""}`;
+          const openJobsOf = (m) => (pendingHandoverItems || []).filter((p) => String(p.machineId) === String(m.id) && p.status === "open");
+          const toAccept   = askableHandovers.filter((h) => myDepartments.includes(h.toDepartment));
+          const sentOn     = startedAll.filter((m) => { if (m.status === "completed") return false; const h = machineHandover(m); return h && myDepartments.includes(h.fromDepartment) && !myDepartments.includes(h.toDepartment); });
+          const myJobs     = (pendingHandoverItems || []).filter((p) => p.status === "open" && myDepartments.includes(p.assignedDepartment));
+          const awaitingRelease = startedAll.filter((m) => { const h = machineHandover(m); return !!(h && isAwaitingRelease(h)); });
+          const Section = ({ title, count, hint, children }) => (
+            <div className="section-card no-lift p-4 sm:p-5" data-staff-section={title}>
+              <div className="flex items-baseline gap-2 flex-wrap mb-3">
+                <h2 className="text-[16px] font-black" style={{ color: "var(--text-strong)" }}>{title}</h2>
+                <span className="text-[14px] font-black tabular-nums" style={{ color: count ? "#B01218" : "var(--text-dim)" }}>({count})</span>
+                {hint && <span className="text-[12px]" style={{ color: "var(--text-dim)" }}>{hint}</span>}
+              </div>
+              {children}
+            </div>
+          );
+          const Empty = ({ text }) => <div className="text-[14px] py-3" style={{ color: "var(--text-dim)" }}>{text}</div>;
+          const Card  = ({ children, tone }) => (
+            <div className="mt-card no-lift p-4 flex flex-col gap-3" style={tone ? { borderColor: tone } : undefined}>{children}</div>
+          );
+          // No department: say so and show nothing else. A Store Manager still
+          // keeps the BOM section above when the role may issue a BOM.
+          if (!isProdHead && !hasDepartments) {
+            return (
+              <div className="rounded-2xl p-8 text-center" data-staff-no-dept
+                   style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.4)" }}>
+                <div className="text-[16px] font-black" style={{ color: "#b45309" }}>No department assigned yet — ask your admin</div>
+                <div className="text-[13px] text-slate-600 mt-1.5 max-w-md mx-auto">
+                  Your machines appear here once an admin sets your department in User Management.
+                </div>
+              </div>
+            );
+          }
+          return (
+            <div className="space-y-4" data-staff-dashboard>
+              {/* Header */}
+              <div className="flex items-baseline gap-2 flex-wrap px-1">
+                <span className="text-[12px] font-bold uppercase tracking-[0.08em]" style={{ color: "var(--text-dim)" }}>
+                  {isProdHead ? "Production Head" : `Your department${myDepartments.length === 1 ? "" : "s"}:`}
+                </span>
+                <span className="text-[18px] font-black" style={{ color: "var(--text-strong)" }}>
+                  {isProdHead ? "Rack release" : myDepartments.join(", ")}
+                </span>
+                {currentUser?.fullName && <span className="text-[12px] ml-auto" style={{ color: "var(--text-dim)" }}>{currentUser.fullName}</span>}
+              </div>
+
+              {/* Production Head: machines assembled on the rack, waiting to be sent on */}
+              {isProdHead && (
+                <Section title="Awaiting release from rack" count={awaitingRelease.length} hint="assembled — send to the next department">
+                  {awaitingRelease.length === 0 && <Empty text="Nothing is waiting on the rack." />}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                    {awaitingRelease.map((m) => {
+                      const h = machineHandover(m);
+                      return (
+                        <Card key={m.id}>
+                          <div>
+                            <div className="text-[17px] font-black" style={{ color: "var(--text-strong)" }}>{titleOf(m, h)}</div>
+                            <div className="text-[13px] mt-0.5" style={{ color: "var(--text-dim)" }}>
+                              {m.bomLabel || ""}{m.rackSlot ? ` · ${slotLabel(m.rackSlot)}` : " · on the rack"} · to {h.toDepartment}
+                            </div>
+                          </div>
+                          {/* The release itself happens only in the Rack View
+                              (details panel / crate face — same handler, same
+                              gate). This opens that machine's rack panel. */}
+                          {canReleaseFromRack && onReleaseHandover && (
+                            <button type="button" data-staff-release={h.id} className={btn} style={{ background: "#4338ca", color: "#fff" }}
+                                    onClick={() => {
+                                      if (m.rackSlot) { setRackPanel(m.rackSlot); return; }
+                                      try { document.querySelector(".rack-shelf")?.scrollIntoView({ behavior: "smooth", block: "start" }); } catch {}
+                                    }}>
+                              → Send to {h.toDepartment}
+                            </button>
+                          )}
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </Section>
+              )}
+
+              {/* To accept */}
+              {!isProdHead && (
+                <Section title="To accept" count={toAccept.length} hint="handed to your department">
+                  {toAccept.length === 0 && <Empty text="No machine is waiting for you to accept." />}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                    {toAccept.map((h) => {
+                      const m = machineOf(h);
+                      const late = isHoldOverdue(h.sentAt, h.acceptTimeoutMinutes, nowTick);
+                      const waited = h.sentAt ? formatDuration(Math.max(0, Math.floor((nowTick - Date.parse(h.sentAt)) / 60000))) : "";
+                      return (
+                        <Card key={h.id} tone={late ? "rgba(239,68,68,0.5)" : "rgba(217,119,6,0.45)"}>
+                          <div>
+                            <div className="text-[17px] font-black" style={{ color: "var(--text-strong)" }}>{titleOf(m, h)}</div>
+                            <div className="text-[13px] mt-0.5" style={{ color: "var(--text-dim)" }}>
+                              {m?.bomLabel ? `${m.bomLabel} · ` : ""}from {h.fromDepartment} → {h.toDepartment}{waited ? ` · waiting ${waited}` : ""}
+                            </div>
+                            {late && <div className="text-[13px] font-black mt-1" style={{ color: "#dc2626" }}>🚦 ON HOLD — accept deadline passed</div>}
+                          </div>
+                          {canAccept && (
+                            <button type="button" data-staff-accept={h.id} className={btn} style={{ background: "#15803d", color: "#fff" }}
+                                    disabled={!!acceptModal} onClick={() => { if (!acceptModal) openAcceptModal(h); }}>
+                              ✓ Accept into {h.toDepartment}
+                            </button>
+                          )}
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </Section>
+              )}
+
+              {/* In your department */}
+              {!isProdHead && (
+                <Section title="In your department" count={myWorking.length} hint="machines you are working on">
+                  {myWorking.length === 0 && <Empty text="No machine is in your department right now." />}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                    {myWorking.map((m) => {
+                      const dept   = m.currentDepartment || m.stage;
+                      const next   = nextDepartment(dept);
+                      const cfg    = (m.deptDurations && m.deptDurations[dept]) || workflow.dept_durations[dept];
+                      const target = (cfg && cfg.minutes) || 0;
+                      const t      = m.departmentEnteredAt ? computeOverrun(m.departmentEnteredAt, target, nowTick) : null;
+                      const jobs   = openJobsOf(m);
+                      const during = !!onSubmitDuringWorkChecklist && !!pickTemplate(checklistTemplates, m.bomKey, dept, "during_work");
+                      return (
+                        <Card key={m.id}>
+                          <div>
+                            <div className="text-[17px] font-black" style={{ color: "var(--text-strong)" }}>{titleOf(m)}</div>
+                            <div className="text-[13px] mt-0.5" style={{ color: "var(--text-dim)" }}>{m.bomLabel || ""}{m.bomLabel ? " · " : ""}in {dept}</div>
+                            <div className="flex items-center gap-2 flex-wrap mt-2">
+                              {t && (
+                                <span className="text-[13px] font-bold px-2.5 py-1 rounded-full"
+                                      style={t.isOverrun ? { background: "rgba(239,68,68,0.1)", color: "#b91c1c", border: "1px solid rgba(239,68,68,0.35)" } : { background: "rgba(21,128,61,0.08)", color: "#15803d", border: "1px solid rgba(21,128,61,0.3)" }}>
+                                  ⏱ {formatDuration(t.actualMinutes)}{target ? ` / ${formatDuration(target)}` : ""}{t.isOverrun ? ` · DELAYED ${formatDuration(t.overrunMinutes)}` : ""}
+                                </span>
+                              )}
+                              {jobs.length > 0 && (
+                                <button type="button" data-staff-jobs={m.id} onClick={() => setJobsDrawer(m.id)}
+                                        className="min-h-[44px] text-[14px] font-black px-3 rounded-xl"
+                                        style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.35)", color: "#b91c1c" }}>
+                                  ⚠ {jobs.length} open job{jobs.length === 1 ? "" : "s"}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex flex-col sm:flex-row gap-2 sm:flex-wrap">
+                            {during && (
+                              <button type="button" data-staff-during={m.id} className={btn} style={{ background: "#B01218", color: "#fff" }} onClick={() => openDuringWorkModal(m)}>
+                                📋 During-Work Checks
+                              </button>
+                            )}
+                            {canReport && (
+                              <button type="button" data-staff-issue={m.id} className={btn}
+                                      style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.4)", color: "#dc2626" }}
+                                      onClick={() => { setRaiseModal({ machine: m }); setRaiseText(""); setRaiseDept(""); setRaiseErr(""); setRaisePart(emptyPendingJob()); }}>
+                                Report Issue
+                              </button>
+                            )}
+                            {m.trialCertificate && canFinish && onUpdateTrialCertificate && (
+                              <button type="button" className={btn} style={{ background: "rgba(217,119,6,0.10)", border: "1px solid rgba(217,119,6,0.4)", color: "#b45309" }}
+                                      onClick={() => setTrialCertModal({ machine: m, editOnly: true })}>
+                                ✎ Certificate
+                              </button>
+                            )}
+                            {next && canFinish && (
+                              <button type="button" data-staff-finish={m.id} className={btn} style={{ background: "#15803d", color: "#fff" }} onClick={() => openFinishModal(m)}>
+                                ✓ Finish → {next}
+                              </button>
+                            )}
+                          </div>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </Section>
+              )}
+
+              {/* Sent on — read-only, so the department knows its transfer went through */}
+              {!isProdHead && sentOn.length > 0 && (
+                <Section title="Sent on" count={sentOn.length} hint="waiting for the next department to accept">
+                  <div className="flex flex-col gap-2">
+                    {sentOn.map((m) => { const h = machineHandover(m); return (
+                      <div key={m.id} className="text-[14px] px-3 py-2 rounded-xl" style={{ background: "rgba(17,24,39,0.03)", color: "var(--text-strong)" }}>
+                        <span className="font-black">{titleOf(m, h)}</span> <span style={{ color: "var(--text-dim)" }}>→ {h.toDepartment} · awaiting accept</span>
+                      </div>
+                    ); })}
+                  </div>
+                </Section>
+              )}
+
+              {/* Pending jobs for your department */}
+              {!isProdHead && (
+                <Section title="Pending jobs for your department" count={myJobs.length} hint="parts and work still open — never blocks a transfer">
+                  {myJobs.length === 0 && <Empty text="No open job for your department." />}
+                  <div className="flex flex-col gap-2">
+                    {myJobs.map((p) => {
+                      const m = (machineLog || []).find((x) => String(x.id) === String(p.machineId)) || null;
+                      const stage = pendingItemStage(p);
+                      return (
+                        <div key={p.id} className="mt-card no-lift p-3.5 flex flex-col gap-2.5" data-staff-job={p.id}>
+                          <div>
+                            <div className="text-[14px] font-black" style={{ color: "var(--text-strong)" }}>{p.description}</div>
+                            <div className="text-[13px] mt-0.5" style={{ color: "var(--text-dim)" }}>
+                              {m ? `${m.bomKey}${m.serialNo ? ` · S/N ${m.serialNo}` : ""}` : "Machine"}
+                              {(p.itemCode || p.itemName) ? ` · part ${p.itemCode || p.itemName}${p.qty != null ? ` × ${p.qty}` : ""}` : ""}
+                              {p.critical ? " · CRITICAL" : ""}
+                              {stage === "received" ? " · part received, finish the work" : ""}
+                            </div>
+                          </div>
+                          {canJobs && (
+                            <div className="flex flex-col sm:flex-row gap-2">
+                              {onReceivePendingItem && !p.receivedAt && (
+                                <button type="button" className={btn} style={{ background: "rgba(37,99,235,0.08)", border: "1px solid rgba(37,99,235,0.4)", color: "#1d4ed8" }}
+                                        onClick={() => setJobAction({ item: p, action: "receive", notes: "", busy: false, error: "" })}>
+                                  Part received
+                                </button>
+                              )}
+                              {onResolvePendingItem && (
+                                <button type="button" className={btn} style={{ background: "#15803d", color: "#fff" }}
+                                        onClick={() => setJobAction({ item: p, action: "complete", notes: "", busy: false, error: "" })}>
+                                  ✓ Work completed
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </Section>
+              )}
+            </div>
+          );
+        })()}
+
         {/* ── Pending Jobs (2026-10-30) ──
             Every unfinished job and missing part, grouped by machine and serial
             number, with the department that owes it. The responsible department
             records the part as received, then the work as completed, here or on
             the machine card — the same handlers either way. */}
-        {mtTab === "pending" && (() => {
+        {!staffMode && mtTab === "pending" && (() => {
           const allJobsScoped = (pendingHandoverItems || [])
             .filter((p) => !scopeMine || myDepartments.includes(p.assignedDepartment));
           const viewJobs = jobsView === "open" ? openJobsScoped
@@ -18084,7 +18288,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
         })()}
 
         {/* Nothing to accept — said, rather than an empty tab top. */}
-        {mtTab === "transfer" && askableHandovers.length === 0 && (
+        {!staffMode && mtTab === "transfer" && askableHandovers.length === 0 && (
           <div className="text-[12px] px-4 py-3 rounded-xl" style={{ background: "var(--surface-raised)", color: "var(--text-dim)", border: "1px solid var(--border-subtle)" }}>
             No machine is waiting to be accepted right now. Machines in production are listed below — finish & transfer from each card.
           </div>
@@ -18100,7 +18304,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
             release it — listing it here put an "Accept Machine" button on it
             and let the receiving department skip the release entirely. Its
             Release button lives on the machine card. */}
-        {mtTab === "transfer" && askableHandovers.length > 0 && (
+        {!staffMode && mtTab === "transfer" && askableHandovers.length > 0 && (
           <div className="rounded-2xl p-5"
                style={{ background: "linear-gradient(135deg,rgba(217, 119, 6,0.08),rgba(234,88,12,0.03))", border: `2px solid ${overdueHandovers.length ? "rgba(239,68,68,0.55)" : "rgba(217, 119, 6,0.45)"}`, boxShadow: overdueHandovers.length ? "0 0 24px rgba(239,68,68,0.15)" : "0 0 16px rgba(217, 119, 6,0.1)" }}>
             <div className="flex items-center gap-4 mb-4 flex-wrap">
@@ -18198,7 +18402,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
         {/* A floor login with no department assigned must see nothing, not
             everything. Say so plainly rather than silently showing an empty
             page the operator cannot explain. */}
-        {isFloorLogin && !hasDepartments && (
+        {!staffMode && isFloorLogin && !hasDepartments && (
           <div className="rounded-2xl p-8 text-center"
                style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.4)" }}>
             <div className="text-sm font-black" style={{ color: "#b45309" }}>No department assigned to this login</div>
@@ -18208,7 +18412,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
           </div>
         )}
 
-        {isFloorLogin && hasDepartments && (
+        {!staffMode && isFloorLogin && hasDepartments && (
           <div className="flex items-baseline gap-3 flex-wrap">
             <span className="text-[13px] font-black text-slate-800">{myDepartments.join(", ")}</span>
             {(() => {
@@ -18222,7 +18426,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
           </div>
         )}
 
-        {showScopeSwitch && (
+        {!staffMode && showScopeSwitch && (
           <div className="flex items-center gap-3 flex-wrap">
             <div className="flex rounded-xl p-1" style={{ background: "rgba(17,24,39,0.05)" }}>
               <button type="button" onClick={() => setScope("mine")}
@@ -18258,7 +18462,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
         {/* ── Migration 036 — released off the rack, waiting to be picked up ──
             The production head has named this machine. It is the clearest
             instruction on the floor, so it sits above everything else. */}
-        {mtTab === "transfer" && scopeMine && (() => {
+        {!staffMode && mtTab === "transfer" && scopeMine && (() => {
           const justReleased = startedAll.filter((m) => {
             if (m.status === "completed") return false;
             const h = (handovers || []).find((x) => x.id === m.pendingHandoverId && x.status === "pending");
@@ -18357,7 +18561,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
             Hidden for a floor login: its own "Go and fix" bucket above already
             lists exactly the faults called to its department, so this factory
             overview would just be a second copy of the same machines. */}
-        {!isFloorLogin && showCalled && (
+        {!staffMode && showCalled && (
           // Opened from the header bell. The panel inside is the same one that
           // used to sit on the page, unchanged; it just no longer takes the
           // first screen.
@@ -18519,7 +18723,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
             a floor login sees its own work and an admin sees the factory.
             Shown to every role: with the tabs gone this is how the floor
             navigates too. */}
-        {(() => {
+        {!staffMode && (() => {
           const cards = [
             { key: "pendingAccept", tab: "transfer",   label: "Pending Acceptance", value: pendingAccept.length,   sub: "waiting for next dept",   color: "#b45309", strip: "status-strip-yellow" },
             { key: "hold",          tab: "transfer",   label: "On HOLD",            value: onHold.length,          sub: "accept deadline passed",  color: "#dc2626", strip: "status-strip-red" },
@@ -18558,7 +18762,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
             Machines waiting on the rack to be started. Starting a build is the
             first working department's job, so a floor login elsewhere in the
             line has no use for this and it is hidden from them. */}
-        {mtTab === "production" && (!isFloorLogin || myDepartments.includes(FIRST_WORK_DEPARTMENT)) && (
+        {(staffMode ? isProdHead : mtTab === "production") && (
         <div>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2.5">
@@ -18956,7 +19160,9 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                           <button type="button" data-action={b.key} disabled={!b.ok} onClick={b.fn} title={b.ok ? "" : b.why}
                                   className="w-full rounded-xl px-2 py-3 text-[12.5px] font-black text-white disabled:opacity-35 disabled:cursor-not-allowed"
                                   style={{ background: b.bg, minHeight: 48 }}>{b.label}</button>
-                          <span className="text-[10px] text-center leading-tight" style={{ color: "var(--text-dim)" }}>{b.sub}</span>
+                          {/* 2026-11-02 — the reason a floor button is off is
+                              readable on a tablet (no hover), not only in title. */}
+                          <span className="text-[10px] text-center leading-tight" style={{ color: !b.ok && b.why ? "#b91c1c" : "var(--text-dim)" }}>{!b.ok && b.why ? b.why : b.sub}</span>
                         </div>
                       ))}
                     </div>
@@ -19093,7 +19299,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
         {/* ── Which screen am I on ──
             The boxes above are the navigation, so the list says plainly what
             it is showing and how to get back to everything. */}
-        {(() => {
+        {!staffMode && (() => {
           const view = mtTab === "transfer"
             ? { title: "Transfer & Accept", sub: filter === "hold" ? "past the accept deadline" : filter === "pendingAccept" ? "waiting for the next department" : "every machine still moving through the line" }
             : mtTab === "pending"
@@ -19116,7 +19322,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
         })()}
 
         {/* ── Empty state ── */}
-        {mtTab !== "pending" && listForTab().length === 0 && (
+        {!staffMode && mtTab !== "pending" && listForTab().length === 0 && (
           <div className="bg-white border border-slate-200 rounded-xl py-20 text-center">
             <div className="text-5xl mb-4">🔧</div>
             <div className="text-sm font-bold text-slate-900 mb-2">No Machines Tracked</div>
@@ -19138,6 +19344,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
         )}
 
         {/* ── Machine cards ── */}
+        {!staffMode && (
         <div className="space-y-4">
           {listForTab().map((machine) => {
             const curIdx   = stageIdx(machine.stage);
@@ -19287,7 +19494,8 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                           signature, checklist and rating are always captured.
                           Keeping it behind History takes the select + button
                           off every card without removing the escape hatch. */}
-                      {isExpanded && !isComplete && futureStages.length > 0 && isAdminUser && canDo("machines","updateStage") && (
+                      {isExpanded && !isComplete && futureStages.length > 0 && isAdminUser && canDo("machines","updateStage") && !machine.pendingHandoverId
+                        && !(handovers || []).some((h) => h && h.status === "pending" && String(h.machineId) === String(machine.id)) && (
                         <>
                           <select value={selStage}
                                   onChange={(e) => setStageMap((p) => ({ ...p, [machine.id]: e.target.value }))}
@@ -19446,7 +19654,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                           📋 Certificate
                         </button>
                       )}
-                      {isComplete && (
+                      {isComplete && isAdminUser && (
                         <button type="button" data-card-report={machine.id} onClick={() => setReportMachineId(machine.id)}
                                 className="text-[11px] font-black px-3 py-1.5 rounded-lg border transition-all"
                                 style={{ background: "rgba(21,128,61,0.08)", border: "1px solid rgba(21,128,61,0.35)", color: "#15803d" }}
@@ -19482,11 +19690,11 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                       <div className="md:col-span-2">
                         <div className="flex items-baseline gap-3 flex-wrap mb-3">
                           <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Production report</div>
-                          <button type="button" data-history-report={machine.id} onClick={() => setReportMachineId(machine.id)}
+                          {isAdminUser && <button type="button" data-history-report={machine.id} onClick={() => setReportMachineId(machine.id)}
                                   className="text-[11px] font-bold px-2.5 py-1 rounded-lg border ml-auto"
                                   style={{ borderColor: "var(--border-rim)", color: "var(--text-strong)", background: "var(--surface-card)" }}>
                             📄 Open full machine report
-                          </button>
+                          </button>}
                           {ratingSummary.average != null && (
                             <span className="text-[12px] font-black" style={{ color: ratingSummary.average >= 4.5 ? "#15803d" : ratingSummary.average >= 3.5 ? "#b45309" : "#dc2626" }}>
                               {formatRatingBadge(Math.round(ratingSummary.average))} {ratingSummary.average} / 5
@@ -19819,6 +20027,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
             );
           })}
         </div>
+        )}
 
       </div>
 
@@ -23526,6 +23735,13 @@ export default function App() {
   // Phase A — handovers refresh. Falls back silently if table doesn't exist
   // (store handles the error).
   const rtHandovers = useCallback(() => { fetchHandovers().then((h) => { if (h) setHandovers(h); }); }, []);
+  // Migration 053 — the four Machine Tracker side tables. Same shape as the
+  // login hydration below; also used as the rollback path when one of these
+  // writes fails after an optimistic update.
+  const rtPendingItems = useCallback(() => { fetchPendingItems().then((x) => { if (x) setPendingHandoverItems(x); }); }, []);
+  const rtResponses    = useCallback(() => { fetchResponses().then((x) => { if (x) setChecklistResponses(x); }); }, []);
+  const rtRatings      = useCallback(() => { fetchRatings().then((x) => { if (x) setDeptRatings(x); }); }, []);
+  const rtAttachments  = useCallback(() => { fetchAllAttachments().then((x) => { if (x) setAttachments(x); }); }, []);
   useRealtimeTables({
     onItemsChange:     reconcileItems,
     onMovementsChange: reconcileItems,   // a ledger movement means stock changed → reconcile
@@ -23540,6 +23756,10 @@ export default function App() {
     // after a write, which covers the SENDER's own screen and nobody else's:
     // the receiving department's tablet learned nothing until it was reloaded.
     onHandoversChange: rtHandovers,
+    onPendingItemsChange:        rtPendingItems,
+    onChecklistResponsesChange:  rtResponses,
+    onRatingsChange:             rtRatings,
+    onAttachmentsChange:         rtAttachments,
     // onAuditChange omitted — AuditHistoryPage re-fetches itself via subscribeAudit
   });
 
@@ -24985,7 +25205,11 @@ export default function App() {
         kind: "owed",
         itemCode: it.code, itemName: it.name || "", qty: it.qty || null, reason: it.remark || "",
       }).then((pr) => {
-        if (!pr.success) { console.warn("[App] not-issued pending job save failed", pr.error); return; }
+        if (!pr.success) {
+          console.warn("[App] not-issued pending job save failed", pr.error);
+          flashSaveError("Pending job not saved", `${bomKey}${serialNo ? ` · ${serialNo}` : ""}: part not issued ${it.name || it.code}${qtyTxt} — ${pr.error || "unknown error"}. Raise it from the machine card.`);
+          return;
+        }
         setPendingHandoverItems((prev) => [pr.item, ...prev]);
         logAudit({
           type: "pending_item_raised", module: "Machine",
@@ -25016,7 +25240,11 @@ export default function App() {
         itemCode: j.itemCode || "", itemName: j.itemName || "", qty: j.qty ?? null, reason: j.reason || "",
         critical: !!j.critical, partSerialNo: j.partSerialNo || "", source: "bom_outward",
       }).then((pr) => {
-        if (!pr.success) { console.warn("[App] outward pending item save failed", pr.error); return; }
+        if (!pr.success) {
+          console.warn("[App] outward pending item save failed", pr.error);
+          flashSaveError("Pending item not saved", `${bomKey}${serialNo ? ` · ${serialNo}` : ""}: ${partName}${qtyTxt} — ${pr.error || "unknown error"}. Raise it from the machine card.`);
+          return;
+        }
         setPendingHandoverItems((prev) => [pr.item, ...prev]);
         logAudit({
           type: "pending_item_raised", module: "Machine",
@@ -25029,7 +25257,15 @@ export default function App() {
       });
     }
   };
-  const handleCreateMachine = (bomKey, bomLabel, serialNo, date, issueId, destination = "rack", deptDurations = null, notIssued = [], preferredSlot = null, extraPending = []) => {
+  // BOM Issue order (2026-11-02, go-live): in Supabase mode the machine row is
+  // created and AWAITED here before any stock moves — BOMDrawer calls this
+  // through onCreateMachineFirst, then runs the stock movements, then writes
+  // the outward row. If the insert fails nothing else happens: no stock
+  // deduction, no outward row, and the operator sees the error. The audit
+  // entry is written only after the row exists. Local mode is unchanged
+  // (immediate). Returns { success, machine } so the caller can abort the
+  // issue (handleAbortMachineCreate) if a later stock movement is refused.
+  const handleCreateMachine = async (bomKey, bomLabel, serialNo, date, issueId, destination = "rack", deptDurations = null, notIssued = [], preferredSlot = null, extraPending = []) => {
     const dateStr = date || fmtDate(new Date());
     // Feature 1: direct production lands the machine in Assembly immediately,
     // skipping the BOM Issued / rack waiting stage. Used for R&D, prototypes,
@@ -25037,11 +25273,11 @@ export default function App() {
     const directMode = destination === "direct";
     const initialStage = directMode ? "Assembly" : "BOM Issued";
     const initialNote  = directMode ? "BOM issued — direct production" : "BOM issued";
-    logAudit({
+    const auditCreated = (machineId) => logAudit({
       type: "machine_created", module: "Machine",
       action: `Machine Created: ${bomKey}${directMode ? " (direct production)" : ""}`,
       ref: bomKey, serialNo: serialNo || "",
-      details: { bomLabel, issueId, destination, initialStage, deptDurations: deptDurations || undefined },
+      details: { bomLabel, issueId, destination, initialStage, deptDurations: deptDurations || undefined, machineId },
     });
     const history = [{ stage: initialStage, date: dateStr, note: initialNote }];
     // If we skipped the rack, also record the implicit BOM Issued → Assembly
@@ -25083,51 +25319,85 @@ export default function App() {
       // path, but allow it so legacy paths and tests don't break).
       deptDurations:       deptDurations || null,
     };
-    setMachineLog((prev) => [newMachine, ...prev]);
-    if (rackSlot) {
+    const auditSlot = () => {
+      if (!rackSlot) return;
       logAudit({
         type: "rack_slot_assigned", module: "Machine",
         action: `Placed on rack ${slotLabel(rackSlot)}: ${bomKey}${serialNo ? ` [${serialNo}]` : ""}`,
         ref: bomKey, serialNo: serialNo || "",
         details: { slotId: rackSlot, how: "bom_outward", issueId },
       });
-    }
+    };
     // 2026-10-30 — every critical item not issued at Outward becomes a pending
     // job on this machine: part missing, owed by Stores, with the reason the
     // store operator wrote. Kind 'owed': the machine may move through the
     // departments but cannot be marked Ready until the part is received and
     // the work completed. Raised once the machine's real id is known.
     const raiseNotIssued = (machineId) => raiseNotIssuedJobs({ machineId, notIssued, bomKey, serialNo, issueId, rackSlot, extraPending });
-    if (!isSupabaseEnabled()) raiseNotIssued(newMachine.id);
+    if (!isSupabaseEnabled()) {
+      setMachineLog((prev) => [newMachine, ...prev]);
+      auditCreated(newMachine.id);
+      auditSlot();
+      raiseNotIssued(newMachine.id);
+      return { success: true, machine: newMachine };
+    }
     // Adopt the id Postgres assigned.
     //
     // `machine_log.id` is a bigserial. The `Date.now()` above is a placeholder
-    // so the optimistic row has a React key, nothing more — the database picks
-    // its own id on insert. machineCreate has always returned that row, and we
-    // used to throw it away. Every later write addressed the machine by the
+    // so the row has a React key, nothing more — the database picks its own id
+    // on insert. machineCreate has always returned that row, and we used to
+    // throw it away. Every later write addressed the machine by the
     // placeholder: `.eq("id", 1761700000000)` is type-valid and matches nothing,
     // and a zero-row UPDATE reports no error, so Start Production, stage
     // changes, Accept and Finish & Transfer could all "succeed" against a row
-    // that does not exist.
-    //
-    // It looked intermittent because machine_log has a realtime subscription:
-    // if a refetch landed first, the placeholder had already been replaced by
-    // the real row and everything worked. If the operator was quick, or the
-    // channel was slow, the write vanished. Found 2026-10-29.
-    if (isSupabaseEnabled()) {
-      machineCreate(newMachine).then((r) => {
-        if (!r.success) {
-          console.warn("[App] Machine create Supabase failed:", r.error);
-          flashSaveError("Machine not saved", `${bomKey}${serialNo ? ` · ${serialNo}` : ""}: ${r.error || "unknown error"}`);
-          return;
-        }
-        const realId = r.machine && r.machine.id;
-        if (realId != null && String(realId) !== String(newMachine.id)) {
-          setMachineLog((prev) => prev.map((m) => (m.id === newMachine.id ? { ...m, id: realId } : m)));
-        }
-        raiseNotIssued(realId != null ? realId : newMachine.id);
-      });
+    // that does not exist. Found 2026-10-29. The insert is awaited now, so the
+    // local row is only ever added with the real id.
+    const r = await machineCreate(newMachine);
+    if (!r.success) {
+      console.warn("[App] Machine create Supabase failed:", r.error);
+      flashSaveError("Machine not saved", `${bomKey}${serialNo ? ` · ${serialNo}` : ""}: ${r.error || "unknown error"}`);
+      return { success: false, error: r.error || "Machine not saved" };
     }
+    const realId = r.machine && r.machine.id != null ? r.machine.id : newMachine.id;
+    const saved = { ...newMachine, id: realId };
+    // A realtime refetch may already have landed the row — never duplicate it.
+    setMachineLog((prev) => [saved, ...prev.filter((m) => String(m.id) !== String(realId))]);
+    auditCreated(realId);
+    auditSlot();
+    raiseNotIssued(realId);
+    return { success: true, machine: saved };
+  };
+
+  // Compensation for the order above: the machine row exists but a stock
+  // movement for its BOM was refused, so the issue is aborted. The lines that
+  // did move have already been reversed by the caller (BOMDrawer); this
+  // removes the machine again (its pending jobs cascade in the database) and
+  // records why. If the delete itself fails the operator is told: a machine
+  // with no materials behind it is then on the rack and must be removed with
+  // Remove From Rack. Nothing in this path touches stock.
+  const handleAbortMachineCreate = async (machineId, why) => {
+    const machine = machineLog.find((m) => String(m.id) === String(machineId));
+    setMachineLog((prev) => prev.filter((m) => String(m.id) !== String(machineId)));
+    setPendingHandoverItems((prev) => prev.filter((p) => String(p.machineId) !== String(machineId)));
+    let persisted = true;
+    if (isSupabaseEnabled()) {
+      const r = await machineDelete(machineId);
+      if (!r.success) {
+        persisted = false;
+        console.warn("[App] handleAbortMachineCreate: machine delete failed", r.error);
+        flashSaveError("Issue aborted — machine not removed",
+          `${machine?.bomKey || ""}${machine?.serialNo ? ` · ${machine.serialNo}` : ""}: the stock was not issued but the machine record could not be deleted — ${r.error || "unknown error"}. Use Remove From Rack.`);
+      }
+    } else {
+      machineDelete(machineId);
+    }
+    logAudit({
+      type: "machine_issue_aborted", module: "Machine",
+      action: `BOM issue aborted: ${machine?.bomKey || ""}${machine?.serialNo ? ` [${machine.serialNo}]` : ""} — ${why || "stock movement refused"}`,
+      ref: machine?.bomKey || "", serialNo: machine?.serialNo || "",
+      details: { machineId, why: why || "", issueId: machine?.issueId || null, persisted },
+    });
+    return { success: persisted };
   };
 
   // 2026-11-01 — issues and pending jobs are TRACKING, not gates. The Ready
@@ -25138,11 +25408,21 @@ export default function App() {
   // acceptance or a stage change. The Trial Certificate rule for READY and
   // every permission check are unchanged.
 
-  const handleUpdateMachineStage = (machineId, newStage) => {
+  const handleUpdateMachineStage = async (machineId, newStage) => {
     const dateStr = fmtDate(new Date());
     const nowIso = new Date().toISOString();
     const machine = machineLog.find((m) => m.id === machineId);
     const isComplete = newStage === "Ready";
+    // 2026-11-02 — an admin override never cuts across an open hand-over: the
+    // receiving department would accept into a stage the machine has already
+    // left, and the handover row would point at the wrong department.
+    const openHandover = !!(machine && machine.pendingHandoverId)
+      || (handovers || []).some((h) => h && h.status === "pending" && String(h.machineId) === String(machineId));
+    if (openHandover) {
+      const msg = "This machine has a hand-over awaiting acceptance. Accept it, or pull it back, before changing the stage.";
+      flashSaveError("Stage not changed", `${machine?.bomKey || ""}${machine?.serialNo ? ` · ${machine.serialNo}` : ""}: ${msg}`);
+      return { success: false, error: msg };
+    }
     // 2026-10-30 — READY is final: a Ready machine never changes stage again
     // (and so can never go back to the rack). READY itself is reached only by
     // the Trial Certificate hand-over, not by this admin shortcut.
@@ -25158,7 +25438,7 @@ export default function App() {
       flashSaveError("Stage not changed", `${machine?.bomKey || ""}${machine?.serialNo ? ` · ${machine.serialNo}` : ""}: ${msg}`);
       return { success: false, error: msg };
     }
-    logAudit({ type: isComplete ? "machine_completed" : "machine_stage", module: "Machine", action: `${machine?.bomKey || ""} [${machine?.serialNo || ""}] → ${newStage}`, ref: machine?.bomKey || "", serialNo: machine?.serialNo || "", details: { from: machine?.stage, to: newStage, bomLabel: machine?.bomLabel } });
+    const auditStage = () => logAudit({ type: isComplete ? "machine_completed" : "machine_stage", module: "Machine", action: `${machine?.bomKey || ""} [${machine?.serialNo || ""}] → ${newStage}`, ref: machine?.bomKey || "", serialNo: machine?.serialNo || "", details: { from: machine?.stage, to: newStage, bomLabel: machine?.bomLabel } });
     setMachineLog((prev) => prev.map((m) => {
       if (m.id !== machineId) return m;
       return {
@@ -25173,21 +25453,27 @@ export default function App() {
       };
     }));
     if (isSupabaseEnabled() && machine) {
-      machineUpdate(machineId, {
+      // Awaited: the audit entry and the caller's success toast follow the
+      // database answer. A refused write rolls the optimistic row back to
+      // the DB truth (refetch) and is reported.
+      const r = await machineUpdate(machineId, {
         stage: newStage,
         status: isComplete ? "completed" : "active",
         completedDate: isComplete ? dateStr : machine.completedDate,
         history: [...(machine.history || []), { stage: newStage, date: dateStr }],
         currentDepartment:   newStage,
         departmentEnteredAt: nowIso,
-      }).then((r) => {
-        if (!r.success) {
-          console.warn("[App] Machine stage Supabase failed:", r.error);
-          flashSaveError(`stage change to ${newStage}`,
-            `${machine.bomKey}${machine.serialNo ? ` · ${machine.serialNo}` : ""}: ${r.error || "unknown error"}`);
-        }
       });
+      if (!r.success) {
+        console.warn("[App] Machine stage Supabase failed:", r.error);
+        flashSaveError(`stage change to ${newStage}`,
+          `${machine.bomKey}${machine.serialNo ? ` · ${machine.serialNo}` : ""}: ${r.error || "unknown error"}`);
+        rtMach();
+        return { success: false, error: r.error || "Stage not saved" };
+      }
     }
+    auditStage();
+    return { success: true };
   };
 
   // SERIAL-BASED start production. Takes the specific rack-machine id(s) the operator
@@ -25351,6 +25637,63 @@ export default function App() {
     const issueIds = [...new Set([machine.issueId, ...crateEntries.map((e) => e.id)].filter((x) => x != null).map(String))];
     const issuedLines  = entries.flatMap((e) => (e.items || []).filter((it) => Number(it.issueQty) > 0));
 
+    // Supabase mode (migration 053): one atomic, idempotent call —
+    // rack_remove_machine returns the stock for the machine's outward lines,
+    // deletes the outward + pending rows and the machine, in one transaction.
+    // The old four-step client sequence could stop half way (stock back,
+    // machine still on the rack). The result is applied to local state only:
+    // the stock has already moved in the database, so no second movement is
+    // recorded here. The audit entry is written after the call succeeds.
+    if (isSupabaseEnabled()) {
+      const c = getSupabase();
+      if (!c) return { success: false, error: "Not connected to the database." };
+      let data, error;
+      try {
+        ({ data, error } = await c.rpc("rack_remove_machine", { p_machine_id: Number(machineId) }));
+      } catch (e) { error = e; }
+      if (error) {
+        console.error("[App] handleRemoveRackMachine: rack_remove_machine failed", error);
+        return { success: false, error: `${error.message || "Remove failed"}. Nothing was removed — the set is still on the rack.` };
+      }
+      const res = data || {};
+      const outIds = new Set((res.outward_ids || []).map(String));
+      const pendIds = new Set((res.pending_ids || []).map(String));
+      const returned = Array.isArray(res.returned) ? res.returned : [];
+      setMachineLog((prev) => prev.filter((m) => String(m.id) !== String(machineId)));
+      setPendingHandoverItems((prev) => prev.filter((p) => String(p.machineId) !== String(machineId)));
+      if (outIds.size || issueIds.length) {
+        setOutwardLog((prev) => prev.filter((e) => !outIds.has(String(e.id)) && !issueIds.includes(String(e.id))));
+      }
+      if (pendIds.size) setPendingLog((prev) => prev.filter((p) => !pendIds.has(String(p.id))));
+      if (!res.already_removed && returned.length) {
+        // Local stock only — the movement rows were written by the function.
+        setItems((prev) => {
+          const next = { ...prev };
+          for (const line of returned) {
+            const code = line && line.code; if (!code) continue;
+            for (const cat of Object.keys(next)) {
+              if (!(next[cat] || []).some((i) => i && i.code === code)) continue;
+              next[cat] = next[cat].map((i) => {
+                if (i.code !== code) return i;
+                const newStock = line.after_stock != null ? Number(line.after_stock) : (Number(i.stock) || 0) + (Number(line.qty) || 0);
+                return { ...i, stock: newStock, status: recomputeStatus(newStock, i.min), trend: [...(i.trend || []).slice(1), newStock] };
+              });
+            }
+          }
+          return next;
+        });
+        reconcileItems();   // and pull the DB truth (history rows) behind it
+      }
+      logAudit({
+        type: "machine_rack_removed", module: "Machine",
+        action: `Rack build removed${machine.rackSlot ? ` from ${slotLabel(machine.rackSlot)}` : ""}: ${machine.bomKey}${machine.serialNo ? ` [${machine.serialNo}]` : ""} — ${res.already_removed ? "already removed (state synced)" : `${returned.length} component(s) returned to stock`}`,
+        ref: machine.bomKey, serialNo: machine.serialNo || "",
+        details: { rackSlot: machine.rackSlot || null, slotId: machine.rackSlot || null, issueId: machine.issueId, crateIssueIds: crateEntries.map((e) => e.id), alreadyRemoved: !!res.already_removed, restored: returned.map((l) => ({ code: l.code, qty: l.qty })), outwardIds: res.outward_ids || [], pendingIds: res.pending_ids || [] },
+      });
+      return { success: true, restored: returned.length, alreadyRemoved: !!res.already_removed };
+    }
+
+    // Local mode — the client-side sequence below is unchanged.
     // 1) Reverse stock for each issued component. Fire one stock movement
     //    per line via the canonical engine so the audit trail mentions the
     //    machine's serial number.
@@ -25682,6 +26025,7 @@ export default function App() {
         });
       } else {
         console.warn("[App] handleFinishTransfer: checklist save failed", cr.error);
+        flashSaveError("Checklist not saved", `${machine.bomKey}${machine.serialNo ? ` · ${machine.serialNo}` : ""}: the Before Dispatch checklist (${checklistTemplate.name || ""}) was not recorded — ${cr.error || "unknown error"}`);
       }
     }
 
@@ -25715,6 +26059,7 @@ export default function App() {
         });
       } else {
         console.warn("[App] handleFinishTransfer: owed item save failed", pr.error);
+        flashSaveError("Pending job not saved", `${machine.bomKey}${machine.serialNo ? ` · ${machine.serialNo}` : ""}: "${text}" — ${pr.error || "unknown error"}. Raise it again from the machine card.`);
       }
     }
 
@@ -25766,6 +26111,24 @@ export default function App() {
     if (!sigRes.success) return { success: false, error: sigRes.error };
     if (!sigRes.signature) return { success: false, error: "Register your signature before accepting a handover." };
 
+    // Step 2b (2026-11-02): find the machine BEFORE flipping the handover. A
+    // tablet whose machine list is stale (slept through the realtime event,
+    // or the machine was created on another device a moment ago) used to
+    // mark the handover accepted and then skip the promote because
+    // `machine` was undefined — the handover was gone and the machine never
+    // moved. Refetch once; if it is still missing, refuse before any write.
+    let machine = machineLog.find((m) => String(m.id) === String(handover.machineId));
+    if (!machine && isSupabaseEnabled()) {
+      const fresh = await fetchMachines();
+      if (Array.isArray(fresh)) {
+        setMachineLog(fresh);
+        machine = fresh.find((m) => String(m.id) === String(handover.machineId)) || null;
+      }
+    }
+    if (!machine) {
+      return { success: false, error: `Machine #${handover.machineId} (${handover.bomKey}${handover.serialNo ? ` · ${handover.serialNo}` : ""}) was not found — refresh the page and try again. The handover has not been accepted.` };
+    }
+
     // Step 3: atomic UPDATE to status='accepted' (RLS: status='pending' guard).
     // Feature 5 — include accept-team snapshot (nullable; migration 031).
     const acceptedByTeamSnapshot = Array.isArray(acceptTeamMembers) && acceptTeamMembers.length > 0
@@ -25780,7 +26143,6 @@ export default function App() {
 
     // Step 4: promote the machine. Same body as handleUpdateMachineStage —
     // kept inline so we can also clear pending_handover_id atomically.
-    const machine = machineLog.find((m) => m.id === handover.machineId);
     const dateStr = fmtDate(new Date());
     const nowIso  = new Date().toISOString();
     const newStage = handover.toDepartment;
@@ -25790,7 +26152,7 @@ export default function App() {
       note: `Accepted into ${newStage}${lateNow ? ` (ON HOLD — accepted late${holdReason ? `: ${holdReason}` : ""})` : ""}` };
 
     setMachineLog((prev) => prev.map((m) =>
-      m.id === handover.machineId
+      String(m.id) === String(handover.machineId)
         ? {
             ...m,
             stage:               newStage,
@@ -25803,7 +26165,7 @@ export default function App() {
           }
         : m
     ));
-    if (isSupabaseEnabled() && machine) {
+    if (isSupabaseEnabled()) {
       machineUpdate(handover.machineId, {
         stage: newStage,
         status: isComplete ? "completed" : "active",
@@ -25821,6 +26183,7 @@ export default function App() {
           // refuses with "Handover already in progress" and nothing can move it.
           flashSaveError(`Accept into ${newStage}`,
             `${machine.bomKey}${machine.serialNo ? ` · ${machine.serialNo}` : ""}: the acceptance was recorded but the machine was not moved — ${r.error || "unknown error"}`);
+          rtMach();   // drop the optimistic promote; show the DB truth
         }
       });
     }
@@ -25870,6 +26233,7 @@ export default function App() {
         });
       } else {
         console.warn("[App] handleAcceptHandover: pending-item save failed", pi.error);
+        flashSaveError("Pending item not saved", `${handover.bomKey}${handover.serialNo ? ` · ${handover.serialNo}` : ""}: "${desc}" — ${pi.error || "unknown error"}. Raise it again from the machine card.`);
       }
     }
 
@@ -25895,6 +26259,7 @@ export default function App() {
         });
       } else {
         console.warn("[App] handleAcceptHandover: before-receive checklist save failed", cr.error);
+        flashSaveError("Checklist not saved", `${handover.bomKey}${handover.serialNo ? ` · ${handover.serialNo}` : ""}: the Before Receive checklist (${checklistTemplate.name || ""}) was not recorded — ${cr.error || "unknown error"}`);
       }
     }
 
@@ -25919,6 +26284,7 @@ export default function App() {
           });
         } else {
           console.warn("[App] handleAcceptHandover: checklist pending job save failed", pi.error);
+          flashSaveError("Pending job not saved", `${handover.bomKey}${handover.serialNo ? ` · ${handover.serialNo}` : ""}: "${job.description}" — ${pi.error || "unknown error"}. Raise it again from the machine card.`);
         }
       }
     }
@@ -25953,6 +26319,7 @@ export default function App() {
       });
     } else {
       console.warn("[App] handleAcceptHandover: rating save failed", ratingRes.error);
+      flashSaveError("Department rating not saved", `${handover.fromDepartment} for ${handover.bomKey}${handover.serialNo ? ` · ${handover.serialNo}` : ""}: ${ratingRes.error || "unknown error"}`);
     }
 
     return { success: true };
@@ -26507,7 +26874,7 @@ export default function App() {
     onCreateBOM: handleCreateBOM, onRenameBOM: handleRenameBOM,
     outwardLog, onAddOutward: handleAddOutward, onRaiseNotIssued: raiseNotIssuedJobs,
     pendingLog, onClearPending: handleClearPending,
-    onCreateMachine: handleCreateMachine, machineLog, canDo,
+    onCreateMachine: handleCreateMachine, onAbortMachine: handleAbortMachineCreate, machineLog, canDo,
     onRemoveRackMachine: handleRemoveRackMachine,
     onDuplicateBOM: handleDuplicateBOM,
     onDeleteBOM: handleDeleteBOM,
@@ -26606,7 +26973,7 @@ export default function App() {
                               bomDefs={bomDefs} settings={settings}
                               outwardLog={outwardLog} inwardLog={inwardLog} pos={pos} items={items}
                               auditLog={auditLog}
-                              canDo={canDo} />,
+                              canDo={canDo} currentUser={currentUser} />,
     settings:  <SettingsPage settings={settings} onSave={handleSaveSettings} isSuperAdmin={currentUser?.role === "super_admin"} canDo={canDo} onRegisterSignature={handleRegisterSignature} currentUser={currentUser}
                               machineLog={machineLog} onAdminCleanup={handleAdminCleanupDone}
                               checklistTemplates={checklistTemplates}
