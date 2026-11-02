@@ -27,14 +27,38 @@ export async function loadSettings() {
     console.warn("[settings:load] supabase client null, falling back to local");
     return getSettingsLocal();
   }
-  const { data, error } = await c.from("settings").select("value").eq("key", "org").maybeSingle();
-  if (error) {
-    console.error("[settings:load] supabase error", error);
+  // Migration 053 — read through get_org_settings(), which strips the
+  // WhatsApp / AI secret keys for everyone but a super admin (direct SELECT on
+  // settings is super-admin only from 053 on). Until the migration is applied
+  // the function does not exist, so fall back to the old table read.
+  let value = null;
+  const rpc = await c.rpc("get_org_settings");
+  if (!rpc.error) {
+    value = rpc.data ?? null;
+    console.info("[settings:load] supabase rpc result", value ? "found" : "empty");
+  } else if (isMissingFunctionError(rpc.error)) {
+    console.warn("[settings:load] get_org_settings not deployed yet — falling back to settings table");
+    const { data, error } = await c.from("settings").select("value").eq("key", "org").maybeSingle();
+    if (error) {
+      console.error("[settings:load] supabase error", error);
+      return getSettingsLocal();
+    }
+    console.info("[settings:load] supabase result", data ? "found" : "empty");
+    value = data?.value ?? null;
+  } else {
+    console.error("[settings:load] supabase rpc error", rpc.error);
     return getSettingsLocal();
   }
-  console.info("[settings:load] supabase result", data ? "found" : "empty");
-  if (data?.value) setSettingsLocal(data.value);
-  return data?.value || null;
+  if (value) setSettingsLocal(value);
+  return value || null;
+}
+
+// "function public.get_org_settings() does not exist" (42883) or PostgREST's
+// schema-cache variant (PGRST202) — the migration has not been applied yet.
+function isMissingFunctionError(err) {
+  if (!err) return false;
+  if (err.code === "42883" || err.code === "PGRST202") return true;
+  return /function .* does not exist|could not find the function|schema cache/i.test(err.message || err.details || err.hint || "");
 }
 
 export async function saveSettings(value) {

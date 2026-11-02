@@ -48,9 +48,21 @@ export async function fetchOutward() {
   console.info("[outward:load] start", { mode });
   if (!isSupabaseEnabled()) return getLocal();
   const c = getSupabase(); if (!c) return getLocal();
-  const { data, error } = await c.from("outward_log").select("*").order("created_at", { ascending: false }).limit(500);
-  if (error) { console.error("[outward:load] failed", error); return getLocal(); }
-  const out = (data || []).map(fromRow);
+  // No row cap. The old `.limit(500)` silently dropped the oldest issues once
+  // the log grew past 500 rows, so Remove From Rack could not find a
+  // machine's outward entry and reports under-counted. Paged by id ascending
+  // (deterministic) in 1000-row pages until a short page comes back.
+  const PAGE = 1000;
+  const rows = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await c.from("outward_log").select("*").order("id", { ascending: true }).range(from, from + PAGE - 1);
+    if (error) { console.error("[outward:load] failed", error); return getLocal(); }
+    const page = data || [];
+    rows.push(...page);
+    if (page.length < PAGE) break;
+  }
+  // Newest first for the UI, as before.
+  const out = rows.map(fromRow).reverse();
   setLocal(out);
   console.info("[outward:load] supabase ok", { count: out.length });
   return out;

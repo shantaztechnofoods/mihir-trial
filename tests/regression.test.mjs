@@ -231,6 +231,8 @@ const AUDIT_EVENT_TYPES = [
   "handover_released",
   // Migration 045 — rack slots (brief §14).
   "rack_slot_assigned", "rack_slot_released", "rack_crate_filled", "trial_certificate_updated", "admin_cleanup",
+  // 2026-11-02 — BOM issue aborted after the machine row was created (stock refused).
+  "machine_issue_aborted",
   "attachment_uploaded", "attachment_deleted",
   "department_rated", "rating_overridden",
   // Migration 028 — BOM-wise reusable checklist submission audit split by stage.
@@ -359,7 +361,8 @@ const USER_FACING_STRINGS = [
   "Working employees",
   "Team per department",
   "Admin Data Cleanup",
-  "Preview deletion",
+  // 2026-11-02 — cleanup disabled for go-live; "Preview deletion" is gone on purpose.
+  "Data Cleanup is disabled.",
   // BOM Edit — Checklist + Critical Items review chips (2026-10-22)
   "Critical Items in this BOM",
   "Department Checklists for ",
