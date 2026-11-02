@@ -34,7 +34,7 @@ test("staff dashboard: department header, the four sections, and no-department m
   assert.match(mp, /const toAccept\s*=\s*askableHandovers\.filter\(\(h\) => myDepartments\.includes\(h\.toDepartment\)\);/);
   assert.match(mp, /const askableHandovers\s*=\s*pendingHandovers\.filter\(\(h\) => !isAwaitingRelease\(h\)\);/);
   assert.match(mp, /const myWorking = startedAll\.filter\(\(m\) => m\.status !== "completed" && !m\.pendingHandoverId && inMyDept\(m\)\);/);
-  assert.match(mp, /const myJobs\s*=\s*\(pendingHandoverItems \|\| \[\]\)\.filter\(\(p\) => p\.status === "open" && myDepartments\.includes\(p\.assignedDepartment\)\);/);
+  assert.match(mp, /const myJobs\s*=\s*\(pendingHandoverItems \|\| \[\]\)\.filter\(\(p\) => pendingItemIsOpen\(p\) && myDepartments\.includes\(p\.assignedDepartment\)\);/);
 });
 
 test("staff actions reuse the existing modals and are permission-gated; buttons are touch sized", () => {

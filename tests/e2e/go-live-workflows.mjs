@@ -177,13 +177,25 @@ ok("admin keeps the full tracker", adm.nav && !adm.dash);
 ok("the waiting hand-over has Accept directly on its machine card", await p.locator("[data-card-accept]").count() > 0);
 // Pending Jobs drawer shows every department's job with its origin and the receipt history
 await p.locator('[data-card-jobs="1"]').first().click(); await p.waitForTimeout(700);
+// the fully received gearbox (job 3) has moved to Completed; open that section to read its receipts
+const fullyMoved = await p.evaluate(() => { const d = document.querySelector("[data-jobs-drawer]"); return { inParts: !!d.querySelector('[data-jobs-section="parts"] [data-job-row="3"]'), inDone: !!d.querySelector('[data-jobs-done-group="parts"] [data-job-row="3"]'), partial: !!d.querySelector('[data-jobs-section="parts"] [data-job-row="2"]') }; });
+ok("fully received part left Pending Parts for Completed; the partly received one stays in Pending Parts", !fullyMoved.inParts && fullyMoved.inDone && fullyMoved.partial);
+await p.evaluate(() => { document.querySelector("[data-jobs-drawer] details").open = true; }); await p.waitForTimeout(200);
 const drawer = await p.evaluate(() => { const d = document.querySelector("[data-jobs-drawer]"); return d ? { text: d.innerText, rows: d.querySelectorAll("[data-job-row]").length, origins: [...d.querySelectorAll("[data-job-origin]")].map((x) => x.innerText.trim()), receipts: d.querySelectorAll('[data-job-history="received"]').length } : null; });
 ok("Pending Jobs drawer lists jobs of ALL departments (Mechanical + Electrical) with origin + reason", drawer && drawer.rows >= 4 && /from Trial/.test(drawer.origins.join("|")) && /from Assembly/.test(drawer.origins.join("|")) && /lamp not available/.test(drawer.text) && /Electrical/.test(drawer.text));
 ok("drawer shows each receipt and the quantity still pending", drawer && drawer.receipts >= 3 && /Part received × 50/.test(drawer.text) && /6 pending/.test(drawer.text) && /inwarded to stock/.test(drawer.text));
+// 2026-11-02 — Pending Jobs split: Pending Parts / Pending Work / Completed (collapsible)
+const sec = await p.evaluate(() => { const d = document.querySelector("[data-jobs-drawer]"); const q = (s) => [...d.querySelectorAll(s)];
+  return { partsRows: q('[data-jobs-section="parts"] [data-job-row]').map((r) => r.dataset.jobKind + ":" + r.dataset.jobRow), workRows: q('[data-jobs-section="work"] [data-job-row]').map((r) => r.dataset.jobKind + ":" + r.dataset.jobRow),
+    cParts: d.querySelector('[data-jobs-count="parts"]')?.innerText, cWork: d.querySelector('[data-jobs-count="work"]')?.innerText, hasDetails: !!d.querySelector("details[data-jobs-section]"), detailsOpen: d.querySelector("details[data-jobs-section]")?.open }; });
+ok("Pending Parts shows only parts (item jobs), Pending Work only work", sec.partsRows.length >= 1 && sec.partsRows.every((x) => x.startsWith("part:")) && sec.workRows.length >= 2 && sec.workRows.every((x) => x.startsWith("work:")) && sec.workRows.includes("work:4"));
+ok("separate pending counts match the rows; Completed is a collapsed section below", Number(sec.cParts) === sec.partsRows.length && Number(sec.cWork) === sec.workRows.length && sec.hasDetails);
 await p.locator('[data-jobs-drawer] [data-job-row="4"] button', { hasText: /^Work completed$/ }).click(); await p.waitForTimeout(500);
 await p.locator("[data-job-submit]").click(); await p.waitForTimeout(900);
 const job4 = (await ls(p, "erp_pending_handover_items")).find((i) => i.id === 4);
 ok("Work completed records who and when; other departments' jobs stay pending", job4.status === "resolved" && !!job4.resolvedBy && !!job4.resolvedAt && (await ls(p, "erp_pending_handover_items")).find((i) => i.id === 1).status === "open");
+const sec2 = await p.evaluate(() => { const d = document.querySelector("[data-jobs-drawer]"); return { work: d.querySelector('[data-jobs-count="work"]')?.innerText, inWork: !!d.querySelector('[data-jobs-section="work"] [data-job-row="4"]'), doneWork: d.querySelector('[data-jobs-count="done-work"]')?.innerText, inDoneWork: !!d.querySelector('[data-jobs-done-group="work"] [data-job-row="4"]'), partsRows: d.querySelectorAll('[data-jobs-section="parts"] [data-job-row]').length }; });
+ok("Work completed moves the work out of Pending Work into Completed at once (counts update); parts untouched", !sec2.inWork && sec2.inDoneWork && Number(sec2.work) === sec.workRows.length - 1 && /work \d+/.test(sec2.doneWork) && sec2.partsRows === sec.partsRows.length);
 await p.locator("[data-jobs-drawer] summary", { hasText: /Completed jobs/ }).click().catch(() => {}); await p.waitForTimeout(300);
 ok("completed job stays visible in the drawer with its completion details", await p.locator('[data-jobs-drawer] [data-job-history="completed"]').count() >= 1);
 await p.locator("[data-jobs-drawer] button[aria-label='Close']").click(); await p.waitForTimeout(300);
@@ -233,6 +245,13 @@ m3 = (await ls(p, "erp_machines")).find((m) => m.id === 3);
 ok("Release ON HOLD clears the hold and keeps the history", m3.holdActive === false && (m3.history || []).some((h) => /Released from ON HOLD/.test(h.note || "")) && (m3.history || []).some((h) => /Put ON HOLD/.test(h.note || "")));
 const audits = (await ls(p, "erp_audit")) || [];
 ok("hold and release are audited", audits.some((a) => a.type === "machine_hold_set") && audits.some((a) => a.type === "machine_hold_released"));
+// ── 2026-11-02 — Pending Jobs tab: split sections + separate counts ──
+await p.locator('[data-summary-card="jobs"]').first().click().catch(() => {}); await p.waitForTimeout(600);
+const tab = await p.evaluate(() => ({ parts: !!document.querySelector('[data-jobs-board] [data-jobs-section="parts"]'), work: !!document.querySelector('[data-jobs-board] [data-jobs-section="work"]'),
+  head: ["parts", "work", "done"].map((k) => document.querySelector(`[data-jobs-head-${k}]`)?.innerText || ""), total: document.querySelector("[data-jobs-total-open]")?.innerText || "",
+  badRows: [...document.querySelectorAll('[data-jobs-section="parts"] [data-job-row]')].filter((r) => r.dataset.jobKind !== "part").length + [...document.querySelectorAll('[data-jobs-section="work"] [data-job-row]')].filter((r) => r.dataset.jobKind !== "work").length,
+  detailsOpen: document.querySelector("[data-jobs-board] details")?.open }));
+ok("Pending Jobs tab: Pending Parts + Pending Work sections, separate pending/completed counts, Completed collapsed", tab.parts && tab.work && /Parts \d+ pending/.test(tab.head[0]) && /Work \d+ pending/.test(tab.head[1]) && /\d+ completed/.test(tab.head[2]) && tab.badRows === 0 && tab.detailsOpen === false, JSON.stringify(tab));
 ok("no page errors across all three roles", errs.length === 0, errs.join(" | "));
 await b.close();
 const failed = results.filter((r) => !r[0]).length;

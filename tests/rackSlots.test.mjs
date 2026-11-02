@@ -339,10 +339,10 @@ test("App: Pending Jobs button on the card opens the shared job rows with existi
   const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
   const app = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
   assert.match(app, /const renderJobGroup = \(m, list, key\) => \{/);
-  assert.match(app, /\{groups\.map\(\(\{ id, m, list \}\) => renderJobGroup\(m, list, id\)\)\}/, "the Pending Jobs tab uses the shared renderer");
+  assert.match(app, /\{renderJobBoard\(allJobsScoped, \{ detailsKey: "completed" \}\)\}/, "the Pending Jobs tab uses the shared board (parts / work / completed)");
   // 2026-11-01 — the same chip also carries the open-issue count
   assert.match(app, /data-card-jobs=\{machine\.id\} data-card-issues=\{machineOpenItems\.length \|\| undefined\}\s*\n\s*onClick=\{\(\) => setJobsDrawer\(machine\.id\)\}/);
-  assert.match(app, /\{open\.length > 0 && renderJobGroup\(m, open, "open"\)\}/, "the drawer uses the shared renderer");
+  assert.match(app, /\{renderJobBoard\(all, \{ detailsKey: "drawer-completed" \}\)\}/, "the drawer uses the shared board");
   assert.match(app, /onClick=\{\(\) => setJobAction\(\{ item: p, action: "receive"/);
   assert.match(app, /onClick=\{\(\) => setJobAction\(\{ item: p, action: "complete"/);
   assert.match(app, /if \(jobAction\.busy\) return;/, "double submit guard kept");
