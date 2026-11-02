@@ -336,7 +336,7 @@ export default function UserManagementPage({ canDo }) {
           {(isSuperAdmin || canDo?.("users", "create")) && (
             <button onClick={openAdd}
               className="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all"
-              style={{ background: "#B01218", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
+              style={{ background: "#2640B0", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
               + Add User
             </button>
           )}
@@ -398,7 +398,7 @@ export default function UserManagementPage({ canDo }) {
                         {(isSuperAdmin || canDo?.("users", "edit")) && (
                           <button onClick={() => openReset(user)}
                             className="px-2.5 py-1 rounded-lg text-[10px] font-medium text-blue-700 hover:text-blue-900 transition-all"
-                            style={{ background: "rgba(215, 25, 32,0.08)", border: "1px solid rgba(215, 25, 32,0.2)" }}>
+                            style={{ background: "rgba(46, 80, 214,0.08)", border: "1px solid rgba(46, 80, 214,0.2)" }}>
                             Reset PW
                           </button>
                         )}
@@ -454,7 +454,7 @@ export default function UserManagementPage({ canDo }) {
                       onClick={() => setForm((f) => ({ ...f, kind: k, departments: [] }))}
                       className="flex-1 text-[11px] font-semibold px-3 py-1.5 rounded-lg transition-all"
                       style={form.kind === k
-                        ? { background: "rgba(215, 25, 32,0.12)", border: "1px solid rgba(215, 25, 32,0.5)", color: "#B01218" }
+                        ? { background: "rgba(46, 80, 214,0.12)", border: "1px solid rgba(46, 80, 214,0.5)", color: "#2640B0" }
                         : { background: "rgba(26,31,46,0.04)", border: "1px solid rgba(26,31,46,0.12)", color: "#64748b" }}>
                       {label}
                     </button>
@@ -513,7 +513,7 @@ export default function UserManagementPage({ canDo }) {
                               onClick={() => setForm((f) => ({ ...f, departments: [d] }))}
                               className="text-[11px] font-semibold px-3 py-1.5 rounded-lg transition-all"
                               style={on
-                                ? { background: "rgba(215, 25, 32,0.12)", border: "1px solid rgba(215, 25, 32,0.5)", color: "#B01218" }
+                                ? { background: "rgba(46, 80, 214,0.12)", border: "1px solid rgba(46, 80, 214,0.5)", color: "#2640B0" }
                                 : { background: "rgba(26,31,46,0.04)", border: "1px solid rgba(26,31,46,0.12)", color: "#64748b" }}>
                         {d}
                       </button>
@@ -540,7 +540,7 @@ export default function UserManagementPage({ canDo }) {
                               })}
                               className="text-[11px] font-semibold px-3 py-1.5 rounded-lg transition-all"
                               style={on
-                                ? { background: "rgba(215, 25, 32,0.12)", border: "1px solid rgba(215, 25, 32,0.5)", color: "#B01218" }
+                                ? { background: "rgba(46, 80, 214,0.12)", border: "1px solid rgba(46, 80, 214,0.5)", color: "#2640B0" }
                                 : { background: "rgba(26,31,46,0.04)", border: "1px solid rgba(26,31,46,0.12)", color: "#64748b" }}>
                         {d}
                       </button>
@@ -578,8 +578,8 @@ export default function UserManagementPage({ canDo }) {
                 <button type="submit" disabled={submitting}
                   className="flex-1 py-2 rounded-xl text-xs font-semibold transition-all"
                   style={{
-                    background: submitting ? "rgba(176, 18, 24,0.4)" : "#B01218",
-                    boxShadow: submitting ? "none" : "0 4px 12px rgba(176, 18, 24,0.35)",
+                    background: submitting ? "rgba(38, 64, 176,0.4)" : "#2640B0",
+                    boxShadow: submitting ? "none" : "0 4px 12px rgba(38, 64, 176,0.35)",
                     cursor: submitting ? "wait" : "pointer",
                     color: "#ffffff",
                   }}>
@@ -639,7 +639,7 @@ export default function UserManagementPage({ canDo }) {
                   }}
                   className="flex-1 py-2 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-2"
                   style={{
-                    background: "linear-gradient(135deg,#D71920,#B01218)",
+                    background: "linear-gradient(135deg,#2E50D6,#2640B0)",
                     opacity: (resetSubmitting || !resetPw.pw || resetPw.pw !== resetPw.confirm) ? 0.5 : 1,
                     cursor: resetSubmitting ? "wait" : (!resetPw.pw || resetPw.pw !== resetPw.confirm) ? "not-allowed" : "pointer",
                     color: "#ffffff",

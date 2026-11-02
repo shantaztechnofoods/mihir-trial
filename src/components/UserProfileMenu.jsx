@@ -167,7 +167,7 @@ export default function UserProfileMenu({ collapsed = false }) {
 
               {isSA && (
                 <div className="mt-3 px-2 py-1 rounded-md text-[9px] font-bold text-center uppercase tracking-wider"
-                     style={{ background: "rgba(236,72,153,0.10)", color: "#be185d", border: "1px solid rgba(236,72,153,0.22)" }}>
+                     style={{ background: "rgba(106,124,242,0.12)", color: "#3F4FC4", border: "1px solid rgba(236,72,153,0.22)" }}>
                   Super Administrator
                 </div>
               )}

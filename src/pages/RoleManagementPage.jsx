@@ -28,7 +28,7 @@ const PAGE_LABELS = {
   audit: "Audit Trail", settings: "Settings", users: "User Management", roles: "Role Management",
 };
 
-const COLORS = ["#B01218","#D71920","#15803d","#b45309","#be185d","#0f766e","#6d28d9","#B45309"];
+const COLORS = ["#2640B0","#2E50D6","#15803d","#b45309","#be185d","#0f766e","#6d28d9","#B45309"];
 const ICONS  = ["👑","🛒","📦","🔧","🔑","📊","🏭","⚙️","👤","🔐"];
 
 function makeEmptyRole() {
@@ -38,7 +38,7 @@ function makeEmptyRole() {
     m.actions.forEach((a) => { actions[m.key][a] = false; });
   });
   return {
-    label: "", icon: "👤", color: "#B01218", badge: "",
+    label: "", icon: "👤", color: "#2640B0", badge: "",
     pages: ["dashboard"],
     actions,
   };
@@ -174,7 +174,7 @@ export default function RoleManagementPage({ canDo }) {
           {canCreate && (
             <button onClick={openAdd}
               className="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all"
-              style={{ background: "#B01218", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
+              style={{ background: "#2640B0", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
               + New Role
             </button>
           )}
@@ -275,7 +275,7 @@ export default function RoleManagementPage({ canDo }) {
                     {ICONS.map((ic) => (
                       <button key={ic} onClick={() => setEditForm((f) => ({ ...f, icon: ic }))}
                         className="w-8 h-8 rounded-lg flex items-center justify-center text-base transition-all"
-                        style={{ background: editForm.icon === ic ? "rgba(176, 18, 24,0.3)" : "rgba(26,31,46,0.05)", border: editForm.icon === ic ? "1px solid rgba(176, 18, 24,0.6)" : "1px solid rgba(26,31,46,0.08)" }}>
+                        style={{ background: editForm.icon === ic ? "rgba(38, 64, 176,0.3)" : "rgba(26,31,46,0.05)", border: editForm.icon === ic ? "1px solid rgba(38, 64, 176,0.6)" : "1px solid rgba(26,31,46,0.08)" }}>
                         {ic}
                       </button>
                     ))}
@@ -350,7 +350,7 @@ export default function RoleManagementPage({ canDo }) {
               </button>
               <button onClick={handleSave} disabled={!editForm.label.trim() || (isNew && !newRoleKey.trim())}
                 className="flex-1 py-2 rounded-xl text-xs font-semibold transition-all"
-                style={{ background: "#B01218", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", opacity: (!editForm.label.trim() || (isNew && !newRoleKey.trim())) ? 0.4 : 1, color: "#ffffff" }}>
+                style={{ background: "#2640B0", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", opacity: (!editForm.label.trim() || (isNew && !newRoleKey.trim())) ? 0.4 : 1, color: "#ffffff" }}>
                 {isNew ? "Create Role" : "Save Changes"}
               </button>
             </div>
