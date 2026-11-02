@@ -3140,3 +3140,53 @@ input:focus, select:focus, textarea:focus { box-shadow: 0 0 0 3px rgba(46,80,214
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
   .sidebar-slate .sb-item:hover, .hero-tile:hover { transform: none; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MOBILE OVERLAY FIX — layout only.
+   Root cause: .modal-backdrop (z-index 50 here, which wins over the Tailwind
+   z-[..] utilities on each modal) and the fixed bottom tab bar (z-50) sat on
+   the same layer, and the tab bar comes later in the page, so it was painted
+   over the bottom of every modal — hiding the footer buttons and swallowing
+   their taps. The tab bar now sits below every overlay (modals 50+, drawer 60),
+   and modal panels are sized to the *visible* viewport (dvh), keep their
+   footer inside it, and respect the phone's safe area and on-screen keyboard.
+   ═══════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 767.98px) {
+  .mobile-tabbar { z-index: 40 !important; }
+
+  .modal-backdrop, .tc-form {
+    padding: 0.75rem 0.75rem max(0.75rem, env(safe-area-inset-bottom)) !important;
+    align-items: center;
+  }
+  /* The panel (and any inline maxHeight: 90vh) is capped to what is actually
+     visible — vh ignores the browser's address bar and the keyboard, dvh
+     does not — so the footer is always on screen. */
+  .modal-backdrop > div {
+    max-height: calc(100dvh - 1.5rem - env(safe-area-inset-bottom)) !important;
+    overscroll-behavior: contain;
+  }
+  /* A panel built as header / scrolling body / footer keeps the body scrolling
+     on its own while the action row stays put. */
+  .modal-backdrop > div.flex-col, .modal-backdrop > div[class*="flex-col"] { overflow: hidden; }
+  .modal-backdrop > div > .overflow-y-auto { min-height: 0; -webkit-overflow-scrolling: touch; }
+  /* Sheets that hug the bottom edge pad their actions above the home bar. */
+  .mt-premium .modal-backdrop > div { padding-bottom: max(12px, env(safe-area-inset-bottom)) !important; max-height: 92dvh !important; }
+  .rack-panel-backdrop > * { max-height: 100dvh; padding-bottom: env(safe-area-inset-bottom); }
+  /* Dialogs that are one scrolling panel (no separate footer) keep their action
+     row pinned to the bottom edge while the form scrolls above it. */
+  .modal-backdrop > div:not(.flex-col):not([class*="flex-col"]) > div:last-child:has(> button) {
+    position: sticky; bottom: 0; z-index: 3; background: #fff;
+    margin-left: -1px; margin-right: -1px; padding-top: 10px; padding-bottom: 6px;
+    box-shadow: 0 -10px 12px -10px rgba(11, 18, 32, .18);
+  }
+  /* Toasts sit at the top of a phone so they never cover a dialog's buttons
+     or the bottom bar. */
+  div.fixed.bottom-6.right-6 { bottom: auto !important; top: 64px; left: 12px; right: 12px !important; max-width: none; }
+  /* Page content never ends under the fixed bar. */
+  .app-main-scroll, main { scroll-padding-bottom: 72px; }
+  /* The build tag used to sit on the bottom-left, on top of the first tab and
+     the corner of any modal footer. Tucked into the top edge on a phone, and
+     out of the way entirely while a dialog is open. */
+  #erp-build-badge { top: 2px !important; bottom: auto !important; left: auto !important; right: 4px !important; font-size: 9px !important; padding: 2px 5px !important; opacity: .7; }
+  body:has(.modal-backdrop) #erp-build-badge, body:has(.tc-form) #erp-build-badge { display: none; }
+}
