@@ -92,13 +92,24 @@ ok("all staff buttons are touch-sized (≥44px), no horizontal scroll", staff.sm
 await p.locator("[data-staff-accept]").first().click(); await p.waitForTimeout(700);
 ok("Accept modal opens from the staff dashboard", await p.locator("text=Accept into Mechanical").count() > 0);
 let confirmBtn = p.getByRole("button", { name: /Confirm Acceptance|Verify & Accept/ });
-if (await p.locator("canvas").count()) { await draw(p, p.locator("canvas").first()); await p.getByRole("button", { name: "Save Signature" }).click(); await p.waitForTimeout(400); }
-await p.locator(".modal-backdrop button", { hasText: /^Ramesh Patel$/ }).first().click().catch(() => {});
-await p.waitForTimeout(200);
+// 2026-11-02 — the signature pad is shown on EVERY acceptance; Confirm needs an employee AND a saved signature
+ok("Accept popup shows the mandatory Digital Signature pad", await p.locator("[data-accept-signature] canvas").count() === 1 && await p.getByRole("button", { name: "Save Signature" }).count() === 1);
+ok("Confirm Acceptance is disabled with no employee and no signature", await confirmBtn.isDisabled());
+await p.locator(".modal-backdrop button", { hasText: /^Ramesh Patel$/ }).first().click(); await p.waitForTimeout(200);
+ok("Confirm is still disabled with an employee but no signature", await confirmBtn.isDisabled());
+await p.getByRole("button", { name: "Save Signature" }).click(); await p.waitForTimeout(300);
+ok("Save Signature with an empty pad does not enable Confirm", await confirmBtn.isDisabled());
+await draw(p, p.locator("[data-accept-signature] canvas").first()); await p.getByRole("button", { name: "Save Signature" }).click(); await p.waitForTimeout(400);
+ok("signature saved: tick shown and Confirm enabled", await p.locator("text=Signature saved").count() > 0 && await confirmBtn.isEnabled());
+await p.locator(".modal-backdrop button", { hasText: /Ramesh Patel$/ }).first().click(); await p.waitForTimeout(200);
+ok("deselecting the last employee disables Confirm again", await confirmBtn.isDisabled());
+await p.locator(".modal-backdrop button", { hasText: /^Ramesh Patel$/ }).first().click(); await p.waitForTimeout(200);
 await confirmBtn.click(); await p.waitForTimeout(1200);
 let hs = await ls(p, "erp_handovers"); let ms = await ls(p, "erp_machines");
 const h21 = hs.find((h) => h.id === 21), m2 = ms.find((m) => m.id === 2);
 ok("hand-over 21 accepted with signer identity + timestamp", h21 && h21.status === "accepted" && !!h21.acceptedBy && !!h21.acceptedAt, h21 ? `by ${h21.acceptedBy}` : "missing");
+ok("acceptance record holds employee name, department, timestamp and the drawn signature", h21 && h21.acceptedByName === "Ramesh Patel" && h21.acceptedInDepartment === "Mechanical" && /<svg/.test(h21.acceptedSignatureSvg || "") && JSON.stringify(h21.acceptedByTeamSnapshot) === JSON.stringify([{ name: "Ramesh Patel" }]));
+ok("machine history entry records who accepted, where and when", (ms.find((m) => m.id === 2)?.history || []).some((e) => e.handoverId === 21 && e.by === "Ramesh Patel" && e.department === "Mechanical" && !!e.at && /by Ramesh Patel/.test(e.note)));
 ok("SN-102 moved to Mechanical, hand-over link cleared", m2 && m2.stage === "Mechanical" && !m2.pendingHandoverId);
 ok("open issue on SN-101 did not block anything (still open)", (await ls(p, "erp_pending_handover_items")).some((i) => i.id === 1 && i.status === "open"));
 
@@ -190,6 +201,18 @@ await p.locator('[data-summary-card="completed"]').click(); await p.waitForTimeo
 ok("admin has the machine report button on the Ready machine", await p.locator("[data-card-report]").count() > 0);
 await p.locator("[data-card-report]").first().click(); await p.waitForTimeout(900);
 ok("machine report opens for admin", await p.locator(".mr-doc").count() > 0);
+// 2026-11-02 — the acceptance signature appears in SN-102's report (hand-over 21). The report button exists
+// only for Ready machines, so mark SN-102 Ready in the local test data first.
+await p.locator("button", { hasText: /← Back/ }).first().click().catch(() => {}); await p.waitForTimeout(500);
+await p.evaluate(() => { const ms = JSON.parse(localStorage.getItem("erp_machines")); const m = ms.find((x) => x.id === 2); m.status = "completed"; m.stage = "Ready"; m.currentDepartment = "Ready"; localStorage.setItem("erp_machines", JSON.stringify(ms)); });
+await p.reload({ waitUntil: "networkidle" }); await p.waitForTimeout(800); await gotoMT(p);
+await p.locator('[data-summary-card="completed"]').click(); await p.waitForTimeout(500);
+if (await p.locator('[data-card-report="2"]').count()) {
+  await p.locator('[data-card-report="2"]').first().click(); await p.waitForTimeout(900);
+  const doc = await p.locator(".mr-doc").innerText();
+  ok("SN-102 report shows the acceptance signature, receiving employee and department", await p.locator("[data-report-accept-signature] img").count() >= 1 && doc.includes("Ramesh Patel") && doc.includes("into Mechanical"));
+} else ok("SN-102 report button found", false);
+await p.locator("button", { hasText: /← Back/ }).first().click().catch(() => {}); await p.waitForTimeout(500);
 // ── 2026-11-02 — manual ON HOLD from the machine card (migration 055) ───────
 await p.locator("button", { hasText: /← Back/ }).first().click().catch(() => {}); await p.waitForTimeout(500);
 await p.locator('[data-summary-card="active"]').first().click().catch(() => {}); await p.waitForTimeout(600);

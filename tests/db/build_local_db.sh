@@ -1,7 +1,7 @@
 #!/bin/bash
 # Rebuild erp_test from the repo migrations. Usage: build.sh [last_migration_number]
 set -e
-LAST=${1:-056}
+LAST=${1:-057}
 MIG=/home/claude/purchase_inventory_os/supabase/migrations
 su postgres -c "psql -q -c 'DROP DATABASE IF EXISTS erp_test' -c 'CREATE DATABASE erp_test'" >/dev/null
 su postgres -c "psql -q -v ON_ERROR_STOP=1 -d erp_test -f /tmp/erpdb/stubs.sql" >/dev/null

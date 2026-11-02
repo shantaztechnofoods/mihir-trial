@@ -84,7 +84,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-02-critical-options";
+const APP_BUILD = "2026-11-02-accept-signature";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -14900,7 +14900,7 @@ function AtoZMachineReport({
         <div className="mr-table">
           <div className="mr-tr mr-th" style={{ gridTemplateColumns: "1.35fr 1.1fr 1.1fr 1fr 1.4fr 0.9fr 1.2fr" }}>
             <div>Hand-over</div><div>Handed over</div><div>Accepted</div><div>Time / target</div>
-            <div>{show.showEmployees !== false ? "Team (lead in bold)" : ""}</div><div>{show.showChecklists !== false ? "Checks" : ""}</div><div>Signed by</div>
+            <div>{show.showEmployees !== false ? "Team (lead in bold)" : ""}</div><div>{show.showChecklists !== false ? "Checks" : ""}</div><div>Accept signature</div>
           </div>
           {machineHandovers.map((h) => {
             const rating  = machineRatings.find((r) => String(r.handoverId) === String(h.id));
@@ -14923,7 +14923,8 @@ function AtoZMachineReport({
                   <div className="mr-td" data-l="Handed over"><div><div>{fmtDT(h.sentAt) || "—"}</div>{userName(h.sentBy) && <div className="mr-label">by {userName(h.sentBy)}</div>}</div></div>
                   <div className="mr-td" data-l="Accepted"><div>
                     <div>{h.acceptedAt ? fmtDT(h.acceptedAt) : h.status === "pending" ? "Waiting" : "—"}</div>
-                    {userName(h.acceptedBy) && <div className="mr-label">by {userName(h.acceptedBy)}</div>}
+                    {(h.acceptedByName || userName(h.acceptedBy)) && <div className="mr-label" data-report-accepted-by>by {h.acceptedByName || userName(h.acceptedBy)}</div>}
+                    {h.acceptedAt && (h.acceptedInDepartment || h.toDepartment) && <div className="mr-label">into {h.acceptedInDepartment || h.toDepartment}</div>}
                     <div className="mr-label">Accept window {dur(h.acceptTimeoutMinutes)}</div>
                   </div></div>
                   <div className="mr-td" data-l="Time / target"><div>
@@ -14937,9 +14938,12 @@ function AtoZMachineReport({
                       const ans = cr.answers || []; const done = ans.filter((a) => a.checked).length; const miss = ans.length - done;
                       return <div key={cr.id}>{({ before_dispatch: "Dispatch", before_receive: "Receive", during_work: "During work" })[cr.stage] || "Checklist"} {done}/{ans.length}{miss ? <span className="mr-red"> · {miss} not done</span> : null}</div>;
                     })}<div className="mr-label">Full answers: Appendix A</div></div> : <span className="mr-muted">—</span>)}</div>
-                  <div className="mr-td" data-l="Signed by">{h.mainEmployeeSignatureSvg
+                  <div className="mr-td" data-l="Accept signature">{h.acceptedSignatureSvg
+                    ? <div data-report-accept-signature><div className="mr-sig"><img src={svgDataUri(h.acceptedSignatureSvg)} alt="Acceptance signature" /></div><div className="mr-label">{h.acceptedByName || userName(h.acceptedBy)}</div></div>
+                    : h.mainEmployeeSignatureSvg
                     ? <div><div className="mr-sig"><img src={svgDataUri(h.mainEmployeeSignatureSvg)} alt="Main Employee signature" /></div><div className="mr-label">{nameFromSnap(h.mainEmployeeId, h.workedBySnapshot)}</div></div>
-                    : <span className="mr-muted">Not signed</span>}</div>
+                    : h.status === "accepted" ? <span className="mr-muted">Signed on file (earlier record)</span>
+                    : <span className="mr-muted">{h.status === "pending" ? "—" : "Not signed"}</span>}</div>
                 </div>
                 {(h.overrunNarration || raised.length > 0) && (
                   <div className="mr-hop-note">
@@ -17273,7 +17277,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
   const [trialCertViewModal, setTrialCertViewModal] = useState(null); // machine object
   // Migration 028 — During-Work checklist runtime modal.
   const [duringWorkModal, setDuringWorkModal] = useState(null); // { machine, template, answers, busy, error }
-  const [acceptModal, setAcceptModal] = useState(null); // { handover, password, needSig, sigSvg, busy, error }
+  const [acceptModal, setAcceptModal] = useState(null); // { handover, password, sigSvg, busy, error }
   const [transferBusy, setTransferBusy] = useState(false);
 
   // Pending handovers filtered to those awaiting acceptance.
@@ -17529,18 +17533,11 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
         .filter((m) => m && m.active && Array.isArray(m.departments) && m.departments.includes(toDept))
         .map((m) => m.name),
     );
-    setAcceptModal({ handover, password: "", needSig: false, sigSvg: null, busy: false, error: "",
+    // 2026-11-02 — the signature pad is ALWAYS shown: every acceptance carries
+    // its own drawn signature (data-accept-signature), never a stored one.
+    setAcceptModal({ handover, password: "", sigSvg: null, busy: false, error: "",
                      pendingItemsToRaise: [], newPendingText: "", holdReason: "",
                      checklistTemplate, checklistAnswers, acceptTeamMembers });
-    // Pre-check: does the current user have a stored signature? If not, we
-    // show the pad before password re-auth. The actual signature creation
-    // still happens through onRegisterSignature.
-    if (!currentUser?.id) return;
-    const sigRes = await getMySignature(currentUser.id);
-    setAcceptModal((prev) => prev && prev.handover.id === handover.id
-      ? { ...prev, needSig: !sigRes.signature }
-      : prev
-    );
   };
 
   const submitAcceptHandover = async () => {
@@ -17549,7 +17546,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
     // before any write.
     const live = (handovers || []).find((x) => x.id === acceptModal.handover.id);
     if (!live || live.status !== "pending") { setAcceptModal(null); showToast("Already accepted", "This machine was accepted already — the list has been refreshed.", "warning"); return; }
-    const { handover, password, needSig, sigSvg, checklistTemplate, checklistAnswers,
+    const { handover, password, sigSvg, checklistTemplate, checklistAnswers,
             acceptTeamMembers = [], holdReason = "" } = acceptModal;
     // 2026-10-30 — a machine accepted after its acceptance window (ON HOLD)
     // needs the reason for the late acceptance; it goes into the machine's
@@ -17559,15 +17556,16 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
       setAcceptModal((prev) => prev ? { ...prev, error: "This machine is ON HOLD — write why it is being accepted late." } : prev);
       return;
     }
-    if (needSig && !sigSvg) {
-      setAcceptModal((prev) => prev ? { ...prev, error: "Please register your signature first." } : prev);
-      return;
-    }
     // 2026-10-30 — the receiving employees must be named when the department
     // has employees configured. Acceptance is a record of who took the machine.
     const deptHasEmps = (settings?.employeeMembers || []).some((m) => m && m.active && Array.isArray(m.departments) && m.departments.includes(handover.toDepartment));
     if (deptHasEmps && acceptTeamMembers.filter(Boolean).length === 0) {
       setAcceptModal((prev) => prev ? { ...prev, error: "Select the employees receiving this machine." } : prev);
+      return;
+    }
+    // 2026-11-02 — the digital signature is mandatory on every acceptance.
+    if (!sigSvg) {
+      setAcceptModal((prev) => prev ? { ...prev, error: "Draw your signature and press Save Signature before confirming." } : prev);
       return;
     }
     // Password is only required when the admin has opted into
@@ -17587,24 +17585,15 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
       }
     }
     setAcceptModal((prev) => prev ? { ...prev, busy: true, error: "" } : prev);
-    // 2026-11-02 — a signature drawn in this modal is registered before the
-    // accept. The pad's onSave clears needSig, so the old `needSig && sigSvg`
-    // guard never ran and every first-time acceptor was refused with
-    // "Register your signature before accepting a handover."
-    if (sigSvg) {
-      const sr = await onRegisterSignature(sigSvg);
-      if (!sr || sr.success === false) {
-        setAcceptModal((prev) => prev ? { ...prev, busy: false, error: sr?.error || "Signature save failed." } : prev);
-        return;
-      }
-    }
     const pendingItemsToRaise = cleanPendingJobs(acceptModal.pendingItemsToRaise);
     const res = await onAcceptHandover({ handoverId: handover.id, password, pendingItemsToRaise, holdReason: holdReason.trim(),
                                          // Pass through so the handler can snapshot the Before-Receive response.
                                          checklistTemplate, checklistAnswers,
                                          stage: "before_receive", department: handover.toDepartment,
                                          // Feature 5 — accept-side team snapshot.
-                                         acceptTeamMembers: acceptTeamMembers.filter(Boolean) });
+                                         acceptTeamMembers: acceptTeamMembers.filter(Boolean),
+                                         // This acceptance's own signature (snapshotted on the hand-over row).
+                                         signatureSvg: sigSvg });
     // Remember the receiving crew for the next machine into this department.
     // Only on a confirmed accept.
     if (res && res.success !== false) {
@@ -20043,6 +20032,17 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                   <span className="text-[9px] text-slate-600 font-mono ml-auto">{h.date}</span>
                                 </div>
                                 {h.note && <div className="text-[10px] text-slate-500 mt-0.5">{h.note}</div>}
+                                {h.handoverId && (() => {
+                                  // 2026-11-02 — acceptance record: who, where, when and the signature.
+                                  const ho = (handovers || []).find((x) => String(x.id) === String(h.handoverId));
+                                  if (!ho || !ho.acceptedSignatureSvg) return null;
+                                  return (
+                                    <div data-history-accept-signature className="mt-1 flex items-center gap-2">
+                                      <img alt="Acceptance signature" src={svgDataUri(ho.acceptedSignatureSvg)} style={{ height: 28, maxWidth: 110, background: "#fff", border: "1px solid rgba(17,24,39,0.12)", borderRadius: 4 }} />
+                                      <span className="text-[9px] text-slate-500">{ho.acceptedByName || h.by} · {ho.acceptedInDepartment || h.department} · {ho.acceptedAt ? new Date(ho.acceptedAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false }) : ""}</span>
+                                    </div>
+                                  );
+                                })()}
                               </div>
                             );
                           })}
@@ -21137,7 +21137,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
 
       {/* ── Phase A — Accept modal (password re-auth + signature) ── */}
       {acceptModal && (() => {
-        const { handover, password, needSig, sigSvg, busy, error } = acceptModal;
+        const { handover, password, sigSvg, busy, error } = acceptModal;
         const setField = (patch) => setAcceptModal((prev) => prev ? { ...prev, ...patch } : prev);
         // Feature 5 — team members from Settings → Employees active in toDepartment.
         const acceptDeptEmps = (settings?.employeeMembers || []).filter((m) => m && m.active
@@ -21181,16 +21181,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                     <div className="text-[10px] text-slate-500 mt-1">Saved permanently in the machine's history and the audit trail.</div>
                   </div>
                 )}
-                {needSig && (
-                  <div>
-                    <div className="text-[11px] font-bold text-slate-500 mb-2">Register your signature (one-time setup)</div>
-                    <SignaturePad
-                      onSave={(svg) => setField({ sigSvg: svg, needSig: false, error: "" })}
-                      onCancel={() => setAcceptModal(null)}
-                    />
-                  </div>
-                )}
-                {!needSig && (
+                {(
                   <>
                     {workflow.require_password_at_accept ? (
                       <div>
@@ -21200,7 +21191,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                onKeyDown={(e) => { if (e.key === "Enter") submitAcceptHandover(); }}
                                placeholder="Password"
                                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-[12px] text-slate-900 placeholder-slate-500 outline-none focus:border-green-500/60" />
-                        <div className="text-[10px] text-slate-500 mt-1">Your saved signature will be attached to this acceptance record.</div>
+                        <div className="text-[10px] text-slate-500 mt-1">Your signature below is attached to this acceptance record.</div>
                       </div>
                     ) : (
                       <div className="rounded-lg px-3 py-2.5" style={{ background: "rgba(34,197,94,0.07)", border: "1px solid rgba(34,197,94,0.3)" }}>
@@ -21208,13 +21199,8 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                           Accepting as <span className="text-slate-900">{currentUser?.fullName || currentUser?.username || "you"}</span>
                         </div>
                         <div className="text-[10px] text-slate-400 mt-0.5">
-                          Your saved signature will be attached. No password required for routine acceptance.
+                          Sign below to confirm. No password required for routine acceptance.
                         </div>
-                      </div>
-                    )}
-                    {sigSvg && (
-                      <div className="rounded-lg px-3 py-2" style={{ background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.25)" }}>
-                        <div className="text-[10px] font-bold text-emerald-300">✓ Signature ready</div>
                       </div>
                     )}
                     {/* Phase B — carry-forward: show previously unresolved items for this machine */}
@@ -21305,6 +21291,31 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                         </div>
                       </div>
                     )}
+                    {/* 2026-11-02 — mandatory Digital Signature for every acceptance */}
+                    <div data-accept-signature className="rounded-lg px-3 py-2.5" style={{ background: "rgba(17,24,39,0.02)", border: `1px solid ${sigSvg ? "rgba(34,197,94,0.4)" : "rgba(17,24,39,0.15)"}` }}>
+                      <div className="text-[10px] font-bold text-slate-600 uppercase tracking-wide mb-1.5">
+                        ✍ Digital signature <span className="text-red-500">*</span>
+                      </div>
+                      {sigSvg ? (
+                        <div>
+                          <div className="rounded bg-white border border-emerald-200 p-1 flex items-center justify-center" style={{ height: 72 }}>
+                            <img alt="Saved signature" src={svgDataUri(sigSvg)} style={{ maxHeight: 64, maxWidth: "100%" }} />
+                          </div>
+                          <div className="flex items-center justify-between mt-1.5">
+                            <div className="text-[10px] font-bold text-emerald-700">✓ Signature saved</div>
+                            <button type="button" disabled={busy} onClick={() => setField({ sigSvg: null })}
+                                    className="text-[10px] font-bold text-slate-500 hover:text-slate-900 underline">Re-sign</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="text-[10px] text-slate-500 mb-1.5">
+                            {acceptDeptEmps.length > 0 ? "Sign on behalf of the receiving employees selected above, then press Save Signature." : "Draw your signature, then press Save Signature."}
+                          </div>
+                          <SignaturePad onSave={(svg) => setField({ sigSvg: svg, error: "" })} />
+                        </>
+                      )}
+                    </div>
                   </>
                 )}
                 {error && (
@@ -21320,8 +21331,9 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                         className="text-[11px] font-bold px-3 py-1.5 rounded-lg text-slate-400 border border-slate-200 bg-slate-50 hover:bg-slate-100 hover:text-slate-900 transition-all disabled:opacity-50">
                   Cancel
                 </button>
-                {!needSig && (
-                  <button onClick={submitAcceptHandover} disabled={busy || (workflow.require_password_at_accept && !password)}
+                {(
+                  <button data-accept-confirm onClick={submitAcceptHandover}
+                          disabled={busy || !sigSvg || (acceptDeptEmps.length > 0 && selectedTeam.filter(Boolean).length === 0) || (workflow.require_password_at_accept && !password)}
                           className="text-[12px] font-black text-slate-900 px-6 py-2 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                           style={{ background: "#15803d", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
                     {busy ? "⏳ Accepting…" : (workflow.require_password_at_accept ? "Verify & Accept" : "Confirm Acceptance")}
@@ -26227,7 +26239,7 @@ export default function App() {
   // main session), attach the operator's signature, flip status to accepted,
   // promote the machine to the new department. Password re-auth is required
   // by design — a saved signature alone is not proof of authorization.
-  const handleAcceptHandover = async ({ handoverId, password, pendingItemsToRaise = [], checklistTemplate = null, checklistAnswers = null, stage = null, department = null, acceptTeamMembers = [], holdReason = "" }) => {
+  const handleAcceptHandover = async ({ handoverId, password, pendingItemsToRaise = [], checklistTemplate = null, checklistAnswers = null, stage = null, department = null, acceptTeamMembers = [], signatureSvg = null, holdReason = "" }) => {
     if (!currentUser?.id) return { success: false, error: "Not authenticated" };
     const handover = handovers.find((h) => h.id === handoverId);
     if (!handover) return { success: false, error: "Handover not found" };
@@ -26263,11 +26275,14 @@ export default function App() {
       if (!reauth.success) return reauth;
     }
 
-    // Step 2: fetch (or require) a stored signature. If none, the UI should
-    // have opened the signature pad first and called handleRegisterSignature.
+    // Step 2 (2026-11-02): the digital signature is drawn on EVERY acceptance
+    // and snapshotted on the hand-over row. The stored per-user signature is
+    // not required (and never overwritten here); its id is kept as a reference.
+    if (!signatureSvg || !String(signatureSvg).includes("<svg")) {
+      return { success: false, error: "A digital signature is required to accept a handover." };
+    }
     const sigRes = await getMySignature(currentUser.id);
-    if (!sigRes.success) return { success: false, error: sigRes.error };
-    if (!sigRes.signature) return { success: false, error: "Register your signature before accepting a handover." };
+    const storedSigId = sigRes?.success && sigRes.signature ? sigRes.signature.id : null;
 
     // Step 2b (2026-11-02): find the machine BEFORE flipping the handover. A
     // tablet whose machine list is stale (slept through the realtime event,
@@ -26292,10 +26307,16 @@ export default function App() {
     const acceptedByTeamSnapshot = Array.isArray(acceptTeamMembers) && acceptTeamMembers.length > 0
       ? acceptTeamMembers.map((name) => ({ name }))
       : null;
+    // Who received the machine: the selected employees, else the logged-in user.
+    const acceptedByName = (acceptedByTeamSnapshot ? acceptedByTeamSnapshot.map((t) => t.name).join(", ") : "")
+      || currentUser.fullName || currentUser.username || "";
     const accRes = await handoverAccept(handoverId, {
       acceptedBy: currentUser.id,
-      acceptedBySignatureId: sigRes.signature.id,
+      acceptedBySignatureId: storedSigId,
       acceptedByTeamSnapshot,
+      acceptedSignatureSvg: signatureSvg,
+      acceptedByName,
+      acceptedInDepartment: handover.toDepartment,
     });
     if (!accRes.success) return accRes;
 
@@ -26307,7 +26328,9 @@ export default function App() {
     const isComplete = newStage === "Ready";
     const lateNow = isHoldOverdue(handover.sentAt, handover.acceptTimeoutMinutes, Date.now());
     const historyEntry = { stage: newStage, date: dateStr,
-      note: `Accepted into ${newStage}${lateNow ? ` (ON HOLD — accepted late${holdReason ? `: ${holdReason}` : ""})` : ""}` };
+      // 2026-11-02 — name, department, time and a link to the signed hand-over.
+      by: acceptedByName, department: newStage, at: nowIso, handoverId, signed: true,
+      note: `Accepted into ${newStage} by ${acceptedByName}${lateNow ? ` (ON HOLD — accepted late${holdReason ? `: ${holdReason}` : ""})` : ""}` };
 
     setMachineLog((prev) => prev.map((m) =>
       String(m.id) === String(handover.machineId)

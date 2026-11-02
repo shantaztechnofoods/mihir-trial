@@ -87,6 +87,9 @@ function fromRow(r) {
     mainEmployeeSignatureSvg:  r.main_employee_signature_svg || null,
     // Migration 031 — accept-side team snapshot (nullable for legacy rows).
     acceptedByTeamSnapshot:    Array.isArray(r.accepted_by_team_snapshot) ? r.accepted_by_team_snapshot : null,
+    acceptedSignatureSvg:      r.accepted_signature_svg || null,
+    acceptedByName:            r.accepted_by_name || null,
+    acceptedInDepartment:      r.accepted_in_department || null,
   };
 }
 
@@ -221,7 +224,7 @@ export async function createHandover(h) {
 // Accept transitions status 'pending' → 'accepted' atomically.
 // The WHERE status = 'pending' makes it race-safe: a second accept returns
 // zero rows and the UI reads the latest state.
-export async function acceptHandover(id, { acceptedBy, acceptedBySignatureId, acceptedByTeamSnapshot = null }) {
+export async function acceptHandover(id, { acceptedBy, acceptedBySignatureId, acceptedByTeamSnapshot = null, acceptedSignatureSvg = null, acceptedByName = null, acceptedInDepartment = null }) {
   console.info("[handovers:accept] start", { id, acceptedBy });
   if (!acceptedBy) return { success: false, error: "acceptedBy is required" };
   if (!isSupabaseEnabled()) {
@@ -230,7 +233,9 @@ export async function acceptHandover(id, { acceptedBy, acceptedBySignatureId, ac
     if (i < 0) return { success: false, error: "handover not found" };
     if (all[i].status !== "pending") return { success: false, error: "already finalised" };
     all[i] = { ...all[i], status: "accepted", acceptedBy, acceptedBySignatureId: acceptedBySignatureId || null,
-               acceptedByTeamSnapshot: acceptedByTeamSnapshot || null, acceptedAt: new Date().toISOString() };
+               acceptedByTeamSnapshot: acceptedByTeamSnapshot || null, acceptedAt: new Date().toISOString(),
+               acceptedSignatureSvg: acceptedSignatureSvg || null, acceptedByName: acceptedByName || null,
+               acceptedInDepartment: acceptedInDepartment || all[i].toDepartment || null };
     setLocal(all);
     return { success: true, handover: all[i] };
   }
@@ -241,6 +246,10 @@ export async function acceptHandover(id, { acceptedBy, acceptedBySignatureId, ac
     accepted_by_signature_id: acceptedBySignatureId || null,
     accepted_at: new Date().toISOString(),
     accepted_by_team_snapshot: acceptedByTeamSnapshot || null,
+    // Migration 057 — per-acceptance signature snapshot, name and department.
+    accepted_signature_svg: acceptedSignatureSvg || null,
+    accepted_by_name: acceptedByName || null,
+    accepted_in_department: acceptedInDepartment || null,
   };
   const { data, error } = await c
     .from("handover_events")
