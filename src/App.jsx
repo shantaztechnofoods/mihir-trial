@@ -84,7 +84,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-02-pending-receipts";
+const APP_BUILD = "2026-11-02-hold-unselected";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -911,7 +911,9 @@ function DashboardPage({ items = {}, pos = [], vendorList = [], machineLog = [],
     const onHold = pendingHo.filter((h) => isHoldOverdue(h.sentAt, h.acceptTimeoutMinutes, now));
     const awaiting = pendingHo.length - onHold.length;
     const openJobs = (pendingHandoverItems || []).filter((p) => p.status === "open");
-    return { live: live.length, byStage, delayed, onHold, onRack, awaiting, openJobs, completed: machineLog.filter((m) => m.status === "completed").length };
+    // 2026-11-02 — machines put ON HOLD by hand (machine card) count too.
+    const manualHold = live.filter((m) => m.holdActive).length;
+    return { live: live.length, byStage, delayed, onHold, manualHold, onRack, awaiting, openJobs, completed: machineLog.filter((m) => m.status === "completed").length };
   })();
 
   // Same reasoning as the navigation: these nine tiles are the first thing
@@ -1014,7 +1016,7 @@ function DashboardPage({ items = {}, pos = [], vendorList = [], machineLog = [],
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               {[
                 { label: "Delayed machines", n: production.delayed.length, color: "#b91c1c", bg: "rgba(239,68,68,0.08)", nav: "machines", hint: "Past the department target" },
-                { label: "On Hold", n: production.onHold.length, color: "#4338ca", bg: "rgba(99,102,241,0.10)", nav: "machines", hint: "Acceptance overdue" },
+                { label: "On Hold", n: production.onHold.length + production.manualHold, color: "#4338ca", bg: "rgba(99,102,241,0.10)", nav: "machines", hint: "Acceptance overdue / put on hold" },
                 { label: "Awaiting acceptance", n: production.awaiting, color: "#b45309", bg: "rgba(217,119,6,0.10)", nav: "machines", hint: production.onRack > 0 ? `Not yet accepted · ${production.onRack} on rack` : "Transferred, not yet accepted" },
                 { label: "Open pending jobs", n: production.openJobs.length, color: "#0e7490", bg: "rgba(14,116,144,0.10)", nav: "machines", hint: "Must close before Ready" },
               ].map((a) => (
@@ -12262,6 +12264,19 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
       }
       if (item.pendingQty > 0) pending.push({ ...item });
     });
+    // 2026-11-02 — EVERY BOM line the operator left unselected (Critical or
+    // Non-Critical) becomes a Pending Job on the machine, with the BOM
+    // quantity and a reason ("Not selected at BOM Outward" unless one was
+    // typed). Critical lines already handled above (unticked + reason) are
+    // skipped here; nothing is deducted from stock for any of them.
+    const handledCodes = new Set(issued.map((i) => i.code));
+    enriched.forEach((item) => {
+      if (isItemChecked(item.code) || handledCodes.has(item.code) || !((Number(item.required) || 0) > 0)) return;
+      const type = item.inv?.outwardInputType === "serial" ? "serial" : "checkbox";
+      issued.push({ ...item, issueQty: 0, pendingQty: 0,
+        criticalInput: { type, confirmed: false, notIssued: true, unselected: true, critical: !!item.inv?.isCritical,
+          remark: criticalRemark(item) || "Not selected at BOM Outward", requiredQty: item.required } });
+    });
 
     // Migration 027 — carry the per-machine duration overrides into the issue
     // payload. Only emitted when a serial is present (= machine will be
@@ -13584,7 +13599,8 @@ function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, onCreateB
     .filter((it) => it && it.criticalInput && it.criticalInput.notIssued)
     .map((it) => ({ code: it.code, name: it.name, unit: it.unit,
                     qty: Number(it.criticalInput.requiredQty) || Number(it.required) || 0,
-                    remark: it.criticalInput.remark || "" }));
+                    remark: it.criticalInput.remark || "",
+                    critical: it.criticalInput.unselected ? !!it.criticalInput.critical : true }));
   // 2026-11-02 — BOMDrawer calls this BEFORE it moves any stock (Supabase
   // mode: the row is awaited; a refused insert aborts the issue with nothing
   // deducted). The drawer then passes the created machine's id in the issue
@@ -13609,8 +13625,7 @@ function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, onCreateB
     };
     onAddOutward(entry, data.pending);
     if (data.rackSet && data.rackSet.mode === "crate" && onRaiseNotIssued) {
-      const notIssuedCrate = (data.issued || []).filter((it) => it && it.criticalInput && it.criticalInput.notIssued)
-        .map((it) => ({ code: it.code, name: it.name, unit: it.unit, qty: Number(it.criticalInput.requiredQty) || Number(it.required) || 0, remark: it.criticalInput.remark || "" }));
+      const notIssuedCrate = notIssuedOf(data.issued);
       if (notIssuedCrate.length) onRaiseNotIssued({ machineId: data.rackSet.machineId, notIssued: notIssuedCrate, bomKey: data.bomKey, serialNo: data.serialNo, issueId: id, rackSlot: data.rackSet.slotId || null });
     }
     // data.machineId is set when the drawer already created the machine
@@ -16966,7 +16981,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
   checklistResponses = [],
   // 2026-10-30 — Item Master, so a pending job can name the missing part by code.
   items = {},
-  onUploadAttachment, onDeleteAttachment, onResolvePendingItem, onReceivePendingItem, onPullBackHandover,
+  onUploadAttachment, onDeleteAttachment, onResolvePendingItem, onReceivePendingItem, onPullBackHandover, onSetMachineHold,
   // Migration 028 — During-Work checklist handler. Optional; button hides when
   // no template is configured for the machine's current department.
   onSubmitDuringWorkChecklist,
@@ -17033,6 +17048,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
   const [jobsDrawer, setJobsDrawer] = useState(null); // machine id
   const [jobsView,  setJobsView]  = useState("open"); // Pending Jobs tab: open | done | all
   const [pullBack,  setPullBack]  = useState(null);   // { handover, reason, busy, error } — admin pull back
+  const [holdModal, setHoldModal]  = useState(null);   // { machine, release, reason, busy, error } — manual ON HOLD / release (2026-11-02)
   const [raiseText,  setRaiseText]  = useState("");
   const [raiseDept,  setRaiseDept]  = useState("");
   const [raiseErr,   setRaiseErr]   = useState("");
@@ -17467,6 +17483,17 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
   // department, and those users see everything exactly as before.
   const myDepartments = Array.isArray(currentUser?.departments) ? currentUser.departments.filter(Boolean) : [];
   const hasDepartments = myDepartments.length > 0;
+  // 2026-11-02 — who may press "Part received" on a job. Mirrors
+  // receive_pending_part() (migration 055): Admin — any job; others need
+  // Finish & Transfer AND the job assigned to one of their departments (or on
+  // a machine now in one; a user with no department assignment is unscoped, as
+  // everywhere else here); a Stores job also goes to the inward permission.
+  const canReceiveJob = (p) => {
+    if (isAdminUser) return true;
+    const mach = (machineLog || []).find((x) => String(x.id) === String(p?.machineId));
+    const inDept = !hasDepartments || myDepartments.includes(p?.assignedDepartment) || (mach && myDepartments.includes(mach.currentDepartment || mach.stage));
+    return (canFinishTransfer(canDo) && !!inDept) || (p?.assignedDepartment === "Stores" && !!canDo("inward", "submit"));
+  };
   // A floor login is one that works machines through the handover chain and is
   // not an admin. It is LOCKED to its own departments: no "All machines"
   // switch, and no machines at all when no department has been assigned.
@@ -17548,9 +17575,13 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
   // for days and that is normal, not late.
   const pendingAccept   = started.filter((m) => {
     const h = machineHandover(m);
-    return h && !isAwaitingRelease(h) && !isHoldOverdue(h.sentAt, h.acceptTimeoutMinutes, nowTick);
+    return !m.holdActive && h && !isAwaitingRelease(h) && !isHoldOverdue(h.sentAt, h.acceptTimeoutMinutes, nowTick);
   });
+  // ON HOLD = a hand-over nobody accepted in time (automatic) OR a machine
+  // somebody put on hold by hand from its card (2026-11-02, migration 055).
   const onHold          = started.filter((m) => {
+    if (m.status === "completed") return false;
+    if (m.holdActive) return true;
     const h = machineHandover(m);
     return h && !isAwaitingRelease(h) && isHoldOverdue(h.sentAt, h.acceptTimeoutMinutes, nowTick);
   });
@@ -17627,7 +17658,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                       title="Classified critical when it was raised">CRITICAL</span>
                               )}
                               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: chip.bg, color: chip.fg }}>{chip.label}</span>
-                              {canAct && onReceivePendingItem && p.status === "open" && !p.receivedAt && (
+                              {onReceivePendingItem && canReceiveJob(p) && p.status === "open" && !p.receivedAt && (
                                 <button type="button" onClick={() => setJobAction({ item: p, action: "receive", notes: "", busy: false, error: "" })}
                                         className="text-[10.5px] font-bold px-2.5 py-1 rounded-lg border transition-all"
                                         style={{ background: "rgba(37,99,235,0.08)", border: "1px solid rgba(37,99,235,0.35)", color: "#1d4ed8" }}>
@@ -18185,7 +18216,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                           </div>
                           {canJobs && (
                             <div className="flex flex-col sm:flex-row gap-2">
-                              {onReceivePendingItem && !p.receivedAt && (
+                              {onReceivePendingItem && canReceiveJob(p) && !p.receivedAt && (
                                 <button type="button" className={btn} style={{ background: "rgba(37,99,235,0.08)", border: "1px solid rgba(37,99,235,0.4)", color: "#1d4ed8" }}
                                         onClick={() => setJobAction({ item: p, action: "receive", notes: "", busy: false, error: "" })}>
                                   Part received
@@ -18705,7 +18736,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
         {!staffMode && (() => {
           const cards = [
             { key: "pendingAccept", tab: "transfer",   label: "Pending Acceptance", value: pendingAccept.length,   sub: "waiting for next dept",   color: "#b45309", strip: "status-strip-yellow" },
-            { key: "hold",          tab: "transfer",   label: "On HOLD",            value: onHold.length,          sub: "accept deadline passed",  color: "#dc2626", strip: "status-strip-red" },
+            { key: "hold",          tab: "transfer",   label: "On HOLD",            value: onHold.length,          sub: "overdue or put on hold",    color: "#dc2626", strip: "status-strip-red" },
             { key: "onRack",        tab: "production", label: "On Rack",            value: onRackMachines.length,  sub: "awaiting head release",   color: "#4338ca", strip: "status-strip-purple" },
             { key: "active",        tab: "production", label: "Active Builds",      value: active.length,          sub: "in production",           color: "#b45309", strip: "status-strip-blue" },
             { key: "completed",     tab: "production", label: "Ready",              value: completed.length,       sub: "finished — final stage",  color: "#15803d", strip: "status-strip-green" },
@@ -19531,7 +19562,37 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                           below, which opens the same drawer where an
                           authorised user reads the detail and marks it
                           resolved. */}
-                      {!isComplete && nextDepartment(machine.currentDepartment || machine.stage) && !machine.pendingHandoverId && canFinishTransfer(canDo) && onFinishTransfer && (
+                      {/* 2026-11-02 — manual ON HOLD / Release, straight on the
+                          card. Same permission the database enforces: Admin,
+                          or Finish & Transfer / Update Stage. The automatic
+                          "hand-over not accepted in time" hold is separate. */}
+                      {machine.holdActive && (
+                        <span data-card-hold-badge={machine.id} className="text-[10px] font-black px-2 py-1 rounded-lg"
+                              style={{ background: "rgba(239,68,68,0.15)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.45)" }}
+                              title={`Put on hold${machine.holdAt ? ` ${new Date(machine.holdAt).toLocaleString()}` : ""}: ${machine.holdReason || "no reason recorded"}`}>
+                          🛑 ON HOLD{machine.holdReason ? ` · ${machine.holdReason.length > 40 ? `${machine.holdReason.slice(0, 40)}…` : machine.holdReason}` : ""}
+                        </span>
+                      )}
+                      {!isComplete && onSetMachineHold && (isAdminUser || canFinishTransfer(canDo) || canDo("machines", "updateStage")) && (
+                        machine.holdActive ? (
+                          <button type="button" data-card-release-hold={machine.id}
+                                  onClick={() => setHoldModal({ machine, release: true, reason: "", busy: false, error: "" })}
+                                  className="text-[11px] font-black px-3 py-1.5 rounded-lg border transition-all"
+                                  style={{ background: "rgba(21,128,61,0.10)", border: "1px solid rgba(21,128,61,0.4)", color: "#15803d" }}
+                                  title="Release this machine from ON HOLD">
+                            ▶ Release ON HOLD
+                          </button>
+                        ) : (
+                          <button type="button" data-card-hold={machine.id}
+                                  onClick={() => setHoldModal({ machine, release: false, reason: "", busy: false, error: "" })}
+                                  className="text-[11px] font-black px-3 py-1.5 rounded-lg border transition-all"
+                                  style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.4)", color: "#b91c1c" }}
+                                  title="Put this machine ON HOLD (a reason is required)">
+                            ⏸ ON HOLD
+                          </button>
+                        )
+                      )}
+                      {!isComplete && nextDepartment(machine.currentDepartment || machine.stage) && !machine.pendingHandoverId && !machine.holdActive && canFinishTransfer(canDo) && onFinishTransfer && (
                         <button onClick={() => openFinishModal(machine)}
                                 className={`font-black text-white rounded-lg transition-all ${isFloorLogin ? "text-[14px] px-5 py-2.5" : "text-[11px] px-3 py-1.5"}`}
                                 style={{ background: "#15803d", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}
@@ -19574,7 +19635,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                         // tab it is shown (Production, Transfer & Accept,
                         // ...): no need to go to another screen. Same role /
                         // department check as before (canAcceptHandover).
-                        const cardCanAccept = !!h && h.status === "pending" && canAcceptHandover(canDo, h.toDepartment) && !!onAcceptHandover;
+                        const cardCanAccept = !!h && h.status === "pending" && !machine.holdActive && canAcceptHandover(canDo, h.toDepartment) && !!onAcceptHandover;
                         return (
                           <div className="flex items-center gap-2 flex-wrap">
                             {machineOverdue ? (
@@ -19922,7 +19983,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                         <span className="text-[9px] font-bold" style={{ color: p.receivedAt ? "#1d4ed8" : "#b45309" }}>
                                           {p.receivedAt ? "Part received · finish work" : (Number(p.receivedQty) || 0) > 0 ? `Partly received · ${pendingItemRemaining(p)} left` : p.itemCode ? "Awaiting part" : "Awaiting work"}
                                         </span>
-                                        {canFinishTransfer(canDo) && onReceivePendingItem && !p.receivedAt && (
+                                        {onReceivePendingItem && canReceiveJob(p) && !p.receivedAt && (
                                           <button onClick={() => setJobAction({ item: p, action: "receive", notes: "", busy: false, error: "" })}
                                                   className="text-[10px] font-bold px-2 py-0.5 rounded border"
                                                   style={{ color: "#1d4ed8", borderColor: "rgba(37,99,235,0.4)", background: "rgba(37,99,235,0.08)" }}>
@@ -20055,6 +20116,48 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
           </div>
         </div>
       )}
+
+      {holdModal && (() => {
+        const m = holdModal.machine;
+        const submit = async () => {
+          if (holdModal.busy) return;
+          const why = holdModal.reason.trim();
+          if (!holdModal.release && !why) { setHoldModal((prev) => prev ? { ...prev, error: "Write why the machine is being put on hold." } : prev); return; }
+          setHoldModal((prev) => prev ? { ...prev, busy: true, error: "" } : prev);
+          const r = await onSetMachineHold({ machineId: m.id, hold: !holdModal.release, reason: why });
+          if (r && r.success === false) { setHoldModal((prev) => prev ? { ...prev, busy: false, error: r.error || "Could not save." } : prev); return; }
+          setHoldModal(null);
+          showToast(`${m.bomKey}${m.serialNo ? ` · S/N ${m.serialNo}` : ""} ${holdModal.release ? "released from hold" : "put ON HOLD"}`);
+        };
+        return (
+          <div data-hold-modal className="modal-backdrop fixed inset-0 z-[72] flex items-center justify-center p-4"
+               style={{ background: "rgba(17,24,39,0.45)", backdropFilter: "blur(12px)" }}
+               onClick={(e) => e.target === e.currentTarget && !holdModal.busy && setHoldModal(null)}>
+            <div className="w-full max-w-md rounded-2xl p-5" style={{ background: "var(--surface-raised)", border: "1px solid rgba(239,68,68,0.35)", boxShadow: "0 24px 70px rgba(17,24,39,0.2)" }}>
+              <h3 className="text-base font-black text-slate-800 mb-1">{holdModal.release ? "Release ON HOLD" : "Put machine ON HOLD"}</h3>
+              <p className="text-[11px] text-slate-500 mb-3">{m.bomKey}{m.serialNo ? ` · S/N ${m.serialNo}` : ""} · now in {m.currentDepartment || m.stage}</p>
+              {holdModal.release ? (
+                <p className="text-[11px] text-slate-600 mb-3">On hold since {m.holdAt ? new Date(m.holdAt).toLocaleString() : "—"}: {m.holdReason || "no reason recorded"}. Releasing lets the machine be finished, transferred and accepted again.</p>
+              ) : (
+                <p className="text-[11px] text-slate-600 mb-3">While on hold the machine cannot be transferred or accepted. Pending jobs, receiving and the checklist keep working. The hold, who set it and the reason stay in the history.</p>
+              )}
+              <label className="block text-[11px] font-bold text-slate-600 mb-1">{holdModal.release ? "Note (optional)" : <>Reason <span className="text-red-500">*</span></>}</label>
+              <textarea data-hold-reason rows={2} value={holdModal.reason} disabled={holdModal.busy} autoFocus
+                        onChange={(e) => setHoldModal((prev) => prev ? { ...prev, reason: e.target.value, error: "" } : prev)}
+                        placeholder={holdModal.release ? "e.g. motor arrived" : "e.g. waiting for motor; quality check"}
+                        className="w-full rounded-lg px-3 py-2.5 text-[13px] text-slate-800 outline-none"
+                        style={{ background: "var(--surface-elevated)", border: "1px solid rgba(17,24,39,0.12)" }} />
+              {holdModal.error && <div className="mt-3 text-[11px] font-bold px-3 py-2 rounded-lg" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.4)", color: "#dc2626" }}>{holdModal.error}</div>}
+              <div className="flex gap-2 mt-4">
+                <button type="button" onClick={() => setHoldModal(null)} disabled={holdModal.busy} className="flex-1 h-11 rounded-lg text-[13px] font-bold text-slate-600 border transition-all disabled:opacity-40" style={{ borderColor: "rgba(17,24,39,0.12)" }}>Cancel</button>
+                <button type="button" data-hold-confirm onClick={submit} disabled={holdModal.busy} className="flex-[2] h-11 rounded-lg text-[13px] font-black text-white transition-all disabled:opacity-50" style={{ background: holdModal.release ? "#15803d" : "#dc2626", color: "#ffffff" }}>
+                  {holdModal.busy ? "Saving…" : holdModal.release ? "▶ Release ON HOLD" : "⏸ Put ON HOLD"}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {pullBack && (() => {
         const h = pullBack.handover;
@@ -25108,9 +25211,9 @@ export default function App() {
         description: `Part not issued at BOM Outward: ${it.name || it.code}${qtyTxt} (${bomKey}${serialNo ? ` · S/N ${serialNo}` : ""}${rackTxt})`,
         kind: "owed",
         itemCode: it.code, itemName: it.name || "", qty: it.qty || null, reason: it.remark || "",
-        // Only critical lines can be "Not verified" at Outward, so these are
-        // critical pending jobs (migration 052 `source` = 'not_issued').
-        critical: true, source: "not_issued",
+        // "Not verified" critical lines are critical jobs; lines simply left
+        // unselected carry their Item Master flag (migration 052 `source`).
+        critical: it.critical !== false && !(it.criticalInput && it.criticalInput.unselected && !it.criticalInput.critical), source: "not_issued",
       }).then((pr) => {
         if (!pr.success) {
           console.warn("[App] not-issued pending job save failed", pr.error);
@@ -25728,6 +25831,7 @@ export default function App() {
     const machine = machineLog.find((m) => m.id === machineId);
     if (!machine) return { success: false, error: "Machine not found" };
     if (machine.pendingHandoverId) return { success: false, error: "Handover already in progress for this machine." };
+    if (machine.holdActive) return { success: false, error: "This machine is ON HOLD — release the hold before transferring it." };
     if (machine.status === "completed" || machine.stage === "Ready") {
       return { success: false, error: "This machine is READY — READY is the final stage." };
     }
@@ -25982,6 +26086,7 @@ export default function App() {
     const handover = handovers.find((h) => h.id === handoverId);
     if (!handover) return { success: false, error: "Handover not found" };
     if (handover.status !== "pending") return { success: false, error: "This handover is no longer pending." };
+    if ((machineLog.find((m) => String(m.id) === String(handover.machineId)) || {}).holdActive) return { success: false, error: "This machine is ON HOLD — release the hold before accepting it." };
     // Migration 036 — a machine parked on the rack is not anyone's to accept
     // until a production head releases it. The Accept button is no longer
     // shown for it; this refuses any other path that would skip the release.
@@ -26423,6 +26528,46 @@ export default function App() {
     return res;
   };
 
+  // 2026-11-02 — manual ON HOLD / Release from the machine card. Local state
+  // first; the database (migration 055) is the authority on who may do it and
+  // stamps hold_by / hold_at itself. A refused save is rolled back on screen.
+  const handleSetMachineHold = async ({ machineId, hold, reason }) => {
+    if (!currentUser?.id) return { success: false, error: "Not authenticated" };
+    const m = machineLog.find((x) => String(x.id) === String(machineId));
+    if (!m) return { success: false, error: "Machine not found" };
+    const isAdmin = currentUser?.role === "super_admin" || currentUser?.role === "Admin";
+    if (!isAdmin && !authCanDo("machines", "finishTransfer") && !authCanDo("machines", "updateStage")) return { success: false, error: "You do not have permission to put a machine on hold or release it." };
+    const why = String(reason || "").trim();
+    if (hold && !why) return { success: false, error: "Write why the machine is being put on hold." };
+    if (hold && m.holdActive) return { success: false, error: "This machine is already on hold." };
+    if (!hold && !m.holdActive) return { success: false, error: "This machine is not on hold." };
+    if (m.status === "completed") return { success: false, error: "A finished machine cannot be put on hold." };
+    const now = new Date().toISOString();
+    const dateStr = fmtDate(new Date());
+    const who = currentUser?.name || currentUser?.email || "user";
+    const note = hold ? `Put ON HOLD by ${who}: ${why}` : `Released from ON HOLD by ${who}${why ? `: ${why}` : ""}`;
+    const nextHistory = [...(m.history || []), { stage: m.stage, date: dateStr, note }];
+    const patch = hold
+      ? { holdActive: true, holdReason: why, holdBy: currentUser.id, holdAt: now }
+      : { holdActive: false, holdReason: "", holdBy: null, holdAt: null };
+    const before = { holdActive: !!m.holdActive, holdReason: m.holdReason || "", holdBy: m.holdBy || null, holdAt: m.holdAt || null, history: m.history || [] };
+    setMachineLog((prev) => prev.map((x) => String(x.id) === String(machineId) ? { ...x, ...patch, history: nextHistory } : x));
+    if (isSupabaseEnabled()) {
+      const r = await machineUpdate(m.id, { holdActive: patch.holdActive, holdReason: hold ? why : "", history: nextHistory });
+      if (!r.success) {
+        setMachineLog((prev) => prev.map((x) => String(x.id) === String(machineId) ? { ...x, ...before } : x));
+        return { success: false, error: r.error || "The hold could not be saved." };
+      }
+    }
+    logAudit({
+      type: hold ? "machine_hold_set" : "machine_hold_released", module: "Machine",
+      action: `${hold ? "Put ON HOLD" : "Released from ON HOLD"}: ${m.bomKey}${m.serialNo ? ` [${m.serialNo}]` : ""}${why ? ` — ${why}` : ""}`,
+      ref: m.bomKey, serialNo: m.serialNo || "",
+      details: { machineId: m.id, department: m.currentDepartment || m.stage, reason: why, previousReason: m.holdReason || "" },
+    });
+    return { success: true };
+  };
+
   const handleReleaseHandover = async (handoverId) => {
     if (!currentUser?.id) return { success: false, error: "Not authenticated" };
     // 2026-10-31 — no Production Manager login yet: an Admin may release.
@@ -26488,9 +26633,18 @@ export default function App() {
   // arrived. The job stays open until "Work completed" (resolve) closes it.
   const handleReceivePendingItem = async (id, { qty, notes, verification = null }) => {
     if (!currentUser?.id) return { success: false, error: "Not authenticated" };
-    if (!canFinishTransfer(authCanDo)) return { success: false, error: "You do not have permission to record a received part (Machines → Finish & Transfer)." };
     const p = pendingHandoverItems.find((x) => x.id === id);
     if (!p) return { success: false, error: "Pending job not found." };
+    {
+      // Admin: any job. Others: their own department's jobs (the database
+      // function enforces the same rule — migration 055).
+      const isAdminR = currentUser?.role === "super_admin" || currentUser?.role === "Admin";
+      const depts = Array.isArray(currentUser?.departments) ? currentUser.departments.filter(Boolean) : [];
+      const mach = machineLog.find((x) => String(x.id) === String(p.machineId));
+      const inDept = depts.length === 0 || depts.includes(p.assignedDepartment) || (mach && depts.includes(mach.currentDepartment || mach.stage));
+      const okR = isAdminR || (canFinishTransfer(authCanDo) && inDept) || (p.assignedDepartment === "Stores" && authCanDo("inward", "submit"));
+      if (!okR) return { success: false, error: "You can only record received parts for your own department's jobs." };
+    }
     // 2026-11-02 — receive the quantity that actually arrived. One receipt per
     // call, never merged: the database function checks the quantity against
     // what is still pending, inwards stock for THAT quantity only (when the
@@ -26878,6 +27032,7 @@ export default function App() {
                               onReceivePendingItem={handleReceivePendingItem}
                               onIssuePendingPart={handleIssuePendingPart}
                               onPullBackHandover={handlePullBackHandover}
+                              onSetMachineHold={handleSetMachineHold}
                               /* Phase 1 — raise a fault mid-work */
                               onRaisePendingItem={handleRaisePendingItem}
                               /* Migration 036 — release a machine off the rack */

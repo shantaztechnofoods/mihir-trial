@@ -140,7 +140,7 @@ test("app: Add Pending Item at BOM Outward — item name, Critical Yes/No, pendi
   assert.match(app, /mode="item" \/>/);
   assert.match(app, /Each pending item needs an item name and a pending quantity\./);
   assert.match(app, /const canSubmit      = checkedE\.some\(\(i\) => i\.issueQty > 0\) && !extraPendingProblem;/);
-  assert.match(app, /critical: true, source: "not_issued"/);
+  assert.match(app, /source: "not_issued"/);
 });
 
 test("app: Finish & Transfer logs no employee names, keeps checklist reasons and Add Pending Job; Accept unchanged", () => {

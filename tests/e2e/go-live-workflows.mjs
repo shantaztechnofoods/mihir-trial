@@ -190,6 +190,26 @@ await p.locator('[data-summary-card="completed"]').click(); await p.waitForTimeo
 ok("admin has the machine report button on the Ready machine", await p.locator("[data-card-report]").count() > 0);
 await p.locator("[data-card-report]").first().click(); await p.waitForTimeout(900);
 ok("machine report opens for admin", await p.locator(".mr-doc").count() > 0);
+// ── 2026-11-02 — manual ON HOLD from the machine card (migration 055) ───────
+await p.locator("button", { hasText: /← Back/ }).first().click().catch(() => {}); await p.waitForTimeout(500);
+await p.locator('[data-summary-card="active"]').first().click().catch(() => {}); await p.waitForTimeout(600);
+const holdBtn = p.locator('[data-card-hold="3"]');
+ok("Admin sees ON HOLD directly on the machine card", await holdBtn.count() === 1);
+await holdBtn.click(); await p.waitForTimeout(400);
+await p.locator("[data-hold-confirm]").click(); await p.waitForTimeout(400);
+ok("ON HOLD needs a reason (refused empty)", await p.locator("[data-hold-modal]").count() === 1 && !(await ls(p, "erp_machines")).find((m) => m.id === 3).holdActive);
+await p.locator("[data-hold-reason]").fill("waiting for motor"); await p.locator("[data-hold-confirm]").click(); await p.waitForTimeout(700);
+let m3 = (await ls(p, "erp_machines")).find((m) => m.id === 3);
+ok("machine 3 is ON HOLD with reason, who and when in history", m3.holdActive === true && m3.holdReason === "waiting for motor" && m3.holdAt && (m3.history || []).some((h) => /Put ON HOLD by .*waiting for motor/.test(h.note || "")));
+ok("ON HOLD badge and Release button show on the card", await p.locator('[data-card-hold-badge="3"]').count() === 1 && await p.locator('[data-card-release-hold="3"]').count() === 1 && await p.locator('[data-card-hold="3"]').count() === 0);
+await p.locator("[data-summary-card=\"hold\"]").first().click().catch(() => {}); await p.waitForTimeout(500);
+ok("the On HOLD list includes the manually held machine", (await p.locator("body").innerText()).includes("SN-103"));
+await p.locator('[data-card-release-hold="3"]').first().click(); await p.waitForTimeout(400);
+await p.locator("[data-hold-confirm]").click(); await p.waitForTimeout(700);
+m3 = (await ls(p, "erp_machines")).find((m) => m.id === 3);
+ok("Release ON HOLD clears the hold and keeps the history", m3.holdActive === false && (m3.history || []).some((h) => /Released from ON HOLD/.test(h.note || "")) && (m3.history || []).some((h) => /Put ON HOLD/.test(h.note || "")));
+const audits = (await ls(p, "erp_audit")) || [];
+ok("hold and release are audited", audits.some((a) => a.type === "machine_hold_set") && audits.some((a) => a.type === "machine_hold_released"));
 ok("no page errors across all three roles", errs.length === 0, errs.join(" | "));
 await b.close();
 const failed = results.filter((r) => !r[0]).length;

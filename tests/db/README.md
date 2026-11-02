@@ -30,3 +30,14 @@ one line for the local run only.
 the append-only `pending_item_receipts` rows, critical-item verification and
 serial rules, no double inward, permissions. Each test file expects a freshly
 built database (rebuild between files).
+
+## 055 — manual ON HOLD + department receiving
+
+`bash tests/db/build_local_db.sh 055` then
+`su postgres -c "psql -q -d erp_test -f tests/db/055_hold_receive_tests.sql"`.
+Note: the 054 suite asserts the 054-era receive rule (any Finish & Transfer
+user) — run it against `build_local_db.sh 054`, not 055.
+
+UI e2e (not part of `npm test`, needs the local-mode preview on :5183):
+`tests/e2e/go-live-workflows.mjs` (incl. manual hold) and
+`tests/e2e/bom-unselected.mjs` (unselected BOM lines → Pending Jobs).
