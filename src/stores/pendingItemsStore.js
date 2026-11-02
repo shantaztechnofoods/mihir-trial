@@ -35,7 +35,8 @@ const toRow = (p) => {
   if (p.partSerialNo)               row.part_serial_no = String(p.partSerialNo).trim();
   if (p.source)                     row.source         = String(p.source).trim();
   // Migration 056 — critical check points ticked at Outward (no serial).
-  if (p.criticalChecks && Array.isArray(p.criticalChecks.points) && p.criticalChecks.points.length) row.critical_checks = p.criticalChecks;
+  // The chosen Critical option (mode) is kept inside the same jsonb: {mode, points}.
+  if (p.criticalChecks && Array.isArray(p.criticalChecks.points) && (p.criticalChecks.points.length || p.criticalChecks.mode)) row.critical_checks = p.criticalChecks;
   return row;
 };
 const fromRow = (r) => ({
