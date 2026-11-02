@@ -8,7 +8,7 @@ behave as intended.
 
 ```
 # needs a local postgres with a `postgres` superuser (service postgresql start)
-bash tests/db/build_local_db.sh 053          # builds erp_test through migration 053
+bash tests/db/build_local_db.sh 054          # builds erp_test through migration 054 (rebuild before each test file)
 su postgres -c "psql -q -d erp_test -f tests/db/053_role_tests.sql" | grep -E 'FAIL|PASSED|FAILED'
 ```
 
@@ -24,3 +24,9 @@ Data Cleanup being disabled, settings secrecy, and the atomic / idempotent
 Note: migration 036 has a stray comment line that is not valid SQL (the live
 database was applied from a corrected copy); the build script patches that
 one line for the local run only.
+
+`054_receipt_tests.sql` covers partial receiving of pending parts
+(`receive_pending_part()`): 100 pending / 50 received → 50 inwarded and 50 left,
+the append-only `pending_item_receipts` rows, critical-item verification and
+serial rules, no double inward, permissions. Each test file expects a freshly
+built database (rebuild between files).

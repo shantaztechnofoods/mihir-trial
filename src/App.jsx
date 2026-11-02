@@ -52,7 +52,7 @@ import {
 } from "./utils/handoverLogic.js";
 // Phase B
 import { fetchTemplates, createTemplate, updateTemplate, deleteTemplate, fetchResponses, createResponse } from "./stores/checklistsStore.js";
-import { fetchPendingItems, createPendingItem, resolvePendingItem, receivePendingItem, pendingItemStage, pendingItemHistory } from "./stores/pendingItemsStore.js";
+import { fetchPendingItems, createPendingItem, resolvePendingItem, receivePendingItem, receivePendingPart, pendingItemStage, pendingItemHistory, pendingItemRemaining } from "./stores/pendingItemsStore.js";
 import { fetchAllAttachments, fetchAttachmentsForMachine, uploadAttachment, signedUrlFor, deleteAttachment } from "./stores/attachmentsStore.js";
 import { fetchRatings, createRating, overrideRating } from "./stores/ratingsStore.js";
 import { computeDepartmentRating, formatRatingBadge, summarizeMachineRatings, buildDepartmentScoreboard } from "./utils/ratingLogic.js";
@@ -84,7 +84,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-02-go-live";
+const APP_BUILD = "2026-11-02-pending-receipts";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -11880,7 +11880,12 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
   const totalPending   = checkedE.reduce((s, i) => s + i.pendingQty, 0);
   const totalOverIssue = checkedE.reduce((s, i) => s + (i.overQty || 0), 0);
   const hasOverIssue   = checkedE.some((i) => (i.overQty || 0) > 0);
-  const canSubmit      = checkedE.some((i) => i.issueQty > 0);
+  // 2026-11-02 — a pending item added at BOM Outward needs an item name and a
+  // pending quantity (Critical / Normal is always set). Blank rows are ignored.
+  const extraPendingProblem = (Array.isArray(extraPending) ? extraPending : []).map(normalizePendingJob).filter((j) => !pendingJobIsBlank(j))
+    .some((j) => !(j.itemName.trim() || j.itemCode.trim()) || !(Number(j.qty) > 0))
+    ? "Each pending item needs an item name and a pending quantity." : "";
+  const canSubmit      = checkedE.some((i) => i.issueQty > 0) && !extraPendingProblem;
 
   const SC = { green: "#22c55e", orange: "#D97706", red: "#ef4444" };
   const SB = { green: "rgba(34,197,94,0.1)", orange: "rgba(217, 119, 6,0.1)", red: "rgba(239,68,68,0.1)" };
@@ -12851,7 +12856,8 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
                       <div className="text-[10px] text-slate-500">No stock is deducted · nothing is added to Item Master</div>
                     </div>
                     <PendingJobRows rows={extraPending} onChange={setExtraPending} inventory={allFlat}
-                                    addLabel="+ Add Pending Item" />
+                                    addLabel="+ Add Pending Item" mode="item" />
+                    {extraPendingProblem && <div data-pending-item-problem className="mt-1.5 text-[11px] font-semibold" style={{ color: "#b45309" }}>{extraPendingProblem}</div>}
                   </div>
                 )}
               </div>
@@ -16790,10 +16796,19 @@ function JobHistory({ item, users = [], compact = false }) {
   const textLabel = { reported: "Reason", received: "Receive remark", completed: "Completion note" };
   return (
     <ol className={`${compact ? "mt-1" : "mt-1.5"} space-y-1`} aria-label="Job history">
-      {entries.map((e) => {
-        const meta = [nameOf(e.by), e.department, when(e.at)].filter(Boolean).join(" · ");
+      {entries.map((e, ei) => {
+        const meta = [nameOf(e.by) || e.byName || "", e.department, when(e.at)].filter(Boolean).join(" · ");
+        // Migration 054 — what a receipt verified and what was left after it.
+        const rc = e.receipt || null;
+        const v = rc && rc.verification ? rc.verification : null;
+        const serials = v && Array.isArray(v.serials) ? v.serials.filter(Boolean) : [];
+        const rcBits = rc ? [
+          rc.remainingQty != null ? (rc.remainingQty > 0 ? `${rc.remainingQty} still pending` : "nothing left pending") : "",
+          rc.stockInwarded ? `${rc.qtyReceived} inwarded to stock` : (rc.itemCode ? "" : "not in Item Master — no stock movement"),
+          v ? (v.kind === "serial" || serials.length ? `Serial${serials.length === 1 ? "" : "s"}: ${serials.join(", ")}` : (v.critical ? "Critical item physically verified" : "Physically received & checked")) : "",
+        ].filter(Boolean) : [];
         return (
-          <li key={e.kind} className="flex items-start gap-2 text-[10.5px] leading-snug">
+          <li key={`${e.kind}-${ei}`} data-job-history={e.kind} className="flex items-start gap-2 text-[10.5px] leading-snug">
             <span className="mt-[3px] w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: tone[e.kind] }} />
             <div className="min-w-0">
               <span className="font-bold" style={{ color: tone[e.kind] }}>{e.label}</span>
@@ -16803,6 +16818,7 @@ function JobHistory({ item, users = [], compact = false }) {
                   ? <><span className="text-slate-500">{textLabel[e.kind]}: </span>{e.text}</>
                   : <span className="text-slate-400 italic">no {textLabel[e.kind].toLowerCase()} given</span>}
               </div>
+              {rcBits.length > 0 && <div data-receipt-detail className="text-slate-600">{rcBits.join(" · ")}</div>}
             </div>
           </li>
         );
@@ -16846,7 +16862,11 @@ function ModalX({ onClose, disabled = false, label = "Close" }) {
   );
 }
 
-function PendingJobRows({ rows, onChange, inventory = [], accent = "#b45309", addLabel = "+ Add pending job", disabled = false }) {
+function PendingJobRows({ rows, onChange, inventory = [], accent = "#b45309", addLabel = "+ Add pending job", disabled = false, mode = "job" }) {
+  // mode "item" (BOM Outward → Add Pending Item): an item with a name, a
+  // pending quantity and a Critical Yes / No choice; the free-text line is a
+  // note. mode "job" (Finish & Transfer, Accept, Report Issue): unchanged.
+  const itemMode = mode === "item";
   const list = (Array.isArray(rows) ? rows : []).map(normalizePendingJob);
   const set = (i, patch) => onChange(list.map((r, idx) => idx === i ? { ...r, ...patch } : r));
   const codes = inventory.slice(0, 2000);
@@ -16866,7 +16886,7 @@ function PendingJobRows({ rows, onChange, inventory = [], accent = "#b45309", ad
           <div className="flex gap-2">
             <input value={r.description} disabled={disabled}
                    onChange={(e) => set(i, { description: e.target.value })}
-                   placeholder="What is pending? e.g. fit the gearbox cover once it arrives"
+                   placeholder={itemMode ? "Note (optional) — e.g. needed for the gearbox cover" : "What is pending? e.g. fit the gearbox cover once it arrives"}
                    className={`flex-1 min-w-0 ${inp}`} style={bd} />
             <button type="button" disabled={disabled} onClick={() => onChange(list.filter((_, idx) => idx !== i))}
                     className="text-[11px] font-bold text-slate-500 hover:text-red-600 px-2 rounded-lg border border-slate-200 flex-shrink-0">
@@ -16883,7 +16903,7 @@ function PendingJobRows({ rows, onChange, inventory = [], accent = "#b45309", ad
                    placeholder="Part / item code" className={`${inp} font-mono`} style={bd} />
             <input type="number" min="0" step="any" value={r.qty} disabled={disabled}
                    onChange={(e) => set(i, { qty: e.target.value })}
-                   placeholder="Qty" className={`${inp} text-right`} style={bd} />
+                   placeholder={itemMode ? "Pending qty *" : "Qty"} data-job-qty-input className={`${inp} text-right`} style={bd} />
             <input value={r.reason} disabled={disabled}
                    onChange={(e) => set(i, { reason: e.target.value })}
                    placeholder="Reason — e.g. not in store, on order, damaged"
@@ -16895,14 +16915,15 @@ function PendingJobRows({ rows, onChange, inventory = [], accent = "#b45309", ad
           <div className="grid grid-cols-1 sm:grid-cols-[1fr_150px] gap-1.5">
             <input value={r.itemName} disabled={disabled} data-job-name
                    onChange={(e) => set(i, { itemName: e.target.value })}
-                   placeholder={invHit(r.itemCode) ? "Item name" : "Item name — type it if the part is not in Item Master"}
+                   placeholder={itemMode ? "Item name *" : invHit(r.itemCode) ? "Item name" : "Item name — type it if the part is not in Item Master"}
                    className={inp} style={bd} />
             <input value={r.partSerialNo} disabled={disabled} data-job-serial
                    onChange={(e) => set(i, { partSerialNo: e.target.value })}
                    placeholder="Part serial no. (optional)" className={`${inp} font-mono`} style={bd} />
           </div>
           <div className="flex items-center gap-1.5" data-job-class>
-            {[["normal", "Normal"], ["critical", "Critical"]].map(([k, label]) => {
+            {itemMode && <span className="text-[10.5px] font-bold text-slate-600 mr-0.5">Critical item?</span>}
+            {[["normal", itemMode ? "No" : "Normal"], ["critical", itemMode ? "Yes" : "Critical"]].map(([k, label]) => {
               const on = (k === "critical") === !!r.critical;
               const col = k === "critical" ? "#dc2626" : "#15803d";
               return (
@@ -17171,23 +17192,12 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
     // slot yet. See src/utils/checklistLogic.js:pickTemplate for the cascade.
     const template = pickTemplate(checklistTemplates, machine.bomKey, fromDepartment, "before_dispatch");
     const answers  = template ? startChecklistResponse(template) : [];
-    // Migration 029 — multi-worker + Main Employee picker init. Operator just
-    // clicked Finish & Transfer; nothing selected yet.
-    // Remembered crew. The same two or three fitters work this department
-    // every day, and this modal used to open with nothing selected every
-    // single time. reconcileTeam drops anyone no longer eligible, so somebody
-    // who left the company or was deactivated in Settings can never come back
-    // pre-ticked — which would be the ERP claiming they worked on a machine
-    // when nobody said so. It stays a pre-selection the operator can change in
-    // one tap; what gets recorded is only ever what they confirmed on screen.
-    //
-    // The signature is deliberately NOT remembered: mainSigSvg stays null and
-    // the pad is shown as always. A pre-filled signature would be a forgery.
-    const recalled     = readTeamMemory("finish", fromDepartment);
-    const recalledTeam = reconcileTeam(recalled.members, eligibleWorkerIds(fromDepartment));
-    const recalledMain = pickRememberedMain(recalledTeam, recalled.mainId);
+    // 2026-11-02 — Transfer does not ask for or log employee names. The
+    // transfer is recorded under the logged-in user (sentBy) and their own
+    // signature; the department that is handing over is the responsibility
+    // record. (Accept keeps its employee logging exactly as before.)
     setFinishModal({ machine, toDepartment, narration: "", template, answers,
-                     workedBy: recalledTeam, mainEmployeeId: recalledMain,
+                     workedBy: [], mainEmployeeId: currentUser?.id || null,
                      mainSigSvg: null, mainSigNeeded: false,
                      // Phase 1 — jobs this department still owes after handing over.
                      owedItems: [] });
@@ -17272,8 +17282,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
   const submitFinishTransfer = async () => {
     if (!finishModal || transferBusy) return;
     const { machine, toDepartment, narration, template, answers,
-            workedBy = [], mainEmployeeId = null, mainSigSvg = null,
-            owedItems = [], actingMainId = null } = finishModal;
+            mainSigSvg = null, owedItems = [] } = finishModal;
     const fromDepartment = machine.currentDepartment || machine.stage;
     // Migration 027 — prefer the per-machine override captured at Outward.
     // Falls back to the live workflow setting for machines created before
@@ -17296,48 +17305,14 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
         return;
       }
     }
-    // Feature 3/4 — validate workers + Main Employee + signature.
-    // Split auth-user UUIDs from "emp:xxx" display-name worker IDs.
-    const authWorkedBy = (Array.isArray(workedBy) ? workedBy : []).filter((id) => !String(id).startsWith("emp:"));
-    const empWorkedBy  = (Array.isArray(workedBy) ? workedBy : []).filter((id) =>  String(id).startsWith("emp:"));
-    if (!Array.isArray(workedBy) || workedBy.length === 0) {
-      showToast("Workers required", `Pick at least one worker from ${fromDepartment}.`, "warning");
-      return;
-    }
-    if (!mainEmployeeId || !workedBy.includes(mainEmployeeId)) {
-      showToast("Main Employee required", "Pick the Main / Responsible Employee.", "warning");
-      return;
-    }
-    // 2026-10-31 — the Main Employee may be a Settings → Employees member
-    // without an ERP login. The DB uuid column takes a login id only; the
-    // employee is identified by main_employee_ref / _name and the snapshot.
-    const mainIsLogin = !String(mainEmployeeId).startsWith("emp:");
+    // 2026-11-02 — the transferring user signs for their own department's
+    // work. No worker / main-employee names are collected at Transfer.
+    if (!currentUser?.id) { showToast("Not signed in", "Sign in again to transfer.", "warning"); return; }
     if (!mainSigSvg || !String(mainSigSvg).trim()) {
-      showToast("Signature required", "The Main Employee must sign to confirm this department's work.", "warning");
+      showToast("Signature required", "Sign to confirm this department's work before transferring.", "warning");
       return;
     }
-    // Build a full snapshot including both auth users and display-name employees.
-    // Only UUID auth workers go into the DB's worked_by uuid[] column.
-    const workedBySnapshot = workedBy.map((id) => {
-      if (String(id).startsWith("emp:")) {
-        const empId = id.slice(4);
-        const m = (settings?.employeeMembers || []).find((x) => x.id === empId);
-        return { id, type: "emp", name: m?.name || empId, main: id === mainEmployeeId || undefined };
-      }
-      const u = (allUsers || []).find((x) => x.id === id);
-      const entry = { id, type: "auth", fullName: u?.fullName || null, username: u?.username || null, main: id === mainEmployeeId || undefined };
-      // 2026-10-30 — acting Main Employee, assigned by an admin.
-      if (actingMainId && id === actingMainId) {
-        entry.acting = true;
-        entry.actingAssignedBy = currentUser?.id || null;
-        entry.actingAssignedByName = currentUser?.fullName || currentUser?.username || null;
-      }
-      return entry;
-    });
-    if (actingMainId && (!isAdminUser || actingMainId !== mainEmployeeId)) {
-      showToast("Acting Main Employee", "Only an admin can assign an Acting Main Employee, and they must be the Main Employee who signs.", "warning");
-      return;
-    }
+    const transferrerName = currentUser.fullName || currentUser.username || null;
     setTransferBusy(true);
     try {
       const res = await onFinishTransfer({
@@ -17349,28 +17324,22 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
         overrunNarration: narration.trim() || null,
         checklistTemplate: template || null,
         checklistAnswers:  Array.isArray(answers) ? answers : [],
-        workedBy:          authWorkedBy,   // only real UUIDs for the DB column
-        workedBySnapshot,                  // full snapshot including emp members
+        workedBy:          [],             // Transfer logs no employee names
+        workedBySnapshot:  null,
         // Phase 1 — jobs this department still owes on the machine it is
         // handing over. Recorded against fromDepartment, not the receiver.
         owedItems:         cleanPendingJobs(owedItems),
-        mainEmployeeId: mainIsLogin ? mainEmployeeId : null,
-        mainEmployeeRef: mainEmployeeId,
-        mainEmployeeName: (workedBySnapshot.find((w) => w.id === mainEmployeeId) || {}).name || (workedBySnapshot.find((w) => w.id === mainEmployeeId) || {}).fullName || null,
+        // The signer is the logged-in user who is transferring (not a picked employee).
+        mainEmployeeId: currentUser.id,
+        mainEmployeeRef: currentUser.id,
+        mainEmployeeName: transferrerName,
         mainEmployeeSignatureSvg: mainSigSvg,
-        actingMainEmployeeId: actingMainId || null,
+        actingMainEmployeeId: null,
       });
       if (res && res.success === false) {
         showToast("Transfer failed", res.error || "Unknown error", "urgent");
         return;
       }
-      // Remember this crew for the next machine through this department.
-      // Only after a confirmed, successful transfer — a failed or abandoned
-      // handover teaches us nothing.
-      // An acting Main Employee is a one-off; never remember them as crew.
-      writeTeamMemory("finish", fromDepartment,
-        actingMainId ? workedBy.filter((x) => x !== actingMainId) : workedBy,
-        actingMainId && mainEmployeeId === actingMainId ? null : mainEmployeeId);
       setFinishModal(null);
       const backToRack = !!machine.rackSlot && fromDepartment === "Assembly" && isRackReleaseHop(fromDepartment, toDepartment);
       showToast(backToRack ? `${machine.bomKey}${machine.serialNo ? ` — ${machine.serialNo}` : ""} · Assembled · Ready` : `${machine.bomKey} → ${toDepartment}`,
@@ -17621,9 +17590,11 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                           ? { label: "✓ Completed", bg: "rgba(22,163,74,0.1)", fg: "#15803d" }
                           : stage === "received"
                           ? { label: "Part received · finish work", bg: "rgba(37,99,235,0.1)", fg: "#1d4ed8" }
-                          : { label: p.itemCode ? "Awaiting part" : "Awaiting work", bg: "rgba(217,119,6,0.12)", fg: "#b45309" };
+                          : stage === "partial"
+                          ? { label: `Partly received · ${pendingItemRemaining(p)} left`, bg: "rgba(37,99,235,0.1)", fg: "#1d4ed8" }
+                          : { label: p.itemCode || p.itemName ? "Awaiting part" : "Awaiting work", bg: "rgba(217,119,6,0.12)", fg: "#b45309" };
                         return (
-                          <div key={p.id} className="px-3 py-2.5 flex items-start gap-3 flex-wrap">
+                          <div key={p.id} data-job-row={p.id} className="px-3 py-2.5 flex items-start gap-3 flex-wrap">
                             <div className="flex-1 min-w-[200px]">
                               <div className="text-[12px] text-slate-800 font-semibold">{p.description}</div>
                               {(p.itemCode || p.itemName) && (
@@ -17632,6 +17603,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                     ? <><span className="font-mono font-bold text-slate-700">{p.itemCode}</span>{p.itemName ? ` · ${p.itemName}` : ""}</>
                                     : <span className="font-bold text-slate-700">{p.itemName}</span>}
                                   {p.qty != null ? ` × ${p.qty}` : ""}
+                                  {p.qty != null && (Number(p.receivedQty) || 0) > 0 ? <span data-job-qty> · {p.receivedQty} received · <b>{pendingItemRemaining(p)} pending</b></span> : null}
                                   {p.partSerialNo ? <> · part S/N <span className="font-mono font-bold text-slate-700">{p.partSerialNo}</span></> : null}
                                   {!p.itemCode && p.itemName ? " · not in Item Master" : ""}
                                 </div>
@@ -17640,6 +17612,12 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                               <JobHistory item={p} users={allUsers} />
                             </div>
                             <div className="flex items-center gap-1.5 flex-wrap">
+                              {p.raisedInDepartment && (
+                                <span data-job-origin className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(99,102,241,0.1)", color: "#4338ca" }}
+                                      title="Department where this job was raised">
+                                  from {p.raisedInDepartment}
+                                </span>
+                              )}
                               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(239,68,68,0.1)", color: "#b91c1c" }}>
                                 {p.assignedDepartment || "Unassigned"}
                               </span>
@@ -18202,6 +18180,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                               {(p.itemCode || p.itemName) ? ` · part ${p.itemCode || p.itemName}${p.qty != null ? ` × ${p.qty}` : ""}` : ""}
                               {p.critical ? " · CRITICAL" : ""}
                               {stage === "received" ? " · part received, finish the work" : ""}
+                              {stage === "partial" ? ` · ${p.receivedQty} received, ${pendingItemRemaining(p)} still pending` : ""}
                             </div>
                           </div>
                           {canJobs && (
@@ -19590,11 +19569,12 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                         // Same modal, same checks (checklist, team, password,
                         // hold reason) as Transfer & Accept; the modal and
                         // the accept handler refuse a second acceptance.
-                        // 2026-11-01 — one Accept button per hand-over: it
-                        // belongs on Transfer & Accept, which is the screen
-                        // for exactly this. The Production card still shows
-                        // who is waiting and the deadline.
-                        const cardCanAccept = mtTab === "transfer" && !!h && h.status === "pending" && canAcceptHandover(canDo, h.toDepartment) && !!onAcceptHandover;
+                        // 2026-11-02 — Accept is on EVERY machine card that is
+                        // waiting for the receiving department, on whichever
+                        // tab it is shown (Production, Transfer & Accept,
+                        // ...): no need to go to another screen. Same role /
+                        // department check as before (canAcceptHandover).
+                        const cardCanAccept = !!h && h.status === "pending" && canAcceptHandover(canDo, h.toDepartment) && !!onAcceptHandover;
                         return (
                           <div className="flex items-center gap-2 flex-wrap">
                             {machineOverdue ? (
@@ -19614,8 +19594,8 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                       disabled={!!acceptModal}
                                       className="text-[11px] font-black text-white px-3 py-1.5 rounded-lg transition-all disabled:opacity-50"
                                       style={{ background: "#15803d", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}
-                                      title={`Accept this machine into ${h.toDepartment}`}>
-                                ✓ Accept Machine
+                                      title={machineOverdue ? `ON HOLD — accept this machine into ${h.toDepartment} to release it (a reason is required)` : `Accept this machine into ${h.toDepartment}`}>
+                                {machineOverdue ? "✓ Accept · release from hold" : "✓ Accept Machine"}
                               </button>
                             )}
                           </div>
@@ -19635,6 +19615,17 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                           {machineOpenItems.length > 0
                             ? `⚠ ${machineOpenItems.length} open issue${machineOpenItems.length === 1 ? "" : "s"}${machineOpenAll.length > machineOpenItems.length ? ` · ${machineOpenAll.length - machineOpenItems.length} owed` : ""}`
                             : `⏳ Pending Jobs · ${machineOpenAll.length}`}
+                        </button>
+                      )}
+                      {/* 2026-11-02 — completed jobs stay visible: when nothing is
+                          open any more, the same drawer is still reachable to
+                          read who completed what, and when. */}
+                      {machineOpenAll.length === 0 && (pendingHandoverItems || []).some((p) => String(p.machineId) === String(machine.id)) && (
+                        <button type="button" data-card-jobs-done={machine.id} onClick={() => setJobsDrawer(machine.id)}
+                                className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg border transition-all"
+                                style={{ background: "rgba(22,163,74,0.06)", border: "1px solid rgba(22,163,74,0.3)", color: "#15803d" }}
+                                title="All pending jobs on this machine are completed — tap to see the completion details">
+                          ✓ Pending Jobs · all done ({(pendingHandoverItems || []).filter((p) => String(p.machineId) === String(machine.id)).length})
                         </button>
                       )}
                       {/* Migration 032 — Certificate view button for Trial-completed machines */}
@@ -19929,7 +19920,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                     ) : (
                                       <>
                                         <span className="text-[9px] font-bold" style={{ color: p.receivedAt ? "#1d4ed8" : "#b45309" }}>
-                                          {p.receivedAt ? "Part received · finish work" : p.itemCode ? "Awaiting part" : "Awaiting work"}
+                                          {p.receivedAt ? "Part received · finish work" : (Number(p.receivedQty) || 0) > 0 ? `Partly received · ${pendingItemRemaining(p)} left` : p.itemCode ? "Awaiting part" : "Awaiting work"}
                                         </span>
                                         {canFinishTransfer(canDo) && onReceivePendingItem && !p.receivedAt && (
                                           <button onClick={() => setJobAction({ item: p, action: "receive", notes: "", busy: false, error: "" })}
@@ -20149,36 +20140,58 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
         // its check points for reference), a normal item the department's
         // physically-received tick. Nothing is recorded until that is given.
         const inv = p.itemCode ? Object.values(items || {}).flatMap((l) => Array.isArray(l) ? l : []).find((i) => i && i.code === p.itemCode) || null : null;
-        const qty = Math.max(1, Number(p.qty) || 1);
-        const critical = !!(inv && inv.isCritical);
-        const inputType = critical && inv.outwardInputType === "serial" ? "serial" : "checkbox";
+        // 2026-11-02 — a receipt is for the quantity that ACTUALLY arrived (it
+        // can be less than what is pending; the rest stays pending). Only that
+        // quantity goes into stock, and every receipt is kept as its own record.
+        const remaining = pendingItemRemaining(p);
+        const qtyText = jobAction.qtyText ?? (remaining != null ? String(remaining) : "");
+        const recvQty = Number(qtyText);
+        const qtyProblem = !isReceive ? "" : (qtyText === "" || !Number.isFinite(recvQty) || recvQty <= 0) ? "Enter the quantity that was actually received."
+          : (remaining != null && recvQty > remaining) ? `Only ${remaining} is still pending — you entered ${recvQty}.` : "";
+        // Critical = the Item Master says so, or the operator classified the
+        // pending item as Critical when raising it (a manual item).
+        const critical = !!(inv && inv.isCritical) || !!p.critical;
+        const inputType = inv && inv.isCritical && inv.outwardInputType === "serial" ? "serial" : "checkbox";
         const checkPoints = inv && Array.isArray(inv.checkPoints) ? inv.checkPoints : [];
+        const serialCount = qtyProblem || !Number.isInteger(recvQty) ? 0 : Math.min(500, recvQty);
         const serials = (jobAction.serials || []).map((x) => String(x || "").trim());
-        const serialProblem = critical && inputType === "serial" ? (() => {
-          const filled = serials.filter(Boolean);
-          if (filled.length < qty) return `Enter all ${qty} serial number${qty === 1 ? "" : "s"} for ${inv.name || p.itemCode}.`;
+        // Serials already recorded on ANY receipt or issued on any machine.
+        const priorSerials = new Set([
+          ...(pendingHandoverItems || []).flatMap((x) => (x.receipts || []).flatMap((r) => (r.verification && r.verification.serials) || [])),
+          ...(outwardLog || []).flatMap((e) => (e.items || []).flatMap((it) => (it.criticalInput?.serials) || [])),
+        ].map((x) => String(x || "").trim().toLowerCase()).filter(Boolean));
+        const serialProblem = (() => {
+          const filled = serials.slice(0, serialCount).filter(Boolean);
           const lower = filled.map((x) => x.toLowerCase());
           if (new Set(lower).size !== lower.length) return "Each unit needs a different serial number.";
-          const used = lower.find((x) => (outwardLog || []).some((e) => (e.items || []).some((it) => (it.criticalInput?.serials || []).some((sv) => String(sv || "").trim().toLowerCase() === x))));
-          if (used) return `Serial "${used}" was already issued to another machine.`;
+          const used = lower.find((x) => priorSerials.has(x));
+          if (used) return `Serial "${used}" has already been recorded.`;
+          if (critical && inputType === "serial") {
+            if (qtyProblem) return "";
+            if (!Number.isInteger(recvQty)) return "A serial-numbered item is received in whole units.";
+            if (filled.length < serialCount) return `Enter all ${serialCount} serial number${serialCount === 1 ? "" : "s"} for ${inv.name || p.itemCode}.`;
+          }
           return "";
-        })() : "";
-        const receiveReady = !isReceive || p.receivedAt || (critical && inputType === "serial" ? !serialProblem : !!jobAction.verified);
-        const receiveWhy = !isReceive || receiveReady ? "" : (critical && inputType === "serial" ? serialProblem : critical ? "Tick the physical verification for this critical item." : "Tick that the part was physically received and checked.");
+        })();
+        const receiveReady = !isReceive || p.receivedAt || (!qtyProblem && !serialProblem && (critical && inputType === "serial" ? true : !!jobAction.verified));
+        const receiveWhy = !isReceive || receiveReady ? "" : (qtyProblem || serialProblem || (critical ? "Tick the physical verification for this critical item." : "Tick that the part was physically received and checked."));
         const submit = async () => {
           if (jobAction.busy) return;
           if (isReceive && !receiveReady) { setJobAction((prev) => prev ? { ...prev, error: receiveWhy } : prev); return; }
           setJobAction((prev) => prev ? { ...prev, busy: true, error: "" } : prev);
+          const filledSerials = serials.slice(0, serialCount).filter(Boolean);
           const verification = isReceive && !p.receivedAt
-            ? (critical && inputType === "serial" ? { kind: "serial", serials: serials.filter(Boolean) } : { kind: "checkbox", critical, verified: true, checkPoints })
+            ? (critical && inputType === "serial"
+                ? { kind: "serial", critical: true, serials: filledSerials }
+                : { kind: "checkbox", critical, verified: true, checkPoints, ...(filledSerials.length ? { serials: filledSerials } : {}) })
             : null;
           const r = isReceive
-            ? await onReceivePendingItem(p.id, { notes: jobAction.notes.trim(), verification })
+            ? await onReceivePendingItem(p.id, { qty: recvQty, notes: jobAction.notes.trim(), verification })
             : await onResolvePendingItem(p.id, { notes: jobAction.notes.trim() });
           if (r && r.success === false) { setJobAction((prev) => prev ? { ...prev, busy: false, error: r.error || "Could not save." } : prev); return; }
           setJobAction(null);
-          showToast(isReceive ? "Part received" : "Work completed",
-                    `${m?.bomKey || ""}${m?.serialNo ? ` · S/N ${m.serialNo}` : ""}${p.itemCode ? ` · ${p.itemCode}` : ""}`);
+          showToast(isReceive ? (r && r.fullyReceived === false ? `Received ${recvQty} · ${r.remainingQty} still pending` : "Part received") : "Work completed",
+                    `${m?.bomKey || ""}${m?.serialNo ? ` · S/N ${m.serialNo}` : ""}${p.itemCode ? ` · ${p.itemCode}` : p.itemName ? ` · ${p.itemName}` : ""}${isReceive && r && r.stockInwarded ? ` · ${recvQty} added to stock` : ""}`);
         };
         return (
           <div className="modal-backdrop fixed inset-0 z-[96] flex items-center justify-center p-4"
@@ -20201,13 +20214,36 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                 <JobHistory item={p} users={allUsers} compact />
               </div>
               {isReceive && !p.receivedAt && (
-                <p className="text-[11px] text-slate-600 mb-2">Confirms the part has arrived for this machine. The job stays open until the work is marked completed.</p>
+                <p className="text-[11px] text-slate-600 mb-2">Records the part arriving for this machine. The job stays open until the work is marked completed.</p>
               )}
-              {isReceive && !p.receivedAt && p.itemCode && (
+              {isReceive && !p.receivedAt && (
+                <div data-receive-qty-box className="rounded-lg px-3 py-2.5 mb-3" style={{ background: "rgba(37,99,235,0.05)", border: "1px solid rgba(37,99,235,0.3)" }}>
+                  <div className="text-[11px] text-slate-600 mb-1.5">
+                    {p.qty != null
+                      ? <>Ordered / pending <b>{p.qty}</b> · received so far <b>{Number(p.receivedQty) || 0}</b> · still pending <b>{remaining}</b></>
+                      : <>No quantity was recorded on this job — enter what arrived.</>}
+                  </div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Quantity received now <span className="text-red-500">*</span></label>
+                  <input type="number" min="0" step="any" inputMode="decimal" data-receive-qty value={qtyText} disabled={jobAction.busy}
+                         onChange={(e) => setJobAction((prev) => prev ? { ...prev, qtyText: e.target.value, error: "" } : prev)}
+                         className="w-32 rounded-lg px-3 py-2 text-[14px] font-bold text-slate-900 outline-none"
+                         style={{ background: "var(--surface-elevated)", border: "1px solid rgba(37,99,235,0.4)" }} />
+                  {!qtyProblem && remaining != null && recvQty < remaining && (
+                    <span data-receive-left className="ml-2 text-[11px] font-semibold text-slate-600">{remaining - recvQty} will stay pending</span>
+                  )}
+                  <div className="text-[10.5px] text-slate-500 mt-1.5">
+                    {p.itemCode && inv
+                      ? <>Only this quantity is added to stock ({inv.name}). The rest stays pending and can be received later.</>
+                      : <>Not in the Item Master — the receipt is recorded on the job, no stock is changed.</>}
+                  </div>
+                  {qtyProblem && <div className="text-[10.5px] font-semibold mt-1" style={{ color: "#dc2626" }}>{qtyProblem}</div>}
+                </div>
+              )}
+              {isReceive && !p.receivedAt && (
                 <div data-receive-verify={critical ? inputType : "normal"} className="rounded-lg px-3 py-2.5 mb-3 space-y-2" style={{ background: critical ? "rgba(239,68,68,0.05)" : "rgba(21,128,61,0.05)", border: `1px solid ${critical ? "rgba(239,68,68,0.3)" : "rgba(21,128,61,0.3)"}` }}>
                   <div className="text-[11px] font-black" style={{ color: critical ? "#b91c1c" : "#15803d" }}>
                     {critical ? `CRITICAL ITEM · ${inputType === "serial" ? "serial number per unit" : "physical verification"}` : "Physical receipt check"}
-                    {!inv && <span className="ml-1 font-semibold text-slate-500">(not in Item Master — treated as a normal item)</span>}
+                    {p.itemCode && !inv && <span className="ml-1 font-semibold text-slate-500">(not in Item Master)</span>}
                   </div>
                   {checkPoints.length > 0 && (
                     <ul className="text-[11px] text-slate-700 space-y-0.5">
@@ -20216,7 +20252,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                   )}
                   {critical && inputType === "serial" ? (
                     <div className="grid grid-cols-2 gap-1.5">
-                      {Array.from({ length: qty }).map((_, idx) => (
+                      {Array.from({ length: serialCount }).map((_, idx) => (
                         <input key={idx} value={serials[idx] || ""} disabled={jobAction.busy} data-receive-serial={idx}
                                onChange={(e) => setJobAction((prev) => { if (!prev) return prev; const next = (prev.serials || []).slice(); next[idx] = e.target.value; return { ...prev, serials: next, error: "" }; })}
                                placeholder={`${inv.name || p.itemCode} serial #${idx + 1}`}
@@ -20225,19 +20261,38 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                       ))}
                     </div>
                   ) : (
-                    <label className="flex items-start gap-2 cursor-pointer text-[11.5px] text-slate-800">
-                      <input type="checkbox" data-receive-check checked={!!jobAction.verified} disabled={jobAction.busy}
-                             onChange={(e) => setJobAction((prev) => prev ? { ...prev, verified: e.target.checked, error: "" } : prev)}
-                             className="w-4 h-4 mt-0.5 accent-emerald-600" />
-                      <span>{critical
-                        ? `I have physically verified ${qty > 1 ? `all ${qty} units of ` : ""}${inv.name || p.itemCode} for this machine.`
-                        : `${p.assignedDepartment || "The department"} has physically received and checked ${inv ? inv.name : p.itemName || p.itemCode}${qty > 1 ? ` (${qty})` : ""}.`}</span>
-                    </label>
+                    <>
+                      <label className="flex items-start gap-2 cursor-pointer text-[11.5px] text-slate-800">
+                        <input type="checkbox" data-receive-check checked={!!jobAction.verified} disabled={jobAction.busy}
+                               onChange={(e) => setJobAction((prev) => prev ? { ...prev, verified: e.target.checked, error: "" } : prev)}
+                               className="w-4 h-4 mt-0.5 accent-emerald-600" />
+                        <span>{critical
+                          ? `I have physically verified ${recvQty > 1 ? `all ${recvQty} units of ` : ""}${(inv && inv.name) || p.itemName || p.itemCode} for this machine.`
+                          : `${p.assignedDepartment || "The department"} has physically received and checked ${inv ? inv.name : p.itemName || p.itemCode || "the part"}${recvQty > 1 ? ` (${recvQty})` : ""}.`}</span>
+                      </label>
+                      {/* A critical item with no serial rule in the Item Master
+                          (a manually named part): serials can still be typed
+                          in, one per unit — optional, not required. */}
+                      {critical && serialCount > 0 && serialCount <= 50 && (
+                        <div data-receive-serials-manual>
+                          <div className="text-[10.5px] text-slate-500 mb-1">Serial numbers (optional — one per unit, if the part has them)</div>
+                          <div className="grid grid-cols-2 gap-1.5">
+                            {Array.from({ length: serialCount }).map((_, idx) => (
+                              <input key={idx} value={serials[idx] || ""} disabled={jobAction.busy} data-receive-serial={idx}
+                                     onChange={(e) => setJobAction((prev) => { if (!prev) return prev; const next = (prev.serials || []).slice(); next[idx] = e.target.value; return { ...prev, serials: next, error: "" }; })}
+                                     placeholder={`serial #${idx + 1}`}
+                                     className="rounded-md px-2 py-1.5 text-[12px] text-slate-900 outline-none"
+                                     style={{ background: "var(--surface-elevated)", border: "1px solid rgba(17,24,39,0.15)" }} />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </>
                   )}
-                  {receiveWhy && <div className="text-[10.5px] font-semibold" style={{ color: "#b45309" }}>{receiveWhy}</div>}
+                  {receiveWhy && !qtyProblem && <div className="text-[10.5px] font-semibold" style={{ color: "#b45309" }}>{receiveWhy}</div>}
                 </div>
               )}
-              {!isReceive && p.itemCode && !p.receivedAt && (
+              {!isReceive && (p.itemCode || p.itemName) && !p.receivedAt && (
                 <p className="text-[11px] font-bold mb-2" style={{ color: "#b45309" }}>This part has not been recorded as received. Mark it completed only if the work is actually done.</p>
               )}
               <label className="block text-[11px] font-bold text-slate-600 mb-1">{isReceive ? "Receive remark / reason (optional)" : "Completion note (optional)"}</label>
@@ -20260,7 +20315,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                         title={isReceive && !receiveReady ? receiveWhy : ""}
                         className="flex-[2] h-11 rounded-lg text-[13px] font-black text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                         style={{ background: isReceive ? "#1d4ed8" : "linear-gradient(135deg,#16a34a,#15803d)", color: "#ffffff" }}>
-                  {jobAction.busy ? "Saving…" : isReceive ? "✓ Part received" : "✓ Work completed"}
+                  {jobAction.busy ? "Saving…" : isReceive ? (remaining != null && recvQty > 0 && recvQty < remaining ? `✓ Receive ${recvQty} · ${remaining - recvQty} stays pending` : "✓ Part received") : "✓ Work completed"}
                 </button>
               </div>
             </div>
@@ -20722,182 +20777,30 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                   </div>
                 )}
 
-                {/* ── Migration 029 + Feature 3/4 — Workers + Main Employee picker ── */}
-                {(() => {
-                  // Auth users assigned to this dept (ERP login accounts)
-                  const deptUsers = (allUsers || []).filter((u) => u && u.status !== "disabled"
-                    && Array.isArray(u.departments) && u.departments.includes(fromDepartment));
-                  // Employee members from settings (factory workers without ERP logins)
-                  const deptEmpMembers = (settings?.employeeMembers || []).filter((m) => m && m.active
-                    && Array.isArray(m.departments) && m.departments.includes(fromDepartment));
-                  const hasAnyWorkers = deptUsers.length > 0 || deptEmpMembers.length > 0;
-                  const workedBy  = Array.isArray(finishModal.workedBy) ? finishModal.workedBy : [];
-                  const mainId    = finishModal.mainEmployeeId || null;
-                  // unassigned auth users
-                  const unassignedUsers = deptUsers.filter((u) => !workedBy.includes(u.id));
-                  // unassigned emp members (synthetic IDs prefixed with "emp:")
-                  const unassignedEmps  = deptEmpMembers.filter((m) => !workedBy.includes(`emp:${m.id}`));
-                  const addWorker = (id) => {
-                    setFinishModal((prev) => {
-                      if (!prev) return prev;
-                      if (!id || prev.workedBy.includes(id)) return prev;
-                      const nextList = [...prev.workedBy, id];
-                      // Auto-pick Main Employee only when it's the first AUTH-user worker (emp members can't sign).
-                      const isAuth = !id.startsWith("emp:");
-                      const nextMain = prev.mainEmployeeId || (isAuth && nextList.filter((x) => !x.startsWith("emp:")).length === 1 ? id : null);
-                      return { ...prev, workedBy: nextList, mainEmployeeId: nextMain };
-                    });
-                  };
-                  const removeWorker = (id) => {
-                    setFinishModal((prev) => {
-                      if (!prev) return prev;
-                      const nextList = prev.workedBy.filter((x) => x !== id);
-                      const nextMain = prev.mainEmployeeId === id ? (nextList.find((x) => !x.startsWith("emp:")) || null) : prev.mainEmployeeId;
-                      return { ...prev, workedBy: nextList, mainEmployeeId: nextMain, mainSigSvg: null, mainSigNeeded: false,
-                               actingMainId: prev.actingMainId === id ? null : prev.actingMainId };
-                    });
-                  };
-                  const setMain = (id) => setFinishModal((prev) => prev ? { ...prev, mainEmployeeId: id, mainSigSvg: null, mainSigNeeded: false } : prev);
-                  const chipName = (id) => {
-                    if (id.startsWith("emp:")) {
-                      const empId = id.slice(4);
-                      return (settings?.employeeMembers || []).find((m) => m.id === empId)?.name || id;
-                    }
-                    const u = (allUsers || []).find((x) => x.id === id);
-                    return u ? (u.fullName || u.username || id) : id;
-                  };
-                  // Workers eligible to be Main (auth users only — emp members can't sign)
-                  const authWorkedBy = workedBy.filter((id) => !id.startsWith("emp:"));
-                  // 2026-10-30 — Acting Main Employee. When the department's
-                  // regular Main Employee is unavailable, an admin may assign
-                  // another ERP user to act for them. They are added to the
-                  // workers, become Main, and must still sign. Recorded on the
-                  // handover snapshot and in the audit trail as "acting".
-                  const actingId = finishModal.actingMainId || null;
-                  const actingChoices = isAdminUser
-                    ? (allUsers || []).filter((u) => u && u.status !== "disabled" && !workedBy.includes(u.id)
-                        && !(Array.isArray(u.departments) && u.departments.includes(fromDepartment)))
-                    : [];
-                  const assignActing = (id) => setFinishModal((prev) => {
-                    if (!prev || !id) return prev;
-                    const base = (prev.workedBy || []).filter((x) => x !== prev.actingMainId);
-                    return { ...prev, workedBy: [...base, id], mainEmployeeId: id, actingMainId: id, mainSigSvg: null, mainSigNeeded: false };
-                  });
-                  const actingBlock = isAdminUser && (actingChoices.length > 0 || actingId) ? (
-                    <div className="mt-3 pt-3 border-t border-slate-200">
-                      <div className="text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1">Regular Main Employee unavailable?</div>
-                      {actingId ? (
-                        <div className="rounded-lg px-3 py-2 flex items-center gap-2 flex-wrap bg-amber-50 border border-amber-200">
-                          <span className="text-[11px] font-bold text-amber-800">Acting Main Employee: {chipName(actingId)}</span>
-                          <span className="text-[10px] text-amber-700">assigned by {currentUser?.fullName || currentUser?.username || "admin"}</span>
-                          <button type="button" onClick={() => removeWorker(actingId)}
-                                  className="ml-auto text-[10px] text-slate-500 hover:text-red-500 underline">Remove</button>
-                        </div>
-                      ) : (
-                        <select value="" onChange={(e) => { if (e.target.value) assignActing(e.target.value); }}
-                                aria-label="Assign Acting Main Employee"
-                                className="w-full bg-white border border-amber-300 rounded-md px-2 py-1.5 text-[11px] text-slate-900 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-50 transition-colors">
-                          <option value="">Admin: assign an Acting Main Employee…</option>
-                          {actingChoices.map((u) => (
-                            <option key={u.id} value={u.id}>{u.fullName || u.username}{u.username && u.fullName ? ` (${u.username})` : ""}</option>
-                          ))}
-                        </select>
-                      )}
-                      <div className="text-[10px] text-slate-500 mt-1">The acting employee is added to the workers, becomes Main and must sign below.</div>
+                {/* ── Transfer signature (2026-11-02) ──
+                    Transfer asks for no employee names: the logged-in user is
+                    the transferer and signs for the department's work. */}
+                <div className="rounded-xl border border-slate-200 bg-white px-3 py-3" data-transfer-sign>
+                  <div className="text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1">
+                    Signature <span className="text-red-500 ml-0.5">*</span>
+                  </div>
+                  <div className="text-[10px] text-slate-500 mb-2">
+                    Transferred by <span className="font-bold text-slate-900">{currentUser?.fullName || currentUser?.username || "you"}</span> · {fromDepartment}. Sign to confirm this department's work.
+                  </div>
+                  {finishModal.mainSigSvg ? (
+                    <div className="rounded-lg px-3 py-2 flex items-center gap-2 bg-emerald-50 border border-emerald-200">
+                      <span className="text-[11px] font-bold text-emerald-700">✓ Signature captured</span>
+                      <button onClick={() => setFinishModal((prev) => prev ? { ...prev, mainSigSvg: null, mainSigNeeded: false } : prev)}
+                              className="ml-auto text-[10px] text-slate-400 hover:text-red-500 underline">
+                        Re-sign
+                      </button>
                     </div>
-                  ) : null;
-                  // 2026-10-31 — compact one-row picker. Every employee of the
-                  // department is selectable (ERP logins and Settings →
-                  // Employees alike): exactly one Main / Responsible Employee
-                  // (who signs) and any number of working employees.
-                  const people = [
-                    ...deptUsers.map((u) => ({ id: u.id, name: u.fullName || u.username || u.id, login: true })),
-                    ...deptEmpMembers.map((m) => ({ id: `emp:${m.id}`, name: m.name, login: false })),
-                  ];
-                  const others = workedBy.filter((id) => id !== mainId);
-                  const chooseMain = (id) => setFinishModal((prev) => {
-                    if (!prev) return prev;
-                    const rest = (prev.workedBy || []).filter((x) => x !== id && x !== prev.mainEmployeeId);
-                    return { ...prev, workedBy: id ? [id, ...rest] : rest, mainEmployeeId: id || null, mainSigSvg: null, mainSigNeeded: false, actingMainId: prev.actingMainId === prev.mainEmployeeId ? null : prev.actingMainId };
-                  });
-                  const toggleWorker = (id) => setFinishModal((prev) => {
-                    if (!prev || id === prev.mainEmployeeId) return prev;
-                    const has = (prev.workedBy || []).includes(id);
-                    return { ...prev, workedBy: has ? prev.workedBy.filter((x) => x !== id) : [...prev.workedBy, id] };
-                  });
-                  return (
-                    <div className="rounded-xl border border-slate-200 bg-white px-3 py-3">
-                      {!hasAnyWorkers && !actingId ? (
-                        <div className="rounded-lg px-2 py-2 text-[11px] font-semibold text-red-600 bg-red-50 border border-red-200">
-                          ⚠ No employees are assigned to {fromDepartment} yet. Ask an admin to assign workers in Settings → Department Workflow or add them in Settings → Employees.
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2" data-team-picker>
-                          <div>
-                            <div className="text-[10px] font-black text-slate-700 uppercase tracking-wider mb-1">Main / Responsible Employee <span className="text-red-500">*</span> <span className="font-semibold normal-case text-slate-500">(signs)</span></div>
-                            <select value={mainId || ""} onChange={(e) => chooseMain(e.target.value)} data-main-select
-                                    className="w-full bg-white border border-amber-300 rounded-md px-2 py-2 text-[12px] text-slate-900 outline-none focus:border-amber-400">
-                              <option value="">— Pick one —</option>
-                              {people.map((x) => <option key={x.id} value={x.id}>{x.name}{x.login ? "" : " (no login)"}</option>)}
-                              {actingId && !people.some((x) => x.id === actingId) && <option value={actingId}>{chipName(actingId)} (acting)</option>}
-                            </select>
-                          </div>
-                          <div>
-                            <div className="text-[10px] font-black text-slate-700 uppercase tracking-wider mb-1">Working employees <span className="font-semibold normal-case text-slate-500">(with the main employee)</span></div>
-                            <div className="flex flex-wrap gap-1" data-worker-chips>
-                              {people.filter((x) => x.id !== mainId).map((x) => {
-                                const on = others.includes(x.id);
-                                return (
-                                  <button key={x.id} type="button" onClick={() => toggleWorker(x.id)} aria-pressed={on} data-worker={x.id}
-                                          className="text-[11px] font-bold px-2 py-1 rounded-md border transition-all"
-                                          style={on ? { background: "#15803d", color: "#fff", borderColor: "#15803d" } : { background: "#fff", color: "#334155", borderColor: "rgba(17,24,39,0.18)" }}>
-                                    {on ? "✓ " : ""}{x.name}
-                                  </button>
-                                );
-                              })}
-                              {people.filter((x) => x.id !== mainId).length === 0 && <span className="text-[10.5px] text-slate-500">No other employee in {fromDepartment}.</span>}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {actingBlock}
-
-                      {/* Main Employee signature capture. Only the main
-                          employee signs this department's work. If their
-                          saved signature is missing, pad shows up inline. */}
-                      {mainId && (() => {
-                        const mainUser = (allUsers || []).find((u) => u.id === mainId);
-                        const isCurrentUser = currentUser && mainId === currentUser.id;
-                        const haveSig = !!finishModal.mainSigSvg;
-                        return (
-                          <div className="mt-3 pt-3 border-t border-slate-200">
-                            <div className="text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1">
-                              Main Employee signature <span className="text-red-500 ml-0.5">*</span>
-                            </div>
-                            <div className="text-[10px] text-slate-500 mb-2">
-                              <span className="font-bold text-slate-900">{chipName(mainId)}</span> must sign to confirm this department's work.
-                              {!isCurrentUser && " (Hand the device to them to sign now.)"}
-                            </div>
-                            {haveSig ? (
-                              <div className="rounded-lg px-3 py-2 flex items-center gap-2 bg-emerald-50 border border-emerald-200">
-                                <span className="text-[11px] font-bold text-emerald-700">✓ Signature captured</span>
-                                <button onClick={() => setFinishModal((prev) => prev ? { ...prev, mainSigSvg: null, mainSigNeeded: false } : prev)}
-                                        className="ml-auto text-[10px] text-slate-400 hover:text-red-500 underline">
-                                  Re-sign
-                                </button>
-                              </div>
-                            ) : (
-                              <SignaturePad light
-                                onSave={(svg) => setFinishModal((prev) => prev ? { ...prev, mainSigSvg: svg } : prev)}
-                              />
-                            )}
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  );
-                })()}
+                  ) : (
+                    <SignaturePad light
+                      onSave={(svg) => setFinishModal((prev) => prev ? { ...prev, mainSigSvg: svg } : prev)}
+                    />
+                  )}
+                </div>
 
                 {/* Phase B — Department checklist (if a template exists for this dept) */}
                 {finishModal.template && Array.isArray(finishModal.answers) && finishModal.answers.length > 0 && (
@@ -23568,6 +23471,7 @@ export default function App() {
   const rackSlotReservationRef = useRef(null);
   // Pending parts being issued right now (double-click / double-submit guard).
   const issuePendingRef = useRef(new Set());
+  const receivePartRef = useRef(new Set());
   // Rack releases in flight (double-click / double-submit guard).
   const releaseBusyRef = useRef(new Set());
   // "Fill Rack" → open that rack's own BOM in the embedded Outward section.
@@ -25204,6 +25108,9 @@ export default function App() {
         description: `Part not issued at BOM Outward: ${it.name || it.code}${qtyTxt} (${bomKey}${serialNo ? ` · S/N ${serialNo}` : ""}${rackTxt})`,
         kind: "owed",
         itemCode: it.code, itemName: it.name || "", qty: it.qty || null, reason: it.remark || "",
+        // Only critical lines can be "Not verified" at Outward, so these are
+        // critical pending jobs (migration 052 `source` = 'not_issued').
+        critical: true, source: "not_issued",
       }).then((pr) => {
         if (!pr.success) {
           console.warn("[App] not-issued pending job save failed", pr.error);
@@ -26579,32 +26486,56 @@ export default function App() {
 
   // 2026-10-30 — the responsible department records that the missing part has
   // arrived. The job stays open until "Work completed" (resolve) closes it.
-  const handleReceivePendingItem = async (id, { notes, verification = null }) => {
+  const handleReceivePendingItem = async (id, { qty, notes, verification = null }) => {
+    if (!currentUser?.id) return { success: false, error: "Not authenticated" };
+    if (!canFinishTransfer(authCanDo)) return { success: false, error: "You do not have permission to record a received part (Machines → Finish & Transfer)." };
     const p = pendingHandoverItems.find((x) => x.id === id);
-    // 2026-10-31 — the verification collected in the popup (critical serials
-    // or the physical-receipt tick) is part of the permanent receive note.
-    const vTxt = verification
-      ? (verification.kind === "serial" ? `Serial${verification.serials.length === 1 ? "" : "s"}: ${verification.serials.join(", ")}` : (verification.critical ? "Critical item physically verified" : "Physically received & checked"))
-      : "";
-    notes = [vTxt, String(notes || "").trim()].filter(Boolean).join(" · ");
-    const machine = p ? machineLog.find((m) => String(m.id) === String(p.machineId)) || null : null;
-    // The receipt is recorded by the department responsible for the job;
-    // falls back to where the machine is now. History entry 2 of 3.
-    const receivedInDepartment = p?.assignedDepartment || machine?.currentDepartment || machine?.stage || "";
-    const res = await receivePendingItem(id, { receivedBy: currentUser?.id, notes, receivedInDepartment });
-    if (!res.success) return res;
-    const receivedAt = res.item?.receivedAt || new Date().toISOString();
-    setPendingHandoverItems((prev) => prev.map((x) => x.id === id
-      ? { ...x, receivedAt, receivedBy: currentUser?.id, receivedNotes: notes || "",
-          receivedInDepartment: res.item?.receivedInDepartment || receivedInDepartment }
-      : x));
-    logAudit({
-      type: "pending_item_received", module: "Machine",
-      action: `Part received${p?.itemCode ? ` (${p.itemCode}${p.qty ? ` × ${p.qty}` : ""})` : ""}${machine ? ` for ${machine.bomKey}${machine.serialNo ? ` [${machine.serialNo}]` : ""}` : ""}`,
-      ref: machine?.bomKey || "", serialNo: machine?.serialNo || "",
-      details: { itemId: id, itemCode: p?.itemCode || undefined, qty: p?.qty ?? undefined, assignedDepartment: p?.assignedDepartment || undefined, receivedInDepartment, notes: notes || "", originalReason: p?.reason || undefined, verification: verification || undefined },
-    });
-    return res;
+    if (!p) return { success: false, error: "Pending job not found." };
+    // 2026-11-02 — receive the quantity that actually arrived. One receipt per
+    // call, never merged: the database function checks the quantity against
+    // what is still pending, inwards stock for THAT quantity only (when the
+    // part is in the Item Master), keeps the remainder pending and writes the
+    // receipt row. A double click / second device cannot inward twice — the
+    // second call sees the new running total.
+    const recvQty = Number(qty);
+    if (!Number.isFinite(recvQty) || recvQty <= 0) return { success: false, error: "Enter the quantity that was actually received." };
+    if (receivePartRef.current.has(id)) return { success: false, error: "This receipt is already being saved." };
+    receivePartRef.current.add(id);
+    try {
+      const machine = machineLog.find((m) => String(m.id) === String(p.machineId)) || null;
+      // The receipt is recorded by the department responsible for the job;
+      // falls back to where the machine is now.
+      const receivedInDepartment = p.assignedDepartment || machine?.currentDepartment || machine?.stage || "";
+      const byName = currentUser.fullName || currentUser.username || "";
+      const res = await receivePendingPart(id, { qty: recvQty, notes: String(notes || "").trim(), verification, department: receivedInDepartment, receivedBy: currentUser.id, receivedByName: byName });
+      if (!res.success) return res;
+      // Local mode keeps stock in the browser: move it here. With Supabase the
+      // database function already did, so just re-read the items.
+      const cat = p.itemCode ? Object.keys(items || {}).find((c) => (items[c] || []).some((i) => i && i.code === p.itemCode)) : null;
+      let stockInwarded = !!res.stockInwarded;
+      if (!isSupabaseEnabled() && cat) {
+        const mv = await handleUpdateStock(cat, p.itemCode, +recvQty, `Pending part received: ${machine?.bomKey || ""}${machine?.serialNo ? ` [${machine.serialNo}]` : ""}`);
+        stockInwarded = !(mv && mv.success === false);
+      } else if (stockInwarded) {
+        reconcileItems();
+      }
+      const receipt = { ...res.receipt, stockInwarded };
+      setPendingHandoverItems((prev) => prev.map((x) => x.id === id
+        ? { ...x,
+            receivedQty: (Number(x.receivedQty) || 0) + recvQty,
+            receipts: [...(x.receipts || []), receipt],
+            ...(res.fullyReceived ? { receivedAt: receipt.receivedAt, receivedBy: currentUser.id, receivedNotes: String(notes || "").trim(), receivedInDepartment } : {}) }
+        : x));
+      logAudit({
+        type: "pending_item_received", module: "Machine",
+        action: `Part received × ${recvQty}${p.itemCode ? ` (${p.itemCode})` : p.itemName ? ` (${p.itemName})` : ""}${res.remainingQty != null ? ` · ${res.remainingQty} still pending` : ""}${machine ? ` for ${machine.bomKey}${machine.serialNo ? ` [${machine.serialNo}]` : ""}` : ""}`,
+        ref: machine?.bomKey || "", serialNo: machine?.serialNo || "",
+        details: { itemId: id, receiptId: receipt.id, itemCode: p.itemCode || undefined, itemName: p.itemName || undefined, qtyReceived: recvQty, qtyPendingBefore: p.qty ?? undefined, remainingQty: res.remainingQty ?? undefined, fullyReceived: !!res.fullyReceived, stockInwarded, assignedDepartment: p.assignedDepartment || undefined, receivedInDepartment, notes: String(notes || "").trim(), originalReason: p.reason || undefined, verification: verification || undefined },
+      });
+      return { ...res, stockInwarded };
+    } finally {
+      receivePartRef.current.delete(id);
+    }
   };
 
   // 2026-10-31 — a part that was Not Issued at BOM Outward is now physically
@@ -26623,6 +26554,7 @@ export default function App() {
     const p = pendingHandoverItems.find((x) => x.id === id);
     if (!p || p.status === "resolved") return { success: false, error: "This pending job is already completed." };
     if (p.receivedAt) return { success: false, error: "This part is already received — mark it completed instead." };
+    if ((Number(p.receivedQty) || 0) > 0) return { success: false, error: "This part is already partly received — record the rest with Part received." };
     const qty = Number(p.qty) || 0;
     if (!p.itemCode || qty <= 0) return { success: false, error: "This job has no item or quantity to issue." };
     const machine = machineLog.find((m) => String(m.id) === String(p.machineId));

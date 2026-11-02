@@ -358,7 +358,8 @@ const USER_FACING_STRINGS = [
   // 2026-10-31 — compact one-row team picker replaced "Workers from" /
   // "+ Add ERP user" / "+ Add factory worker"; the card shows "Team per department".
   "Main / Responsible Employee",
-  "Working employees",
+  // 2026-11-02 — "Working employees" left the Transfer popup on purpose (no employee names at Transfer).
+  "Quantity received now",
   "Team per department",
   "Admin Data Cleanup",
   // 2026-11-02 — cleanup disabled for go-live; "Preview deletion" is gone on purpose.

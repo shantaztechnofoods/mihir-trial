@@ -41,6 +41,14 @@ const seed = () => {
   localStorage.setItem("erp_pending_handover_items", JSON.stringify([
     { id: 1, machineId: 1, description: "Belt guard rattles at full speed", assignedDepartment: "Mechanical", raisedInDepartment: "Trial", kind: "fault", status: "open", raisedAt: h(4), critical: true },
   ]));
+  // 2026-11-02 — pending-part receiving: job 2 = manual CRITICAL item (not in Item Master), job 3 = 100 gearboxes
+  // (in Item Master, stock 10), job 4 = work owed by Electrical, raised in Assembly (another department).
+  const pj = JSON.parse(localStorage.getItem("erp_pending_handover_items"));
+  pj.push({ id: 2, machineId: 1, description: "Cover plate", itemName: "Cover plate", qty: 10, critical: true, assignedDepartment: "Mechanical", raisedInDepartment: "Stores", kind: "owed", status: "open", raisedAt: h(3), reason: "ordered", source: "bom_outward", receivedQty: 0, receipts: [] });
+  pj.push({ id: 3, machineId: 1, description: "Gearbox", itemCode: "GBX", itemName: "Gearbox", qty: 100, assignedDepartment: "Mechanical", raisedInDepartment: "Stores", kind: "owed", status: "open", raisedAt: h(3), reason: "short in store", source: "not_issued", receivedQty: 0, receipts: [] });
+  pj.push({ id: 4, machineId: 1, description: "Wire the panel lamp", assignedDepartment: "Electrical", raisedInDepartment: "Assembly", kind: "owed", status: "open", raisedAt: h(2), reason: "lamp not available", receivedQty: 0, receipts: [] });
+  localStorage.setItem("erp_pending_handover_items", JSON.stringify(pj));
+  localStorage.setItem("erp_items", JSON.stringify({ Mechanical: [{ id: 1, code: "GBX", name: "Gearbox", unit: "Nos", stock: 10, min: 1, status: "safe", trend: [10, 10, 10, 10, 10], history: [], isCritical: false }] }));
   localStorage.setItem("erp_checklist_responses", "[]"); localStorage.setItem("erp_dept_ratings", "[]"); localStorage.setItem("erp_attachments", "[]");
   const s = JSON.parse(localStorage.getItem("erp_settings") || "{}");
   s.employeeMembers = [{ id: "r1", name: "Ramesh Patel", active: true, departments: ["Mechanical", "Electrical"] }, { id: "s1", name: "Suresh Rana", active: true, departments: ["Mechanical"] }];
@@ -97,13 +105,43 @@ ok("open issue on SN-101 did not block anything (still open)", (await ls(p, "erp
 // Finish & Transfer SN-101 → Electrical (signature mandatory)
 await p.locator('[data-staff-finish="1"]').click(); await p.waitForTimeout(800);
 ok("Finish & Transfer modal opens from the staff dashboard", await p.locator("text=Finish & Transfer").count() > 0);
-await p.locator("[data-main-select]").selectOption({ label: "Ramesh Patel (no login)" }); await p.waitForTimeout(300);
+ok("Transfer popup asks for NO employee names (no team picker, no main-employee select)", await p.locator("[data-team-picker], [data-main-select], [data-worker-chips]").count() === 0 && await p.locator("[data-transfer-sign]").count() === 1);
 await draw(p, p.locator("canvas").first()); await p.getByRole("button", { name: "Save Signature" }).click(); await p.waitForTimeout(400);
 await p.locator("button", { hasText: /^Finish & Transfer → Electrical/ }).click(); await p.waitForTimeout(1200);
 hs = await ls(p, "erp_handovers"); ms = await ls(p, "erp_machines");
 const hNew = hs.find((h) => h.machineId === 1 && h.status === "pending");
 ok("pending hand-over created SN-101 Mechanical → Electrical with sender + signature", hNew && hNew.toDepartment === "Electrical" && !!hNew.sentBy && !!(hNew.sentBySignatureId || hNew.mainEmployeeSignatureSvg));
 ok("SN-101 linked to the open hand-over", ms.find((m) => m.id === 1)?.pendingHandoverId === hNew?.id);
+ok("Transfer logged the transferer (signed-in user), no worker names", hNew?.sentBy === "u_mech" && (!hNew.workedBy || hNew.workedBy.length === 0) && !hNew.workedBySnapshot);
+ok("open pending jobs did not block the transfer", (await ls(p, "erp_pending_handover_items")).filter((i) => i.status === "open").length >= 3);
+
+// ── 1b. Part received: partial quantity, stock inward, remaining stays pending ──
+const stockOf = async () => (await ls(p, "erp_items")).Mechanical.find((i) => i.code === "GBX").stock;
+const openReceive = async (id) => { await p.locator(`[data-staff-job="${id}"] button`, { hasText: /^Part received$/ }).click(); await p.waitForTimeout(500); };
+await openReceive(3);
+ok("Part received asks for the quantity, defaulting to what is pending", (await p.locator("[data-receive-qty]").inputValue()) === "100");
+await p.locator("[data-receive-qty]").fill("120"); await p.waitForTimeout(200);
+ok("receiving more than pending is refused in the popup", await p.locator("text=/Only 100 is still pending/").count() > 0 && await p.locator("[data-job-submit]").isDisabled());
+await p.locator("[data-receive-qty]").fill("50"); await p.locator("[data-receive-check]").check(); await p.waitForTimeout(200);
+ok("popup says the other 50 stay pending", await p.locator("[data-receive-left]").innerText().then((t) => /50 will stay pending/.test(t)).catch(() => false));
+await p.locator("[data-job-submit]").click(); await p.waitForTimeout(1000);
+let job3 = (await ls(p, "erp_pending_handover_items")).find((i) => i.id === 3);
+ok("100 pending, 50 received → 50 inwarded to stock (10 → 60)", (await stockOf()) === 60, `stock ${await stockOf()}`);
+ok("job keeps 50 pending, stays open, one receipt with employee + time + remaining", job3.status === "open" && job3.receivedQty === 50 && !job3.receivedAt && job3.receipts.length === 1 && job3.receipts[0].qtyReceived === 50 && job3.receipts[0].remainingQty === 50 && !!job3.receipts[0].receivedAt && job3.receipts[0].receivedBy === "u_mech");
+await openReceive(3);
+ok("second receipt defaults to the 50 still pending", (await p.locator("[data-receive-qty]").inputValue()) === "50");
+await p.locator("[data-receive-check]").check(); await p.locator("[data-job-submit]").click(); await p.waitForTimeout(1000);
+job3 = (await ls(p, "erp_pending_handover_items")).find((i) => i.id === 3);
+ok("final 50 received → stock 110, both receipts kept, receive step closed", (await stockOf()) === 110 && job3.receipts.length === 2 && !!job3.receivedAt && job3.receipts[0].qtyReceived === 50, `stock ${await stockOf()}`);
+ok("no double inward: no Part received button left on the fully received job", await p.locator('[data-staff-job="3"] button', { hasText: /^Part received$/ }).count() === 0);
+// critical manual item: verification required, serials optional, stock untouched
+await openReceive(2);
+ok("critical manual item shows the critical verification block", await p.locator('[data-receive-verify="checkbox"]').count() === 1 && await p.locator("text=/CRITICAL ITEM/").count() > 0);
+await p.locator("[data-receive-qty]").fill("4");
+ok("critical receipt cannot be saved without the verification tick", await p.locator("[data-job-submit]").isDisabled());
+await p.locator("[data-receive-check]").check(); await p.locator("[data-receive-serial]").first().fill("CP-1"); await p.locator("[data-job-submit]").click(); await p.waitForTimeout(1000);
+const job2 = (await ls(p, "erp_pending_handover_items")).find((i) => i.id === 2);
+ok("critical partial receipt: 4 of 10, 6 pending, verification + serial recorded, stock unchanged", job2.receivedQty === 4 && job2.receipts[0].remainingQty === 6 && job2.receipts[0].verification?.critical === true && job2.receipts[0].verification?.serials?.[0] === "CP-1" && (await stockOf()) === 110);
 await p.screenshot({ path: "/home/claude/work/e2e-staff-after.png", fullPage: true });
 
 // ── 2. Production Head ──────────────────────────────────────────────────────
@@ -124,6 +162,20 @@ await logout(p); await p.reload({ waitUntil: "networkidle" }); await p.waitForTi
 await login(p, "admin", "admin123"); await gotoMT(p);
 const adm = await p.evaluate(() => ({ nav: !!document.querySelector("[data-mt-nav]"), dash: !!document.querySelector("[data-staff-dashboard]") }));
 ok("admin keeps the full tracker", adm.nav && !adm.dash);
+// 2026-11-02 — machine card: Accept is on the card itself (this is not the Transfer & Accept tab)
+ok("the waiting hand-over has Accept directly on its machine card", await p.locator("[data-card-accept]").count() > 0);
+// Pending Jobs drawer shows every department's job with its origin and the receipt history
+await p.locator('[data-card-jobs="1"]').first().click(); await p.waitForTimeout(700);
+const drawer = await p.evaluate(() => { const d = document.querySelector("[data-jobs-drawer]"); return d ? { text: d.innerText, rows: d.querySelectorAll("[data-job-row]").length, origins: [...d.querySelectorAll("[data-job-origin]")].map((x) => x.innerText.trim()), receipts: d.querySelectorAll('[data-job-history="received"]').length } : null; });
+ok("Pending Jobs drawer lists jobs of ALL departments (Mechanical + Electrical) with origin + reason", drawer && drawer.rows >= 4 && /from Trial/.test(drawer.origins.join("|")) && /from Assembly/.test(drawer.origins.join("|")) && /lamp not available/.test(drawer.text) && /Electrical/.test(drawer.text));
+ok("drawer shows each receipt and the quantity still pending", drawer && drawer.receipts >= 3 && /Part received × 50/.test(drawer.text) && /6 pending/.test(drawer.text) && /inwarded to stock/.test(drawer.text));
+await p.locator('[data-jobs-drawer] [data-job-row="4"] button', { hasText: /^Work completed$/ }).click(); await p.waitForTimeout(500);
+await p.locator("[data-job-submit]").click(); await p.waitForTimeout(900);
+const job4 = (await ls(p, "erp_pending_handover_items")).find((i) => i.id === 4);
+ok("Work completed records who and when; other departments' jobs stay pending", job4.status === "resolved" && !!job4.resolvedBy && !!job4.resolvedAt && (await ls(p, "erp_pending_handover_items")).find((i) => i.id === 1).status === "open");
+await p.locator("[data-jobs-drawer] summary", { hasText: /Completed jobs/ }).click().catch(() => {}); await p.waitForTimeout(300);
+ok("completed job stays visible in the drawer with its completion details", await p.locator('[data-jobs-drawer] [data-job-history="completed"]').count() >= 1);
+await p.locator("[data-jobs-drawer] button[aria-label='Close']").click(); await p.waitForTimeout(300);
 const pb = p.locator("button", { hasText: /Pull back/ }).first();
 if (await pb.count() === 0) { await p.locator('[data-summary-card="awaiting"], [data-summary-card]').first().click(); await p.waitForTimeout(500); }
 ok("admin sees Pull back", await p.locator("button", { hasText: /Pull back/ }).count() > 0);

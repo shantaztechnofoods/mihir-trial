@@ -264,9 +264,11 @@ test("App: finish Assembly returns a rack machine to its rack; admin transfers f
   assert.equal(releaseCalls.length, 2, "release only from the Rack View (panel + crate face)");
   assert.match(app, /const r = await onReleaseHandover\(ho\.id\);/);
   assert.match(app, /const r = await onReleaseHandover\(faceHo\.id\);/);
-  // workers, signature, checklist and pending-work sections stay in the popup
+  // signature, checklist and pending-work sections stay in the popup; the
+  // worker / main-employee pickers are gone (2026-11-02: Transfer logs no names)
   assert.match(app, /Anything still pending from \{fromDepartment\}\?/);
-  assert.match(app, /The Main Employee must sign to confirm this department's work\./);
+  assert.match(app, /Sign to confirm this department's work\./);
+  assert.match(app, /data-transfer-sign/);
 });
 
 // 2026-10-31 live bug (M-10 (2), S/N 123456789): a pulled-back (cancelled)
@@ -309,9 +311,13 @@ test("App: Accept Machine on the card reuses the accept modal and refuses duplic
   const path = await import("node:path");
   const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
   const app = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
-  // 2026-11-01 — the card's Accept button now renders only on Transfer &
-  // Accept; the Production card no longer repeats it.
-  assert.match(app, /const cardCanAccept = mtTab === "transfer" && !!h && h\.status === "pending" && canAcceptHandover\(canDo, h\.toDepartment\) && !!onAcceptHandover;/);
+  // 2026-11-02 — Accept is on every machine card that waits for the receiving
+  // department, on whichever tab (no hop to Transfer & Accept needed). Same
+  // role/department check; an overdue (ON HOLD) hand-over is released by
+  // accepting it, which still demands the hold reason.
+  assert.match(app, /const cardCanAccept = !!h && h\.status === "pending" && canAcceptHandover\(canDo, h\.toDepartment\) && !!onAcceptHandover;/);
+  assert.doesNotMatch(app, /const cardCanAccept = mtTab/);
+  assert.match(app, /machineOverdue \? "✓ Accept · release from hold" : "✓ Accept Machine"/);
   assert.match(app, /data-card-accept=\{h\.id\}\n\s+onClick=\{\(\) => \{ if \(!acceptModal\) openAcceptModal\(h\); \}\}/);
   assert.match(app, /if \(!live \|\| live\.status !== "pending"\) \{ setAcceptModal\(null\); showToast\("Already accepted"/);
   // the Transfer & Accept section still offers its own button
@@ -344,12 +350,14 @@ test("App: Part received asks for the item's configured verification and gates t
   const path = await import("node:path");
   const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
   const app = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
-  assert.match(app, /const inputType = critical && inv\.outwardInputType === "serial" \? "serial" : "checkbox";/);
-  assert.match(app, /const receiveReady = !isReceive \|\| p\.receivedAt \|\| \(critical && inputType === "serial" \? !serialProblem : !!jobAction\.verified\);/);
+  assert.match(app, /const inputType = inv && inv\.isCritical && inv\.outwardInputType === "serial" \? "serial" : "checkbox";/);
+  // a pending item the operator classified Critical is critical even when it is not in the Item Master
+  assert.match(app, /const critical = !!\(inv && inv\.isCritical\) \|\| !!p\.critical;/);
+  assert.match(app, /const receiveReady = !isReceive \|\| p\.receivedAt \|\| \(!qtyProblem && !serialProblem && \(critical && inputType === "serial" \? true : !!jobAction\.verified\)\);/);
   assert.match(app, /if \(isReceive && !receiveReady\) \{ setJobAction\(\(prev\) => prev \? \{ \.\.\.prev, error: receiveWhy \} : prev\); return; \}/);
   assert.match(app, /data-job-submit onClick=\{submit\} disabled=\{jobAction\.busy \|\| \(isReceive && !receiveReady\)\}/);
-  assert.match(app, /await onReceivePendingItem\(p\.id, \{ notes: jobAction\.notes\.trim\(\), verification \}\)/);
-  assert.match(app, /const handleReceivePendingItem = async \(id, \{ notes, verification = null \}\) => \{/);
+  assert.match(app, /await onReceivePendingItem\(p\.id, \{ qty: recvQty, notes: jobAction\.notes\.trim\(\), verification \}\)/);
+  assert.match(app, /const handleReceivePendingItem = async \(id, \{ qty, notes, verification = null \}\) => \{/);
   // popup above the Pending Jobs drawer (z-66) and the rack panel (z-65)
   const i = app.indexOf("{jobAction && (() => {");
   assert.ok(/className="modal-backdrop fixed inset-0 z-\[96\]/.test(app.slice(i, i + 9000)), "job action modal is top-most");
@@ -364,10 +372,15 @@ test("App: compact team picker, non-login Main Employee, migration 050", async (
   const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
   const app = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
   const store = fs.readFileSync(path.join(root, "src/stores/handoverStore.js"), "utf8");
-  assert.match(app, /data-team-picker/);
-  assert.match(app, /\{people\.map\(\(x\) => <option key=\{x\.id\} value=\{x\.id\}>\{x\.name\}\{x\.login \? "" : " \(no login\)"\}<\/option>\)\}/, "Main select lists logins and Settings employees");
-  assert.match(app, /const mainIsLogin = !String\(mainEmployeeId\)\.startsWith\("emp:"\);/);
-  assert.match(app, /mainEmployeeId: mainIsLogin \? mainEmployeeId : null,\n\s+mainEmployeeRef: mainEmployeeId,/);
+  // 2026-11-02 — Finish & Transfer no longer asks for / logs employee names
+  // (the picker, "Main Employee" select and acting-main block are gone from the
+  // popup). The transferer is the signed-in user, who signs; ACCEPT keeps its
+  // own employee logging untouched.
+  assert.doesNotMatch(app, /data-team-picker/);
+  assert.doesNotMatch(app, /data-main-select/);
+  assert.match(app, /mainEmployeeId: currentUser\.id,\n\s+mainEmployeeRef: currentUser\.id,/);
+  assert.match(app, /workedBy:          \[\],             \/\/ Transfer logs no employee names/);
+  assert.match(app, /acceptTeamMembers = reconcileTeam\(/, "Accept still logs its team");
   assert.doesNotMatch(app, /must have ERP login/, "no login-only restriction text");
   assert.match(store, /row\.main_employee_ref\s+= h\.mainEmployeeRef \|\| null;/);
   const up = fs.readFileSync(path.join(root, "supabase/migrations/050_handover_main_employee_ref.sql"), "utf8");
@@ -528,7 +541,7 @@ test("App + migration 052: pending items added at BOM Outward", async () => {
   // 1 — the option exists in BOM Outward, and only where a machine exists
   assert.match(app, /data-add-pending-item onClick=\{\(\) => setExtraPending\(\[emptyPendingJob\(\)\]\)\}/);
   assert.match(app, /\{serialNo && !rackSet && \([\s\S]{0,400}?data-extra-pending/);
-  assert.match(app, /<PendingJobRows rows=\{extraPending\} onChange=\{setExtraPending\} inventory=\{allFlat\}\s*\n\s*addLabel="\+ Add Pending Item" \/>/);
+  assert.match(app, /<PendingJobRows rows=\{extraPending\} onChange=\{setExtraPending\} inventory=\{allFlat\}\s*\n\s*addLabel="\+ Add Pending Item" mode="item" \/>/);
 
   // 2/3 — Item Master code or a hand-typed name; Critical / Normal; part serial
   assert.match(app, /const emptyPendingJob = \(\) => \(\{ description: "", itemCode: "", itemName: "", qty: "", reason: "", critical: false, partSerialNo: "" \}\);/);
@@ -594,8 +607,8 @@ test("App: Machine Tracker navigation is the summary boxes, for staff and admin 
   assert.match(app, /aria-current=\{isOn \? "page" : undefined\}/);
   assert.match(app, /data-view-header/);
 
-  // Accept: Transfer & Accept only
-  assert.match(app, /const cardCanAccept = mtTab === "transfer" &&/);
+  // Accept: on the card itself (2026-11-02), whichever tab shows it
+  assert.match(app, /const cardCanAccept = !!h && h\.status === "pending" &&/);
   // Update Stage: admin-only AND behind History
   assert.match(app, /\{isExpanded && !isComplete && futureStages\.length > 0 && isAdminUser && canDo\("machines","updateStage"\)/);
   // untouched: Rack View and the actions the floor works with
