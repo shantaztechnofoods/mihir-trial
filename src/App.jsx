@@ -84,7 +84,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-02-pending-critical-checks";
+const APP_BUILD = "2026-11-02-transfer-no-signature";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -17335,7 +17335,6 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
     // record. (Accept keeps its employee logging exactly as before.)
     setFinishModal({ machine, toDepartment, narration: "", template, answers,
                      workedBy: [], mainEmployeeId: currentUser?.id || null,
-                     mainSigSvg: null, mainSigNeeded: false,
                      // Phase 1 — jobs this department still owes after handing over.
                      owedItems: [] });
   };
@@ -17419,7 +17418,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
   const submitFinishTransfer = async () => {
     if (!finishModal || transferBusy) return;
     const { machine, toDepartment, narration, template, answers,
-            mainSigSvg = null, owedItems = [] } = finishModal;
+            owedItems = [] } = finishModal;
     const fromDepartment = machine.currentDepartment || machine.stage;
     // Migration 027 — prefer the per-machine override captured at Outward.
     // Falls back to the live workflow setting for machines created before
@@ -17442,13 +17441,9 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
         return;
       }
     }
-    // 2026-11-02 — the transferring user signs for their own department's
-    // work. No worker / main-employee names are collected at Transfer.
+    // 2026-11-02 — no signature and no worker / main-employee names are
+    // collected at Transfer; the signed-in user is recorded as the transferer.
     if (!currentUser?.id) { showToast("Not signed in", "Sign in again to transfer.", "warning"); return; }
-    if (!mainSigSvg || !String(mainSigSvg).trim()) {
-      showToast("Signature required", "Sign to confirm this department's work before transferring.", "warning");
-      return;
-    }
     const transferrerName = currentUser.fullName || currentUser.username || null;
     setTransferBusy(true);
     try {
@@ -17470,7 +17465,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
         mainEmployeeId: currentUser.id,
         mainEmployeeRef: currentUser.id,
         mainEmployeeName: transferrerName,
-        mainEmployeeSignatureSvg: mainSigSvg,
+        mainEmployeeSignatureSvg: null,   // Transfer needs no signature (Accept still does)
         actingMainEmployeeId: null,
       });
       if (res && res.success === false) {
@@ -21012,29 +21007,14 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                   </div>
                 )}
 
-                {/* ── Transfer signature (2026-11-02) ──
-                    Transfer asks for no employee names: the logged-in user is
-                    the transferer and signs for the department's work. */}
-                <div className="rounded-xl border border-slate-200 bg-white px-3 py-3" data-transfer-sign>
-                  <div className="text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1">
-                    Signature <span className="text-red-500 ml-0.5">*</span>
+                {/* ── Transferred by (2026-11-02) ──
+                    No signature and no employee names at Transfer: the
+                    logged-in user and their department are recorded
+                    automatically. (Accept keeps its mandatory signature.) */}
+                <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5" data-transfer-by>
+                  <div className="text-[10px] text-slate-500">
+                    Transferred by <span className="font-bold text-slate-900">{currentUser?.fullName || currentUser?.username || "you"}</span> · {fromDepartment} — recorded automatically from your login.
                   </div>
-                  <div className="text-[10px] text-slate-500 mb-2">
-                    Transferred by <span className="font-bold text-slate-900">{currentUser?.fullName || currentUser?.username || "you"}</span> · {fromDepartment}. Sign to confirm this department's work.
-                  </div>
-                  {finishModal.mainSigSvg ? (
-                    <div className="rounded-lg px-3 py-2 flex items-center gap-2 bg-emerald-50 border border-emerald-200">
-                      <span className="text-[11px] font-bold text-emerald-700">✓ Signature captured</span>
-                      <button onClick={() => setFinishModal((prev) => prev ? { ...prev, mainSigSvg: null, mainSigNeeded: false } : prev)}
-                              className="ml-auto text-[10px] text-slate-400 hover:text-red-500 underline">
-                        Re-sign
-                      </button>
-                    </div>
-                  ) : (
-                    <SignaturePad light
-                      onSave={(svg) => setFinishModal((prev) => prev ? { ...prev, mainSigSvg: svg } : prev)}
-                    />
-                  )}
                 </div>
 
                 {/* Phase B — Department checklist (if a template exists for this dept) */}

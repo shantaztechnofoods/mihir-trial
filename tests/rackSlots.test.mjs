@@ -267,8 +267,14 @@ test("App: finish Assembly returns a rack machine to its rack; admin transfers f
   // signature, checklist and pending-work sections stay in the popup; the
   // worker / main-employee pickers are gone (2026-11-02: Transfer logs no names)
   assert.match(app, /Anything still pending from \{fromDepartment\}\?/);
-  assert.match(app, /Sign to confirm this department's work\./);
-  assert.match(app, /data-transfer-sign/);
+  // 2026-11-02 — Transfer has NO signature; the transferer is recorded from the login
+  assert.doesNotMatch(app, /data-transfer-sign|Sign to confirm this department's work|Signature required/);
+  assert.match(app, /data-transfer-by/);
+  assert.match(app, /mainEmployeeSignatureSvg: null,   \/\/ Transfer needs no signature/);
+  assert.match(app, /mainEmployeeName: transferrerName,/);
+  // Accept keeps its mandatory signature
+  assert.match(app, /Please register your signature first\./);
+  assert.match(app, /Register your signature before accepting a handover/);
 });
 
 // 2026-10-31 live bug (M-10 (2), S/N 123456789): a pulled-back (cancelled)

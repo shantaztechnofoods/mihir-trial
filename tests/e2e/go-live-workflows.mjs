@@ -102,15 +102,15 @@ ok("hand-over 21 accepted with signer identity + timestamp", h21 && h21.status =
 ok("SN-102 moved to Mechanical, hand-over link cleared", m2 && m2.stage === "Mechanical" && !m2.pendingHandoverId);
 ok("open issue on SN-101 did not block anything (still open)", (await ls(p, "erp_pending_handover_items")).some((i) => i.id === 1 && i.status === "open"));
 
-// Finish & Transfer SN-101 → Electrical (signature mandatory)
+// Finish & Transfer SN-101 → Electrical (no signature; Accept keeps its signature)
 await p.locator('[data-staff-finish="1"]').click(); await p.waitForTimeout(800);
 ok("Finish & Transfer modal opens from the staff dashboard", await p.locator("text=Finish & Transfer").count() > 0);
-ok("Transfer popup asks for NO employee names (no team picker, no main-employee select)", await p.locator("[data-team-picker], [data-main-select], [data-worker-chips]").count() === 0 && await p.locator("[data-transfer-sign]").count() === 1);
-await draw(p, p.locator("canvas").first()); await p.getByRole("button", { name: "Save Signature" }).click(); await p.waitForTimeout(400);
+ok("Transfer popup asks for NO employee names (no team picker, no main-employee select)", await p.locator("[data-team-picker], [data-main-select], [data-worker-chips]").count() === 0 && await p.locator("[data-transfer-sign]").count() === 0 && await p.locator("[data-transfer-by]").count() === 1);
+ok("Transfer popup has no signature box / Save Signature button", await p.locator("canvas").count() === 0 && await p.getByRole("button", { name: "Save Signature" }).count() === 0 && /Transferred by Ramesh/.test(await p.locator("[data-transfer-by]").innerText()));
 await p.locator("button", { hasText: /^Finish & Transfer → Electrical/ }).click(); await p.waitForTimeout(1200);
 hs = await ls(p, "erp_handovers"); ms = await ls(p, "erp_machines");
 const hNew = hs.find((h) => h.machineId === 1 && h.status === "pending");
-ok("pending hand-over created SN-101 Mechanical → Electrical with sender + signature", hNew && hNew.toDepartment === "Electrical" && !!hNew.sentBy && !!(hNew.sentBySignatureId || hNew.mainEmployeeSignatureSvg));
+ok("pending hand-over created SN-101 Mechanical → Electrical recorded from the login (name + from-department), no signature required", hNew && hNew.toDepartment === "Electrical" && hNew.fromDepartment === "Mechanical" && !!hNew.sentBy && !!hNew.mainEmployeeName && !hNew.mainEmployeeSignatureSvg);
 ok("SN-101 linked to the open hand-over", ms.find((m) => m.id === 1)?.pendingHandoverId === hNew?.id);
 ok("Transfer logged the transferer (signed-in user), no worker names", hNew?.sentBy === "u_mech" && (!hNew.workedBy || hNew.workedBy.length === 0) && !hNew.workedBySnapshot);
 ok("open pending jobs did not block the transfer", (await ls(p, "erp_pending_handover_items")).filter((i) => i.status === "open").length >= 3);
