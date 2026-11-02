@@ -15150,8 +15150,12 @@ function ReportCenterPage({
   // handleFulfillPending moves stock and writes an audit row, nothing else. The
   // A-to-Z report needs those rows or a machine's critical parts come out short.
   auditLog = [],
+  // 2026-11-01 — the full per-machine history (Machine journey) is admin-only.
+  // Staff never see another department's timings or ratings here.
+  currentUser = null,
 }) {
-  const [tab, setTab] = useState("machine");
+  const isAdminUser = currentUser?.role === "super_admin" || currentUser?.role === "Admin";
+  const [tab, setTab] = useState(isAdminUser ? "machine" : "factory");
   const [dateFrom,    setDateFrom]    = useState("");
   const [dateTo,      setDateTo]      = useState("");
   const [machineFilter,  setMachineFilter]  = useState("");
@@ -15173,7 +15177,7 @@ function ReportCenterPage({
     { id: "machine",    label: "Machine journey", hint: "BOM to Ready, one machine" },
     { id: "monthly",    label: "Monthly",         hint: "month by month" },
     { id: "customer",   label: "Customer",        hint: "progress PDF to send" },
-  ];
+  ].filter((t) => t.id !== "machine" || isAdminUser);
   const [serialFilter, setSerialFilter] = useState("");
 
   // ── Filters ──
@@ -15648,7 +15652,7 @@ function ReportCenterPage({
           </div>
         )}
 
-        {tab === "machine" && (() => {
+        {tab === "machine" && isAdminUser && (() => {
           // Picker candidates: honour the shared Machine / dept / date filters
           // (filteredMachines already applies them). Operator picks one.
           const options = filteredMachines.slice().sort((a, b) => {
@@ -17564,6 +17568,17 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
   // is easy to cause by forgetting one click.
   const isFloorLogin = !isAdminUser
     && (canDo("machines", "accept") || canDo("machines", "finishTransfer"));
+  // 2026-11-01 — department-wise staff experience. Anyone who is not an admin
+  // gets the compact department dashboard below (staffMode) instead of the
+  // full tracker: their own departments, the machines waiting on them, their
+  // pending jobs, and only the actions their role allows. Machine history,
+  // ratings and the full machine report are admin-only. The Production Head
+  // has no department: they get the rack view plus the machines awaiting
+  // release, nothing else. Every button in that layout opens the SAME modal
+  // and calls the SAME handler as the admin tracker — nothing is duplicated.
+  const staffMode  = !isAdminUser;
+  const isProdHead = staffMode && (currentUser?.role === "Production Head" || (canDo("machines", "release") && !isFloorLogin));
+  const canReleaseFromRack = canDo("machines", "release") || isAdminUser;
   // The first department that actually does work — machines are started onto
   // it from the rack. Derived, so adding a stage ahead of Assembly keeps this
   // correct.
@@ -17975,7 +17990,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
         )}
         {/* Departments Called, behind a bell. Same count and same scope as the
             panel it opens; hidden for a floor login, as the panel always was. */}
-        {!isFloorLogin && (() => {
+        {!staffMode && (() => {
           const calledN = (pendingHandoverItems || [])
             .filter((p) => p.status === "open")
             .filter((p) => !scopeMine || myDepartments.includes(p.assignedDepartment)).length;
@@ -18026,12 +18041,263 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
           </div>
         )}
 
+        {/* ── Department-wise staff dashboard (2026-11-01) ──
+            Everyone who is not an admin works from this compact view instead of
+            the factory tracker: their own departments, the machines waiting
+            on them, their open jobs, and only the actions their role allows.
+            Every button opens the same modal the admin tracker opens
+            (openAcceptModal / openFinishModal / openDuringWorkModal /
+            setRaiseModal / setJobsDrawer / setJobAction) — the handlers,
+            signatures and checklists are untouched. No machine history,
+            ratings or reports: those stay admin-only. */}
+        {staffMode && (() => {
+          const btn = "min-h-[48px] w-full sm:w-auto px-5 rounded-xl text-[15px] font-black transition-all active:scale-[0.98]";
+          const canAccept  = canAcceptHandover(canDo) && !!onAcceptHandover;
+          const canFinish  = canFinishTransfer(canDo) && !!onFinishTransfer;
+          const canJobs    = canFinishTransfer(canDo);
+          const canReport  = !!onRaisePendingItem && canDo("machines", "accept");
+          const machineOf  = (h) => (machineLog || []).find((m) => String(m.id) === String(h.machineId)) || null;
+          const titleOf    = (m, h) => `${(m && m.bomKey) || (h && h.bomKey) || "Machine"}${(m && m.serialNo) || (h && h.serialNo) ? ` · S/N ${(m && m.serialNo) || h.serialNo}` : ""}`;
+          const openJobsOf = (m) => (pendingHandoverItems || []).filter((p) => String(p.machineId) === String(m.id) && p.status === "open");
+          const toAccept   = askableHandovers.filter((h) => myDepartments.includes(h.toDepartment));
+          const sentOn     = startedAll.filter((m) => { if (m.status === "completed") return false; const h = machineHandover(m); return h && myDepartments.includes(h.fromDepartment) && !myDepartments.includes(h.toDepartment); });
+          const myJobs     = (pendingHandoverItems || []).filter((p) => p.status === "open" && myDepartments.includes(p.assignedDepartment));
+          const awaitingRelease = startedAll.filter((m) => { const h = machineHandover(m); return !!(h && isAwaitingRelease(h)); });
+          const Section = ({ title, count, hint, children }) => (
+            <div className="section-card no-lift p-4 sm:p-5" data-staff-section={title}>
+              <div className="flex items-baseline gap-2 flex-wrap mb-3">
+                <h2 className="text-[16px] font-black" style={{ color: "var(--text-strong)" }}>{title}</h2>
+                <span className="text-[14px] font-black tabular-nums" style={{ color: count ? "#B01218" : "var(--text-dim)" }}>({count})</span>
+                {hint && <span className="text-[12px]" style={{ color: "var(--text-dim)" }}>{hint}</span>}
+              </div>
+              {children}
+            </div>
+          );
+          const Empty = ({ text }) => <div className="text-[14px] py-3" style={{ color: "var(--text-dim)" }}>{text}</div>;
+          const Card  = ({ children, tone }) => (
+            <div className="mt-card no-lift p-4 flex flex-col gap-3" style={tone ? { borderColor: tone } : undefined}>{children}</div>
+          );
+          // No department: say so and show nothing else. A Store Manager still
+          // keeps the BOM section above when the role may issue a BOM.
+          if (!isProdHead && !hasDepartments) {
+            return (
+              <div className="rounded-2xl p-8 text-center" data-staff-no-dept
+                   style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.4)" }}>
+                <div className="text-[16px] font-black" style={{ color: "#b45309" }}>No department assigned yet — ask your admin</div>
+                <div className="text-[13px] text-slate-600 mt-1.5 max-w-md mx-auto">
+                  Your machines appear here once an admin sets your department in User Management.
+                </div>
+              </div>
+            );
+          }
+          return (
+            <div className="space-y-4" data-staff-dashboard>
+              {/* Header */}
+              <div className="flex items-baseline gap-2 flex-wrap px-1">
+                <span className="text-[12px] font-bold uppercase tracking-[0.08em]" style={{ color: "var(--text-dim)" }}>
+                  {isProdHead ? "Production Head" : `Your department${myDepartments.length === 1 ? "" : "s"}:`}
+                </span>
+                <span className="text-[18px] font-black" style={{ color: "var(--text-strong)" }}>
+                  {isProdHead ? "Rack release" : myDepartments.join(", ")}
+                </span>
+                {currentUser?.fullName && <span className="text-[12px] ml-auto" style={{ color: "var(--text-dim)" }}>{currentUser.fullName}</span>}
+              </div>
+
+              {/* Production Head: machines assembled on the rack, waiting to be sent on */}
+              {isProdHead && (
+                <Section title="Awaiting release from rack" count={awaitingRelease.length} hint="assembled — send to the next department">
+                  {awaitingRelease.length === 0 && <Empty text="Nothing is waiting on the rack." />}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                    {awaitingRelease.map((m) => {
+                      const h = machineHandover(m);
+                      return (
+                        <Card key={m.id}>
+                          <div>
+                            <div className="text-[17px] font-black" style={{ color: "var(--text-strong)" }}>{titleOf(m, h)}</div>
+                            <div className="text-[13px] mt-0.5" style={{ color: "var(--text-dim)" }}>
+                              {m.bomLabel || ""}{m.rackSlot ? ` · ${slotLabel(m.rackSlot)}` : " · on the rack"} · to {h.toDepartment}
+                            </div>
+                          </div>
+                          {/* The release itself happens only in the Rack View
+                              (details panel / crate face — same handler, same
+                              gate). This opens that machine's rack panel. */}
+                          {canReleaseFromRack && onReleaseHandover && (
+                            <button type="button" data-staff-release={h.id} className={btn} style={{ background: "#4338ca", color: "#fff" }}
+                                    onClick={() => {
+                                      if (m.rackSlot) { setRackPanel(m.rackSlot); return; }
+                                      try { document.querySelector(".rack-shelf")?.scrollIntoView({ behavior: "smooth", block: "start" }); } catch {}
+                                    }}>
+                              → Send to {h.toDepartment}
+                            </button>
+                          )}
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </Section>
+              )}
+
+              {/* To accept */}
+              {!isProdHead && (
+                <Section title="To accept" count={toAccept.length} hint="handed to your department">
+                  {toAccept.length === 0 && <Empty text="No machine is waiting for you to accept." />}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                    {toAccept.map((h) => {
+                      const m = machineOf(h);
+                      const late = isHoldOverdue(h.sentAt, h.acceptTimeoutMinutes, nowTick);
+                      const waited = h.sentAt ? formatDuration(Math.max(0, Math.floor((nowTick - Date.parse(h.sentAt)) / 60000))) : "";
+                      return (
+                        <Card key={h.id} tone={late ? "rgba(239,68,68,0.5)" : "rgba(217,119,6,0.45)"}>
+                          <div>
+                            <div className="text-[17px] font-black" style={{ color: "var(--text-strong)" }}>{titleOf(m, h)}</div>
+                            <div className="text-[13px] mt-0.5" style={{ color: "var(--text-dim)" }}>
+                              {m?.bomLabel ? `${m.bomLabel} · ` : ""}from {h.fromDepartment} → {h.toDepartment}{waited ? ` · waiting ${waited}` : ""}
+                            </div>
+                            {late && <div className="text-[13px] font-black mt-1" style={{ color: "#dc2626" }}>🚦 ON HOLD — accept deadline passed</div>}
+                          </div>
+                          {canAccept && (
+                            <button type="button" data-staff-accept={h.id} className={btn} style={{ background: "#15803d", color: "#fff" }}
+                                    disabled={!!acceptModal} onClick={() => { if (!acceptModal) openAcceptModal(h); }}>
+                              ✓ Accept into {h.toDepartment}
+                            </button>
+                          )}
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </Section>
+              )}
+
+              {/* In your department */}
+              {!isProdHead && (
+                <Section title="In your department" count={myWorking.length} hint="machines you are working on">
+                  {myWorking.length === 0 && <Empty text="No machine is in your department right now." />}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                    {myWorking.map((m) => {
+                      const dept   = m.currentDepartment || m.stage;
+                      const next   = nextDepartment(dept);
+                      const cfg    = (m.deptDurations && m.deptDurations[dept]) || workflow.dept_durations[dept];
+                      const target = (cfg && cfg.minutes) || 0;
+                      const t      = m.departmentEnteredAt ? computeOverrun(m.departmentEnteredAt, target, nowTick) : null;
+                      const jobs   = openJobsOf(m);
+                      const during = !!onSubmitDuringWorkChecklist && !!pickTemplate(checklistTemplates, m.bomKey, dept, "during_work");
+                      return (
+                        <Card key={m.id}>
+                          <div>
+                            <div className="text-[17px] font-black" style={{ color: "var(--text-strong)" }}>{titleOf(m)}</div>
+                            <div className="text-[13px] mt-0.5" style={{ color: "var(--text-dim)" }}>{m.bomLabel || ""}{m.bomLabel ? " · " : ""}in {dept}</div>
+                            <div className="flex items-center gap-2 flex-wrap mt-2">
+                              {t && (
+                                <span className="text-[13px] font-bold px-2.5 py-1 rounded-full"
+                                      style={t.isOverrun ? { background: "rgba(239,68,68,0.1)", color: "#b91c1c", border: "1px solid rgba(239,68,68,0.35)" } : { background: "rgba(21,128,61,0.08)", color: "#15803d", border: "1px solid rgba(21,128,61,0.3)" }}>
+                                  ⏱ {formatDuration(t.actualMinutes)}{target ? ` / ${formatDuration(target)}` : ""}{t.isOverrun ? ` · DELAYED ${formatDuration(t.overrunMinutes)}` : ""}
+                                </span>
+                              )}
+                              {jobs.length > 0 && (
+                                <button type="button" data-staff-jobs={m.id} onClick={() => setJobsDrawer(m.id)}
+                                        className="min-h-[44px] text-[14px] font-black px-3 rounded-xl"
+                                        style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.35)", color: "#b91c1c" }}>
+                                  ⚠ {jobs.length} open job{jobs.length === 1 ? "" : "s"}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex flex-col sm:flex-row gap-2 sm:flex-wrap">
+                            {during && (
+                              <button type="button" data-staff-during={m.id} className={btn} style={{ background: "#B01218", color: "#fff" }} onClick={() => openDuringWorkModal(m)}>
+                                📋 During-Work Checks
+                              </button>
+                            )}
+                            {canReport && (
+                              <button type="button" data-staff-issue={m.id} className={btn}
+                                      style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.4)", color: "#dc2626" }}
+                                      onClick={() => { setRaiseModal({ machine: m }); setRaiseText(""); setRaiseDept(""); setRaiseErr(""); setRaisePart(emptyPendingJob()); }}>
+                                Report Issue
+                              </button>
+                            )}
+                            {m.trialCertificate && canFinish && onUpdateTrialCertificate && (
+                              <button type="button" className={btn} style={{ background: "rgba(217,119,6,0.10)", border: "1px solid rgba(217,119,6,0.4)", color: "#b45309" }}
+                                      onClick={() => setTrialCertModal({ machine: m, editOnly: true })}>
+                                ✎ Certificate
+                              </button>
+                            )}
+                            {next && canFinish && (
+                              <button type="button" data-staff-finish={m.id} className={btn} style={{ background: "#15803d", color: "#fff" }} onClick={() => openFinishModal(m)}>
+                                ✓ Finish → {next}
+                              </button>
+                            )}
+                          </div>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </Section>
+              )}
+
+              {/* Sent on — read-only, so the department knows its transfer went through */}
+              {!isProdHead && sentOn.length > 0 && (
+                <Section title="Sent on" count={sentOn.length} hint="waiting for the next department to accept">
+                  <div className="flex flex-col gap-2">
+                    {sentOn.map((m) => { const h = machineHandover(m); return (
+                      <div key={m.id} className="text-[14px] px-3 py-2 rounded-xl" style={{ background: "rgba(17,24,39,0.03)", color: "var(--text-strong)" }}>
+                        <span className="font-black">{titleOf(m, h)}</span> <span style={{ color: "var(--text-dim)" }}>→ {h.toDepartment} · awaiting accept</span>
+                      </div>
+                    ); })}
+                  </div>
+                </Section>
+              )}
+
+              {/* Pending jobs for your department */}
+              {!isProdHead && (
+                <Section title="Pending jobs for your department" count={myJobs.length} hint="parts and work still open — never blocks a transfer">
+                  {myJobs.length === 0 && <Empty text="No open job for your department." />}
+                  <div className="flex flex-col gap-2">
+                    {myJobs.map((p) => {
+                      const m = (machineLog || []).find((x) => String(x.id) === String(p.machineId)) || null;
+                      const stage = pendingItemStage(p);
+                      return (
+                        <div key={p.id} className="mt-card no-lift p-3.5 flex flex-col gap-2.5" data-staff-job={p.id}>
+                          <div>
+                            <div className="text-[14px] font-black" style={{ color: "var(--text-strong)" }}>{p.description}</div>
+                            <div className="text-[13px] mt-0.5" style={{ color: "var(--text-dim)" }}>
+                              {m ? `${m.bomKey}${m.serialNo ? ` · S/N ${m.serialNo}` : ""}` : "Machine"}
+                              {(p.itemCode || p.itemName) ? ` · part ${p.itemCode || p.itemName}${p.qty != null ? ` × ${p.qty}` : ""}` : ""}
+                              {p.critical ? " · CRITICAL" : ""}
+                              {stage === "received" ? " · part received, finish the work" : ""}
+                            </div>
+                          </div>
+                          {canJobs && (
+                            <div className="flex flex-col sm:flex-row gap-2">
+                              {onReceivePendingItem && !p.receivedAt && (
+                                <button type="button" className={btn} style={{ background: "rgba(37,99,235,0.08)", border: "1px solid rgba(37,99,235,0.4)", color: "#1d4ed8" }}
+                                        onClick={() => setJobAction({ item: p, action: "receive", notes: "", busy: false, error: "" })}>
+                                  Part received
+                                </button>
+                              )}
+                              {onResolvePendingItem && (
+                                <button type="button" className={btn} style={{ background: "#15803d", color: "#fff" }}
+                                        onClick={() => setJobAction({ item: p, action: "complete", notes: "", busy: false, error: "" })}>
+                                  ✓ Work completed
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </Section>
+              )}
+            </div>
+          );
+        })()}
+
         {/* ── Pending Jobs (2026-10-30) ──
             Every unfinished job and missing part, grouped by machine and serial
             number, with the department that owes it. The responsible department
             records the part as received, then the work as completed, here or on
             the machine card — the same handlers either way. */}
-        {mtTab === "pending" && (() => {
+        {!staffMode && mtTab === "pending" && (() => {
           const allJobsScoped = (pendingHandoverItems || [])
             .filter((p) => !scopeMine || myDepartments.includes(p.assignedDepartment));
           const viewJobs = jobsView === "open" ? openJobsScoped
@@ -18084,7 +18350,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
         })()}
 
         {/* Nothing to accept — said, rather than an empty tab top. */}
-        {mtTab === "transfer" && askableHandovers.length === 0 && (
+        {!staffMode && mtTab === "transfer" && askableHandovers.length === 0 && (
           <div className="text-[12px] px-4 py-3 rounded-xl" style={{ background: "var(--surface-raised)", color: "var(--text-dim)", border: "1px solid var(--border-subtle)" }}>
             No machine is waiting to be accepted right now. Machines in production are listed below — finish & transfer from each card.
           </div>
@@ -18100,7 +18366,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
             release it — listing it here put an "Accept Machine" button on it
             and let the receiving department skip the release entirely. Its
             Release button lives on the machine card. */}
-        {mtTab === "transfer" && askableHandovers.length > 0 && (
+        {!staffMode && mtTab === "transfer" && askableHandovers.length > 0 && (
           <div className="rounded-2xl p-5"
                style={{ background: "linear-gradient(135deg,rgba(217, 119, 6,0.08),rgba(234,88,12,0.03))", border: `2px solid ${overdueHandovers.length ? "rgba(239,68,68,0.55)" : "rgba(217, 119, 6,0.45)"}`, boxShadow: overdueHandovers.length ? "0 0 24px rgba(239,68,68,0.15)" : "0 0 16px rgba(217, 119, 6,0.1)" }}>
             <div className="flex items-center gap-4 mb-4 flex-wrap">
@@ -18198,7 +18464,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
         {/* A floor login with no department assigned must see nothing, not
             everything. Say so plainly rather than silently showing an empty
             page the operator cannot explain. */}
-        {isFloorLogin && !hasDepartments && (
+        {!staffMode && isFloorLogin && !hasDepartments && (
           <div className="rounded-2xl p-8 text-center"
                style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.4)" }}>
             <div className="text-sm font-black" style={{ color: "#b45309" }}>No department assigned to this login</div>
@@ -18208,7 +18474,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
           </div>
         )}
 
-        {isFloorLogin && hasDepartments && (
+        {!staffMode && isFloorLogin && hasDepartments && (
           <div className="flex items-baseline gap-3 flex-wrap">
             <span className="text-[13px] font-black text-slate-800">{myDepartments.join(", ")}</span>
             {(() => {
@@ -18222,7 +18488,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
           </div>
         )}
 
-        {showScopeSwitch && (
+        {!staffMode && showScopeSwitch && (
           <div className="flex items-center gap-3 flex-wrap">
             <div className="flex rounded-xl p-1" style={{ background: "rgba(17,24,39,0.05)" }}>
               <button type="button" onClick={() => setScope("mine")}
@@ -18258,7 +18524,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
         {/* ── Migration 036 — released off the rack, waiting to be picked up ──
             The production head has named this machine. It is the clearest
             instruction on the floor, so it sits above everything else. */}
-        {mtTab === "transfer" && scopeMine && (() => {
+        {!staffMode && mtTab === "transfer" && scopeMine && (() => {
           const justReleased = startedAll.filter((m) => {
             if (m.status === "completed") return false;
             const h = (handovers || []).find((x) => x.id === m.pendingHandoverId && x.status === "pending");
@@ -18357,7 +18623,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
             Hidden for a floor login: its own "Go and fix" bucket above already
             lists exactly the faults called to its department, so this factory
             overview would just be a second copy of the same machines. */}
-        {!isFloorLogin && showCalled && (
+        {!staffMode && showCalled && (
           // Opened from the header bell. The panel inside is the same one that
           // used to sit on the page, unchanged; it just no longer takes the
           // first screen.
@@ -18519,7 +18785,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
             a floor login sees its own work and an admin sees the factory.
             Shown to every role: with the tabs gone this is how the floor
             navigates too. */}
-        {(() => {
+        {!staffMode && (() => {
           const cards = [
             { key: "pendingAccept", tab: "transfer",   label: "Pending Acceptance", value: pendingAccept.length,   sub: "waiting for next dept",   color: "#b45309", strip: "status-strip-yellow" },
             { key: "hold",          tab: "transfer",   label: "On HOLD",            value: onHold.length,          sub: "accept deadline passed",  color: "#dc2626", strip: "status-strip-red" },
@@ -18558,7 +18824,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
             Machines waiting on the rack to be started. Starting a build is the
             first working department's job, so a floor login elsewhere in the
             line has no use for this and it is hidden from them. */}
-        {mtTab === "production" && (!isFloorLogin || myDepartments.includes(FIRST_WORK_DEPARTMENT)) && (
+        {(staffMode ? isProdHead : mtTab === "production") && (
         <div>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2.5">
@@ -19093,7 +19359,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
         {/* ── Which screen am I on ──
             The boxes above are the navigation, so the list says plainly what
             it is showing and how to get back to everything. */}
-        {(() => {
+        {!staffMode && (() => {
           const view = mtTab === "transfer"
             ? { title: "Transfer & Accept", sub: filter === "hold" ? "past the accept deadline" : filter === "pendingAccept" ? "waiting for the next department" : "every machine still moving through the line" }
             : mtTab === "pending"
@@ -19116,7 +19382,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
         })()}
 
         {/* ── Empty state ── */}
-        {mtTab !== "pending" && listForTab().length === 0 && (
+        {!staffMode && mtTab !== "pending" && listForTab().length === 0 && (
           <div className="bg-white border border-slate-200 rounded-xl py-20 text-center">
             <div className="text-5xl mb-4">🔧</div>
             <div className="text-sm font-bold text-slate-900 mb-2">No Machines Tracked</div>
@@ -19138,6 +19404,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
         )}
 
         {/* ── Machine cards ── */}
+        {!staffMode && (
         <div className="space-y-4">
           {listForTab().map((machine) => {
             const curIdx   = stageIdx(machine.stage);
@@ -19446,7 +19713,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                           📋 Certificate
                         </button>
                       )}
-                      {isComplete && (
+                      {isComplete && isAdminUser && (
                         <button type="button" data-card-report={machine.id} onClick={() => setReportMachineId(machine.id)}
                                 className="text-[11px] font-black px-3 py-1.5 rounded-lg border transition-all"
                                 style={{ background: "rgba(21,128,61,0.08)", border: "1px solid rgba(21,128,61,0.35)", color: "#15803d" }}
@@ -19482,11 +19749,11 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                       <div className="md:col-span-2">
                         <div className="flex items-baseline gap-3 flex-wrap mb-3">
                           <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Production report</div>
-                          <button type="button" data-history-report={machine.id} onClick={() => setReportMachineId(machine.id)}
+                          {isAdminUser && <button type="button" data-history-report={machine.id} onClick={() => setReportMachineId(machine.id)}
                                   className="text-[11px] font-bold px-2.5 py-1 rounded-lg border ml-auto"
                                   style={{ borderColor: "var(--border-rim)", color: "var(--text-strong)", background: "var(--surface-card)" }}>
                             📄 Open full machine report
-                          </button>
+                          </button>}
                           {ratingSummary.average != null && (
                             <span className="text-[12px] font-black" style={{ color: ratingSummary.average >= 4.5 ? "#15803d" : ratingSummary.average >= 3.5 ? "#b45309" : "#dc2626" }}>
                               {formatRatingBadge(Math.round(ratingSummary.average))} {ratingSummary.average} / 5
@@ -19819,6 +20086,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
             );
           })}
         </div>
+        )}
 
       </div>
 
@@ -26606,7 +26874,7 @@ export default function App() {
                               bomDefs={bomDefs} settings={settings}
                               outwardLog={outwardLog} inwardLog={inwardLog} pos={pos} items={items}
                               auditLog={auditLog}
-                              canDo={canDo} />,
+                              canDo={canDo} currentUser={currentUser} />,
     settings:  <SettingsPage settings={settings} onSave={handleSaveSettings} isSuperAdmin={currentUser?.role === "super_admin"} canDo={canDo} onRegisterSignature={handleRegisterSignature} currentUser={currentUser}
                               machineLog={machineLog} onAdminCleanup={handleAdminCleanupDone}
                               checklistTemplates={checklistTemplates}

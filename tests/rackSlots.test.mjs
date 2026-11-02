@@ -580,6 +580,9 @@ test("App: Machine Tracker navigation is the summary boxes, for staff and admin 
   assert.doesNotMatch(app, /\{ id: "production", label: "Production" \}/);
   assert.match(app, /data-mt-nav/);
   const nav = app.slice(app.indexOf("Summary boxes = the navigation"), app.indexOf("data-mt-nav") + 2000);
+  // 2026-11-01 — the boxes are the admin tracker's navigation. Non-admins now
+  // get the department dashboard (staffMode, see tests/staffMode.test.mjs),
+  // so the boxes are gated by staffMode there — never by isFloorLogin.
   assert.ok(!/isFloorLogin/.test(nav.slice(0, nav.indexOf("data-mt-nav"))), "the nav is not hidden from a floor login");
   for (const tab of ["transfer", "production", "pending"]) assert.ok(nav.includes(`tab: "${tab}"`), `a box opens ${tab}`);
 
