@@ -131,6 +131,7 @@ await p.locator("[data-summary-card=\"active\"]").first().click(); await p.waitF
 const chip = p.locator("[data-card-jobs]");
 ok("the machine card shows the Pending Jobs button with all three jobs", await chip.count() === 1 && /Pending Jobs · 7/.test(await chip.first().innerText()));
 await chip.first().click(); await p.waitForTimeout(700);
+ok("drawer: Pending Parts and Pending Work sections with counts; Completed is collapsed", await p.locator('[data-jobs-drawer] [data-jobs-section="parts"]').count() === 1 && await p.locator('[data-jobs-drawer] [data-jobs-section="work"]').count() === 1 && await p.locator("[data-jobs-drawer] details").evaluate((d) => !d.open) && Number(await p.locator('[data-jobs-drawer] [data-jobs-count="parts"]').innerText()) >= 5);
 const drawer = await p.locator("[data-jobs-drawer]").innerText();
 ok("opening Pending Jobs lists both jobs with name, qty and reason", /Cover sheet/.test(drawer) && /Gearbox/.test(drawer) && /Special coupling/.test(drawer) && /Check points at Outward: 1\/2 ticked/.test(drawer) && /Not selected at BOM Outward/.test(drawer));
 const oSer = jobs.find((j) => j.itemName === "Option test serial"), oChk = jobs.find((j) => j.itemName === "Option test checks"), oBoth = jobs.find((j) => j.itemName === "Option test both");

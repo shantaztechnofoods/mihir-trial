@@ -52,7 +52,7 @@ import {
 } from "./utils/handoverLogic.js";
 // Phase B
 import { fetchTemplates, createTemplate, updateTemplate, deleteTemplate, fetchResponses, createResponse } from "./stores/checklistsStore.js";
-import { fetchPendingItems, createPendingItem, resolvePendingItem, receivePendingItem, receivePendingPart, pendingItemStage, pendingItemHistory, pendingItemRemaining } from "./stores/pendingItemsStore.js";
+import { fetchPendingItems, createPendingItem, resolvePendingItem, receivePendingItem, receivePendingPart, pendingItemIsPart, pendingItemIsDone, pendingItemIsOpen, pendingItemStage, pendingItemHistory, pendingItemRemaining } from "./stores/pendingItemsStore.js";
 import { fetchAllAttachments, fetchAttachmentsForMachine, uploadAttachment, signedUrlFor, deleteAttachment } from "./stores/attachmentsStore.js";
 import { fetchRatings, createRating, overrideRating } from "./stores/ratingsStore.js";
 import { computeDepartmentRating, formatRatingBadge, summarizeMachineRatings, buildDepartmentScoreboard } from "./utils/ratingLogic.js";
@@ -84,7 +84,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-02-accept-signature";
+const APP_BUILD = "2026-11-02-pending-split";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -910,7 +910,7 @@ function DashboardPage({ items = {}, pos = [], vendorList = [], machineLog = [],
     const onRack = (handovers || []).filter((h) => h && h.status === "pending" && h.releaseRequired && !h.releasedAt).length;
     const onHold = pendingHo.filter((h) => isHoldOverdue(h.sentAt, h.acceptTimeoutMinutes, now));
     const awaiting = pendingHo.length - onHold.length;
-    const openJobs = (pendingHandoverItems || []).filter((p) => p.status === "open");
+    const openJobs = (pendingHandoverItems || []).filter(pendingItemIsOpen);
     // 2026-11-02 — machines put ON HOLD by hand (machine card) count too.
     const manualHold = live.filter((m) => m.holdActive).length;
     return { live: live.length, byStage, delayed, onHold, manualHold, onRack, awaiting, openJobs, completed: machineLog.filter((m) => m.status === "completed").length };
@@ -17671,7 +17671,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
     return !!(h && myDepartments.includes(h.toDepartment));
   };
   const openItemsFor = (m, kind) => (pendingHandoverItems || []).filter((p) =>
-    String(p.machineId) === String(m.id) && p.status === "open"
+    String(p.machineId) === String(m.id) && pendingItemIsOpen(p)
     && (kind === "owed" ? p.kind === "owed" : p.kind !== "owed")
     && myDepartments.includes(p.assignedDepartment));
   // "Take in" means the machine is actually waiting on this department. One
@@ -17750,15 +17750,15 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                     <div className="divide-y" style={{ borderColor: "rgba(17,24,39,0.06)" }}>
                       {list.map((p) => {
                         const stage = pendingItemStage(p);
-                        const chip = stage === "completed"
-                          ? { label: "✓ Completed", bg: "rgba(22,163,74,0.1)", fg: "#15803d" }
+                        const chip = pendingItemIsDone(p)
+                          ? { label: pendingItemIsPart(p) && p.status !== "resolved" ? "✓ Fully received" : "✓ Completed", bg: "rgba(22,163,74,0.1)", fg: "#15803d" }
                           : stage === "received"
                           ? { label: "Part received · finish work", bg: "rgba(37,99,235,0.1)", fg: "#1d4ed8" }
                           : stage === "partial"
                           ? { label: `Partly received · ${pendingItemRemaining(p)} left`, bg: "rgba(37,99,235,0.1)", fg: "#1d4ed8" }
                           : { label: p.itemCode || p.itemName ? "Awaiting part" : "Awaiting work", bg: "rgba(217,119,6,0.12)", fg: "#b45309" };
                         return (
-                          <div key={p.id} data-job-row={p.id} className="px-3 py-2.5 flex items-start gap-3 flex-wrap">
+                          <div key={p.id} data-job-row={p.id} data-job-kind={pendingItemIsPart(p) ? "part" : "work"} className="px-3 py-2.5 flex items-start gap-3 flex-wrap">
                             <div className="flex-1 min-w-[200px]">
                               <div className="text-[12px] text-slate-800 font-semibold">{p.description}</div>
                               {(p.itemCode || p.itemName) && (
@@ -17824,13 +17824,60 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                   </div>
     );
   };
+  // 2026-11-02 — Pending Jobs board: PENDING PARTS, PENDING WORK, then a
+  // collapsible COMPLETED section. A job is a part when it names an item; a
+  // part is completed when fully received (partial receipts stay pending),
+  // work when marked Work completed. Used by the Pending Jobs tab and the
+  // machine drawer; rows and actions come from renderJobGroup.
+  const renderJobBoard = (items, { detailsKey = "completed" } = {}) => {
+    const list = Array.isArray(items) ? items : [];
+    const openParts = list.filter((p) => pendingItemIsOpen(p) && pendingItemIsPart(p));
+    const openWork  = list.filter((p) => pendingItemIsOpen(p) && !pendingItemIsPart(p));
+    const donePartsL = list.filter((p) => pendingItemIsDone(p) && pendingItemIsPart(p));
+    const doneWorkL  = list.filter((p) => pendingItemIsDone(p) && !pendingItemIsPart(p));
+    const byMach = (arr) => Object.entries(arr.reduce((acc, p) => { (acc[String(p.machineId)] = acc[String(p.machineId)] || []).push(p); return acc; }, {}))
+      .map(([id, l]) => ({ id, m: machineLog.find((x) => String(x.id) === id) || null, list: l.slice().sort((a, b) => String(a.raisedAt || "").localeCompare(String(b.raisedAt || ""))) }))
+      .sort((a, b) => (a.m?.serialNo || "").localeCompare(b.m?.serialNo || ""));
+    const block = (key, title, icon, tone, arr, empty) => (
+      <section data-jobs-section={key} className="space-y-2">
+        <div className="flex items-center gap-2">
+          <span className="text-[12.5px] font-black" style={{ color: tone }}>{icon} {title}</span>
+          <span data-jobs-count={key} className="text-[10.5px] font-black px-2 py-0.5 rounded-full" style={{ background: `${tone}1a`, color: tone }}>{arr.length}</span>
+        </div>
+        {arr.length === 0
+          ? <div className="rounded-lg px-3 py-2.5 text-[11px] font-semibold" style={{ background: "rgba(22,163,74,0.06)", color: "#15803d" }}>{empty}</div>
+          : byMach(arr).map(({ id, m, list: l }) => renderJobGroup(m, l, `${key}-${id}`))}
+      </section>
+    );
+    return (
+      <div data-jobs-board className="space-y-4">
+        {block("parts", "Pending Parts", "📦", "#b45309", openParts, "✓ No part is pending.")}
+        {block("work", "Pending Work", "🛠", "#1d4ed8", openWork, "✓ No work is pending.")}
+        <details data-jobs-section={detailsKey} className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+          <summary className="cursor-pointer font-bold py-1">
+            Completed jobs ({donePartsL.length + doneWorkL.length})
+            <span data-jobs-count="done-parts" className="ml-2 font-semibold">parts {donePartsL.length}</span>
+            <span data-jobs-count="done-work" className="ml-2 font-semibold">work {doneWorkL.length}</span>
+          </summary>
+          <div className="mt-2 space-y-3">
+            {donePartsL.length + doneWorkL.length === 0
+              ? <div className="text-[11px] italic px-1">Nothing completed yet.</div>
+              : <>
+                  {donePartsL.length > 0 && <div data-jobs-done-group="parts"><div className="text-[11px] font-black mb-1" style={{ color: "#15803d" }}>Completed parts</div><div className="space-y-2">{byMach(donePartsL).map(({ id, m, list: l }) => renderJobGroup(m, l, `dp-${id}`))}</div></div>}
+                  {doneWorkL.length > 0 && <div data-jobs-done-group="work"><div className="text-[11px] font-black mb-1" style={{ color: "#15803d" }}>Completed work</div><div className="space-y-2">{byMach(doneWorkL).map(({ id, m, list: l }) => renderJobGroup(m, l, `dw-${id}`))}</div></div>}
+                </>}
+          </div>
+        </details>
+      </div>
+    );
+  };
   const listForTab = () => (mtTab === "pending" ? []
     : mtTab === "transfer" ? (filter === "hold" ? onHold : filter === "pendingAccept" ? pendingAccept : active)
     : filtered);
   // 2026-10-30 — Pending Jobs: every open job in the factory (a floor login
   // sees only what is assigned to its own departments), grouped by machine.
   const openJobsScoped = (pendingHandoverItems || [])
-    .filter((p) => p.status === "open")
+    .filter(pendingItemIsOpen)
     .filter((p) => !scopeMine || myDepartments.includes(p.assignedDepartment));
   const filtered  = filter === "active" ? active
                    : filter === "completed" ? completed
@@ -18083,7 +18130,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
             panel it opens; hidden for a floor login, as the panel always was. */}
         {!staffMode && (() => {
           const calledN = (pendingHandoverItems || [])
-            .filter((p) => p.status === "open")
+            .filter(pendingItemIsOpen)
             .filter((p) => !scopeMine || myDepartments.includes(p.assignedDepartment)).length;
           return (
             <button type="button" onClick={() => setShowCalled((v) => !v)}
@@ -18149,10 +18196,10 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
           const canReport  = !!onRaisePendingItem && canDo("machines", "accept");
           const machineOf  = (h) => (machineLog || []).find((m) => String(m.id) === String(h.machineId)) || null;
           const titleOf    = (m, h) => `${(m && m.bomKey) || (h && h.bomKey) || "Machine"}${(m && m.serialNo) || (h && h.serialNo) ? ` · S/N ${(m && m.serialNo) || h.serialNo}` : ""}`;
-          const openJobsOf = (m) => (pendingHandoverItems || []).filter((p) => String(p.machineId) === String(m.id) && p.status === "open");
+          const openJobsOf = (m) => (pendingHandoverItems || []).filter((p) => String(p.machineId) === String(m.id) && pendingItemIsOpen(p));
           const toAccept   = askableHandovers.filter((h) => myDepartments.includes(h.toDepartment));
           const sentOn     = startedAll.filter((m) => { if (m.status === "completed") return false; const h = machineHandover(m); return h && myDepartments.includes(h.fromDepartment) && !myDepartments.includes(h.toDepartment); });
-          const myJobs     = (pendingHandoverItems || []).filter((p) => p.status === "open" && myDepartments.includes(p.assignedDepartment));
+          const myJobs     = (pendingHandoverItems || []).filter((p) => pendingItemIsOpen(p) && myDepartments.includes(p.assignedDepartment));
           const awaitingRelease = startedAll.filter((m) => { const h = machineHandover(m); return !!(h && isAwaitingRelease(h)); });
           const Section = ({ title, count, hint, children }) => (
             <div className="section-card no-lift p-4 sm:p-5" data-staff-section={title}>
@@ -18392,51 +18439,23 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
         {!staffMode && mtTab === "pending" && (() => {
           const allJobsScoped = (pendingHandoverItems || [])
             .filter((p) => !scopeMine || myDepartments.includes(p.assignedDepartment));
-          const viewJobs = jobsView === "open" ? openJobsScoped
-                         : jobsView === "done" ? allJobsScoped.filter((p) => p.status === "resolved")
-                         : allJobsScoped;
           const userName = (id) => { if (!id) return ""; const u = (allUsers || []).find((x) => x.id === id); return u ? (u.fullName || u.username || "") : ""; };
-          const byMachine = viewJobs.reduce((acc, p) => {
-            const k = String(p.machineId);
-            (acc[k] = acc[k] || []).push(p);
-            return acc;
-          }, {});
-          const groups = Object.entries(byMachine).map(([id, list]) => {
-            const m = machineLog.find((x) => String(x.id) === id) || null;
-            return { id, m, list: list.slice().sort((a, b) => String(a.raisedAt || "").localeCompare(String(b.raisedAt || ""))) };
-          }).sort((a, b) => (a.m?.serialNo || "").localeCompare(b.m?.serialNo || ""));
           const canAct = canFinishTransfer(canDo);
-          const receivedN = openJobsScoped.filter((p) => p.receivedAt).length;
-          const partsN    = openJobsScoped.filter((p) => p.itemCode).length;
+          const partsOpenN = openJobsScoped.filter(pendingItemIsPart).length;
+          const workOpenN  = openJobsScoped.length - partsOpenN;
+          const doneN      = allJobsScoped.filter(pendingItemIsDone).length;
           return (
             <div className="section-card p-4 sm:p-5">
               <div className="flex items-center gap-2.5 flex-wrap mb-4">
                 <div className="sec-icon" style={{ background: "rgba(220,38,38,0.08)", color: "#dc2626" }}><AlertOctagon size={16} /></div>
                 <span className="text-[13px] font-bold" style={{ color: "var(--text-strong)" }}>Pending Jobs</span>
-                <span className="sp-pill sp-pill-red">{openJobsScoped.length} open</span>
-                {partsN > 0 && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(217,119,6,0.12)", color: "#b45309" }}>{partsN} missing part{partsN === 1 ? "" : "s"}</span>}
-                {receivedN > 0 && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(37,99,235,0.1)", color: "#1d4ed8" }}>{receivedN} part{receivedN === 1 ? "" : "s"} received · work to finish</span>}
+                <span className="sp-pill sp-pill-red" data-jobs-total-open>{openJobsScoped.length} open</span>
+                <span data-jobs-head-parts className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(217,119,6,0.12)", color: "#b45309" }}>Parts {partsOpenN} pending</span>
+                <span data-jobs-head-work className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(37,99,235,0.1)", color: "#1d4ed8" }}>Work {workOpenN} pending</span>
+                <span data-jobs-head-done className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(22,163,74,0.1)", color: "#15803d" }}>{doneN} completed</span>
                 <span className="text-[10px]" style={{ color: "var(--text-dim)" }}>tracked until completed — an open job never stops a machine moving on</span>
-                <div className="ml-auto flex items-center gap-1 rounded-lg p-0.5" style={{ background: "rgba(17,24,39,0.05)" }} role="group" aria-label="Show jobs">
-                  {[["open", "Open"], ["done", "Completed"], ["all", "All"]].map(([k, l]) => (
-                    <button key={k} type="button" onClick={() => setJobsView(k)} aria-pressed={jobsView === k}
-                            className="text-[10.5px] font-bold px-2.5 py-1 rounded-md transition-all"
-                            style={jobsView === k ? { background: "var(--surface-card)", color: "#111827", boxShadow: "0 1px 2px rgba(17,24,39,0.12)" } : { color: "#6b7280" }}>
-                      {l}
-                    </button>
-                  ))}
-                </div>
               </div>
-              {groups.length === 0 && (
-                <div className="py-12 text-center">
-                  <div className="text-3xl mb-2">✅</div>
-                  <div className="text-[12px] font-bold text-slate-700">{jobsView === "done" ? "No completed jobs yet" : "No pending jobs"}</div>
-                  <div className="text-[10.5px] text-slate-500 mt-1">Jobs recorded at Finish &amp; Transfer, at Accept, from Report Issue, or for parts not issued at BOM Outward will appear here.</div>
-                </div>
-              )}
-              <div className="space-y-3">
-                {groups.map(({ id, m, list }) => renderJobGroup(m, list, id))}
-              </div>
+              {renderJobBoard(allJobsScoped, { detailsKey: "completed" })}
             </div>
           );
         })()}
@@ -18728,7 +18747,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                       className="absolute top-3 right-3 z-10 w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100 text-xs font-bold">✕</button>
         {(() => {
           const openAssigned = (pendingHandoverItems || [])
-            .filter((p) => p.status === "open")
+            .filter(pendingItemIsOpen)
             // A floor login is only shown what has been called to its own
             // departments; the rest of the factory is not its business.
             .filter((p) => !scopeMine || myDepartments.includes(p.assignedDepartment));
@@ -19521,7 +19540,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
             //          cannot reach Ready. Blocking transfer here would stall
             //          the line for a part nobody is waiting on yet.
             const machineOpenAll = (pendingHandoverItems || [])
-              .filter((p) => String(p.machineId) === String(machine.id) && p.status === "open");
+              .filter((p) => String(p.machineId) === String(machine.id) && pendingItemIsOpen(p));
             const machineOpenItems = machineOpenAll.filter((p) => p.kind !== "owed");
             // Parts that were short at BOM issue and have since been given out
             // of Pending Stock. Matched on serial number, the same way the
@@ -19870,7 +19889,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                 {isExpanded && (() => {
                   const machineAttachments = (attachments || []).filter((a) => a.machineId === machine.id);
                   const machinePendingItems = (pendingHandoverItems || []).filter((p) => p.machineId === machine.id);
-                  const openItems = machinePendingItems.filter((p) => p.status === "open");
+                  const openItems = machinePendingItems.filter(pendingItemIsOpen);
                   const machineRatings = (deptRatings || []).filter((r) => r.machineId === machine.id);
                   const ratingSummary = summarizeMachineRatings(machineRatings);
                   return (
@@ -19969,7 +19988,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                             // Jobs raised at this hand-over — tracked apart from the delay.
                                             const js = (pendingHandoverItems || []).filter((p) => String(p.raisedInHandoverId) === String(h.id));
                                             if (!js.length) return "—";
-                                            const open = js.filter((p) => p.status === "open").length;
+                                            const open = js.filter(pendingItemIsOpen).length;
                                             return `${js.length}${open ? ` (${open} open)` : " (done)"}`;
                                           })()}
                                         </td>
@@ -20358,8 +20377,9 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
       {jobsDrawer != null && (() => {
         const m = machineLog.find((x) => String(x.id) === String(jobsDrawer)) || null;
         const all = (pendingHandoverItems || []).filter((p) => String(p.machineId) === String(jobsDrawer));
-        const open = all.filter((p) => p.status !== "resolved");
-        const done = all.filter((p) => p.status === "resolved");
+        const open = all.filter(pendingItemIsOpen);
+        const done = all.filter(pendingItemIsDone);
+        const openPartsN = open.filter(pendingItemIsPart).length;
         return (
           <div className="rack-panel-backdrop fixed inset-0 z-[66] flex justify-end" style={{ background: "rgba(17,24,39,0.35)", pointerEvents: jobAction ? "none" : "auto" }}
                onClick={(e) => e.target === e.currentTarget && !jobAction && setJobsDrawer(null)}>
@@ -20367,21 +20387,12 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
               <div className="px-4 sm:px-5 py-4 flex items-center justify-between gap-3" style={{ background: "#b91c1c", color: "#fff" }}>
                 <div>
                   <div className="text-[17px] font-black">⏳ Pending Jobs · {m?.bomKey || "Machine"}{m?.serialNo ? ` · S/N ${m.serialNo}` : ""}</div>
-                  <div className="text-[11px] opacity-90">{open.length} open · {done.length} completed · now in {m?.status === "completed" ? "Ready" : (m?.currentDepartment || m?.stage || "—")}</div>
+                  <div className="text-[11px] opacity-90">{openPartsN} part{openPartsN === 1 ? "" : "s"} · {open.length - openPartsN} work pending · {done.length} completed · now in {m?.status === "completed" ? "Ready" : (m?.currentDepartment || m?.stage || "—")}</div>
                 </div>
                 <button type="button" aria-label="Close" onClick={() => setJobsDrawer(null)} className="w-9 h-9 rounded-lg text-[18px] font-black" style={{ background: "rgba(255,255,255,0.18)", color: "#fff" }}>✕</button>
               </div>
               <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3">
-                {open.length === 0 && (
-                  <div className="rounded-xl px-4 py-6 text-center text-[12px] font-semibold" style={{ background: "rgba(22,163,74,0.08)", color: "#15803d" }}>✓ No pending job is open on this machine.</div>
-                )}
-                {open.length > 0 && renderJobGroup(m, open, "open")}
-                {done.length > 0 && (
-                  <details className="text-[11px]" style={{ color: "var(--text-muted)" }}>
-                    <summary className="cursor-pointer font-bold py-1">Completed jobs ({done.length})</summary>
-                    <div className="mt-2">{renderJobGroup(m, done, "done")}</div>
-                  </details>
-                )}
+                {renderJobBoard(all, { detailsKey: "drawer-completed" })}
               </div>
             </div>
           </div>
@@ -21204,11 +21215,11 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                       </div>
                     )}
                     {/* Phase B — carry-forward: show previously unresolved items for this machine */}
-                    {(pendingHandoverItems || []).filter((p) => p.machineId === handover.machineId && p.status === "open").length > 0 && (
+                    {(pendingHandoverItems || []).filter((p) => p.machineId === handover.machineId && pendingItemIsOpen(p)).length > 0 && (
                       <div className="rounded-lg px-3 py-2" style={{ background: "rgba(217, 119, 6,0.07)", border: "1px solid rgba(217, 119, 6,0.3)" }}>
                         <div className="text-[10px] font-bold text-amber-700 uppercase tracking-wide mb-1">⏳ Pending items carried forward from previous departments</div>
                         <ul className="list-disc list-inside text-[11px] text-amber-800 space-y-0.5">
-                          {(pendingHandoverItems || []).filter((p) => p.machineId === handover.machineId && p.status === "open").map((p) => (
+                          {(pendingHandoverItems || []).filter((p) => p.machineId === handover.machineId && pendingItemIsOpen(p)).map((p) => (
                             <li key={p.id}><span className="font-semibold">{p.raisedInDepartment}:</span> {p.description}</li>
                           ))}
                         </ul>
@@ -26472,7 +26483,7 @@ export default function App() {
 
     // Phase B — compute + save a department rating snapshot for the sender's work.
     const openPendingItemsCount =
-      (pendingHandoverItems.filter((p) => p.machineId === handover.machineId && p.status === "open").length)
+      (pendingHandoverItems.filter((p) => p.machineId === handover.machineId && pendingItemIsOpen(p)).length)
       + cleanPendingJobs(pendingItemsToRaise).length;
     const overrunMinutesForRating = Number(accRes.handover.overrunMinutes) || 0;
     const heldMinutesForRating = wasOverdue

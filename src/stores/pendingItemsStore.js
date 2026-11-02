@@ -140,6 +140,14 @@ export function pendingItemHistory(p) {
   return out;
 }
 
+// A job that names a part (item code or name) is a PART; anything else is WORK.
+// A part is finished when it is fully received (received_at is only set on the
+// last receipt — partial receipts keep the remainder pending). Work is finished
+// when it is marked Work completed (status resolved). Nothing is deleted.
+export const pendingItemIsPart = (p) => !!p && (String(p.itemCode || "").trim() !== "" || String(p.itemName || "").trim() !== "");
+export const pendingItemIsDone = (p) => !!p && (p.status === "resolved" || (pendingItemIsPart(p) && !!p.receivedAt));
+export const pendingItemIsOpen = (p) => !!p && p.status === "open" && !pendingItemIsDone(p);
+
 // Where a job is in its life: reported → awaiting part/work → received → completed.
 export function pendingItemStage(p) {
   if (!p) return "awaiting";

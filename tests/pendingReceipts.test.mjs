@@ -130,7 +130,7 @@ test("app: Pending Jobs view shows every department's job with origin, qty progr
   assert.match(app, /const all = \(pendingHandoverItems \|\| \[\]\)\.filter\(\(p\) => String\(p\.machineId\) === String\(jobsDrawer\)\);/);
   assert.match(app, /data-job-origin/);
   assert.match(app, /<b>\{pendingItemRemaining\(p\)\} pending<\/b>/);
-  assert.match(app, /Completed jobs \(\{done\.length\}\)/);
+  assert.match(app, /Completed jobs \(\{donePartsL\.length \+ doneWorkL\.length\}\)/);
   assert.match(app, /data-card-jobs-done=\{machine\.id\}/);
   // completed jobs record who and when (existing columns, unchanged)
   assert.match(app, /resolvedBy: currentUser\?\.id, resolvedAt: new Date\(\)\.toISOString\(\)/);
