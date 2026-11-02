@@ -225,7 +225,7 @@ export function getRoleLabel(user, roles) {
 
 export function getRoleColor(user, roles) {
   if (!user) return "#6366f1";
-  if (user.role === "super_admin") return "#ec4899";
+  if (user.role === "super_admin") return "#6A7CF2";
   return roles[user.role]?.color || "#6366f1";
 }
 

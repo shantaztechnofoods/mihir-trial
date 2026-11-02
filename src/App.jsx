@@ -84,7 +84,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-02-dept-staff-create";
+const APP_BUILD = "2026-11-02-cobalt-ui";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -119,7 +119,7 @@ const inventoryData = {
 const bomDefinitions = {
   "KM-10": {
     label: "Kneading Machine 10L",
-    color: "#D71920",
+    color: "#2E50D6",
     items: [
       { code: "OIL-046",  qty: 2 },
       { code: "BRG-001",  qty: 2 },
@@ -129,7 +129,7 @@ const bomDefinitions = {
   },
   "KM-15": {
     label: "Kneading Machine 15L",
-    color: "#B01218",
+    color: "#2640B0",
     items: [
       { code: "OIL-046",  qty: 3 },
       { code: "BRG-001",  qty: 2 },
@@ -328,13 +328,13 @@ const monthlyPOData = [
 ];
 
 const stockDistribution = [
-  { name: "Safe", value: 1147, color: "#D71920" },
+  { name: "Safe", value: 1147, color: "#2E50D6" },
   { name: "Warning", value: 67, color: "#b45309" },
   { name: "Critical", value: 34, color: "#b91c1c" },
 ];
 
 const spendByCategory = [
-  { name: "Lubricants", value: 38, color: "#D71920" },
+  { name: "Lubricants", value: 38, color: "#2E50D6" },
   { name: "Bearings", value: 24, color: "#6d28d9" },
   { name: "Electrical", value: 18, color: "#b45309" },
   { name: "Belts", value: 12, color: "#15803d" },
@@ -628,7 +628,7 @@ function Sidebar({ activePage, setActivePage, collapsed, setCollapsed, badges = 
                       <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full min-w-[18px] text-center leading-tight"
                             style={{
                               color: "#ffffff",
-                              background: item.id==="pending" ? "linear-gradient(135deg,#f59e0b,#d97706)" : item.id==="pipeline" ? "linear-gradient(135deg,#818cf8,#6366f1)" : item.id==="machines" ? "linear-gradient(135deg,#f0353d,#dc2626)" : "linear-gradient(135deg,#ef4444,#dc2626)",
+                              background: item.id==="pending" ? "linear-gradient(135deg,#f59e0b,#d97706)" : item.id==="pipeline" ? "linear-gradient(135deg,#818cf8,#6366f1)" : item.id==="machines" ? "linear-gradient(135deg,#5A78EA,#2640B0)" : "linear-gradient(135deg,#ef4444,#dc2626)",
                               boxShadow:  "0 2px 8px rgba(0,0,0,0.3)",
                             }}>{b}</span>
                     ) : null; })()}
@@ -714,7 +714,7 @@ const Btn = ({ variant = "ghost", size = "sm", onClick, children, className = ""
     purple:  "bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100 hover:border-purple-300",
   };
   const primaryStyle = variant === "primary" && disabled ? {
-    background: "rgba(215,25,32,0.35)", boxShadow: "none", color: "#7f1d1d",
+    background: "rgba(46, 80, 214,0.35)", boxShadow: "none", color: "#7f1d1d",
   } : {};
   const waStyle = variant === "wa" ? { color: "#ffffff" } : {};
   // eslint-disable-next-line jsx-a11y/no-autofocus
@@ -730,7 +730,7 @@ const Btn = ({ variant = "ghost", size = "sm", onClick, children, className = ""
 // ─── METRIC CARD ─────────────────────────────────────────────────────────────
 
 function MetricCard({ label, value, delta, deltaUp, icon, barPct, barColor, valueColor, delay = 0, highlight = false }) {
-  const color = barColor || "#D71920";
+  const color = barColor || "#2E50D6";
   return (
     <div
       className="kpi-tile relative"
@@ -921,14 +921,14 @@ function DashboardPage({ items = {}, pos = [], vendorList = [], machineLog = [],
   // the dashboard look assembled rather than designed. Stroked icons take each
   // tile's own colour instead of fighting it.
   const kpis = [
-    { label: "Total SKUs",        value: totalSKUs,                                              Icon: Boxes,        color: "#D71920", nav: "inventory",  sub: `${safeItems.length} safe` },
+    { label: "Total SKUs",        value: totalSKUs,                                              Icon: Boxes,        color: "#2E50D6", nav: "inventory",  sub: `${safeItems.length} safe` },
     { label: "Critical Stock",    value: criticalN,                                              Icon: AlertOctagon, color: "#b91c1c", nav: "inventory",  sub: `${warningItems.length} warning`,  alert: criticalN > 0 },
     { label: "Pending POs",       value: pendingPOs.length,                                      Icon: AlertTriangle,color: "#b45309", nav: "pipeline",   sub: "awaiting approval",               alert: pendingPOs.length > 0 },
     { label: "Open PO Value",     value: fmtVal(openPOValue),                                    Icon: Wallet,       color: "#15803d", nav: "pipeline",   sub: `${pos.filter(p=>p.status!=="received").length} open` },
-    { label: "In Production",     value: machineLog.filter((m) => m.status === "active" && m.stage !== "BOM Issued").length, Icon: Cog, color: "#B01218", nav: "machines",   sub: "machines active" },
+    { label: "In Production",     value: machineLog.filter((m) => m.status === "active" && m.stage !== "BOM Issued").length, Icon: Cog, color: "#2640B0", nav: "machines",   sub: "machines active" },
     { label: "Machines Ready",    value: machineLog.filter((m) => m.status === "completed").length, Icon: CircleCheckBig, color: "#15803d", nav: "machines", sub: "completed" },
     { label: "Pending Materials", value: pendingLog.length,                                      Icon: Hourglass,    color: "#b45309", nav: "pending",    sub: "items pending",                   alert: pendingLog.length > 0 },
-    { label: "Pending Approvals", value: pos.filter((p) => p.status === "pending").length,       Icon: ClipboardList,color: "#D71920", nav: "pipeline",   sub: "awaiting review",                 alert: pos.filter((p) => p.status === "pending").length > 0 },
+    { label: "Pending Approvals", value: pos.filter((p) => p.status === "pending").length,       Icon: ClipboardList,color: "#2E50D6", nav: "pipeline",   sub: "awaiting review",                 alert: pos.filter((p) => p.status === "pending").length > 0 },
     { label: "In Follow Up",      value: followUps.length,                                       Icon: PhoneCall,    color: "#6d28d9", nav: "pipeline",   sub: "orders tracked" },
   ];
 
@@ -1001,8 +1001,8 @@ function DashboardPage({ items = {}, pos = [], vendorList = [], machineLog = [],
         <div className="section-card overflow-hidden">
           <div className="flex items-center justify-between px-5 pt-4 pb-3 flex-wrap gap-2">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(215,25,32,0.08)" }}>
-                <Cog size={16} style={{ color: "#D71920" }} />
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(46, 80, 214,0.08)" }}>
+                <Cog size={16} style={{ color: "#2E50D6" }} />
               </div>
               <div>
                 <div className="text-[13px] font-bold" style={{ color: "var(--text-strong)" }}>Production Overview</div>
@@ -1426,7 +1426,7 @@ function QuickStockModal({ item, mode, onConfirm, onClose }) {
           {/* Quantity input */}
           <div>
             <div className="text-[11px] font-medium tracking-tight mb-1.5"
-                 style={{ color: "#b01218" }}>
+                 style={{ color: "#2640B0" }}>
               Quantity
             </div>
             <input ref={inputRef} type="number" min="1" value={qty}
@@ -1441,13 +1441,13 @@ function QuickStockModal({ item, mode, onConfirm, onClose }) {
           {previewStatus && (
             <div className="flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all"
                  style={{
-                   background: previewStatus === "critical" ? "rgba(239,68,68,0.06)" : previewStatus === "warning" ? "rgba(217, 119, 6,0.06)" : "rgba(215, 25, 32,0.06)",
-                   border: `1px solid ${previewStatus === "critical" ? "rgba(239,68,68,0.3)" : previewStatus === "warning" ? "rgba(217, 119, 6,0.3)" : "rgba(215, 25, 32,0.3)"}`,
+                   background: previewStatus === "critical" ? "rgba(239,68,68,0.06)" : previewStatus === "warning" ? "rgba(217, 119, 6,0.06)" : "rgba(46, 80, 214,0.06)",
+                   border: `1px solid ${previewStatus === "critical" ? "rgba(239,68,68,0.3)" : previewStatus === "warning" ? "rgba(217, 119, 6,0.3)" : "rgba(46, 80, 214,0.3)"}`,
                  }}>
               <div>
                 <div className="text-[10px] font-medium text-slate-500 uppercase tracking-[0.06em] mb-0.5">New Stock</div>
                 <div className="text-sm font-black font-mono"
-                     style={{ color: previewStatus === "critical" ? "#b91c1c" : previewStatus === "warning" ? "#b45309" : "#B01218", fontFamily: "'Inter',system-ui,sans-serif", fontVariantNumeric: "tabular-nums" }}>
+                     style={{ color: previewStatus === "critical" ? "#b91c1c" : previewStatus === "warning" ? "#b45309" : "#2640B0", fontFamily: "'Inter',system-ui,sans-serif", fontVariantNumeric: "tabular-nums" }}>
                   {newStock} <span className="text-xs font-semibold text-slate-500">{item.unit}</span>
                 </div>
               </div>
@@ -1518,7 +1518,7 @@ function ItemDetailModal({ item, category, onClose, onDelete, onUpdateStock, onE
 
         {/* Header */}
         <div className="px-6 py-5 border-b border-slate-200 flex items-start justify-between flex-shrink-0"
-             style={{ background: "linear-gradient(90deg,rgba(215, 25, 32,0.1),rgba(176, 18, 24,0.05))" }}>
+             style={{ background: "linear-gradient(90deg,rgba(46, 80, 214,0.1),rgba(38, 64, 176,0.05))" }}>
           <div className="flex-1 min-w-0 pr-3 flex items-start gap-3">
             {/* Optional item photo (Phase 1 item media) */}
             {item.photo && (
@@ -1682,7 +1682,7 @@ function ItemDetailModal({ item, category, onClose, onDelete, onUpdateStock, onE
 
           {/* Stock adjustment panel */}
           {adjustMode && (
-            <div className="p-4 rounded-xl" style={{ background: "rgba(215, 25, 32,0.05)", border: "1px solid rgba(215, 25, 32,0.3)" }}>
+            <div className="p-4 rounded-xl" style={{ background: "rgba(46, 80, 214,0.05)", border: "1px solid rgba(46, 80, 214,0.3)" }}>
               <div className="text-[9px] font-black text-blue-600 uppercase tracking-[0.08em] mb-3">
                 {adjustMode === "add" ? "Add Stock" : "Remove Stock"}
               </div>
@@ -1695,7 +1695,7 @@ function ItemDetailModal({ item, category, onClose, onDelete, onUpdateStock, onE
                        style={{ fontVariantNumeric: "tabular-nums" }} />
                 <button onClick={handleAdjust}
                         className="px-4 py-2 rounded-xl text-xs font-bold text-white transition-all duration-200"
-                        style={{ background: "#B01218", border: "1px solid rgba(176, 18, 24,0.5)", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
+                        style={{ background: "#2640B0", border: "1px solid rgba(38, 64, 176,0.5)", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
                   Confirm
                 </button>
                 <button onClick={() => { setAdjustMode(null); setAdjustQty(""); }}
@@ -1815,7 +1815,7 @@ function ItemDetailModal({ item, category, onClose, onDelete, onUpdateStock, onE
                   {[
                     ["Total Consumed",    `${totalConsumed} ${item.unit}`,    "#D97706"],
                     ["Last Used",         lastConsDate || "—",                "#8b5cf6"],
-                    ["BOMs Using Item",   Object.keys(byBOM).length || "—",   "#D71920"],
+                    ["BOMs Using Item",   Object.keys(byBOM).length || "—",   "#2E50D6"],
                     ["Machines Used In",  Object.keys(byMachine).length || "—","#22c55e"],
                   ].map(([lbl, val, col]) => (
                     <div key={lbl} className="px-3.5 py-3 rounded-xl"
@@ -2013,7 +2013,7 @@ function ItemDetailModal({ item, category, onClose, onDelete, onUpdateStock, onE
             // Type badge config
             const txnCfg = (t) => {
               if (t === "Purchase Receipt") return { color: "#15803d",  bg: "rgba(34,197,94,0.12)",   brd: "rgba(34,197,94,0.3)",   icon: "📥" };
-              if (t === "BOM Issue")        return { color: "#D71920",  bg: "rgba(215, 25, 32,0.12)",  brd: "rgba(215, 25, 32,0.3)",  icon: "🔧" };
+              if (t === "BOM Issue")        return { color: "#2E50D6",  bg: "rgba(46, 80, 214,0.12)",  brd: "rgba(46, 80, 214,0.3)",  icon: "🔧" };
               if (t === "Manual Outward")   return { color: "#b45309",  bg: "rgba(217, 119, 6,0.12)",  brd: "rgba(217, 119, 6,0.3)",  icon: "📤" };
               if (t === "Stock In")         return { color: "#15803d",  bg: "rgba(74,222,128,0.10)",  brd: "rgba(74,222,128,0.25)", icon: "⬆️" };
               if (t === "Stock Out")        return { color: "#b91c1c",  bg: "rgba(239,68,68,0.10)",   brd: "rgba(239,68,68,0.25)",  icon: "⬇️" };
@@ -2042,9 +2042,9 @@ function ItemDetailModal({ item, category, onClose, onDelete, onUpdateStock, onE
                     <button key={key} onClick={() => setMvFilter(key)}
                             className="text-[10px] font-bold px-2.5 py-1 rounded-lg border transition-all"
                             style={{
-                              color:       mvFilter === key ? "#D71920" : "#64748b",
-                              background:  mvFilter === key ? "rgba(215, 25, 32,0.12)" : "transparent",
-                              borderColor: mvFilter === key ? "rgba(215, 25, 32,0.35)" : "rgba(17,24,39,0.10)",
+                              color:       mvFilter === key ? "#2E50D6" : "#64748b",
+                              background:  mvFilter === key ? "rgba(46, 80, 214,0.12)" : "transparent",
+                              borderColor: mvFilter === key ? "rgba(46, 80, 214,0.35)" : "rgba(17,24,39,0.10)",
                             }}>
                       {label}
                     </button>
@@ -2363,7 +2363,7 @@ function AddItemModal({ machines, onSave, onClose, initialValues = null, vendorL
   })();
 
   const Label = ({ text, req }) => (
-    <div className="text-[11px] font-medium tracking-tight mb-1.5" style={{ color: "#b01218" }}>
+    <div className="text-[11px] font-medium tracking-tight mb-1.5" style={{ color: "#2640B0" }}>
       {text}{req && <span className="text-red-400 ml-0.5">*</span>}
     </div>
   );
@@ -2380,13 +2380,13 @@ function AddItemModal({ machines, onSave, onClose, initialValues = null, vendorL
            style={{
              maxHeight: "92vh",
              background: "var(--surface-elevated)",
-             border: "1px solid rgba(215, 25, 32,0.32)",
-             boxShadow: "0 40px 100px rgba(17,24,39,0.22), 0 0 0 1px rgba(17,24,39,0.04), 0 0 80px rgba(215, 25, 32,0.1)",
+             border: "1px solid rgba(46, 80, 214,0.32)",
+             boxShadow: "0 40px 100px rgba(17,24,39,0.22), 0 0 0 1px rgba(17,24,39,0.04), 0 0 80px rgba(46, 80, 214,0.1)",
            }}>
 
         {/* Header */}
         <div className="px-6 py-5 border-b border-slate-200 flex items-center justify-between flex-shrink-0"
-             style={{ background: "linear-gradient(90deg,rgba(215, 25, 32,0.11),rgba(176, 18, 24,0.06))" }}>
+             style={{ background: "linear-gradient(90deg,rgba(46, 80, 214,0.11),rgba(38, 64, 176,0.06))" }}>
           <div>
             <div className="text-[15px] font-semibold text-slate-900 tracking-tight">{isEdit ? "Edit Inventory Item" : "Add Inventory Item"}</div>
             <div className="text-[11px] text-slate-400 mt-0.5">Status auto-calculates from stock vs minimum level</div>
@@ -2500,9 +2500,9 @@ function AddItemModal({ machines, onSave, onClose, initialValues = null, vendorL
           {computedStatus && (
             <div className="flex items-center justify-between px-4 py-3 rounded-xl"
                  style={{
-                   background: computedStatus === "critical" ? "rgba(239,68,68,0.04)" : computedStatus === "warning" ? "rgba(217, 119, 6,0.04)" : "rgba(215, 25, 32,0.04)",
-                   border: `1px solid ${computedStatus === "critical" ? "rgba(239,68,68,0.3)" : computedStatus === "warning" ? "rgba(217, 119, 6,0.3)" : "rgba(215, 25, 32,0.3)"}`,
-                   boxShadow: computedStatus === "critical" ? "0 0 16px rgba(239,68,68,0.06)" : computedStatus === "warning" ? "0 0 16px rgba(217, 119, 6,0.06)" : "0 0 16px rgba(215, 25, 32,0.06)",
+                   background: computedStatus === "critical" ? "rgba(239,68,68,0.04)" : computedStatus === "warning" ? "rgba(217, 119, 6,0.04)" : "rgba(46, 80, 214,0.04)",
+                   border: `1px solid ${computedStatus === "critical" ? "rgba(239,68,68,0.3)" : computedStatus === "warning" ? "rgba(217, 119, 6,0.3)" : "rgba(46, 80, 214,0.3)"}`,
+                   boxShadow: computedStatus === "critical" ? "0 0 16px rgba(239,68,68,0.06)" : computedStatus === "warning" ? "0 0 16px rgba(217, 119, 6,0.06)" : "0 0 16px rgba(46, 80, 214,0.06)",
                  }}>
               <div>
                 <div className="text-[9px] font-black text-slate-400 uppercase tracking-[0.08em]">Auto-detected status</div>
@@ -2547,7 +2547,7 @@ function AddItemModal({ machines, onSave, onClose, initialValues = null, vendorL
                      className={inp(false)} />
               <button type="button" onClick={addCheckPoint} disabled={!cpDraft.trim()}
                       className="px-4 rounded-xl text-[12px] font-bold text-white disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
-                      style={{ background: "#D71920" }}>+ Add</button>
+                      style={{ background: "#2E50D6" }}>+ Add</button>
             </div>
           </div>
 
@@ -2592,8 +2592,8 @@ function AddItemModal({ machines, onSave, onClose, initialValues = null, vendorL
               <div
                 className="min-h-[44px] w-full bg-slate-50 border rounded-xl px-3 py-2 flex flex-wrap gap-1.5 items-center cursor-text transition-all"
                 style={{
-                  borderColor: dropOpen ? "rgba(215, 25, 32,0.55)" : "var(--border-rim)",
-                  boxShadow:   dropOpen ? "0 0 0 2px rgba(215, 25, 32,0.12)" : "none",
+                  borderColor: dropOpen ? "rgba(46, 80, 214,0.55)" : "var(--border-rim)",
+                  boxShadow:   dropOpen ? "0 0 0 2px rgba(46, 80, 214,0.12)" : "none",
                 }}
                 onClick={() => { setDropOpen(true); setTimeout(() => vendorSearchRef.current?.focus(), 0); }}
               >
@@ -2637,7 +2637,7 @@ function AddItemModal({ machines, onSave, onClose, initialValues = null, vendorL
               {/* Dropdown */}
               {dropOpen && (
                 <div className="absolute left-0 right-0 top-full mt-1 z-20 rounded-xl overflow-hidden overflow-y-auto"
-                     style={{ background: "var(--surface-elevated)", border: "1px solid rgba(215, 25, 32,0.4)", boxShadow: "0 20px 50px rgba(17,24,39,0.18)", maxHeight: 224 }}>
+                     style={{ background: "var(--surface-elevated)", border: "1px solid rgba(46, 80, 214,0.4)", boxShadow: "0 20px 50px rgba(17,24,39,0.18)", maxHeight: 224 }}>
                   {vendorList.length === 0 ? (
                     <div className="px-4 py-5 text-center">
                       <div className="text-[11px] text-slate-500 mb-1">No vendors in Vendor Master yet.</div>
@@ -2828,19 +2828,19 @@ function AddItemModal({ machines, onSave, onClose, initialValues = null, vendorL
             <button onClick={handleSave}
                     className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-lg px-3 py-1.5 text-white border transition-all duration-200"
                     style={{
-                      background: "linear-gradient(135deg, #D71920 0%, #B01218 100%)",
-                      borderColor: "rgba(176, 18, 24,0.5)",
-                      boxShadow: "0 0 12px rgba(215, 25, 32,0.45), 0 2px 8px rgba(17,24,39,0.08)",
+                      background: "linear-gradient(135deg, #2E50D6 0%, #2640B0 100%)",
+                      borderColor: "rgba(38, 64, 176,0.5)",
+                      boxShadow: "0 0 12px rgba(46, 80, 214,0.45), 0 2px 8px rgba(17,24,39,0.08)",
                     }}
                     onMouseEnter={e => {
-                      e.currentTarget.style.background = "linear-gradient(135deg, #D71920 0%, #B01218 100%)";
-                      e.currentTarget.style.boxShadow = "0 0 22px rgba(176, 18, 24,0.7), 0 0 6px rgba(215, 25, 32,0.4), 0 2px 8px rgba(17,24,39,0.08)";
+                      e.currentTarget.style.background = "linear-gradient(135deg, #2E50D6 0%, #2640B0 100%)";
+                      e.currentTarget.style.boxShadow = "0 0 22px rgba(38, 64, 176,0.7), 0 0 6px rgba(46, 80, 214,0.4), 0 2px 8px rgba(17,24,39,0.08)";
                       e.currentTarget.style.borderColor = "rgba(139,160,255,0.7)";
                     }}
                     onMouseLeave={e => {
-                      e.currentTarget.style.background = "linear-gradient(135deg, #D71920 0%, #B01218 100%)";
-                      e.currentTarget.style.boxShadow = "0 0 12px rgba(215, 25, 32,0.45), 0 2px 8px rgba(17,24,39,0.08)";
-                      e.currentTarget.style.borderColor = "rgba(176, 18, 24,0.5)";
+                      e.currentTarget.style.background = "linear-gradient(135deg, #2E50D6 0%, #2640B0 100%)";
+                      e.currentTarget.style.boxShadow = "0 0 12px rgba(46, 80, 214,0.45), 0 2px 8px rgba(17,24,39,0.08)";
+                      e.currentTarget.style.borderColor = "rgba(38, 64, 176,0.5)";
                     }}>
               {isEdit ? "💾 Save Changes" : "💾 Save Item"}
             </button>
@@ -2920,7 +2920,7 @@ function ItemImportModal({ items, onImport, onClose }) {
          style={{ background: "rgba(17,24,39,0.45)", backdropFilter: "blur(14px)" }}
          onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl overflow-hidden"
-           style={{ background: "var(--surface-elevated)", border: "1px solid rgba(215, 25, 32,0.35)", boxShadow: "0 32px 80px rgba(17,24,39,0.22)", animation: "slideUp 0.2s ease both" }}>
+           style={{ background: "var(--surface-elevated)", border: "1px solid rgba(46, 80, 214,0.35)", boxShadow: "0 32px 80px rgba(17,24,39,0.22)", animation: "slideUp 0.2s ease both" }}>
 
         {/* Header */}
         <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
@@ -2933,7 +2933,7 @@ function ItemImportModal({ items, onImport, onClose }) {
 
         <div className="flex-1 overflow-y-auto p-6 space-y-5">
           {/* Column guide — operator's actual 2-column sheet. Other columns ignored. */}
-          <div className="rounded-xl p-4 space-y-3" style={{ background: "rgba(215, 25, 32,0.06)", border: "1px solid rgba(215, 25, 32,0.15)" }}>
+          <div className="rounded-xl p-4 space-y-3" style={{ background: "rgba(46, 80, 214,0.06)", border: "1px solid rgba(46, 80, 214,0.15)" }}>
             <div>
               <div className="text-[11px] font-semibold text-blue-300 mb-1.5">Supported columns — only these two are read</div>
               <div className="grid grid-cols-2 gap-1.5">
@@ -2943,11 +2943,11 @@ function ItemImportModal({ items, onImport, onClose }) {
                 ].map(({ label, req, hint }) => (
                   <div key={label} className="flex items-center gap-2">
                     <span className="text-[10px] font-mono font-semibold"
-                          style={{ color: req ? "#B01218" : "#64748b" }}>{label}</span>
+                          style={{ color: req ? "#2640B0" : "#64748b" }}>{label}</span>
                     <span className="text-[9px] px-1.5 py-0.5 rounded-full"
-                          style={{ background: req ? "rgba(215, 25, 32,0.15)" : "rgba(17,24,39,0.04)",
-                                   color: req ? "#B01218" : "#475569",
-                                   border: req ? "1px solid rgba(215, 25, 32,0.3)" : "1px solid rgba(17,24,39,0.06)" }}>
+                          style={{ background: req ? "rgba(46, 80, 214,0.15)" : "rgba(17,24,39,0.04)",
+                                   color: req ? "#2640B0" : "#475569",
+                                   border: req ? "1px solid rgba(46, 80, 214,0.3)" : "1px solid rgba(17,24,39,0.06)" }}>
                       {hint}
                     </span>
                   </div>
@@ -2969,7 +2969,7 @@ function ItemImportModal({ items, onImport, onClose }) {
                onClick={() => fileRef.current?.click()}
                className="rounded-xl border-2 border-dashed cursor-pointer flex flex-col items-center justify-center py-10 transition-all"
                style={{ borderColor: "var(--border-rim)" }}
-               onMouseEnter={(e) => e.currentTarget.style.borderColor = "rgba(215, 25, 32,0.4)"}
+               onMouseEnter={(e) => e.currentTarget.style.borderColor = "rgba(46, 80, 214,0.4)"}
                onMouseLeave={(e) => e.currentTarget.style.borderColor = "rgba(17,24,39,0.10)"}>
             <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" className="hidden"
                    onChange={(e) => { const f = e.target.files[0]; if (f) parseFile(f); e.target.value = ""; }} />
@@ -3039,7 +3039,7 @@ function ItemImportModal({ items, onImport, onClose }) {
             <Btn variant="ghost" size="sm" onClick={onClose}>Cancel</Btn>
             <button onClick={handleImport} disabled={!rows || (readyCount + updateCount) === 0}
                     className="text-xs font-black px-5 py-2 rounded-xl text-white transition-opacity"
-                    style={{ background: "#B01218", boxShadow: "0 1px 2px rgba(17,24,39,0.14)",
+                    style={{ background: "#2640B0", boxShadow: "0 1px 2px rgba(17,24,39,0.14)",
                              opacity: (!rows || (readyCount + updateCount) === 0) ? 0.4 : 1,
                              cursor: (!rows || (readyCount + updateCount) === 0) ? "not-allowed" : "pointer", color: "#ffffff" }}>
               {(() => { const total = readyCount + updateCount; return `Import${total > 0 ? ` ${total} Item${total !== 1 ? "s" : ""}` : ""}`; })()}
@@ -3372,7 +3372,7 @@ function InventoryPage({ items, setItems, handleUpdateStock, pos = [], inwardLog
   const filtersActive = search || statusFilter !== "all" || catFilter !== "all";
   const clearFilters  = () => { setSearch(""); setStatusFilter("all"); setCatFilter("all"); };
 
-  const catColors = { Electrical: "#D97706", Mechanical: "#D71920", "R&D": "#a78bfa", Other: "#6b7280" };
+  const catColors = { Electrical: "#D97706", Mechanical: "#2E50D6", "R&D": "#a78bfa", Other: "#6b7280" };
 
   const SortIcon = ({ col }) =>
     sortCol !== col
@@ -3614,7 +3614,7 @@ function InventoryPage({ items, setItems, handleUpdateStock, pos = [], inwardLog
       <div className="p-6 space-y-4">
         {/* Metric cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <MetricCard label="Total SKUs"    value={totalSKUs.toLocaleString("en-IN")} barPct={totalSKUs ? Math.round((safeCount / totalSKUs) * 100) : 0} barColor="#D71920" icon="📦" />
+          <MetricCard label="Total SKUs"    value={totalSKUs.toLocaleString("en-IN")} barPct={totalSKUs ? Math.round((safeCount / totalSKUs) * 100) : 0} barColor="#2E50D6" icon="📦" />
           <MetricCard label="Critical"      value={String(criticalCount)} valueColor="#dc2626" icon="🚨"
                       barPct={totalSKUs ? Math.round((criticalCount / totalSKUs) * 100) : 0} barColor="#ef4444" />
           <MetricCard label="Low Stock"     value={String(warningCount)}  valueColor="#d97706" icon="⚠️"
@@ -3840,7 +3840,7 @@ function InventoryPage({ items, setItems, handleUpdateStock, pos = [], inwardLog
             </div>
             <div className="text-[11px] tabular-nums" style={{ color: "var(--text-muted)" }}>
               Inventory Value:{" "}
-              <span className="font-bold" style={{ color: "#d71920" }}>₹{filteredVal.toLocaleString("en-IN")}</span>
+              <span className="font-bold" style={{ color: "#2E50D6" }}>₹{filteredVal.toLocaleString("en-IN")}</span>
               {filtersActive && <span className="ml-1" style={{ color: "var(--text-dim)" }}>(filtered)</span>}
             </div>
           </div>
@@ -4064,7 +4064,7 @@ function POModal({ initialPO, vendorList, items, onSave, onClose, prefill = null
   const inpCls = `bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-900 placeholder-slate-500 outline-none modal-input`;
   const selStyle = { background: "var(--surface-input)", color: "var(--text)" };
   const PLabel = ({ text, req }) => (
-    <div className="text-[11px] font-medium tracking-tight mb-1.5" style={{ color: "#b01218" }}>
+    <div className="text-[11px] font-medium tracking-tight mb-1.5" style={{ color: "#2640B0" }}>
       {text}{req && <span className="text-red-400 ml-0.5">*</span>}
     </div>
   );
@@ -4074,9 +4074,9 @@ function POModal({ initialPO, vendorList, items, onSave, onClose, prefill = null
          style={{ background: "rgba(17,24,39,0.45)", backdropFilter: "blur(16px)" }}
          onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="w-full max-w-2xl flex flex-col rounded-2xl overflow-hidden"
-           style={{ maxHeight: "92vh", background: "var(--surface-elevated)", border: "1px solid rgba(215, 25, 32,0.32)", boxShadow: "0 40px 100px rgba(17,24,39,0.22),0 0 80px rgba(215, 25, 32,0.1)", animation: "slideUp 0.25s ease both" }}>
+           style={{ maxHeight: "92vh", background: "var(--surface-elevated)", border: "1px solid rgba(46, 80, 214,0.32)", boxShadow: "0 40px 100px rgba(17,24,39,0.22),0 0 80px rgba(46, 80, 214,0.1)", animation: "slideUp 0.25s ease both" }}>
         <div className="px-6 py-5 border-b border-slate-200 flex items-center justify-between flex-shrink-0"
-             style={{ background: "linear-gradient(90deg,rgba(215, 25, 32,0.11),rgba(176, 18, 24,0.06))" }}>
+             style={{ background: "linear-gradient(90deg,rgba(46, 80, 214,0.11),rgba(38, 64, 176,0.06))" }}>
           <div>
             <div className="text-[15px] font-semibold text-slate-900">{isEdit ? "Edit Purchase Order" : "Create Purchase Order"}</div>
             <div className="text-[11px] text-slate-400 mt-0.5">Select vendor · Add items · Review totals</div>
@@ -4134,9 +4134,9 @@ function POModal({ initialPO, vendorList, items, onSave, onClose, prefill = null
                               className="flex-shrink-0 text-left rounded-xl border transition-all duration-150"
                               style={{
                                 minWidth: 148, padding: "10px 12px",
-                                background: isSelected ? "rgba(215, 25, 32,0.10)" : "rgba(17,24,39,0.03)",
-                                borderColor: isSelected ? "rgba(215, 25, 32,0.55)" : "rgba(17,24,39,0.10)",
-                                boxShadow: isSelected ? "0 0 14px rgba(215, 25, 32,0.18)" : "none",
+                                background: isSelected ? "rgba(46, 80, 214,0.10)" : "rgba(17,24,39,0.03)",
+                                borderColor: isSelected ? "rgba(46, 80, 214,0.55)" : "rgba(17,24,39,0.10)",
+                                boxShadow: isSelected ? "0 0 14px rgba(46, 80, 214,0.18)" : "none",
                               }}>
                         <div className="flex items-center gap-1 mb-1.5">
                           <span className="text-[10px]">{pIcon}</span>
@@ -4179,12 +4179,12 @@ function POModal({ initialPO, vendorList, items, onSave, onClose, prefill = null
               <div className="col-span-2">
                 {/* Label row — shows item-filter badge when active */}
                 <div className="flex items-center gap-2 mb-1.5">
-                  <div className="text-[11px] font-medium tracking-tight" style={{ color: "#b01218" }}>
+                  <div className="text-[11px] font-medium tracking-tight" style={{ color: "#2640B0" }}>
                     Vendor<span className="text-red-400 ml-0.5">*</span>
                   </div>
                   {addCode && itemLinkedVendors.length > 0 && (
                     <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
-                          style={{ background: "rgba(176, 18, 24,0.12)", color: "#4338ca", border: "1px solid rgba(176, 18, 24,0.22)" }}>
+                          style={{ background: "rgba(38, 64, 176,0.12)", color: "#4338ca", border: "1px solid rgba(38, 64, 176,0.22)" }}>
                       {itemLinkedVendors.length} linked · {addCodeItem?.name}
                     </span>
                   )}
@@ -4357,7 +4357,7 @@ function POModal({ initialPO, vendorList, items, onSave, onClose, prefill = null
                      onKeyDown={(e) => e.key === "Enter" && addLine()} />
               <button onClick={addLine}
                       className="px-3 py-2 rounded-xl text-xs font-bold text-white"
-                      style={{ background: "#B01218", border: "1px solid rgba(176, 18, 24,0.5)", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
+                      style={{ background: "#2640B0", border: "1px solid rgba(38, 64, 176,0.5)", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
                 + Add
               </button>
             </div>
@@ -4506,7 +4506,7 @@ function POModal({ initialPO, vendorList, items, onSave, onClose, prefill = null
             </button>
             <button onClick={() => handleSave("pending")}
                     className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-lg px-3 py-1.5 text-white border transition-all"
-                    style={{ background: "#B01218", borderColor: "rgba(176, 18, 24,0.5)", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
+                    style={{ background: "#2640B0", borderColor: "rgba(38, 64, 176,0.5)", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
               📤 Submit for Approval
             </button>
           </div>
@@ -4537,10 +4537,10 @@ function PODetailModal({ po, onClose, onApprove, onMarkOrdered, onMarkReceived, 
          style={{ background: "rgba(17,24,39,0.45)", backdropFilter: "blur(16px)" }}
          onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="w-full max-w-lg flex flex-col rounded-2xl overflow-hidden"
-           style={{ maxHeight: "90vh", background: "var(--surface-elevated)", border: "1px solid rgba(215, 25, 32,0.32)", boxShadow: "0 40px 100px rgba(17,24,39,0.22)", animation: "slideUp 0.25s ease both" }}>
+           style={{ maxHeight: "90vh", background: "var(--surface-elevated)", border: "1px solid rgba(46, 80, 214,0.32)", boxShadow: "0 40px 100px rgba(17,24,39,0.22)", animation: "slideUp 0.25s ease both" }}>
 
         <div className="px-6 py-5 border-b border-slate-200 flex items-start justify-between flex-shrink-0"
-             style={{ background: "linear-gradient(90deg,rgba(215, 25, 32,0.1),rgba(176, 18, 24,0.05))" }}>
+             style={{ background: "linear-gradient(90deg,rgba(46, 80, 214,0.1),rgba(38, 64, 176,0.05))" }}>
           <div>
             <div className="text-[15px] font-semibold text-slate-900">{po.id}</div>
             <div className="flex items-center gap-2 mt-1.5 flex-wrap">
@@ -4723,7 +4723,7 @@ function PurchasePage({ pos, vendorList, items, onCreatePO, onUpdatePO, onReceiv
     <div className="flex-1 overflow-y-auto">
       {toast && (
         <div className="fixed bottom-6 right-6 z-[60] flex items-center gap-3 px-5 py-3.5 rounded-2xl"
-             style={{ background: "var(--surface-raised)", border: "1px solid rgba(215, 25, 32,0.45)", boxShadow: "0 20px 60px rgba(17,24,39,0.14)", animation: "slideUp 0.3s ease both" }}>
+             style={{ background: "var(--surface-raised)", border: "1px solid rgba(46, 80, 214,0.45)", boxShadow: "0 20px 60px rgba(17,24,39,0.14)", animation: "slideUp 0.3s ease both" }}>
           <span className="text-lg">🧾</span>
           <div>
             <div className="text-xs font-black text-slate-900">{toast.msg}</div>
@@ -4777,7 +4777,7 @@ function PurchasePage({ pos, vendorList, items, onCreatePO, onUpdatePO, onReceiv
 
       <div className="p-6 space-y-6">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <MetricCard label="Total POs"  value={String(pos.length)} barPct={100} barColor="#D71920" />
+          <MetricCard label="Total POs"  value={String(pos.length)} barPct={100} barColor="#2E50D6" />
           <MetricCard label="Open Value" value={`₹${(totalAmt / 100000).toFixed(1)}L`} valueColor="#d97706"
                       barPct={pos.length ? Math.round((pendingN / pos.length) * 100) : 0} barColor="#D97706" />
           <MetricCard label="Received"   value={String(receivedN)} valueColor="#15803d"
@@ -4922,7 +4922,7 @@ function VendorImportModal({ vendorList, onImport, onClose }) {
          style={{ background: "rgba(17,24,39,0.45)", backdropFilter: "blur(14px)" }}
          onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl overflow-hidden"
-           style={{ background: "var(--surface-elevated)", border: "1px solid rgba(215, 25, 32,0.35)", boxShadow: "0 32px 80px rgba(17,24,39,0.22)", animation: "slideUp 0.2s ease both" }}>
+           style={{ background: "var(--surface-elevated)", border: "1px solid rgba(46, 80, 214,0.35)", boxShadow: "0 32px 80px rgba(17,24,39,0.22)", animation: "slideUp 0.2s ease both" }}>
 
         {/* Header */}
         <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
@@ -4936,7 +4936,7 @@ function VendorImportModal({ vendorList, onImport, onClose }) {
         <div className="flex-1 overflow-y-auto p-6 space-y-5">
 
           {/* Column guide */}
-          <div className="rounded-xl p-4 space-y-3" style={{ background: "rgba(215, 25, 32,0.06)", border: "1px solid rgba(215, 25, 32,0.15)" }}>
+          <div className="rounded-xl p-4 space-y-3" style={{ background: "rgba(46, 80, 214,0.06)", border: "1px solid rgba(46, 80, 214,0.15)" }}>
             <div>
               <div className="text-[11px] font-semibold text-blue-300 mb-1.5">Supported columns — use these exact header names in your sheet</div>
               <div className="grid grid-cols-2 gap-1.5">
@@ -4952,11 +4952,11 @@ function VendorImportModal({ vendorList, onImport, onClose }) {
                 ].map(({ label, req, hint }) => (
                   <div key={label} className="flex items-center gap-2">
                     <span className="text-[10px] font-mono font-semibold"
-                          style={{ color: req ? "#B01218" : "#64748b" }}>{label}</span>
+                          style={{ color: req ? "#2640B0" : "#64748b" }}>{label}</span>
                     <span className="text-[9px] px-1.5 py-0.5 rounded-full"
-                          style={{ background: req ? "rgba(215, 25, 32,0.15)" : "rgba(17,24,39,0.04)",
-                                   color: req ? "#B01218" : "#475569",
-                                   border: req ? "1px solid rgba(215, 25, 32,0.3)" : "1px solid rgba(17,24,39,0.06)" }}>
+                          style={{ background: req ? "rgba(46, 80, 214,0.15)" : "rgba(17,24,39,0.04)",
+                                   color: req ? "#2640B0" : "#475569",
+                                   border: req ? "1px solid rgba(46, 80, 214,0.3)" : "1px solid rgba(17,24,39,0.06)" }}>
                       {hint}
                     </span>
                   </div>
@@ -4974,7 +4974,7 @@ function VendorImportModal({ vendorList, onImport, onClose }) {
                onClick={() => fileRef.current?.click()}
                className="rounded-xl border-2 border-dashed cursor-pointer flex flex-col items-center justify-center py-10 transition-all"
                style={{ borderColor: "var(--border-rim)" }}
-               onMouseEnter={(e) => e.currentTarget.style.borderColor = "rgba(215, 25, 32,0.4)"}
+               onMouseEnter={(e) => e.currentTarget.style.borderColor = "rgba(46, 80, 214,0.4)"}
                onMouseLeave={(e) => e.currentTarget.style.borderColor = "rgba(17,24,39,0.10)"}>
             <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" className="hidden"
                    onChange={(e) => { const f = e.target.files[0]; if (f) parseFile(f); e.target.value = ""; }} />
@@ -5047,7 +5047,7 @@ function VendorImportModal({ vendorList, onImport, onClose }) {
             <Btn variant="ghost" size="sm" onClick={onClose}>Cancel</Btn>
             <button onClick={handleImport} disabled={!rows || (readyCount + updateCount) === 0}
                     className="text-xs font-black px-5 py-2 rounded-xl text-white transition-opacity"
-                    style={{ background: "#B01218", boxShadow: "0 1px 2px rgba(17,24,39,0.14)",
+                    style={{ background: "#2640B0", boxShadow: "0 1px 2px rgba(17,24,39,0.14)",
                              opacity: (!rows || (readyCount + updateCount) === 0) ? 0.4 : 1,
                              cursor: (!rows || (readyCount + updateCount) === 0) ? "not-allowed" : "pointer", color: "#ffffff" }}>
               {(() => {
@@ -5092,7 +5092,7 @@ function VendorModal({ initialVendor, onSave, onClose }) {
 
   const ILabel = ({ text, req }) => (
     <div className="text-[11px] font-medium tracking-tight mb-1.5"
-         style={{ color: "#b01218" }}>
+         style={{ color: "#2640B0" }}>
       {text}{req && <span className="text-red-400 ml-0.5">*</span>}
     </div>
   );
@@ -5105,7 +5105,7 @@ function VendorModal({ initialVendor, onSave, onClose }) {
          style={{ background: "rgba(17,24,39,0.45)", backdropFilter: "blur(14px)" }}
          onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl overflow-hidden"
-           style={{ background: "var(--surface-elevated)", border: "1px solid rgba(215, 25, 32,0.35)", boxShadow: "0 32px 80px rgba(17,24,39,0.22), 0 0 60px rgba(215, 25, 32,0.08)", animation: "slideUp 0.2s ease both" }}>
+           style={{ background: "var(--surface-elevated)", border: "1px solid rgba(46, 80, 214,0.35)", boxShadow: "0 32px 80px rgba(17,24,39,0.22), 0 0 60px rgba(46, 80, 214,0.08)", animation: "slideUp 0.2s ease both" }}>
 
         <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
           <div>
@@ -5194,7 +5194,7 @@ function VendorModal({ initialVendor, onSave, onClose }) {
           <Btn variant="ghost" size="sm" onClick={onClose}>Cancel</Btn>
           <button onClick={handleSave}
                   className="text-xs font-black px-5 py-2 rounded-xl text-white"
-                  style={{ background: "#B01218", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
+                  style={{ background: "#2640B0", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
             {isEdit ? "Save Changes" : "Add Vendor"}
           </button>
         </div>
@@ -5272,7 +5272,7 @@ function VendorsPage({ vendorList, pos, items, onAddVendor, onEditVendor, onDele
     <div className="flex-1 overflow-y-auto">
       {toast && (
         <div className="fixed bottom-6 right-6 z-[60] flex items-center gap-3 px-5 py-3.5 rounded-2xl"
-             style={{ background: "var(--surface-raised)", border: "1px solid rgba(215, 25, 32,0.45)", boxShadow: "0 20px 60px rgba(17,24,39,0.14)", animation: "slideUp 0.3s ease both" }}>
+             style={{ background: "var(--surface-raised)", border: "1px solid rgba(46, 80, 214,0.45)", boxShadow: "0 20px 60px rgba(17,24,39,0.14)", animation: "slideUp 0.3s ease both" }}>
           <span className="text-lg">🏭</span>
           <div className="text-xs font-black text-slate-900">{toast}</div>
           <button onClick={() => setToast(null)} className="ml-2 text-slate-600 hover:text-slate-500 text-xs">✕</button>
@@ -5376,7 +5376,7 @@ function VendorsPage({ vendorList, pos, items, onAddVendor, onEditVendor, onDele
 
       <Topbar title="Vendor Management" subtitle={`${activeVendors.length} suppliers · ${activeVendors.filter((v) => v.status === "preferred").length} preferred`}>
         <input ref={searchRef} value={search} onChange={(e) => setSearch(e.target.value)}
-               placeholder="Search vendors..." className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 outline-none w-44 focus:border-[#d71920]/40 focus:outline-none transition-colors" />
+               placeholder="Search vendors..." className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 outline-none w-44 focus:border-[#2E50D6]/40 focus:outline-none transition-colors" />
         {canDo("vendors","add") && (
           <button onClick={() => setShowImport(true)}
                   className="text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-900 hover:border-slate-300 transition-all flex items-center gap-1.5">
@@ -5389,7 +5389,7 @@ function VendorsPage({ vendorList, pos, items, onAddVendor, onEditVendor, onDele
       <div className="p-6 space-y-6">
         {/* Stats — driven by active (non-archived) vendors */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <MetricCard label="Total Vendors"  value={activeVendors.length.toString()} icon="🏭" barPct={100} barColor="#d71920" />
+          <MetricCard label="Total Vendors"  value={activeVendors.length.toString()} icon="🏭" barPct={100} barColor="#2E50D6" />
           <MetricCard label="Preferred"      value={activeVendors.filter((v) => v.status === "preferred").length.toString()} icon="⭐" barPct={activeVendors.length ? Math.round((activeVendors.filter((v) => v.status === "preferred").length / activeVendors.length) * 100) : 0} barColor="#22c55e" valueColor="#15803d" />
           <MetricCard label="Under Review"   value={activeVendors.filter((v) => v.status === "review").length.toString()} icon="🔍" barPct={activeVendors.length ? Math.round((activeVendors.filter((v) => v.status === "review").length / activeVendors.length) * 100) : 0} barColor="#D97706" valueColor="#d97706" />
           <MetricCard label="Poor"           value={activeVendors.filter((v) => v.status === "poor").length.toString()} icon="⚠️" barPct={activeVendors.length ? Math.round((activeVendors.filter((v) => v.status === "poor").length / activeVendors.length) * 100) : 0} barColor="#ef4444" valueColor="#dc2626" />
@@ -5400,10 +5400,10 @@ function VendorsPage({ vendorList, pos, items, onAddVendor, onEditVendor, onDele
           <div className={`${profileVendor ? "xl:col-span-2" : ""} grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 content-start`}>
             {filtered.map((v) => (
               <div key={v.id}
-                   className={`bg-white border rounded-xl cursor-pointer card-hover transition-all overflow-hidden ${profileVendor?.id === v.id ? "border-[#d71920]/40 shadow-[0_0_0_3px_rgba(215,25,32,0.06),0_2px_8px_rgba(17,24,39,0.08)]" : "border-slate-200 shadow-sm hover:shadow-md hover:border-slate-300"}`}
+                   className={`bg-white border rounded-xl cursor-pointer card-hover transition-all overflow-hidden ${profileVendor?.id === v.id ? "border-[#2E50D6]/40 shadow-[0_0_0_3px_rgba(46, 80, 214,0.06),0_2px_8px_rgba(17,24,39,0.08)]" : "border-slate-200 shadow-sm hover:shadow-md hover:border-slate-300"}`}
                    onClick={() => setProfileVendor(profileVendor?.id === v.id ? null : v)}>
                 {/* Brand accent strip — only on selected card */}
-                {profileVendor?.id === v.id && <div className="h-0.5 w-full" style={{ background: "#d71920" }} />}
+                {profileVendor?.id === v.id && <div className="h-0.5 w-full" style={{ background: "#2E50D6" }} />}
 
                 <div className="p-4">
                   {/* Header: vendor name + status badges */}
@@ -5505,9 +5505,9 @@ function VendorsPage({ vendorList, pos, items, onAddVendor, onEditVendor, onDele
             const roleColor  = (r) => r === "Preferred" ? "#b45309" : r === "Approved" ? "#047857" : r === "Backup" ? "#6b7280" : "#64748b";
 
             return (
-              <div className="bg-white border border-[#d71920]/20 rounded-xl overflow-hidden self-start sticky top-4 overflow-y-auto max-h-[calc(100vh-120px)]" style={{ boxShadow: "0 2px 12px rgba(17,24,39,0.06)" }}>
+              <div className="bg-white border border-[#2E50D6]/20 rounded-xl overflow-hidden self-start sticky top-4 overflow-y-auto max-h-[calc(100vh-120px)]" style={{ boxShadow: "0 2px 12px rgba(17,24,39,0.06)" }}>
                 {/* Brand accent strip */}
-                <div className="h-0.5 w-full" style={{ background: "#d71920" }} />
+                <div className="h-0.5 w-full" style={{ background: "#2E50D6" }} />
 
                 <div className="p-5 space-y-5">
                 {/* Header */}
@@ -5524,7 +5524,7 @@ function VendorsPage({ vendorList, pos, items, onAddVendor, onEditVendor, onDele
                   <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-[0.08em] mb-2">Purchase History</div>
                   <div className="grid grid-cols-2 gap-2">
                     {[
-                      ["Total POs",   vendorPOs.length,                               "#d71920"],
+                      ["Total POs",   vendorPOs.length,                               "#2E50D6"],
                       ["Total Value", `₹${totalValue.toLocaleString("en-IN")}`,        "#15803d"],
                       ["Pending",     pendingPOs.length,                               "#d97706"],
                       ["Received",    receivedPOs.length,                              "#6d28d9"],
@@ -5638,7 +5638,7 @@ function VendorsPage({ vendorList, pos, items, onAddVendor, onEditVendor, onDele
                     <div className="space-y-1.5 mb-2">
                       <input value={vendorPOSearch} onChange={(e) => setVendorPOSearch(e.target.value)}
                              placeholder="Search PO id, item…"
-                             className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-[11px] text-[#111827] placeholder-slate-400 outline-none focus:border-[#d71920]/40 transition-colors" />
+                             className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-[11px] text-[#111827] placeholder-slate-400 outline-none focus:border-[#2E50D6]/40 transition-colors" />
                       <select value={vendorPOStatus} onChange={(e) => setVendorPOStatus(e.target.value)}
                               className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-[11px] text-[#111827] outline-none">
                         <option value="all">All statuses</option>
@@ -5688,7 +5688,7 @@ function VendorsPage({ vendorList, pos, items, onAddVendor, onEditVendor, onDele
                         </div>
                         {!filterActive && filteredVendorPOs.length > 8 && (
                           <button onClick={() => setVendorPOExpanded((x) => !x)}
-                                  className="w-full mt-2 text-[10px] font-bold py-1.5 rounded-lg border border-slate-200 hover:border-[#d71920]/30 hover:bg-[#d71920]/5 transition-all" style={{ color: "#d71920" }}>
+                                  className="w-full mt-2 text-[10px] font-bold py-1.5 rounded-lg border border-slate-200 hover:border-[#2E50D6]/30 hover:bg-[#2E50D6]/5 transition-all" style={{ color: "#2E50D6" }}>
                             {vendorPOExpanded ? `▲ Show fewer (hide ${filteredVendorPOs.length - 8})` : `▼ Show all ${filteredVendorPOs.length}`}
                           </button>
                         )}
@@ -5700,7 +5700,7 @@ function VendorsPage({ vendorList, pos, items, onAddVendor, onEditVendor, onDele
                 {/* Notes */}
                 {v.notes && (
                   <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
-                    <div className="text-[9px] font-black uppercase tracking-wide mb-1" style={{ color: "#d71920" }}>Notes</div>
+                    <div className="text-[9px] font-black uppercase tracking-wide mb-1" style={{ color: "#2E50D6" }}>Notes</div>
                     <div className="text-[11px] text-slate-700">{v.notes}</div>
                   </div>
                 )}
@@ -5876,7 +5876,7 @@ function AnalyticsPage({ items, pos, vendorList, settings = SETTINGS_DEFAULTS })
     catSpend[cat] = (catSpend[cat] || 0) + (li.amount || 0);
   }));
   const catSpendTotal = Object.values(catSpend).reduce((s, v) => s + v, 0) || 1;
-  const catColors = { Electrical: "#D97706", Mechanical: "#D71920", "R&D": "#a78bfa", Other: "#6b7280" };
+  const catColors = { Electrical: "#D97706", Mechanical: "#2E50D6", "R&D": "#a78bfa", Other: "#6b7280" };
   const spendByCat = Object.entries(catSpend)
     .map(([name, val]) => ({ name, value: Math.round((val / catSpendTotal) * 100), color: catColors[name] || "#6b7280" }))
     .sort((a, b) => b.value - a.value);
@@ -5922,7 +5922,7 @@ function AnalyticsPage({ items, pos, vendorList, settings = SETTINGS_DEFAULTS })
                 <XAxis dataKey="month" tick={{ fill: "#475569", fontSize: 11 }} />
                 <YAxis tick={{ fill: "#475569", fontSize: 11 }} />
                 <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="value" name="PO Value (₹K)" fill="#D7192020" stroke="#D71920" strokeWidth={1.5} radius={[3, 3, 0, 0]} />
+                <Bar dataKey="value" name="PO Value (₹K)" fill="#2E50D620" stroke="#2E50D6" strokeWidth={1.5} radius={[3, 3, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -6107,8 +6107,8 @@ function AIPage({ items, pos, vendorList = [], bomDefs = {}, machineLog = [], pe
 
   const aiStats = [
     { label: "Reorder Accuracy", pct: 94, color: "#15803d" },
-    { label: "Demand Forecast",  pct: 87, color: "#D71920" },
-    { label: "Vendor Scoring",   pct: 91, color: "#D71920" },
+    { label: "Demand Forecast",  pct: 87, color: "#2E50D6" },
+    { label: "Vendor Scoring",   pct: 91, color: "#2E50D6" },
     { label: "Price Prediction", pct: 78, color: "#b45309" },
   ];
 
@@ -6195,7 +6195,7 @@ function AIPage({ items, pos, vendorList = [], bomDefs = {}, machineLog = [], pe
             <SectionHeader>📊 Live Inventory Stats</SectionHeader>
             <div className="space-y-3">
               {[
-                { label: "Total SKUs",    value: allItems.length,    color: "#D71920" },
+                { label: "Total SKUs",    value: allItems.length,    color: "#2E50D6" },
                 { label: "Critical",      value: critItems.length,   color: "#b91c1c" },
                 { label: "Warning",       value: warnItems.length,   color: "#b45309" },
                 { label: "Pending POs",   value: pendingPOs.length,  color: "#6d28d9" },
@@ -8196,7 +8196,7 @@ const Toggle = ({ checked, onChange, label, desc }) => (
     </div>
     <button onClick={() => onChange(!checked)}
             className="relative flex-shrink-0 w-11 h-6 rounded-full transition-all duration-200"
-            style={{ background: checked ? "#D71920" : "rgba(17,24,39,0.10)", border: `1px solid ${checked ? "rgba(215, 25, 32,0.6)" : "rgba(17,24,39,0.14)"}` }}>
+            style={{ background: checked ? "#2E50D6" : "rgba(17,24,39,0.10)", border: `1px solid ${checked ? "rgba(46, 80, 214,0.6)" : "rgba(17,24,39,0.14)"}` }}>
       <div className="absolute top-0.5 h-5 w-5 rounded-full transition-all duration-200 shadow"
            style={{ background: "#fff", left: checked ? "calc(100% - 22px)" : "2px" }} />
     </button>
@@ -8347,7 +8347,7 @@ function ChecklistAdminPanel({ templates = [], canConfig = false, onCreate, onUp
         {canConfig && !editing && (
           <button onClick={() => start(null)}
                   className="text-[11px] font-black text-white px-3 py-1.5 rounded-lg"
-                  style={{ background: "#B01218", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
+                  style={{ background: "#2640B0", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
             + Add Checklist
           </button>
         )}
@@ -8360,7 +8360,7 @@ function ChecklistAdminPanel({ templates = [], canConfig = false, onCreate, onUp
           )}
           {templates.map((t) => (
             <div key={t.id} className="rounded-lg px-3 py-2 flex items-center gap-3 flex-wrap"
-                 style={{ background: t.active === false ? "rgba(17,24,39,0.03)" : "rgba(215, 25, 32,0.05)", border: `1px solid ${t.active === false ? "rgba(17,24,39,0.06)" : "rgba(215, 25, 32,0.25)"}` }}>
+                 style={{ background: t.active === false ? "rgba(17,24,39,0.03)" : "rgba(46, 80, 214,0.05)", border: `1px solid ${t.active === false ? "rgba(17,24,39,0.06)" : "rgba(46, 80, 214,0.25)"}` }}>
               <span className="text-[11px] font-black text-blue-300 w-28">{t.department}</span>
               <span className="text-[12px] font-bold text-slate-900 flex-1">{t.name}</span>
               <span className="text-[10px] text-slate-500">{(t.items || []).length} item{(t.items || []).length === 1 ? "" : "s"} · v{t.version || 1}</span>
@@ -8377,7 +8377,7 @@ function ChecklistAdminPanel({ templates = [], canConfig = false, onCreate, onUp
       )}
 
       {editing && (
-        <div className="rounded-xl p-4 space-y-3" style={{ background: "rgba(215, 25, 32,0.05)", border: "1px solid rgba(215, 25, 32,0.3)" }}>
+        <div className="rounded-xl p-4 space-y-3" style={{ background: "rgba(46, 80, 214,0.05)", border: "1px solid rgba(46, 80, 214,0.3)" }}>
           <div className="text-[11px] font-black text-blue-300">{editing.id ? "Edit template" : "New template"}</div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
@@ -8431,7 +8431,7 @@ function ChecklistAdminPanel({ templates = [], canConfig = false, onCreate, onUp
             </div>
           </div>
           {preview && (
-            <div className="rounded-lg p-3" style={{ background: "rgba(215, 25, 32,0.05)", border: "1px solid rgba(215, 25, 32,0.3)" }}>
+            <div className="rounded-lg p-3" style={{ background: "rgba(46, 80, 214,0.05)", border: "1px solid rgba(46, 80, 214,0.3)" }}>
               <div className="text-[10px] font-bold text-blue-300 uppercase tracking-wide mb-2">Preview — how operators will see this during Finish &amp; Transfer</div>
               <div className="space-y-2">
                 {editing.items.length === 0 && <div className="text-[11px] text-slate-500 italic">Add at least one question to preview.</div>}
@@ -8630,7 +8630,7 @@ function EmployeeMembersPanel({ members = [], canConfig = false, onSave }) {
         {canConfig && !editing && (
           <button onClick={() => start(null)}
                   className="text-[11px] font-black text-white px-3 py-1.5 rounded-lg"
-                  style={{ background: "#B01218", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
+                  style={{ background: "#2640B0", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
             + Add Employee
           </button>
         )}
@@ -8638,7 +8638,7 @@ function EmployeeMembersPanel({ members = [], canConfig = false, onSave }) {
 
       {editing && (
         <div className="mb-4 rounded-xl px-4 py-4 space-y-3"
-             style={{ background: "rgba(215, 25, 32,0.04)", border: "1px solid rgba(215, 25, 32,0.25)" }}>
+             style={{ background: "rgba(46, 80, 214,0.04)", border: "1px solid rgba(46, 80, 214,0.25)" }}>
           <div className="text-[12px] font-bold text-slate-700">
             {members.some((m) => m.id === editing.id) ? "Edit Employee" : "New Employee"}
           </div>
@@ -8917,7 +8917,7 @@ function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, onSave, i
         )}
         <button onClick={() => handleSave()}
                 className="inline-flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-xl transition-all duration-200"
-                style={{ background: saved ? "rgba(22,163,74,0.12)" : "#B01218", color: saved ? "#15803d" : "#fff", border: saved ? "1px solid rgba(22,163,74,0.35)" : "1px solid rgba(176,18,24,0.45)", boxShadow: saved ? "none" : "0 0 12px rgba(215, 25, 32,0.3)" }}>
+                style={{ background: saved ? "rgba(22,163,74,0.12)" : "#2640B0", color: saved ? "#15803d" : "#fff", border: saved ? "1px solid rgba(22,163,74,0.35)" : "1px solid rgba(38, 64, 176,0.45)", boxShadow: saved ? "none" : "0 0 12px rgba(46, 80, 214,0.3)" }}>
           {saved ? "✅ Saved!" : "💾 Save Changes"}
         </button>
       </Topbar>
@@ -8944,9 +8944,9 @@ function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, onSave, i
               <button key={t.id} onClick={() => setTab(t.id)}
                       className="text-[12px] font-bold px-3.5 py-2.5 -mb-px transition-all whitespace-nowrap"
                       style={{
-                        color:       sel ? "#d71920" : "#6b7280",
-                        background:  sel ? "rgba(215,25,32,0.07)" : "transparent",
-                        borderBottom: `2px solid ${sel ? "#d71920" : "transparent"}`,
+                        color:       sel ? "#2E50D6" : "#6b7280",
+                        background:  sel ? "rgba(46, 80, 214,0.07)" : "transparent",
+                        borderBottom: `2px solid ${sel ? "#2E50D6" : "transparent"}`,
                       }}>
                 {t.label}
               </button>
@@ -9000,7 +9000,7 @@ function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, onSave, i
                     {REPORT_LANGS.map(([code, label]) => (
                       <button key={code} type="button" disabled={!canEdit} onClick={() => setRc({ language: code })} aria-pressed={rc.language === code}
                               className="text-[11px] font-bold px-3 py-1.5 rounded-lg border transition-all disabled:opacity-60"
-                              style={rc.language === code ? { background: "#D71920", color: "#fff", borderColor: "#D71920" } : { background: "#fff", color: "#475569", borderColor: "rgba(17,24,39,0.15)" }}>
+                              style={rc.language === code ? { background: "#2E50D6", color: "#fff", borderColor: "#2E50D6" } : { background: "#fff", color: "#475569", borderColor: "rgba(17,24,39,0.15)" }}>
                         {label}
                       </button>
                     ))}
@@ -9042,13 +9042,13 @@ function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, onSave, i
                     {[["A4", "A4"], ["Letter", "Letter"], ["A3", "A3"]].map(([v, l]) => (
                       <button key={v} type="button" disabled={!canEdit} onClick={() => setRc({ pageSize: v })} aria-pressed={(rc.pageSize || "A4") === v}
                               className="text-[11px] font-bold px-3 py-1.5 rounded-lg border disabled:opacity-60"
-                              style={(rc.pageSize || "A4") === v ? { background: "#D71920", color: "#fff", borderColor: "#D71920" } : { background: "#fff", color: "#475569", borderColor: "rgba(17,24,39,0.15)" }}>{l}</button>
+                              style={(rc.pageSize || "A4") === v ? { background: "#2E50D6", color: "#fff", borderColor: "#2E50D6" } : { background: "#fff", color: "#475569", borderColor: "rgba(17,24,39,0.15)" }}>{l}</button>
                     ))}
                     <span className="w-2" />
                     {[["portrait", "Portrait"], ["landscape", "Landscape"]].map(([v, l]) => (
                       <button key={v} type="button" disabled={!canEdit} onClick={() => setRc({ orientation: v })} aria-pressed={(rc.orientation || "portrait") === v}
                               className="text-[11px] font-bold px-3 py-1.5 rounded-lg border disabled:opacity-60"
-                              style={(rc.orientation || "portrait") === v ? { background: "#D71920", color: "#fff", borderColor: "#D71920" } : { background: "#fff", color: "#475569", borderColor: "rgba(17,24,39,0.15)" }}>{l}</button>
+                              style={(rc.orientation || "portrait") === v ? { background: "#2E50D6", color: "#fff", borderColor: "#2E50D6" } : { background: "#fff", color: "#475569", borderColor: "rgba(17,24,39,0.15)" }}>{l}</button>
                     ))}
                   </div>
                 </div>
@@ -9087,7 +9087,7 @@ function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, onSave, i
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>
-            <div className="mt-3 px-3.5 py-3 rounded-xl" style={{ background: "rgba(215, 25, 32,0.06)", border: "1px solid rgba(215, 25, 32,0.18)" }}>
+            <div className="mt-3 px-3.5 py-3 rounded-xl" style={{ background: "rgba(46, 80, 214,0.06)", border: "1px solid rgba(46, 80, 214,0.18)" }}>
               <div className="text-[11px] text-blue-300 font-semibold">ℹ️ Low Stock Alerts</div>
               <div className="text-[11px] text-slate-400 mt-1">
                 Low stock thresholds are set per item in <span className="text-slate-900 font-semibold">Item Master → Minimum Stock</span>.
@@ -9123,7 +9123,7 @@ function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, onSave, i
               )}
               <div className="space-y-6">
                 {/* ── Acceptance timeout (separate from per-dept work duration) ── */}
-                <div className="rounded-lg p-3" style={{ background: "rgba(215, 25, 32,0.04)", border: "1px solid rgba(215, 25, 32,0.2)" }}>
+                <div className="rounded-lg p-3" style={{ background: "rgba(46, 80, 214,0.04)", border: "1px solid rgba(46, 80, 214,0.2)" }}>
                   <SLabel text="Acceptance timeout (receiving dept)" hint="A handover not accepted within this window shows as OVERDUE / HOLD in Machine Tracker and reports. Separate from the department's work-duration limit." />
                   <div className="flex items-center gap-2 flex-wrap">
                     <input type="number" min="0" step="1"
@@ -9468,7 +9468,7 @@ function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, onSave, i
                 </div>
                 <button onClick={handleBackup}
                         className="flex-shrink-0 text-[12px] font-bold px-4 py-2 rounded-xl border transition-all"
-                        style={{ color: backupOk ? "#15803d" : "#d71920", background: backupOk ? "rgba(22,163,74,0.10)" : "rgba(215,25,32,0.06)", borderColor: backupOk ? "rgba(22,163,74,0.28)" : "rgba(215,25,32,0.22)" }}>
+                        style={{ color: backupOk ? "#15803d" : "#2E50D6", background: backupOk ? "rgba(22,163,74,0.10)" : "rgba(46, 80, 214,0.06)", borderColor: backupOk ? "rgba(22,163,74,0.28)" : "rgba(46, 80, 214,0.22)" }}>
                   {backupOk ? "✅ Downloaded" : "⬇ Backup Now"}
                 </button>
               </div>
@@ -9569,7 +9569,7 @@ function POSearchCenter({
   };
 
   const statusColor = (s) => ({
-    draft:    "#6b7280", pending:  "#f59e0b", approved: "#D71920",
+    draft:    "#6b7280", pending:  "#f59e0b", approved: "#2E50D6",
     ordered:  "#8b5cf6", received: "#22c55e", overdue:  "#ef4444",
     rejected: "#ef4444", review:   "#D97706",
   }[s] || "#6b7280");
@@ -9956,7 +9956,7 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
         {canDo("pipeline","create") && (
           <button onClick={() => { setCreatePrefill(null); setShowCreatePO(true); }}
                   className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-lg px-3 py-1.5 text-white border transition-all"
-                  style={{ background: "#B01218", borderColor: "rgba(176, 18, 24,0.5)", color: "#ffffff" }}>
+                  style={{ background: "#2640B0", borderColor: "rgba(38, 64, 176,0.5)", color: "#ffffff" }}>
             + New PO
           </button>
         )}
@@ -10019,7 +10019,7 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
                         <div className="text-[8px] text-amber-700 uppercase tracking-wide mb-0.5">Shortage</div>
                         <div className="text-[11px] font-bold text-amber-700">{shortage} {item.unit}</div>
                       </div>
-                      <div className="px-2 py-1.5 rounded-lg" style={{ background: "rgba(215, 25, 32,0.05)", border: "1px solid rgba(215, 25, 32,0.15)" }}>
+                      <div className="px-2 py-1.5 rounded-lg" style={{ background: "rgba(46, 80, 214,0.05)", border: "1px solid rgba(46, 80, 214,0.15)" }}>
                         <div className="text-[8px] text-blue-700 uppercase tracking-wide mb-0.5">Recommended</div>
                         <div className="text-[11px] font-bold text-blue-400">{recommendedQty} {item.unit}</div>
                       </div>
@@ -10112,7 +10112,7 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
 
           {/* ─ Col 3: Make Order ─ */}
           <div className="flex-1 flex flex-col min-w-[210px] max-w-[270px]">
-            <ColHdr icon="📦" title="Make Order" count={makeOrderPOs.length} color="#D71920" />
+            <ColHdr icon="📦" title="Make Order" count={makeOrderPOs.length} color="#2E50D6" />
             <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 pb-2">
               {makeOrderPOs.length === 0 && <div className="text-center py-10 text-[11px] text-slate-600"><div className="text-3xl mb-2">📋</div>No approved POs to order</div>}
               {makeOrderPOs.map(po => {
@@ -10342,10 +10342,10 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
              style={{ background: "rgba(17,24,39,0.45)", backdropFilter: "blur(12px)" }}
              onClick={e => e.target === e.currentTarget && setViewPO(null)}>
           <div className="w-full max-w-2xl flex flex-col rounded-2xl overflow-hidden"
-               style={{ maxHeight:"92vh", background:"var(--surface-elevated)", border:"1px solid rgba(215, 25, 32,0.32)", boxShadow:"0 40px 100px rgba(17,24,39,0.22)", animation:"slideUp 0.25s ease both" }}>
+               style={{ maxHeight:"92vh", background:"var(--surface-elevated)", border:"1px solid rgba(46, 80, 214,0.32)", boxShadow:"0 40px 100px rgba(17,24,39,0.22)", animation:"slideUp 0.25s ease both" }}>
             {/* ── Header ── */}
             <div className="px-5 py-4 border-b border-slate-200 flex-shrink-0"
-                 style={{ background:"linear-gradient(90deg,rgba(215, 25, 32,0.09),rgba(176, 18, 24,0.05))" }}>
+                 style={{ background:"linear-gradient(90deg,rgba(46, 80, 214,0.09),rgba(38, 64, 176,0.05))" }}>
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
@@ -10483,7 +10483,7 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
               {/* Activity History */}
               {viewPO.activityLog?.length > 0 && (() => {
                 const iconCfg = {
-                  "Created PO":     { icon: "📄", color: "#D71920" },
+                  "Created PO":     { icon: "📄", color: "#2E50D6" },
                   "Approved":       { icon: "✅", color: "#15803d" },
                   "Rejected":       { icon: "❌", color: "#b91c1c" },
                   "Order Placed":   { icon: "📋", color: "#6d28d9" },
@@ -10527,7 +10527,7 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
               {viewPO.status === "approved" && canDo("pipeline","ordered") && (
                 <button onClick={() => { setMoModal(viewPO); setViewPO(null); setEta(""); setEtaCustom(""); }}
                         className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-lg px-3 py-1.5 text-white border transition-all"
-                        style={{ background:"#B01218", borderColor:"rgba(176, 18, 24,0.5)", color: "#ffffff" }}>
+                        style={{ background:"#2640B0", borderColor:"rgba(38, 64, 176,0.5)", color: "#ffffff" }}>
                   📋 Confirm Order + ETA
                 </button>
               )}
@@ -10638,7 +10638,7 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
         <div className="modal-backdrop fixed inset-0 z-[55] flex items-center justify-center p-4"
              style={{ background:"rgba(17,24,39,0.45)", backdropFilter:"blur(12px)" }}
              onClick={e=>e.target===e.currentTarget&&(setMoModal(null),setEta(""),setEtaCustom(""))}>
-          <div className="w-full max-w-sm rounded-2xl p-6 space-y-4" style={{ background:"var(--surface-elevated)", border:"1px solid rgba(215, 25, 32,0.4)", boxShadow:"0 40px 80px rgba(17,24,39,0.22)", animation:"slideUp 0.25s ease both" }}>
+          <div className="w-full max-w-sm rounded-2xl p-6 space-y-4" style={{ background:"var(--surface-elevated)", border:"1px solid rgba(46, 80, 214,0.4)", boxShadow:"0 40px 80px rgba(17,24,39,0.22)", animation:"slideUp 0.25s ease both" }}>
             <div>
               <div className="text-sm font-black text-slate-900">📋 Confirm Order</div>
               <div className="text-[10px] text-slate-500 mt-1">{moModal.id} · {moModal.vendor} · ₹{(moModal.amount||0).toLocaleString("en-IN")}</div>
@@ -10662,7 +10662,7 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
               <Btn variant="ghost" size="sm" onClick={()=>{setMoModal(null);setEta("");setEtaCustom("");}}>Cancel</Btn>
               <button onClick={handleConfirm} disabled={!eta||(eta==="custom"&&!etaCustom)}
                       className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-lg px-4 py-1.5 text-white border transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                      style={{ background:"#B01218", borderColor:"rgba(176, 18, 24,0.5)", color: "#ffffff" }}>
+                      style={{ background:"#2640B0", borderColor:"rgba(38, 64, 176,0.5)", color: "#ffffff" }}>
                 ✅ Confirm & Start Follow-Up
               </button>
             </div>
@@ -10730,7 +10730,7 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
                   { label: "Current Stock", value: `${item.stock} ${item.unit}`, color: item.status === "critical" ? "#b91c1c" : "#b45309" },
                   { label: "Min Stock",     value: `${item.min} ${item.unit}`,   color: "#6b7280" },
                   { label: "Shortage",      value: `${shortage} ${item.unit}`,   color: "#b45309" },
-                  { label: "Recommended",   value: `${recommendedQty} ${item.unit}`, color: "#D71920" },
+                  { label: "Recommended",   value: `${recommendedQty} ${item.unit}`, color: "#2E50D6" },
                 ].map(s => (
                   <div key={s.label} className="px-3 py-2.5 rounded-xl" style={{ background: "rgba(17,24,39,0.03)", border: "1px solid rgba(17,24,39,0.06)" }}>
                     <div className="text-[9px] font-black text-slate-600 uppercase tracking-wider mb-1">{s.label}</div>
@@ -10766,7 +10766,7 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
                   disabled={parsedQty < 1}
                   onClick={() => { openCreatePO(item, parsedQty); setQtyModal(null); }}
                   className="flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-semibold rounded-lg px-3 py-1.5 text-white border transition-all disabled:opacity-40"
-                  style={{ background: "linear-gradient(135deg,#D71920,#B01218)", borderColor: "rgba(176, 18, 24,0.5)" }}>
+                  style={{ background: "linear-gradient(135deg,#2E50D6,#2640B0)", borderColor: "rgba(38, 64, 176,0.5)" }}>
                   📋 Create PO →
                 </button>
               </div>
@@ -10802,7 +10802,7 @@ function InwardPage({ items, handleUpdateStock, vendorList, onInwardComplete, on
 
   const ILabel = ({ text, req }) => (
     <div className="text-[11px] font-medium tracking-tight mb-1.5"
-         style={{ color: "#b01218" }}>
+         style={{ color: "#2640B0" }}>
       {text}{req && <span className="text-red-400 ml-0.5">*</span>}
     </div>
   );
@@ -10942,7 +10942,7 @@ function InwardPage({ items, handleUpdateStock, vendorList, onInwardComplete, on
                       {selectedItem.stock} <span className="text-xs text-slate-500">{selectedItem.unit}</span>
                     </div>
                     <div className="mt-2 h-1 bg-slate-50 rounded-full overflow-hidden">
-                      <div className="h-full rounded-full" style={{ width: `${fillPctNow}%`, background: statusConfig[selectedItem.status].dot || "#D71920" }} />
+                      <div className="h-full rounded-full" style={{ width: `${fillPctNow}%`, background: statusConfig[selectedItem.status].dot || "#2E50D6" }} />
                     </div>
                     <div className="text-[9px] text-slate-600 mt-1">Min: {selectedItem.min} {selectedItem.unit}</div>
                   </div>
@@ -10960,7 +10960,7 @@ function InwardPage({ items, handleUpdateStock, vendorList, onInwardComplete, on
                       {newS} <span className="text-xs text-slate-500">{selectedItem.unit}</span>
                     </div>
                     <div className="mt-2 h-1 bg-slate-50 rounded-full overflow-hidden">
-                      <div className="h-full rounded-full transition-all duration-500" style={{ width: `${fillPctNew}%`, background: newCfg.dot || "#D71920" }} />
+                      <div className="h-full rounded-full transition-all duration-500" style={{ width: `${fillPctNew}%`, background: newCfg.dot || "#2E50D6" }} />
                     </div>
                     <div className="text-[9px] text-slate-600 mt-1">{fillPctNew}% of min level</div>
                   </div>
@@ -11340,10 +11340,10 @@ function BomChecklistSlots({
              onClick={(e) => e.target === e.currentTarget && !busy && closeEditor()}>
           <div className="w-full max-w-xl rounded-2xl overflow-hidden flex flex-col"
                style={{ maxHeight: "90vh", background: "var(--surface-elevated)",
-                        border: "1px solid rgba(215, 25, 32,0.5)",
+                        border: "1px solid rgba(46, 80, 214,0.5)",
                         boxShadow: "0 40px 100px rgba(17,24,39,0.22)" }}>
             <div className="px-5 py-3 border-b border-slate-200 flex items-start justify-between flex-shrink-0"
-                 style={{ background: "linear-gradient(90deg,rgba(215, 25, 32,0.14),rgba(176, 18, 24,0.06))" }}>
+                 style={{ background: "linear-gradient(90deg,rgba(46, 80, 214,0.14),rgba(38, 64, 176,0.06))" }}>
               <div>
                 <div className="text-sm font-black text-slate-900">📋 Checklist · {editing.dept}</div>
                 <div className="text-[11px] text-slate-400 mt-0.5">{CHECKLIST_STAGES.find((s) => s.key === editing.stage).long}</div>
@@ -11367,7 +11367,7 @@ function BomChecklistSlots({
                 </button>
                 {reuseOpen && reuseCandidates.length > 0 && (
                   <div className="absolute left-0 right-0 top-full mt-1 z-10 rounded-lg overflow-hidden overflow-y-auto"
-                       style={{ background: "var(--surface-elevated)", border: "1px solid rgba(215, 25, 32,0.35)", maxHeight: 220 }}>
+                       style={{ background: "var(--surface-elevated)", border: "1px solid rgba(46, 80, 214,0.35)", maxHeight: 220 }}>
                     {reuseCandidates.map((t) => (
                       <button key={t.id}
                               onMouseDown={(e) => { e.preventDefault(); applyReuse(t); }}
@@ -11607,7 +11607,7 @@ function BOMPasteLines({ inventory = [], existingLines = [], onApply = () => {} 
       <div className="flex items-center gap-2 mt-3">
         <button onClick={apply} disabled={addCount === 0}
                 className="px-4 py-2 rounded-lg text-xs font-bold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ background: "#B01218", color: "#ffffff" }}>
+                style={{ background: "#2640B0", color: "#ffffff" }}>
           Add {addCount} line{plural(addCount)}
         </button>
         <button onClick={reset} disabled={!hasPaste}
@@ -12435,7 +12435,7 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
             <div className="text-sm font-black text-slate-900 leading-snug">{bomKey} — {bom.label}</div>
             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
               {serialNo && (
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background:"rgba(215, 25, 32,0.12)", color:"#b01218", border:"1px solid rgba(215, 25, 32,0.25)" }}>S/N: {serialNo}</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background:"rgba(46, 80, 214,0.12)", color:"#2640B0", border:"1px solid rgba(46, 80, 214,0.25)" }}>S/N: {serialNo}</span>
               )}
               <span className="text-[10px] text-slate-500">{enriched.length} components</span>
               {readyN > 0   && <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold" style={{ background: "rgba(34,197,94,0.12)",  color: "#15803d",  border: "1px solid rgba(34,197,94,0.22)"  }}>{readyN} ready</span>}
@@ -12497,7 +12497,7 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
               <button key={f} onClick={() => setFilterStatus(f)}
                       className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg border transition-all"
                       style={ filterStatus === f
-                        ? { background: f === "all" ? "rgba(215, 25, 32,0.15)" : SB[f], borderColor: f === "all" ? "rgba(215, 25, 32,0.4)" : SC[f] + "55", color: f === "all" ? "#B01218" : SC[f] }
+                        ? { background: f === "all" ? "rgba(46, 80, 214,0.15)" : SB[f], borderColor: f === "all" ? "rgba(46, 80, 214,0.4)" : SC[f] + "55", color: f === "all" ? "#2640B0" : SC[f] }
                         : { background: "transparent", borderColor: "rgba(17,24,39,0.06)", color: "#64748b" } }>
                 {f === "all" ? `All (${enriched.length})` : `${SL[f]} (${enriched.filter(i=>i.status===f).length})`}
               </button>
@@ -12677,7 +12677,7 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
 
             {/* Migration 041 — department durations for this model. Copied onto
                 every machine at Outward, so the operator is not asked again. */}
-            <div className="rounded-xl p-4" style={{ background: "rgba(215, 25, 32,0.05)", border: "1px solid rgba(215, 25, 32,0.2)" }}>
+            <div className="rounded-xl p-4" style={{ background: "rgba(46, 80, 214,0.05)", border: "1px solid rgba(46, 80, 214,0.2)" }}>
               <div className="flex items-center gap-3 flex-wrap mb-3">
                 <span className="text-lg">⏱️</span>
                 <div className="flex-1 min-w-[160px]">
@@ -12764,7 +12764,7 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
                          placeholder="Qty" className="w-20 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-900 outline-none modal-input"
                          style={{ fontFamily: "'Inter',system-ui,sans-serif" }} />
                   <button onClick={addItemToBOM} className="px-4 py-2 rounded-lg text-xs font-bold text-white"
-                          style={{ background: "#B01218", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>Add</button>
+                          style={{ background: "#2640B0", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>Add</button>
                 </div>
               </div>
               {addErr && <div className="text-[10px] text-red-400 mt-2">⚠ {addErr}</div>}
@@ -12933,7 +12933,7 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
                       }}
                       disabled={!canSubmit}
                       className="text-xs font-black px-6 py-2.5 rounded-xl border transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                      style={{ background: canSubmit ? "#b01218" : "#9ca3af", color: "#ffffff", boxShadow: canSubmit ? "0 1px 2px rgba(17,24,39,0.14)" : "none", borderColor: "transparent" }}>
+                      style={{ background: canSubmit ? "#2640B0" : "#9ca3af", color: "#ffffff", boxShadow: canSubmit ? "0 1px 2px rgba(17,24,39,0.14)" : "none", borderColor: "transparent" }}>
                 📤 Issue Stock
               </button>
             ) : (
@@ -13213,9 +13213,9 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
              style={{ background: "rgba(17,24,39,0.45)", backdropFilter: "blur(12px)" }}
              onClick={(e) => e.target === e.currentTarget && !issuing && setShowDestChoice(false)}>
           <div className="w-full max-w-md rounded-2xl overflow-hidden"
-               style={{ background: "var(--surface-elevated)", border: "1px solid rgba(215, 25, 32,0.4)", boxShadow: "0 40px 80px rgba(17,24,39,0.22)" }}>
+               style={{ background: "var(--surface-elevated)", border: "1px solid rgba(46, 80, 214,0.4)", boxShadow: "0 40px 80px rgba(17,24,39,0.22)" }}>
             <div className="px-6 py-5 border-b border-slate-200"
-                 style={{ background: "linear-gradient(90deg,rgba(215, 25, 32,0.10),rgba(176, 18, 24,0.05))" }}>
+                 style={{ background: "linear-gradient(90deg,rgba(46, 80, 214,0.10),rgba(38, 64, 176,0.05))" }}>
               <div className="text-sm font-black text-slate-900">Where should this build go?</div>
               <div className="text-[11px] text-slate-500 mt-0.5">
                 {bomKey}{serialNo ? ` · S/N ${serialNo}` : ""}
@@ -13281,10 +13281,10 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
              onClick={(e) => e.target === e.currentTarget && !issuing && setShowDurationModal(false)}>
           <div className="w-full max-w-xl rounded-2xl overflow-hidden flex flex-col"
                style={{ maxHeight: "92vh", background: "var(--surface-elevated)",
-                        border: "1px solid rgba(215, 25, 32,0.5)",
-                        boxShadow: "0 40px 100px rgba(17,24,39,0.22), 0 0 60px rgba(215, 25, 32,0.08)" }}>
+                        border: "1px solid rgba(46, 80, 214,0.5)",
+                        boxShadow: "0 40px 100px rgba(17,24,39,0.22), 0 0 60px rgba(46, 80, 214,0.08)" }}>
             <div className="px-6 py-4 border-b border-slate-200 flex items-start justify-between flex-shrink-0"
-                 style={{ background: "linear-gradient(90deg,rgba(215, 25, 32,0.14),rgba(176, 18, 24,0.06))" }}>
+                 style={{ background: "linear-gradient(90deg,rgba(46, 80, 214,0.14),rgba(38, 64, 176,0.06))" }}>
               <div>
                 <div className="text-sm font-black text-slate-900 flex items-center gap-2">
                   ⏱️ Department Durations
@@ -13365,7 +13365,7 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
                         }}
                         disabled={issuing}
                         className="text-xs font-black text-white px-4 py-1.5 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                        style={{ background: "#B01218",
+                        style={{ background: "#2640B0",
                                  boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
                   ✓ Save Durations & Continue
                 </button>
@@ -13460,7 +13460,7 @@ function BomLineCheckPointsModal({ code, itemName = "", bomLabel = "", current =
                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs text-slate-900 outline-none modal-input" />
             <button type="button" onClick={add} disabled={!draft.trim()}
                     className="px-4 rounded-xl text-[12px] font-bold text-white disabled:opacity-40 flex-shrink-0"
-                    style={{ background: "#D71920" }}>+ Add</button>
+                    style={{ background: "#2E50D6" }}>+ Add</button>
           </div>
 
           {tmpl.length > 0 && differsFromTemplate && (
@@ -13558,7 +13558,7 @@ function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, onCreateB
 
   const OLabel = ({ text, req }) => (
     <div className="text-[11px] font-medium tracking-tight mb-1.5"
-         style={{ color: "#b01218" }}>
+         style={{ color: "#2640B0" }}>
       {text}{req && <span className="text-red-400 ml-0.5">*</span>}
     </div>
   );
@@ -13842,7 +13842,7 @@ function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, onCreateB
                 </button>
                 <button onClick={confirmSerial}
                         className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white transition-all"
-                        style={{ background: "#B01218", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
+                        style={{ background: "#2640B0", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
                   Proceed to Issue →
                 </button>
               </div>
@@ -13854,7 +13854,7 @@ function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, onCreateB
       {/* 2026-06-02d — BOM action toast (Duplicate / Delete result) */}
       {bomActionToast && (
         <div className="fixed bottom-6 right-6 z-[65] flex items-center gap-3 px-5 py-3.5 rounded-2xl"
-             style={{ background: "var(--surface-raised)", border: "1px solid rgba(215, 25, 32,0.45)", boxShadow: "0 20px 60px rgba(17,24,39,0.14)", animation: "slideUp 0.3s ease both" }}>
+             style={{ background: "var(--surface-raised)", border: "1px solid rgba(46, 80, 214,0.45)", boxShadow: "0 20px 60px rgba(17,24,39,0.14)", animation: "slideUp 0.3s ease both" }}>
           <span className="text-lg">📋</span>
           <div>
             <div className="text-xs font-bold text-slate-900">{bomActionToast.text}</div>
@@ -14071,7 +14071,7 @@ function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, onCreateB
                style={{ border: "1px solid var(--border-rim)", boxShadow: "0 32px 80px rgba(17,24,39,0.18)", maxHeight: "90vh", animation: "slideUp 0.25s ease both" }}>
             <div className="px-6 py-4 flex items-center justify-between flex-shrink-0" style={{ borderBottom: "1px solid rgba(17,24,39,0.08)" }}>
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center text-base" style={{ background: "rgba(215, 25, 32,0.15)" }}>📋</div>
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center text-base" style={{ background: "rgba(46, 80, 214,0.15)" }}>📋</div>
                 <div>
                   <div className="text-sm font-black text-slate-900">Create New BOM</div>
                   <div className="text-[10px] text-slate-500 mt-0.5">Define a new machine model with components and rack capacity</div>
@@ -14194,7 +14194,7 @@ function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, onCreateB
                     style={{ fontFamily: "'Inter',system-ui,sans-serif" }} />
                   <button onClick={addCreateItem}
                     className="px-4 py-2 rounded-lg text-xs font-bold text-white mt-2"
-                    style={{ background: "#B01218", color: "#ffffff" }}>+ Add</button>
+                    style={{ background: "#2640B0", color: "#ffffff" }}>+ Add</button>
                 </div>
               </div>
 
@@ -14267,7 +14267,7 @@ function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, onCreateB
             {canDo("outward","editBOM") && onCreateBOM && (
               <button onClick={openCreateBOM}
                 className="text-[11px] font-bold px-3 py-1.5 rounded-lg text-white transition-all"
-                style={{ background: "#B01218", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
+                style={{ background: "#2640B0", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
                 + New BOM
               </button>
             )}
@@ -14555,7 +14555,7 @@ function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, onCreateB
                       <td className="px-4 py-2 text-[10px] text-slate-500 font-mono">{entry.date}</td>
                       <td className="px-4 py-2">
                         <span className="text-[9px] font-bold px-2 py-0.5 rounded-full"
-                              style={{ background: entry.type === "bom" ? "rgba(217, 119, 6,0.1)" : "rgba(215, 25, 32,0.1)", color: entry.type === "bom" ? "#B45309" : "#B01218", border: `1px solid ${entry.type === "bom" ? "rgba(217, 119, 6,0.2)" : "rgba(215, 25, 32,0.2)"}` }}>
+                              style={{ background: entry.type === "bom" ? "rgba(217, 119, 6,0.1)" : "rgba(46, 80, 214,0.1)", color: entry.type === "bom" ? "#B45309" : "#2640B0", border: `1px solid ${entry.type === "bom" ? "rgba(217, 119, 6,0.2)" : "rgba(46, 80, 214,0.2)"}` }}>
                           {entry.type === "bom" ? "BOM" : "Manual"}
                         </span>
                       </td>
@@ -15535,7 +15535,7 @@ function ReportCenterPage({
                     aria-pressed={tab === t.id}
                     className="text-left px-4 py-2 rounded-xl border transition-all"
                     style={tab === t.id
-                      ? { background: "rgba(215, 25, 32,0.1)", borderColor: "rgba(215, 25, 32,0.45)", color: "#B01218" }
+                      ? { background: "rgba(46, 80, 214,0.1)", borderColor: "rgba(46, 80, 214,0.45)", color: "#2640B0" }
                       : { background: "transparent", borderColor: "rgba(17,24,39,0.12)", color: "#475569" }}>
               <div className="text-[12px] font-bold">{t.label}</div>
               <div className="text-[10px] opacity-70">{t.hint}</div>
@@ -15558,7 +15558,7 @@ function ReportCenterPage({
             ⬇ Excel / CSV
           </button>
           <button onClick={printReport} data-export-pdf
-                  className="text-[11px] font-black px-3 py-1.5 rounded-lg text-white" style={{ background: "#B01218" }}
+                  className="text-[11px] font-black px-3 py-1.5 rounded-lg text-white" style={{ background: "#2640B0" }}
                   title={tab === "customer" ? "Save the customer PDF to send manually (no link is created)" : "Print or save this report as PDF"}>
             🖨 {tab === "customer" ? "Save customer PDF" : "PDF"}
           </button>
@@ -15588,7 +15588,7 @@ function ReportCenterPage({
         {tab === "factory" && (
           <div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <ReportKPI label={T("Total machines")} value={summary.total} color="#D71920" />
+              <ReportKPI label={T("Total machines")} value={summary.total} color="#2E50D6" />
               <ReportKPI label={T("Active")} value={summary.active} color="#D97706" />
               <ReportKPI label={T("Completed")} value={summary.completed} color="#22c55e" />
               <ReportKPI label={T("Avg rating")} value={summary.avgRating ?? "—"} color="#eab308" suffix={summary.avgRating ? "★" : ""} />
@@ -15630,7 +15630,7 @@ function ReportCenterPage({
           return (
             <div>
               <div className="rounded-xl p-4 mb-4 no-print flex items-center gap-3 flex-wrap"
-                   style={{ background: "rgba(215, 25, 32,0.05)", border: "1px solid rgba(215, 25, 32,0.25)" }}>
+                   style={{ background: "rgba(46, 80, 214,0.05)", border: "1px solid rgba(46, 80, 214,0.25)" }}>
                 <div className="text-[10px] font-black uppercase tracking-wider text-blue-200">A-to-Z Machine Report</div>
                 <select value={pickedId}
                         onChange={(e) => setAtozMachineId(e.target.value)}
@@ -15646,7 +15646,7 @@ function ReportCenterPage({
                 </select>
                 <button onClick={printReport} disabled={!pickedId}
                         className="text-[11px] font-black text-white px-3 py-1.5 rounded-lg transition-all disabled:opacity-40"
-                        style={{ background: "#B01218", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
+                        style={{ background: "#2640B0", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
                   🖨 Print / Save as PDF
                 </button>
               </div>
@@ -15780,7 +15780,7 @@ function DepartmentScoreboard({ rows = [], openIssues = [], waitingNow = [] }) {
   );
 }
 
-function ReportKPI({ label, value, color = "#D71920", suffix = "" }) {
+function ReportKPI({ label, value, color = "#2E50D6", suffix = "" }) {
   return (
     <div className="kpi-tile">
       <div className="flex items-center justify-between mb-2">
@@ -15859,7 +15859,7 @@ const DISPLAY_STAGE_COLORS = {
   "Ready":      "#15803d",
 };
 const STAGE_COLORS = {
-  "BOM Issued": "#D71920",
+  "BOM Issued": "#2E50D6",
   "Assembly":   "#8b5cf6",
   "Mechanical": "#D97706",
   "Electrical": "#eab308",
@@ -15954,7 +15954,7 @@ function SignaturePad({ onSave, onCancel, initialSvg = "", light = false }) {
         )}
         <button type="button" onClick={save}
                 className="text-[11px] font-black text-white px-4 py-1.5 rounded-lg transition-all"
-                style={{ background: "#B01218", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
+                style={{ background: "#2640B0", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
           Save Signature
         </button>
       </div>
@@ -18121,7 +18121,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
         {canView("reports") && (
           <button type="button" data-open-reports onClick={() => onNavigate("reports")}
                   className="h-9 px-3 rounded-lg text-[12px] font-black flex items-center gap-1.5"
-                  style={{ background: "rgba(215,25,32,0.10)", color: "#B01218", border: "1px solid rgba(215,25,32,0.35)" }}
+                  style={{ background: "rgba(46, 80, 214,0.10)", color: "#2640B0", border: "1px solid rgba(46, 80, 214,0.35)" }}
                   title="Open the Report Center">
             📄 Reports
           </button>
@@ -18154,7 +18154,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
           <button onClick={() => onNavigate("machines_settings")}
                   title="Open Machine Tracker settings (deadlines, HOLD rules, checklists, employees)"
                   className="h-9 px-3 rounded-lg text-[12px] font-black inline-flex items-center gap-1.5 transition-all"
-                  style={{ background: "rgba(215, 25, 32,0.1)", border: "1px solid rgba(215, 25, 32,0.35)", color: "#b01218" }}>
+                  style={{ background: "rgba(46, 80, 214,0.1)", border: "1px solid rgba(46, 80, 214,0.35)", color: "#2640B0" }}>
             ⚙️ Settings
           </button>
         )}
@@ -18205,7 +18205,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
             <div className="section-card no-lift p-4 sm:p-5" data-staff-section={title}>
               <div className="flex items-baseline gap-2 flex-wrap mb-3">
                 <h2 className="text-[16px] font-black" style={{ color: "var(--text-strong)" }}>{title}</h2>
-                <span className="text-[14px] font-black tabular-nums" style={{ color: count ? "#B01218" : "var(--text-dim)" }}>({count})</span>
+                <span className="text-[14px] font-black tabular-nums" style={{ color: count ? "#2640B0" : "var(--text-dim)" }}>({count})</span>
                 {hint && <span className="text-[12px]" style={{ color: "var(--text-dim)" }}>{hint}</span>}
               </div>
               {children}
@@ -18342,7 +18342,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                           </div>
                           <div className="flex flex-col sm:flex-row gap-2 sm:flex-wrap">
                             {during && (
-                              <button type="button" data-staff-during={m.id} className={btn} style={{ background: "#B01218", color: "#fff" }} onClick={() => openDuringWorkModal(m)}>
+                              <button type="button" data-staff-during={m.id} className={btn} style={{ background: "#2640B0", color: "#fff" }} onClick={() => openDuringWorkModal(m)}>
                                 📋 During-Work Checks
                               </button>
                             )}
@@ -18868,7 +18868,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                         <button type="button"
                                 onClick={() => { if (mm) { setFilter("active"); setExpanded(mm.id); setIssuePopup(null); } }}
                                 className="mt-3 w-full text-center text-[11px] font-bold py-2 rounded-lg transition-all"
-                                style={{ background: "rgba(215,25,32,0.1)", color: "#b01218", border: "1px solid rgba(215,25,32,0.3)" }}>
+                                style={{ background: "rgba(46, 80, 214,0.1)", color: "#2640B0", border: "1px solid rgba(46, 80, 214,0.3)" }}>
                           View machine →
                         </button>
                       </div>
@@ -19528,7 +19528,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
             // (Trial → Ready) and its acceptance, never by a stage jump.
             const futureStages = MACHINE_STAGES.filter((s, i) => i > curIdx && s !== "Ready");
             const dispStage  = displayStageOf(machine);
-            const stageColor = STAGE_COLORS[dispStage] || "#D71920";
+            const stageColor = STAGE_COLORS[dispStage] || "#2E50D6";
             const pct = isComplete ? 100 : Math.round((curIdx / (MACHINE_STAGES.length - 1)) * 100);
             // Display-only stage index for the card stepper (see DISPLAY_STAGES).
             const dispIdx = DISPLAY_STAGES.indexOf(dispStage);
@@ -19680,7 +19680,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                           <button onClick={() => handleStageUpdate(machine)}
                                   disabled={!selStage}
                                   className="text-[11px] font-bold px-3 py-1.5 rounded-lg border transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                                  style={{ background: selStage ? "#B01218" : "transparent", borderColor: selStage ? "rgba(215, 25, 32,0.4)" : "rgba(17,24,39,0.10)", color: selStage ? "white" : "#6b7280" }}>
+                                  style={{ background: selStage ? "#2640B0" : "transparent", borderColor: selStage ? "rgba(46, 80, 214,0.4)" : "rgba(17,24,39,0.10)", color: selStage ? "white" : "#6b7280" }}>
                             Update
                           </button>
                         </>
@@ -19700,7 +19700,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                         && pickTemplate(checklistTemplates, machine.bomKey, machine.currentDepartment || machine.stage, "during_work") && (
                         <button onClick={() => openDuringWorkModal(machine)}
                                 className="text-[11px] font-black text-white px-3 py-1.5 rounded-lg transition-all"
-                                style={{ background: "#B01218", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}
+                                style={{ background: "#2640B0", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}
                                 title="During-Work Checks">
                           📋 During-Work Checks
                         </button>
@@ -20040,7 +20040,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                         <div className="relative pl-5">
                           <div className="absolute left-2 top-0 bottom-0 w-px" style={{ background: "rgba(17,24,39,0.06)" }} />
                           {[...machine.history].reverse().map((h, i) => {
-                            const sc = STAGE_COLORS[h.stage] || "#D71920";
+                            const sc = STAGE_COLORS[h.stage] || "#2E50D6";
                             return (
                               <div key={i} className="relative mb-3 last:mb-0">
                                 <div className="absolute -left-[13px] top-1 w-2.5 h-2.5 rounded-full flex-shrink-0"
@@ -20275,7 +20275,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
             </div>
             <button type="button" data-report-print onClick={printMachineReport}
                     className="h-9 px-3 rounded-lg text-[12px] font-black text-white flex items-center gap-1.5"
-                    style={{ background: "#B01218" }}>🖨 <span className="hidden sm:inline">Print / PDF</span></button>
+                    style={{ background: "#2640B0" }}>🖨 <span className="hidden sm:inline">Print / PDF</span></button>
             <button type="button" aria-label="Close report" onClick={() => setReportMachineId(null)}
                     className="w-9 h-9 rounded-full flex items-center justify-center text-[15px] font-black"
                     style={{ background: "rgba(17,24,39,0.07)", color: "var(--text-dim)" }}>✕</button>
@@ -21232,7 +21232,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                         follow the same "unchecked needs remark" rule as
                         Finish & Transfer. */}
                     {acceptModal.checklistTemplate && (acceptModal.checklistAnswers || []).length > 0 && (
-                      <div className="rounded-lg px-3 py-2.5" style={{ background: "rgba(215, 25, 32,0.05)", border: "1px solid rgba(215, 25, 32,0.3)" }}>
+                      <div className="rounded-lg px-3 py-2.5" style={{ background: "rgba(46, 80, 214,0.05)", border: "1px solid rgba(46, 80, 214,0.3)" }}>
                         <div className="text-[10px] font-bold text-blue-200 uppercase tracking-wider mb-1">
                           📋 {acceptModal.checklistTemplate.name || "After Acceptance Checklist"}
                         </div>
@@ -21365,10 +21365,10 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                style={{ background: "rgba(17,24,39,0.45)", backdropFilter: "blur(10px)" }}
                onClick={(e) => e.target === e.currentTarget && !busy && setDuringWorkModal(null)}>
             <div className="relative w-full max-w-md rounded-2xl overflow-hidden flex flex-col"
-                 style={{ background: "var(--surface-elevated)", border: "1px solid rgba(215, 25, 32,0.4)", boxShadow: "0 40px 80px rgba(17,24,39,0.22)", maxHeight: "90vh" }}>
+                 style={{ background: "var(--surface-elevated)", border: "1px solid rgba(46, 80, 214,0.4)", boxShadow: "0 40px 80px rgba(17,24,39,0.22)", maxHeight: "90vh" }}>
               <ModalX onClose={() => setDuringWorkModal(null)} disabled={!!busy} />
               <div className="px-6 py-4 border-b border-slate-200 flex-shrink-0"
-                   style={{ background: "linear-gradient(90deg,rgba(215, 25, 32,0.12),rgba(176, 18, 24,0.05))" }}>
+                   style={{ background: "linear-gradient(90deg,rgba(46, 80, 214,0.12),rgba(38, 64, 176,0.05))" }}>
                 <div className="text-sm font-black text-slate-900">📋 During-Work Checks</div>
                 <div className="text-[11px] text-slate-400 mt-0.5">{machine.bomKey}{machine.serialNo ? ` · S/N ${machine.serialNo}` : ""} · {machine.currentDepartment || machine.stage}</div>
                 <div className="text-[10px] text-slate-500 mt-0.5">{template?.name || "Checks"}</div>
@@ -21416,7 +21416,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                 </button>
                 <button onClick={submitDuringWork} disabled={busy}
                         className="text-xs font-black text-white px-4 py-1.5 rounded-lg transition-all disabled:opacity-50"
-                        style={{ background: "#B01218", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
+                        style={{ background: "#2640B0", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
                   {busy ? "Saving…" : "✓ Save Checks"}
                 </button>
               </div>
@@ -21849,7 +21849,7 @@ function PendingPage({ pendingLog, onClearPending, onFulfillPending, onFulfillGr
                         <span className="text-[9px] font-mono text-slate-600">{entry.code}</span>
                         {cf.mode === "all" && (
                           <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
-                                style={{ background: "rgba(215, 25, 32,0.1)", color: "#b01218", border: "1px solid rgba(215, 25, 32,0.25)" }}>
+                                style={{ background: "rgba(46, 80, 214,0.1)", color: "#2640B0", border: "1px solid rgba(46, 80, 214,0.25)" }}>
                             {entry.bomKey}{entry.serialNo ? ` · ${entry.serialNo}` : ""}
                           </span>
                         )}
@@ -21961,7 +21961,7 @@ function PendingPage({ pendingLog, onClearPending, onFulfillPending, onFulfillGr
                 const gSC       = gStatus === "ready" ? "#22c55e" : gStatus === "partial" ? "#D97706" : "#ef4444";
                 const gLabel    = gStatus === "ready" ? "All Ready" : gStatus === "partial" ? "Partially Available" : "Awaiting Stock";
                 const machine   = machineByIssue[String(group.issueId)] || null;
-                const stageColor = machine ? (STAGE_COLORS[machine.stage] || "#D71920") : "#D71920";
+                const stageColor = machine ? (STAGE_COLORS[machine.stage] || "#2E50D6") : "#2E50D6";
                 const bom        = bomDefs?.[group.bomKey];
 
                 return (
@@ -21983,7 +21983,7 @@ function PendingPage({ pendingLog, onClearPending, onFulfillPending, onFulfillGr
                             <span className="text-sm font-bold text-slate-900">{group.bomLabel}</span>
                             {group.serialNo && (
                               <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded-full"
-                                    style={{ background: "rgba(215, 25, 32,0.12)", color: "#b01218", border: "1px solid rgba(215, 25, 32,0.25)" }}>
+                                    style={{ background: "rgba(46, 80, 214,0.12)", color: "#2640B0", border: "1px solid rgba(46, 80, 214,0.25)" }}>
                                 S/N: {group.serialNo}
                               </span>
                             )}
@@ -22097,10 +22097,10 @@ function PendingPage({ pendingLog, onClearPending, onFulfillPending, onFulfillGr
 // ─── HISTORY & REPORTS ────────────────────────────────────────────────────────
 
 const AUDIT_META = {
-  po_created:        { label: "PO Created",        icon: "📋", color: "#D71920", module: "Purchase"   },
+  po_created:        { label: "PO Created",        icon: "📋", color: "#2E50D6", module: "Purchase"   },
   po_approved:       { label: "PO Approved",        icon: "✅", color: "#15803d", module: "Purchase"   },
   po_rejected:       { label: "PO Rejected",        icon: "❌", color: "#b91c1c", module: "Purchase"   },
-  po_ordered:        { label: "Order Placed",        icon: "🚚", color: "#B01218", module: "Purchase"   },
+  po_ordered:        { label: "Order Placed",        icon: "🚚", color: "#2640B0", module: "Purchase"   },
   po_received:       { label: "PO Received",         icon: "📥", color: "#047857", module: "Purchase"   },
   po_deleted:        { label: "PO Deleted",          icon: "🗑️", color: "#64748b", module: "Purchase"   },
   inward_manual:     { label: "Manual Inward",       icon: "📥", color: "#047857", module: "Inward"     },
@@ -22108,17 +22108,17 @@ const AUDIT_META = {
   outward_manual:    { label: "Manual Outward",      icon: "📤", color: "#B45309", module: "Outward"    },
   stock_adjust:      { label: "Stock Adjusted",      icon: "🔢", color: "#6d28d9", module: "Inventory"  },
   inventory_add:     { label: "Item Added",          icon: "➕", color: "#15803d", module: "Inventory"  },
-  inventory_edit:    { label: "Item Edited",         icon: "✏️", color: "#D71920", module: "Inventory"  },
+  inventory_edit:    { label: "Item Edited",         icon: "✏️", color: "#2E50D6", module: "Inventory"  },
   inventory_delete:  { label: "Item Deleted",        icon: "🗑️", color: "#b91c1c", module: "Inventory"  },
   inventory_archive: { label: "Item Archived",        icon: "📦", color: "#64748b", module: "Inventory"  },
   bom_updated:       { label: "BOM Updated",         icon: "⚙️", color: "#b45309", module: "BOM"        },
   pending_fulfilled: { label: "Pending Fulfilled",   icon: "✅", color: "#15803d", module: "Pending"    },
   pending_cleared:   { label: "Pending Cleared",     icon: "🧹", color: "#64748b", module: "Pending"    },
-  machine_created:   { label: "Machine Created",     icon: "🏭", color: "#D71920", module: "Machine"    },
-  machine_stage:     { label: "Stage Updated",       icon: "🔄", color: "#B01218", module: "Machine"    },
+  machine_created:   { label: "Machine Created",     icon: "🏭", color: "#2E50D6", module: "Machine"    },
+  machine_stage:     { label: "Stage Updated",       icon: "🔄", color: "#2640B0", module: "Machine"    },
   machine_completed: { label: "Completed",           icon: "🏆", color: "#15803d", module: "Machine"    },
   vendor_add:        { label: "Vendor Added",        icon: "➕", color: "#15803d", module: "Vendor"     },
-  vendor_edit:       { label: "Vendor Updated",      icon: "✏️", color: "#D71920", module: "Vendor"     },
+  vendor_edit:       { label: "Vendor Updated",      icon: "✏️", color: "#2E50D6", module: "Vendor"     },
   vendor_delete:     { label: "Vendor Deleted",      icon: "🗑️", color: "#b91c1c", module: "Vendor"     },
   role_changed:      { label: "Role Changed",        icon: "👤", color: "#6d28d9", module: "Settings"   },
 };
@@ -22497,7 +22497,7 @@ function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, machine
   const machineStatus = (() => {
     const c = { completed: 0, active: 0 };
     machineLog.forEach((m) => { c[m.status] = (c[m.status] || 0) + 1; });
-    return [{ name: "Active", value: c.active || 0, fill: "#D71920" }, { name: "Completed", value: c.completed || 0, fill: "#22c55e" }];
+    return [{ name: "Active", value: c.active || 0, fill: "#2E50D6" }, { name: "Completed", value: c.completed || 0, fill: "#22c55e" }];
   })();
   const stageBreakdown = (() => {
     const c = {};
@@ -22536,7 +22536,7 @@ function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, machine
         {HR_TABS.map((t) => (
           <button key={t.id} onClick={() => setTab(t.id)}
             className="flex items-center gap-1.5 px-3.5 py-2 text-[11px] font-semibold rounded-t-lg transition-all relative"
-            style={tab===t.id ? { color:"#d71920", background:"rgba(215,25,32,0.07)", borderBottom:"2px solid #d71920" } : { color:"#475569" }}>
+            style={tab===t.id ? { color:"#2E50D6", background:"rgba(46, 80, 214,0.07)", borderBottom:"2px solid #2E50D6" } : { color:"#475569" }}>
             <span>{t.icon}</span>{t.label}
           </button>
         ))}
@@ -22623,7 +22623,7 @@ function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, machine
             ) : (
               <div className="space-y-3">
                 {purchaseRows.map((p) => {
-                  const STATUS_COLOR = { pending:"#f59e0b", approved:"#D71920", ordered:"#B01218", received:"#22c55e", rejected:"#ef4444", overdue:"#D97706" };
+                  const STATUS_COLOR = { pending:"#f59e0b", approved:"#2E50D6", ordered:"#2640B0", received:"#22c55e", rejected:"#ef4444", overdue:"#D97706" };
                   const sc = STATUS_COLOR[p.status] || "#64748b";
                   const totalAmt = (p.amount||0).toLocaleString("en-IN");
                   return (
@@ -22686,7 +22686,7 @@ function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, machine
               <div className="space-y-3">
                 {machineRows.map((m) => {
                   const isComplete = m.status === "completed";
-                  const STAGE_C = { "BOM Issued":"#D71920","Assembly":"#B01218","Mechanical":"#8b5cf6","Electrical":"#f59e0b","Trial":"#B45309","Ready":"#22c55e" };
+                  const STAGE_C = { "BOM Issued":"#2E50D6","Assembly":"#2640B0","Mechanical":"#8b5cf6","Electrical":"#f59e0b","Trial":"#B45309","Ready":"#22c55e" };
                   const stageColor = STAGE_C[m.stage] || "#64748b";
                   return (
                     <div key={m.id} className="rounded-xl p-4" style={CARD_STYLE}>
@@ -22886,7 +22886,7 @@ function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, machine
                         </div>
                       </div>
                       <div className="mt-3 grid grid-cols-3 gap-3">
-                        <div className="rounded-lg p-2 text-center" style={{ background:"rgba(215, 25, 32,0.08)" }}>
+                        <div className="rounded-lg p-2 text-center" style={{ background:"rgba(46, 80, 214,0.08)" }}>
                           <div className="text-sm font-black text-blue-400">{v.orders}</div>
                           <div className="text-[9px] text-slate-500">Orders</div>
                         </div>
@@ -23039,7 +23039,7 @@ function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, machine
                 URL.revokeObjectURL(url);
               }}
                 className="px-4 py-2.5 rounded-xl text-xs font-bold text-white transition-all hover:scale-[1.02] active:scale-[0.98]"
-                style={{ background: "#B01218", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
+                style={{ background: "#2640B0", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
                 📥 Download Report
               </button>
             </div>
@@ -23047,8 +23047,8 @@ function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, machine
             {/* KPI summary */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {[
-                { label:"Total PO Value",  value:`₹${pos.reduce((s,p)=>s+(p.amount||0),0).toLocaleString("en-IN")}`, icon:"💰", color:"#D71920" },
-                { label:"Total POs",       value:pos.length,                                                           icon:"📋", color:"#B01218" },
+                { label:"Total PO Value",  value:`₹${pos.reduce((s,p)=>s+(p.amount||0),0).toLocaleString("en-IN")}`, icon:"💰", color:"#2E50D6" },
+                { label:"Total POs",       value:pos.length,                                                           icon:"📋", color:"#2640B0" },
                 { label:"Machines Tracked",value:machineLog.length,                                                    icon:"🔧", color:"#15803d" },
                 { label:"Inward Entries",  value:inwardLog.length,                                                     icon:"📥", color:"#047857" },
               ].map((k) => (
@@ -23069,12 +23069,12 @@ function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, machine
                 {monthlyPurchase.length === 0 ? <div className="text-center text-slate-600 py-8 text-xs">No data</div> : (
                   <ResponsiveContainer width="100%" height={180}>
                     <AreaChart data={monthlyPurchase} margin={{top:4,right:4,left:0,bottom:4}}>
-                      <defs><linearGradient id="hrPG" x1="0" y1="0" x2="0" y2="1"><stop offset="10%" stopColor="#D71920" stopOpacity={0.25}/><stop offset="95%" stopColor="#D71920" stopOpacity={0}/></linearGradient></defs>
+                      <defs><linearGradient id="hrPG" x1="0" y1="0" x2="0" y2="1"><stop offset="10%" stopColor="#2E50D6" stopOpacity={0.25}/><stop offset="95%" stopColor="#2E50D6" stopOpacity={0}/></linearGradient></defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(17,24,39,0.04)" />
                       <XAxis dataKey="month" tick={{fill:"#475569",fontSize:9}} axisLine={false} tickLine={false} />
                       <YAxis tick={{fill:"#475569",fontSize:9}} axisLine={false} tickLine={false} />
                       <Tooltip contentStyle={{background:"var(--surface-elevated)",border:"1px solid var(--border-rim)",borderRadius:8,fontSize:11}} />
-                      <Area type="monotone" dataKey="amount" stroke="#D71920" strokeWidth={2} fill="url(#hrPG)" name="Amount ₹" />
+                      <Area type="monotone" dataKey="amount" stroke="#2E50D6" strokeWidth={2} fill="url(#hrPG)" name="Amount ₹" />
                     </AreaChart>
                   </ResponsiveContainer>
                 )}
@@ -23090,7 +23090,7 @@ function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, machine
                       <XAxis dataKey="name" tick={{fill:"#475569",fontSize:8}} axisLine={false} tickLine={false} />
                       <YAxis tick={{fill:"#475569",fontSize:9}} axisLine={false} tickLine={false} />
                       <Tooltip contentStyle={{background:"var(--surface-elevated)",border:"1px solid var(--border-rim)",borderRadius:8,fontSize:11}} />
-                      <Bar dataKey="value" fill="#B01218" radius={[4,4,0,0]} name="Amount ₹" />
+                      <Bar dataKey="value" fill="#2640B0" radius={[4,4,0,0]} name="Amount ₹" />
                     </BarChart>
                   </ResponsiveContainer>
                 )}
@@ -23118,7 +23118,7 @@ function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, machine
                         <div className="text-[9px] text-slate-600 mb-2 uppercase tracking-wider">Active by Stage</div>
                         <div className="flex flex-wrap gap-2">
                           {stageBreakdown.map((s) => {
-                            const STAGE_C={"BOM Issued":"#D71920","Assembly":"#B01218","Mechanical":"#8b5cf6","Electrical":"#f59e0b","Trial":"#B45309","Ready":"#22c55e"};
+                            const STAGE_C={"BOM Issued":"#2E50D6","Assembly":"#2640B0","Mechanical":"#8b5cf6","Electrical":"#f59e0b","Trial":"#B45309","Ready":"#22c55e"};
                             const c = STAGE_C[s.stage]||"#64748b";
                             return <span key={s.stage} className="text-[9px] font-bold px-2 py-0.5 rounded-full" style={{background:c+"18",color:c}}>{s.stage}: {s.count}</span>;
                           })}
@@ -23181,7 +23181,7 @@ function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, machine
                     <div className="text-lg font-black text-green-400">{pendingFulfilled.length}</div>
                     <div className="text-[9px] text-slate-500">Fulfilled</div>
                   </div>
-                  <div className="rounded-lg px-3 py-2 text-center" style={{background:"rgba(215, 25, 32,0.08)"}}>
+                  <div className="rounded-lg px-3 py-2 text-center" style={{background:"rgba(46, 80, 214,0.08)"}}>
                     <div className="text-lg font-black text-blue-400">{[...new Set(pendingLog.map(p=>p.issueId).filter(Boolean))].length}</div>
                     <div className="text-[9px] text-slate-500">Machines Pending</div>
                   </div>
@@ -23233,7 +23233,7 @@ function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, machine
 
 const ROLE_CONFIG = {
   Admin: {
-    label: "Admin", icon: "👑", color: "#B01218", badge: "Full Access",
+    label: "Admin", icon: "👑", color: "#2640B0", badge: "Full Access",
     pages: ["dashboard","inventory","inward","outward","pending","pipeline","machines","vendors","analytics","ai","history","settings"],
     actions: {
       inventory: { add: true,  edit: true,  delete: true,  adjust: true  },
@@ -23246,7 +23246,7 @@ const ROLE_CONFIG = {
     },
   },
   "Purchase Manager": {
-    label: "Purchase Manager", icon: "🛒", color: "#D71920", badge: "Purchase",
+    label: "Purchase Manager", icon: "🛒", color: "#2E50D6", badge: "Purchase",
     pages: ["dashboard","inventory","inward","pipeline","vendors","history","analytics"],
     actions: {
       inventory: { add: false, edit: false, delete: false, adjust: false },
@@ -23301,7 +23301,7 @@ function EmptyState({ icon = "📭", title = "Nothing here yet", desc = "", acti
 
 // ─── LOADING SPINNER ─────────────────────────────────────────────────────────
 
-function Spinner({ size = 20, color = "#D71920" }) {
+function Spinner({ size = 20, color = "#2E50D6" }) {
   return (
     <div className="animate-spin" style={{ width: size, height: size, borderRadius: "50%", border: `2px solid rgba(17,24,39,0.10)`, borderTopColor: color }} />
   );
@@ -23371,12 +23371,12 @@ function GlobalSearch({ items, pos, vendorList, machineLog, onClose, onNavigate 
       })),
     },
     {
-      type: "po", label: "Purchase Orders", color: "#D71920",
+      type: "po", label: "Purchase Orders", color: "#2E50D6",
       total: matchedPOs.length,
       rows: matchedPOs.slice(0, LIMIT).map((p) => {
-        const stClr = { pending:"#f59e0b", approved:"#D71920", ordered:"#8b5cf6", received:"#22c55e", rejected:"#ef4444" }[p.status] || "#64748b";
+        const stClr = { pending:"#f59e0b", approved:"#2E50D6", ordered:"#8b5cf6", received:"#22c55e", rejected:"#ef4444" }[p.status] || "#64748b";
         return {
-          nav: "pipeline", icon: "🛒", color: "#D71920",
+          nav: "pipeline", icon: "🛒", color: "#2E50D6",
           label: p.id,
           badge: { text: p.status, bg: stClr + "20", color: stClr },
           sub: `${p.vendor}  ·  ₹${(p.amount || 0).toLocaleString("en-IN")}  ·  ${p.date || ""}`,
@@ -23384,12 +23384,12 @@ function GlobalSearch({ items, pos, vendorList, machineLog, onClose, onNavigate 
       }),
     },
     {
-      type: "vendor", label: "Vendors", color: "#B01218",
+      type: "vendor", label: "Vendors", color: "#2640B0",
       total: matchedVendors.length,
       rows: matchedVendors.slice(0, LIMIT).map((v) => ({
-        nav: "vendors", icon: "🏭", color: "#B01218",
+        nav: "vendors", icon: "🏭", color: "#2640B0",
         label: v.name,
-        badge: v.category ? { text: v.category, bg: "#B0121820", color: "#B01218" } : null,
+        badge: v.category ? { text: v.category, bg: "#2640B020", color: "#2640B0" } : null,
         sub: [v.contactPerson, v.phone, v.email].filter(Boolean).join("  ·  ") || "No contact info",
       })),
     },
@@ -23530,7 +23530,7 @@ function NotificationPanel({ notifications, dismissed, onClose, onNavigate, onDi
   const TYPE_CFG = {
     critical:      { label: "Critical Stock",     icon: "🔴", color: "#b91c1c", nav: "inventory" },
     warning:       { label: "Low Stock Alert",    icon: "🟠", color: "#b45309", nav: "inventory" },
-    approval:      { label: "Approval Pending",   icon: "📋", color: "#D71920", nav: "pipeline" },
+    approval:      { label: "Approval Pending",   icon: "📋", color: "#2E50D6", nav: "pipeline" },
     followup:      { label: "Follow-Up Due",      icon: "📞", color: "#6d28d9", nav: "pipeline" },
     pending_alert: { label: "Pending Materials",  icon: "⏳", color: "#b45309", nav: "pending" },
     machine_ready: { label: "Machine Ready",      icon: "🏆", color: "#15803d", nav: "machines" },
@@ -24130,7 +24130,7 @@ export default function App() {
           <div className="flex gap-2">
             <button onClick={retryAuthLoad}
                     className="flex-1 py-2 rounded-xl text-xs font-semibold text-white"
-                    style={{ background: "#B01218", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
+                    style={{ background: "#2640B0", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
               ↻ Retry
             </button>
             <button onClick={() => { try { localStorage.removeItem("erp_session"); } catch {} try { localStorage.removeItem("erp_supabase_session"); } catch {} try { window.location.reload(); } catch {} }}
@@ -24147,7 +24147,7 @@ export default function App() {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--surface-base)", color: "var(--text)", fontFamily: "Inter, system-ui, sans-serif" }}>
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 rounded-full animate-spin" style={{ border: "3px solid rgba(176, 18, 24,0.15)", borderTopColor: "#B01218" }} />
+          <div className="w-8 h-8 rounded-full animate-spin" style={{ border: "3px solid rgba(38, 64, 176,0.15)", borderTopColor: "#2640B0" }} />
           <div style={{ fontSize: 11, color: "#64748b", letterSpacing: 1.4, textTransform: "uppercase", fontWeight: 700 }}>
             Restoring session{supabaseMode ? "" : ""}…
           </div>
@@ -25093,7 +25093,7 @@ export default function App() {
     if (bomDefs[k]) return { success: false, error: "A BOM with this key already exists" };
     if (!(def.label || "").trim()) return { success: false, error: "Machine Model Name is required" };
     if (!(def.items || []).length) return { success: false, error: "At least one component is required" };
-    const palette = ["#D71920","#B01218","#6d28d9","#be185d","#b45309","#15803d","#0e7490","#0f766e","#B45309","#7e22ce"];
+    const palette = ["#2E50D6","#2640B0","#6d28d9","#be185d","#b45309","#15803d","#0e7490","#0f766e","#B45309","#7e22ce"];
     const color = def.color || palette[Object.keys(bomDefs).length % palette.length];
     const newBom = {
       label: def.label.trim(),
@@ -25131,7 +25131,7 @@ export default function App() {
     let newKey = `${srcKey}-COPY`;
     let n = 2;
     while (bomDefs[newKey]) { newKey = `${srcKey}-COPY-${n++}`; }
-    const palette = ["#D71920","#B01218","#6d28d9","#be185d","#b45309","#15803d","#0e7490","#0f766e","#B45309","#7e22ce"];
+    const palette = ["#2E50D6","#2640B0","#6d28d9","#be185d","#b45309","#15803d","#0e7490","#0f766e","#B45309","#7e22ce"];
     const newBom = {
       label:        src.label ? `${src.label} (Copy)` : newKey,
       color:        palette[Object.keys(bomDefs).length % palette.length],
@@ -27268,7 +27268,7 @@ export default function App() {
   return (
     <MobileNavContext.Provider value={openMobileNav}>
     <div className="app-shell flex h-screen overflow-hidden"
-         style={{ background: "var(--surface-base)", color: "var(--text)", fontFamily: "'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif", fontFeatureSettings: '"cv02","cv03","cv04","cv11"' }}>
+         style={{ background: "var(--surface-base)", color: "var(--text)", fontFamily: "'Inter', system-ui, -apple-system, sans-serif", fontFeatureSettings: '"cv02","cv03","cv04","cv11"' }}>
 
       {/* Sidebar in its own boundary — historically the blast site (UserProfileMenu
           dereferenced currentUser.fullName, which is nullable in Supabase, blanking
@@ -27341,9 +27341,9 @@ export default function App() {
              style={{ background: "rgba(17,24,39,0.45)", backdropFilter: "blur(12px)" }}
              onClick={(e) => e.target === e.currentTarget && setShowShortcuts(false)}>
           <div className="w-full max-w-2xl rounded-2xl overflow-hidden"
-               style={{ background: "var(--surface-elevated)", border: "1px solid rgba(176, 18, 24,0.4)", boxShadow: "0 40px 80px rgba(17,24,39,0.22)" }}>
+               style={{ background: "var(--surface-elevated)", border: "1px solid rgba(38, 64, 176,0.4)", boxShadow: "0 40px 80px rgba(17,24,39,0.22)" }}>
             <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between"
-                 style={{ background: "linear-gradient(90deg,rgba(215, 25, 32,0.10),rgba(176, 18, 24,0.05))" }}>
+                 style={{ background: "linear-gradient(90deg,rgba(46, 80, 214,0.10),rgba(38, 64, 176,0.05))" }}>
               <div>
                 <div className="text-sm font-black text-slate-900">⌨ Keyboard Shortcuts</div>
                 <div className="text-[10px] text-slate-500 mt-0.5">Press <kbd className="px-1 py-0.5 text-[9px] font-mono rounded bg-slate-100 border border-slate-200">Esc</kbd> to close</div>

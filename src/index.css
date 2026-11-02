@@ -4,20 +4,20 @@
 
 /* ═══════════════════════════════════════════════════════════════════════════
    SHANTAZ ERP — Refined Enterprise Design System  (2026-10-28-phase1)
-   White canvas · SHANTAZ Red #d71920 · Plus Jakarta Sans
+   Cool paper · cobalt #2E50D6 · Inter
    One coherent light theme. Purposeful interactions. No decorative excess.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 :root {
   /* ── Brand / Accent ─────────────────────────────────────────────────────── */
-  --brand:              #d71920;
-  --brand-mid:          #b01218;
-  --brand-deep:         #8a0e12;
-  --brand-light:        #e84048;
-  --brand-pale:         #fde8e9;
-  --brand-wash:         #fef4f4;
-  --brand-glow:         rgba(215, 25, 32, 0.18);
-  --brand-rgb:          215, 25, 32;
+  --brand:              #2E50D6;
+  --brand-mid:          #2640B0;
+  --brand-deep:         #1D3187;
+  --brand-light:        #5A78EA;
+  --brand-pale:         #E6ECFF;
+  --brand-wash:         #F3F6FF;
+  --brand-glow:         rgba(46, 80, 214, 0.18);
+  --brand-rgb:          46, 80, 214;
 
   /* ── Surface hierarchy ──────────────────────────────────────────────────── */
   --surface-page:       #f8f9fb;
@@ -66,8 +66,8 @@
   --border-subtle:      rgba(17, 24, 39, 0.12);
   --border-rim:         rgba(17, 24, 39, 0.17);
   --border-rim-strong:  rgba(17, 24, 39, 0.22);
-  --border-brand:       rgba(215, 25, 32, 0.32);
-  --border-brand-strong: rgba(215, 25, 32, 0.55);
+  --border-brand:       rgba(46, 80, 214, 0.32);
+  --border-brand-strong: rgba(46, 80, 214, 0.55);
 
   /* ── Shadows ─────────────────────────────────────────────────────────────── */
   --shadow-xs:  0 1px 2px rgba(17, 24, 39, 0.06);
@@ -77,7 +77,7 @@
   --shadow-xl:  0 24px 48px rgba(17, 24, 39, 0.14), 0 8px 18px rgba(17, 24, 39, 0.08);
   --shadow-2xl: 0 32px 64px rgba(17, 24, 39, 0.16), 0 12px 24px rgba(17, 24, 39, 0.09);
   --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.80);
-  --shadow-brand: 0 6px 16px -4px rgba(215, 25, 32, 0.28), 0 2px 6px -2px rgba(215, 25, 32, 0.16);
+  --shadow-brand: 0 6px 16px -4px rgba(46, 80, 214, 0.28), 0 2px 6px -2px rgba(46, 80, 214, 0.16);
 
   /* ── Easing ──────────────────────────────────────────────────────────────── */
   --ease-swift:  cubic-bezier(0.22, 1, 0.36, 1);
@@ -130,10 +130,10 @@
   /* ── Nav ─────────────────────────────────────────────────────────────────── */
   --nav-surface:       #ffffff;
   --nav-rim:           rgba(17, 24, 39, 0.08);
-  --nav-active-bg:     rgba(215, 25, 32, 0.08);
-  --nav-active-border: rgba(215, 25, 32, 0.30);
+  --nav-active-bg:     rgba(46, 80, 214, 0.08);
+  --nav-active-border: rgba(46, 80, 214, 0.30);
   --nav-text:          #3f4854;   /*  9.27:1 — resting nav label */
-  --nav-text-active:   #d71920;   /*  5.19:1 — brand red, active item only */
+  --nav-text-active:   #2E50D6;   /*  5.19:1 — brand red, active item only */
   /* The sidebar section captions (OVERVIEW / TRANSACTIONS / OPERATIONS ...)
      were #94a3b8 = 2.56:1. They are the map of the whole app and they were the
      faintest text in it. */
@@ -162,7 +162,7 @@ html, body, #root {
   padding: 0;
   background: var(--surface-page);
   color: var(--text);
-  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -208,7 +208,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
 
 /* ── Typography & Forms ──────────────────────────────────────────────────────── */
 input, button, select, textarea {
-  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
 input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
@@ -269,7 +269,7 @@ button:active:not(:disabled) { transform: scale(0.975); }
 
 /* ── Modal input ─────────────────────────────────────────────────────────────── */
 .modal-input {
-  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
   font-size: 13px;
   color: #111827;
   background: #ffffff !important;
@@ -541,7 +541,7 @@ tbody tr { transition: background-color 0.08s ease; }
 
 .sidebar-slate .sb-logo {
   background: #ffffff;
-  color: #d71920;
+  color: #2E50D6;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
 }
 .sidebar-slate .sb-logo-name { color: #f8fafc; }
@@ -569,21 +569,21 @@ tbody tr { transition: background-color 0.08s ease; }
 .sidebar-slate .sb-item { color: #cbd5e1; }
 .sidebar-slate .sb-item:not(.is-active):hover { background: rgba(255, 255, 255, 0.05); color: #f1f5f9; }
 .sidebar-slate .sb-item.is-active {
-  background: linear-gradient(90deg, rgba(240, 53, 61, 0.16), rgba(240, 53, 61, 0.03));
+  background: linear-gradient(90deg, rgba(90, 120, 234, 0.16), rgba(90, 120, 234, 0.03));
   color: #fff;
   font-weight: 600;
 }
 .sidebar-slate .sb-indicator {
   position: absolute; left: -8px; top: 7px; bottom: 7px; width: 3px;
   border-radius: 0 4px 4px 0;
-  background: #f0353d;
-  box-shadow: 0 0 12px rgba(240, 53, 61, 0.65);
+  background: #5A78EA;
+  box-shadow: 0 0 12px rgba(90, 120, 234, 0.65);
 }
 .sidebar-slate .sb-icon { color: #94a3b8; }
 .sidebar-slate .sb-item:hover .sb-icon { color: #cbd5e1; }
 .sidebar-slate .sb-icon.is-active {
-  background: rgba(240, 53, 61, 0.14);
-  border: 1px solid rgba(240, 53, 61, 0.3);
+  background: rgba(90, 120, 234, 0.14);
+  border: 1px solid rgba(90, 120, 234, 0.3);
   color: #f87171;
 }
 
@@ -729,8 +729,8 @@ body .flex-1.overflow-y-auto > .p-6 { padding: 24px 28px; }
 
 /* All primary action buttons get the premium gradient + glow (Slate Pro) */
 body .btn-primary-brand {
-  background: linear-gradient(180deg, #f0353d, #d01820);
-  box-shadow: 0 1px 2px rgba(0,0,0,0.1), 0 6px 16px -4px rgba(215,25,32,0.45), inset 0 1px 0 rgba(255,255,255,0.18);
+  background: #2E50D6;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1), 0 6px 16px -4px rgba(46, 80, 214,0.45), inset 0 1px 0 rgba(255,255,255,0.18);
 }
 
 /* Empty states across pages — more polish */
@@ -746,8 +746,8 @@ body [class*="rounded-full"][class*="font-bold"] { font-variant-numeric: tabular
 body input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):focus,
 body textarea:focus,
 body select:focus {
-  border-color: rgba(240, 53, 61, 0.5) !important;
-  box-shadow: 0 0 0 3px rgba(240, 53, 61, 0.1) !important;
+  border-color: rgba(90, 120, 234, 0.5) !important;
+  box-shadow: 0 0 0 3px rgba(90, 120, 234, 0.1) !important;
   outline: none;
 }
 
@@ -1160,16 +1160,16 @@ kbd.erp-kbd {
   position: relative;
   isolation: isolate;
   background: linear-gradient(var(--surface-card), var(--surface-card)) padding-box,
-              linear-gradient(135deg, rgba(215,25,32,0.40), rgba(215,25,32,0.06) 60%, transparent) border-box;
+              linear-gradient(135deg, rgba(46, 80, 214,0.40), rgba(46, 80, 214,0.06) 60%, transparent) border-box;
   border: 1px solid transparent;
 }
 
 /* ── Primary button ───────────────────────────────────────────────────────────── */
 .btn-primary-brand {
-  background: linear-gradient(135deg, #d71920 0%, #b01218 100%);
+  background: linear-gradient(135deg, #2E50D6 0%, #2640B0 100%);
   color: #ffffff !important;
-  border: 1px solid rgba(176, 18, 24, 0.55);
-  box-shadow: 0 2px 8px -2px rgba(215, 25, 32, 0.30);
+  border: 1px solid rgba(38, 64, 176, 0.55);
+  box-shadow: 0 2px 8px -2px rgba(46, 80, 214, 0.30);
   font-weight: 600;
   letter-spacing: -0.005em;
   transition: box-shadow 0.16s ease, filter 0.14s ease;
@@ -1180,7 +1180,7 @@ kbd.erp-kbd {
 }
 .btn-primary-brand:active:not(:disabled) {
   filter: brightness(0.96);
-  box-shadow: 0 1px 4px -1px rgba(215, 25, 32, 0.25);
+  box-shadow: 0 1px 4px -1px rgba(46, 80, 214, 0.25);
 }
 
 /* ── Entrance animations ──────────────────────────────────────────────────────── */
@@ -2234,7 +2234,7 @@ input, textarea, select {
   --wa-surface:    #ffffff;
   --wa-field:      #f6f7f9;   /* ERP cool surface — headers, composer  */
   --wa-line:       #e6e9ef;
-  --wa-accent:     #D71920;   /* ERP red — active + primary action     */
+  --wa-accent:     #2E50D6;   /* ERP red — active + primary action     */
   --wa-live:       #0f9d58;   /* status only, never chrome             */
   --wa-ink:        #111b21;
   --wa-ink-2:      #5b6b7c;
@@ -2283,7 +2283,7 @@ input, textarea, select {
 .wa-tab.is-on {
   color: var(--wa-accent);
   border-bottom-color: var(--wa-accent);
-  background: rgba(215, 25, 32, .05);
+  background: rgba(46, 80, 214, .05);
 }
 .wa-tab-badge {
   min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px;
@@ -2524,7 +2524,7 @@ input, textarea, select {
   font-size: 13px; line-height: 1.45; color: var(--wa-ink);
   transition: border-color .12s ease, background .12s ease;
 }
-.wa-choice:hover { border-color: var(--wa-accent); background: rgba(215,25,32,.03); }
+.wa-choice:hover { border-color: var(--wa-accent); background: rgba(46, 80, 214,.03); }
 
 .wa-rule { display: flex; align-items: flex-start; gap: 6px; padding: 10px 0; }
 .wa-rule + .wa-rule { border-top: 1px solid var(--wa-line); }
@@ -2650,124 +2650,134 @@ body :where(:not(.sidebar-slate):not(.sidebar-slate *):not(.tc-form):not(.tc-for
 .rack-set { background: rgba(255,255,255,0.55); border: 1px dashed rgba(17,24,39,0.18); }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   CHAMPAGNE IVORY — the ERP's warm-neutral surface system  (2026-10-31)
+   COBALT INK — the ERP's design system  (2026-11-02)
 
-   One palette for every module. The paper is a light champagne ivory, the
-   cards stay pure white, and everything that used to be a cool slate grey —
-   hairlines, subtle fills, shadows and body ink — moves onto a warm neutral
-   ramp of the same weight so nothing reads as grey-on-beige.
+   One quiet, cool-neutral surface system with a single accent. Paper is a
+   soft blue-grey, cards are white, ink is a deep blue-black, the navigation
+   rail is dark ink. Cobalt is the only brand colour; red is reserved for
+   danger and critical states, so a red mark always means "look here".
+   Status colours (green / amber / red / blue / violet) and the rack model
+   colours are unchanged — they are the ERP's vocabulary.
 
-   Nothing structural changes here: no layout, no component, no business
-   colour. Brand red, status colours (green / amber / red / indigo) and the
-   rack model colours are deliberately untouched — they are the ERP's
-   vocabulary and they read correctly against warm paper.
-
-   Contrast (WCAG AA needs 4.5:1 for body text; every value here clears 7:1
-   on white and on the paper):
-       ink                    on #fff   on paper
-       --text-strong #171310   18.5       16.8
-       --text-muted  #3A332A   12.5       11.3
-       --text-dim    #4C4435    9.6        8.8
-       --text-faint  #5B5240    7.7        7.0
-       slate-500 →   #5C5341    7.6        6.9   (was 4.8 — a real lift)
+   Contrast (AA needs 4.5:1 for body text):
+       ink                     on #fff   on paper
+       --text-strong #0B1220    18.9      17.4
+       --text-muted  #33405A    10.6       9.8
+       --text-dim    #46516A     8.2       7.5
+       --text-faint  #57627A     6.2       5.7
+       --text-placeholder #6B7690 4.6      4.2   (placeholder, never a value)
 
    Declared last so it wins over the earlier :root blocks.
    ═══════════════════════════════════════════════════════════════════════ */
 :root {
-  /* ── Paper ──────────────────────────────────────────────────────────── */
-  --surface-page:       #F8F4EA;
-  --surface-base:       #F8F4EA;
-  /* Two-tone wash: light at the top-left, a shade deeper at the bottom
-     right. Fixed, so it does not slide while a long page scrolls. */
-  --champagne-wash:     linear-gradient(165deg, #FCFAF3 0%, #F8F4EA 45%, #F2EBDA 100%);
-  --gold-wash:          var(--champagne-wash);   /* kept: earlier alias */
-
-  /* ── Cards stay pure white — the contrast against the paper is the
-        hierarchy, so nothing inside a card needs a border to be found. ── */
+  --surface-page:       #F4F6FA;
+  --surface-base:       #F4F6FA;
   --surface-card:       #ffffff;
   --surface-raised:     #ffffff;
   --surface-elevated:   #ffffff;
   --surface-input:      #ffffff;
-  --surface-highlight:  #F1EADA;
-  --surface-glass:        rgba(255, 253, 248, 0.90);
-  --surface-glass-strong: rgba(255, 253, 248, 0.97);
-  --surface-muted:      rgba(124, 101, 54, 0.045);
-  --surface-muted2:     rgba(124, 101, 54, 0.085);
+  --surface-highlight:  #EDF1F7;
+  --surface-glass:        rgba(255, 255, 255, 0.92);
+  --surface-glass-strong: rgba(255, 255, 255, 0.98);
+  --surface-muted:      rgba(15, 23, 42, 0.035);
+  --surface-muted2:     rgba(15, 23, 42, 0.065);
 
-  /* ── Hairlines — warm taupe at the weight the slate lines used to be ── */
-  --border-subtle:      rgba(124, 101, 54, 0.17);
-  --border-rim:         rgba(124, 101, 54, 0.24);
-  --border-rim-strong:  rgba(124, 101, 54, 0.32);
+  --border-subtle:      rgba(15, 23, 42, 0.09);
+  --border-rim:         rgba(15, 23, 42, 0.14);
+  --border-rim-strong:  rgba(15, 23, 42, 0.22);
 
-  /* ── Ink — warm neutrals, every step darker than the slate it replaces ── */
-  --text:               #262019;
-  --text-strong:        #171310;
-  --text-muted:         #3A332A;
-  --text-dim:           #4C4435;
-  --text-faint:         #5B5240;
-  --text-placeholder:   #786F5C;
-  --text-disabled:      #A79C86;
+  --text:               #1B2433;
+  --text-strong:        #0B1220;
+  --text-muted:         #33405A;
+  --text-dim:           #46516A;
+  --text-faint:         #57627A;
+  --text-placeholder:   #6B7690;
+  --text-disabled:      #9AA5BA;
 
-  /* ── Shadows — warm, low and wide; light falls the same way everywhere ── */
-  --shadow-sm:  0 1px 2px rgba(86, 68, 33, 0.05), 0 1px 3px rgba(86, 68, 33, 0.07);
-  --shadow-md:  0 2px 8px -2px rgba(86, 68, 33, 0.09), 0 6px 18px -6px rgba(86, 68, 33, 0.11);
+  --shadow-xs:  0 1px 2px rgba(15, 23, 42, 0.05);
+  --shadow-sm:  0 1px 2px rgba(15, 23, 42, 0.05), 0 1px 3px rgba(15, 23, 42, 0.06);
+  --shadow-md:  0 2px 6px -1px rgba(15, 23, 42, 0.07), 0 8px 20px -8px rgba(15, 23, 42, 0.12);
+  --shadow-lg:  0 12px 28px -8px rgba(15, 23, 42, 0.16), 0 4px 10px -4px rgba(15, 23, 42, 0.08);
+  --shadow-brand: 0 4px 12px -3px rgba(46, 80, 214, 0.35);
 
-  /* ── Gold accent, for the few places that carry one ── */
-  --mt-gold:            #A8842C;
-  --mt-gold-soft:       rgba(168, 132, 44, 0.10);
+  --radius-lg:  10px;
+  --radius-xl:  14px;
+  --radius-2xl: 16px;
+
+  --nav-surface:       #0C1424;
+  --nav-active-bg:     rgba(90, 120, 234, 0.14);
+  --nav-active-border: rgba(90, 120, 234, 0.35);
+  --nav-text-active:   #2E50D6;
+
+  --mt-gold:            #2E50D6;
+  --mt-gold-soft:       rgba(46, 80, 214, 0.08);
 }
 
-html, body, #root { background: var(--champagne-wash); }
-/* The app shell paints `background: var(--surface-base)` inline, which resets
-   background-image; this restores the wash without touching the component. */
-.app-shell { background-image: var(--champagne-wash) !important; background-attachment: fixed; }
+html, body, #root { background: var(--surface-page); font-feature-settings: "cv11", "ss01", "tnum" 0; letter-spacing: -0.003em; }
+.app-shell { background-image: none !important; background: var(--surface-page) !important; }
 
-/* ── Tailwind neutrals, harmonised ───────────────────────────────────────────
-   The app reaches for slate utilities in ~1,300 places. Re-pointing the six
-   that carry surface and body ink keeps every module on one palette without
-   touching a single component. Cards (.bg-white) stay white, and the light
-   end of the ramp (100–300) is left alone so light text on dark surfaces is
-   unaffected. */
-.bg-slate-50      { background-color: #F8F5EC; }
-.bg-slate-100     { background-color: #F1EBDE; }
-.border-slate-100 { border-color: rgba(124, 101, 54, 0.13); }
-.border-slate-200 { border-color: rgba(124, 101, 54, 0.20); }
-.text-slate-400   { color: #6E6553; }
-.text-slate-500   { color: #5C5341; }
-.text-slate-600   { color: #4A4234; }
-.text-slate-700   { color: #3E372C; }
-.text-slate-800   { color: #2B251D; }
-.text-slate-900   { color: #171310; }
-.divide-slate-100 > :not([hidden]) ~ :not([hidden]) { border-color: rgba(124, 101, 54, 0.13); }
-.divide-slate-200 > :not([hidden]) ~ :not([hidden]) { border-color: rgba(124, 101, 54, 0.20); }
+/* Numbers line up in columns everywhere data is shown. */
+.erp-table td, .erp-table th, .hero-tile-value, .kpi-tile, .metric-value, .tabular-nums { font-variant-numeric: tabular-nums; }
 
-/* ── Navigation rail ─────────────────────────────────────────────────────────
-   Deep warm charcoal rather than cool navy: beside champagne paper, a blue
-   black reads as a different design. Every accent — the red indicator, the
-   active item, the logo — is unchanged. */
-.sidebar-slate            { background: #15120D; border-right: 1px solid #272116; color: #D6D0C3; }
-.sidebar-slate .sb-divider     { border-bottom: 1px solid #252016; }
-.sidebar-slate .sb-divider-top { border-top: 1px solid #252016; }
-.sidebar-slate .sb-search      { background: #1D1810; border: 1px solid #2F2718; color: #A79C86; }
-.sidebar-slate .sb-search:hover{ background: #241E14; border-color: #3B3120; }
-.sidebar-slate .sb-kbd         { background: #15120D; border: 1px solid #3B3120; color: #A79C86; }
-.sidebar-slate .sb-iconbtn     { background: #1D1810; border: 1px solid #2F2718; color: #D6D0C3; }
-.sidebar-slate .sb-iconbtn:hover { background: #241E14; border-color: #3B3120; }
-.sidebar-slate .sb-section     { color: #8A7F66; }
-.sidebar-slate .sb-item        { color: #CFC8B8; }
-.sidebar-slate .sb-icon        { color: #A2998A; }
-.sidebar-slate .sb-user-chevron{ color: #8A7F66; }
-.sidebar-slate .sb-collapse    { color: #8A7F66; }
-.sidebar-slate nav::-webkit-scrollbar-thumb { background: #3B3120; }
+/* ── Tailwind neutrals, harmonised onto the cool ramp ───────────────────── */
+.bg-slate-50      { background-color: #F6F8FB; }
+.bg-slate-100     { background-color: #EDF1F7; }
+.border-slate-100 { border-color: rgba(15, 23, 42, 0.07); }
+.border-slate-200 { border-color: rgba(15, 23, 42, 0.12); }
+.text-slate-400   { color: #66728B; }
+.text-slate-500   { color: #556077; }
+.text-slate-600   { color: #434E65; }
+.text-slate-700   { color: #333E55; }
+.text-slate-800   { color: #1E2940; }
+.text-slate-900   { color: #0B1220; }
+.divide-slate-100 > :not([hidden]) ~ :not([hidden]) { border-color: rgba(15, 23, 42, 0.07); }
+.divide-slate-200 > :not([hidden]) ~ :not([hidden]) { border-color: rgba(15, 23, 42, 0.12); }
 
-/* ── Machine Tracker ─────────────────────────────────────────────────────────
-   The tracker now shares the ERP palette — white cards, champagne paper, the
-   same hairlines — and keeps only what is its own: the card shell and the
-   filter chips, in gold. */
+/* ── Navigation rail: dark ink, cobalt active state ─────────────────────── */
+.sidebar-slate            { background: #0C1424; border-right: 1px solid #16203A; color: #C3CCDD; }
+.sidebar-slate .sb-divider     { border-bottom: 1px solid #16203A; }
+.sidebar-slate .sb-divider-top { border-top: 1px solid #16203A; }
+.sidebar-slate .sb-logo        { background: linear-gradient(145deg, #3A5BE8, #2640B0); color: #fff; box-shadow: 0 4px 12px rgba(46, 80, 214, 0.45); border-radius: 10px; }
+.sidebar-slate .sb-search      { background: #121C32; border: 1px solid #1D2A47; color: #8E9AB5; }
+.sidebar-slate .sb-search:hover{ background: #16223C; border-color: #28385B; }
+.sidebar-slate .sb-kbd         { background: #0C1424; border: 1px solid #28385B; color: #8E9AB5; }
+.sidebar-slate .sb-iconbtn     { background: #121C32; border: 1px solid #1D2A47; color: #C3CCDD; }
+.sidebar-slate .sb-iconbtn:hover { background: #16223C; border-color: #28385B; }
+.sidebar-slate .sb-section     { color: #75829E; letter-spacing: 0.08em; }
+.sidebar-slate .sb-item        { color: #B9C3D6; border-radius: 8px; }
+.sidebar-slate .sb-item:not(.is-active):hover { background: rgba(255, 255, 255, 0.05); color: #F1F5FB; }
+.sidebar-slate .sb-item.is-active { background: rgba(90, 120, 234, 0.16); color: #fff; font-weight: 600; }
+.sidebar-slate .sb-indicator   { background: #7C93FF; box-shadow: none; }
+.sidebar-slate .sb-icon        { color: #8793AE; }
+.sidebar-slate .sb-icon.is-active { background: rgba(124, 147, 255, 0.18); border: 1px solid rgba(124, 147, 255, 0.35); color: #B7C5FF; }
+.sidebar-slate .sb-user-chevron{ color: #75829E; }
+.sidebar-slate .sb-collapse    { color: #75829E; }
+.sidebar-slate nav::-webkit-scrollbar-thumb { background: #28385B; }
+
+/* ── Cards, tables, modals: one calm elevation language ─────────────────── */
+.glass, .glass-strong, .premium-card, .section-card { border-color: var(--border-subtle); box-shadow: var(--shadow-sm); }
+.glass, .section-card, .premium-card { border-radius: 14px; }
+.modal-panel { border-radius: 16px; box-shadow: var(--shadow-lg); border: 1px solid var(--border-subtle); }
+.erp-table thead th, body .erp-table thead th { background: #F6F8FB; color: #46516A; font-weight: 600; letter-spacing: 0.02em; border-bottom: 1px solid var(--border-rim); }
+.erp-table tbody tr:hover, body .erp-table tbody tr:hover { background: #F6F8FC; }
+.page-header { border-bottom: 1px solid var(--border-subtle); background: rgba(255, 255, 255, 0.92); backdrop-filter: blur(10px); }
+
+/* ── Controls ────────────────────────────────────────────────────────────── */
+input:not([type="checkbox"]):not([type="radio"]):not([type="color"]), textarea, select { border-color: rgba(15, 23, 42, 0.16) !important; border-radius: 9px; }
+input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):hover, select:hover, textarea:hover { border-color: rgba(15, 23, 42, 0.28) !important; }
+input:focus-visible, textarea:focus-visible, select:focus-visible { border-color: rgba(46, 80, 214, 0.65) !important; box-shadow: 0 0 0 3px rgba(46, 80, 214, 0.16); }
+*:focus-visible { outline-color: #2E50D6; }
+button, [role="button"] { font-weight: 600; }
+body .btn-primary-brand { background: #2E50D6; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12), 0 4px 10px -3px rgba(46, 80, 214, 0.40); border: 1px solid #2640B0; }
+body .btn-primary-brand:hover:not(:disabled) { background: #2A49C4; }
+::selection { background: rgba(46, 80, 214, 0.18); }
+::-webkit-scrollbar-thumb { background: rgba(15, 23, 42, 0.16); }
+
+/* ── Machine Tracker ─────────────────────────────────────────────────────── */
 .mt-premium .mt-card {
   background: var(--surface-card);
   border: 1px solid var(--border-subtle);
-  border-radius: 16px;
+  border-radius: 14px;
   box-shadow: var(--shadow-sm);
   transition: border-color .18s ease, box-shadow .18s ease;
 }
@@ -2775,8 +2785,8 @@ html, body, #root { background: var(--champagne-wash); }
 .mt-premium .mt-card-ready { border-color: rgba(21, 128, 61, 0.28); }
 .mt-premium .mt-chip {
   display: inline-flex; align-items: center; gap: 6px;
-  height: 32px; padding: 0 12px; border-radius: 10px;
-  font-size: 11.5px; font-weight: 700;
+  height: 32px; padding: 0 12px; border-radius: 8px;
+  font-size: 11.5px; font-weight: 600;
   color: var(--text-dim);
   background: var(--surface-card);
   border: 1px solid var(--border-subtle);
@@ -2785,15 +2795,35 @@ html, body, #root { background: var(--champagne-wash); }
 .mt-premium .mt-chip:hover { color: var(--text-strong); border-color: var(--border-rim); }
 .mt-premium .mt-chip[data-on="1"],
 .mt-premium .mt-chip-active {
-  color: #7D6118; background: var(--mt-gold-soft); border-color: rgba(168, 132, 44, 0.45);
+  color: #2640B0; background: rgba(46, 80, 214, 0.08); border-color: rgba(46, 80, 214, 0.40);
 }
 @media (max-width: 640px) {
-  /* A phone on the shop floor: full-width actions, nothing clipped. */
-  .mt-premium .mt-card { border-radius: 14px; }
+  .mt-premium .mt-card { border-radius: 12px; }
   .mt-premium .page-header-actions { width: 100%; }
 }
 
-/* ── Paper is for screens; printed reports stay white ──────────────────── */
+/* ── Refinements: calmer weights, quieter cards, compact phones ─────────── */
+body .text-2xl, body .text-3xl { font-weight: 700; }
+body .font-black { font-weight: 800; }
+.hero-tile { border-radius: 14px; padding: 16px 18px; }
+.hero-tile-icon { width: 42px; height: 42px; border-radius: 10px; }
+.hero-tile-value { font-size: 28px; font-weight: 700; }
+@media (hover: hover) { .hero-tile:hover { transform: translateY(-1px); } }
+.modal-panel label { color: #33405A !important; }
+.modal-panel > :first-child { background: #fff; }
+.toast { border-radius: 12px; box-shadow: var(--shadow-lg); }
+.empty-state-title { color: var(--text-strong); }
+.skeleton { background: linear-gradient(90deg, #E9EDF4 25%, #F3F5F9 50%, #E9EDF4 75%); background-size: 200% 100%; }
+@media (max-width: 640px) {
+  .hero-tile { padding: 12px 14px; gap: 12px; }
+  .hero-tile-icon { width: 36px; height: 36px; }
+  .hero-tile-value { font-size: 24px; }
+  .page-header { padding: 12px 16px; }
+}
+
+/* Field labels stay neutral ink; colour is kept for state, not for form chrome. */
+body label[style*="rgb(38, 64, 176)"], body label[style*="rgb(46, 80, 214)"] { color: #33405A !important; }
+
 @media print {
   html, body, #root, .app-shell {
     background: #fff !important;

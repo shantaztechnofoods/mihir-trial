@@ -56,42 +56,63 @@ export default function LoginPage({ notice = "", onRetry = null }) {
     }
   };
 
-  const fieldStyle = { background: "#f8fafc", border: "1.5px solid #e2e8f0", color: "#0f172a" };
-  const focusOn  = (e) => { e.target.style.borderColor = "#f0353d"; e.target.style.boxShadow = "0 0 0 3px rgba(240,53,61,0.12)"; e.target.style.background = "#fff"; };
-  const focusOff = (e) => { e.target.style.borderColor = "#e2e8f0"; e.target.style.boxShadow = "none"; e.target.style.background = "#f8fafc"; };
+  const fieldStyle = { background: "#ffffff", border: "1px solid rgba(15,23,42,0.18)", color: "#0B1220" };
+  const focusOn  = (e) => { e.target.style.borderColor = "#2E50D6"; e.target.style.boxShadow = "0 0 0 3px rgba(46,80,214,0.16)"; };
+  const focusOff = (e) => { e.target.style.borderColor = "rgba(15,23,42,0.18)"; e.target.style.boxShadow = "none"; };
 
   return (
     <div
       data-login-screen
-      className="min-h-screen flex items-center justify-center relative overflow-hidden py-8"
-      style={{ background: "radial-gradient(1200px 600px at 50% -10%, #142037 0%, #0b1120 55%)", fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}
+      className="min-h-screen flex"
+      style={{ background: "#F4F6FA", fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}
     >
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-[-120px] left-1/2 -translate-x-1/2 w-[680px] h-[460px] rounded-full"
-             style={{ background: "radial-gradient(circle,rgba(240,53,61,0.22),transparent 70%)", filter: "blur(90px)" }} />
-        <div className="absolute inset-0 opacity-[0.04]"
-             style={{ backgroundImage: "linear-gradient(#fff 1px,transparent 1px),linear-gradient(90deg,#fff 1px,transparent 1px)", backgroundSize: "44px 44px" }} />
-      </div>
-
-      <div className="relative z-10 w-full max-w-[400px] px-4">
-        <div className="text-center mb-7">
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4 text-white text-2xl font-black"
-               style={{ background: "#c4151d", boxShadow: "0 10px 30px rgba(240,53,61,0.35)" }}>
-            S
+      {/* Brand panel — large screens only */}
+      <aside className="hidden lg:flex flex-col justify-between w-[46%] max-w-[640px] p-12 relative overflow-hidden"
+             style={{ background: "#0C1424", color: "#E6EBF5" }} aria-hidden="true">
+        <div className="absolute inset-0 pointer-events-none"
+             style={{ background: "radial-gradient(900px 500px at 0% 0%, rgba(58,91,232,0.28), transparent 60%)" }} />
+        <div className="relative flex items-center gap-3">
+          <div className="w-10 h-10 rounded-[10px] flex items-center justify-center text-white text-lg font-bold"
+               style={{ background: "linear-gradient(145deg,#3A5BE8,#2640B0)", boxShadow: "0 4px 12px rgba(46,80,214,0.45)" }}>S</div>
+          <div>
+            <div className="text-[15px] font-bold tracking-[0.12em]" style={{ color: "#F4F7FD" }}>SHANTAZ</div>
+            <div className="text-[10px] font-medium tracking-[0.18em]" style={{ color: "#8E9AB5" }}>TECHNOFOODS ERP</div>
           </div>
-          <div className="text-[16px] font-extrabold tracking-[0.14em]" style={{ color: "#f8fafc" }}>SHANTAZ</div>
-          <div className="text-[10px] font-semibold tracking-[0.2em] mt-1" style={{ color: "#94a3b8" }}>TECHNOFOODS&nbsp;ERP</div>
         </div>
+        <div className="relative max-w-[420px]">
+          <h1 className="text-[32px] leading-[1.15] font-semibold tracking-[-0.025em]" style={{ color: "#F4F7FD" }}>
+            Purchase, stock and production, on one floor.
+          </h1>
+          <ul className="mt-8 space-y-4 text-[14px]" style={{ color: "#B9C3D6" }}>
+            {["Every machine, from BOM issue to ready", "Handovers signed and recorded by department", "Stock and purchase orders always in step"].map((t) => (
+              <li key={t} className="flex items-start gap-3">
+                <span className="mt-[7px] w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#7C93FF" }} />
+                <span>{t}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div className="relative text-[12px]" style={{ color: "#75829E" }}>Shantaz Technofoods — internal use only</div>
+      </aside>
 
-        <div className="rounded-2xl p-6 sm:p-8"
-             style={{ background: "rgba(255,255,255,0.98)", border: "1px solid rgba(255,255,255,0.1)", boxShadow: "0 32px 80px -20px rgba(0,0,0,0.6)" }}>
-          <div className="mb-6">
-            <h2 className="text-[18px] font-extrabold tracking-[-0.02em] mb-1" style={{ color: "#0f172a" }}>Welcome back</h2>
-            <p className="text-[12px]" style={{ color: "#64748b" }}>Sign in to your Shantaz ERP account</p>
+      <main className="flex-1 flex items-center justify-center px-5 py-10">
+        <div className="w-full max-w-[380px]">
+          <div className="lg:hidden flex items-center gap-3 mb-8">
+            <div className="w-10 h-10 rounded-[10px] flex items-center justify-center text-white text-lg font-bold"
+                 style={{ background: "linear-gradient(145deg,#3A5BE8,#2640B0)", boxShadow: "0 4px 12px rgba(46,80,214,0.35)" }}>S</div>
+            <div>
+              <div className="text-[15px] font-bold tracking-[0.12em]" style={{ color: "#0B1220" }}>SHANTAZ</div>
+              <div className="text-[10px] font-medium tracking-[0.18em]" style={{ color: "#556077" }}>TECHNOFOODS ERP</div>
+            </div>
+          </div>
+
+          <div className="mb-7">
+            <h2 className="text-[24px] font-semibold tracking-[-0.02em] mb-1.5" style={{ color: "#0B1220" }}>Sign in</h2>
+            <p className="text-[13px]" style={{ color: "#556077" }}>Use the username and password given to you by your administrator.</p>
           </div>
 
           {notice && (
-            <div role="status" className="mb-4 px-3.5 py-2.5 rounded-xl text-[12px] leading-snug"
+            <div role="status" className="mb-4 px-3.5 py-2.5 rounded-[10px] text-[12px] leading-snug"
                  style={{ background: "rgba(217,119,6,0.08)", border: "1px solid rgba(217,119,6,0.25)", color: "#92400e" }}>
               {notice}
               {onRetry && (
@@ -102,7 +123,7 @@ export default function LoginPage({ notice = "", onRetry = null }) {
 
           <form ref={formRef} onSubmit={handleSubmit} className="space-y-4" noValidate>
             <div>
-              <label htmlFor="login-username" className="block text-[11px] font-bold uppercase tracking-[0.08em] mb-1.5" style={{ color: "#475569" }}>
+              <label htmlFor="login-username" className="block text-[12px] font-semibold mb-1.5" style={{ color: "#33405A" }}>
                 Username
               </label>
               <input
@@ -118,7 +139,7 @@ export default function LoginPage({ notice = "", onRetry = null }) {
                 spellCheck={false}
                 autoFocus
                 onInput={() => error && setError("")}
-                className="w-full px-3.5 py-3 rounded-xl text-[16px] sm:text-[13px] outline-none transition-all"
+                className="w-full px-3.5 py-3 rounded-[10px] text-[16px] sm:text-[13px] outline-none transition-all"
                 style={fieldStyle}
                 onFocus={focusOn}
                 onBlur={focusOff}
@@ -126,7 +147,7 @@ export default function LoginPage({ notice = "", onRetry = null }) {
             </div>
 
             <div>
-              <label htmlFor="login-password" className="block text-[11px] font-bold uppercase tracking-[0.08em] mb-1.5" style={{ color: "#475569" }}>
+              <label htmlFor="login-password" className="block text-[12px] font-semibold mb-1.5" style={{ color: "#33405A" }}>
                 Password
               </label>
               <div className="relative">
@@ -144,7 +165,7 @@ export default function LoginPage({ notice = "", onRetry = null }) {
                   readOnly={pwLocked}
                   onPointerDown={unlockPw}
                   onInput={() => error && setError("")}
-                  className="w-full px-3.5 py-3 pr-16 rounded-xl text-[16px] sm:text-[13px] outline-none transition-all"
+                  className="w-full px-3.5 py-3 pr-16 rounded-[10px] text-[16px] sm:text-[13px] outline-none transition-all"
                   style={fieldStyle}
                   onFocus={(e) => { unlockPw(); focusOn(e); }}
                   onBlur={focusOff}
@@ -155,8 +176,8 @@ export default function LoginPage({ notice = "", onRetry = null }) {
                   aria-label={showPw ? "Hide password" : "Show password"}
                   aria-pressed={showPw}
                   aria-controls="login-password"
-                  className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[11px] font-bold uppercase tracking-wide px-2.5 rounded-lg"
-                  style={{ color: "#475569", minHeight: 36, minWidth: 52 }}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[12px] font-semibold px-2.5 rounded-lg"
+                  style={{ color: "#2640B0", minHeight: 36, minWidth: 52 }}
                 >
                   {showPw ? "Hide" : "Show"}
                 </button>
@@ -164,7 +185,7 @@ export default function LoginPage({ notice = "", onRetry = null }) {
             </div>
 
             {error && (
-              <div role="alert" className="px-3.5 py-2.5 rounded-xl text-[12px] font-medium"
+              <div role="alert" className="px-3.5 py-2.5 rounded-[10px] text-[12.5px] font-medium"
                    style={{ background: "rgba(220,38,38,0.07)", border: "1px solid rgba(220,38,38,0.2)", color: "#b91c1c" }}>
                 {error}
               </div>
@@ -174,18 +195,18 @@ export default function LoginPage({ notice = "", onRetry = null }) {
               type="submit"
               disabled={loading}
               aria-busy={loading}
-              className="w-full py-3 rounded-xl text-[14px] font-bold text-white transition-all mt-1"
-              style={{ background: loading ? "rgba(192,21,29,0.5)" : "#d01820", boxShadow: loading ? "none" : "0 6px 18px -4px rgba(240,53,61,0.45)", cursor: loading ? "not-allowed" : "pointer", minHeight: 46 }}
+              className="w-full py-3 rounded-[10px] text-[14px] font-semibold text-white transition-all mt-1"
+              style={{ background: loading ? "rgba(46,80,214,0.55)" : "#2E50D6", border: "1px solid #2640B0", boxShadow: loading ? "none" : "0 1px 2px rgba(15,23,42,0.12), 0 6px 14px -4px rgba(46,80,214,0.45)", cursor: loading ? "not-allowed" : "pointer", minHeight: 46 }}
             >
               {loading ? "Signing in…" : "Sign In"}
             </button>
           </form>
-        </div>
 
-        <p className="text-center text-[10px] mt-6" style={{ color: "#64748b" }}>
-          Shantaz Technofoods — Internal ERP · Secure Login
-        </p>
-      </div>
+          <p className="text-[12px] mt-8" style={{ color: "#66728B" }}>
+            Forgot your password? Ask your administrator to reset it.
+          </p>
+        </div>
+      </main>
     </div>
   );
 }

@@ -128,8 +128,8 @@ export default class RootErrorBoundary extends Component {
                 padding: "6px 12px",
                 borderRadius: 8,
                 color: "#1A1F2E",
-                background: "#B01218",
-                border: "1px solid rgba(176, 18, 24,0.5)",
+                background: "#2640B0",
+                border: "1px solid rgba(38, 64, 176,0.5)",
                 cursor: "pointer",
               }}
             >

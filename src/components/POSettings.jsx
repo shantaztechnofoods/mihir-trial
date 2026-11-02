@@ -211,8 +211,8 @@ export default function POSettings({ value, onChange, onPersist, isSuperAdmin = 
               <button key={c.id} onClick={() => setEditId(c.id)}
                       className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all"
                       style={{
-                        background: sel ? "rgba(215, 25, 32,0.10)" : "rgba(26,31,46,0.04)",
-                        border:     `1px solid ${sel ? "rgba(215, 25, 32,0.40)" : "rgba(26,31,46,0.07)"}`,
+                        background: sel ? "rgba(46, 80, 214,0.10)" : "rgba(26,31,46,0.04)",
+                        border:     `1px solid ${sel ? "rgba(46, 80, 214,0.40)" : "rgba(26,31,46,0.07)"}`,
                       }}>
                 {c.logo
                   ? <img src={c.logo} alt="" className="w-9 h-9 rounded object-contain bg-white/5 flex-shrink-0" />
@@ -248,7 +248,7 @@ export default function POSettings({ value, onChange, onPersist, isSuperAdmin = 
               <button onClick={() => onPersist(po)}
                       title="Save all companies to Supabase"
                       className="text-[11px] font-bold px-3 py-1.5 rounded-lg text-white border border-blue-500/50 transition-all"
-                      style={{ background: "#B01218", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
+                      style={{ background: "#2640B0", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
                 💾 Save Company
               </button>
             )}

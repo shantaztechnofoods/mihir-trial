@@ -10,7 +10,7 @@ function highlight(text, query) {
   return (
     <>
       {text.slice(0, idx)}
-      <mark style={{ background: "rgba(176, 18, 24,0.45)", color: "#1A1F2E", padding: "0 1px", borderRadius: 2 }}>
+      <mark style={{ background: "rgba(38, 64, 176,0.45)", color: "#1A1F2E", padding: "0 1px", borderRadius: 2 }}>
         {text.slice(idx, idx + query.length)}
       </mark>
       {text.slice(idx + query.length)}
@@ -204,7 +204,7 @@ export default function ItemSearchSelect({
                     onClick={() => pick(it)}
                     className="w-full text-left px-3 py-2 transition-colors flex items-center gap-2"
                     style={{
-                      background: active ? "rgba(176, 18, 24,0.18)" : "transparent",
+                      background: active ? "rgba(38, 64, 176,0.18)" : "transparent",
                       borderBottom: "1px solid rgba(26,31,46,0.04)",
                     }}
                   >

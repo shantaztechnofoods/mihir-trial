@@ -566,33 +566,26 @@ test("regression: APP_BUILD / APP_BUILD_TAG match (deploy-marker consistency)", 
   );
 });
 
-// 2026-10-31 — Champagne Ivory surface system. One warm-neutral palette for
-// every module: champagne paper, white cards, warm hairlines and ink. The
-// business colours (brand red, status green/amber/red/indigo, rack models)
-// are deliberately untouched, and printed reports stay white.
-test("theme: champagne ivory palette is the last word in index.css", () => {
+// 2026-11-02 — Cobalt Ink design system. One cool-neutral palette for every
+// module: soft blue-grey paper, white cards, deep-ink rail, a single cobalt
+// accent. Red is reserved for danger/critical; status colours and the rack
+// model colours are untouched, and printed reports stay white.
+test("theme: cobalt ink design system is the last word in index.css", () => {
   const css = read("src/index.css");
-  const theme = css.slice(css.indexOf("CHAMPAGNE IVORY"));
-  assert.ok(theme.length > 1500, "the champagne block is the final block");
-  // paper + wash, cards still white
-  assert.match(theme, /--surface-page:\s+#F8F4EA;/);
-  assert.match(theme, /--champagne-wash:\s+linear-gradient\(165deg, #FCFAF3 0%, #F8F4EA 45%, #F2EBDA 100%\);/);
+  const theme = css.slice(css.indexOf("COBALT INK"));
+  assert.ok(theme.length > 1500, "the cobalt block is present");
+  assert.match(theme, /--surface-page:\s+#F4F6FA;/);
   assert.match(theme, /--surface-card:\s+#ffffff;/);
-  assert.match(theme, /html, body, #root \{ background: var\(--champagne-wash\); \}/);
-  assert.match(theme, /\.app-shell \{ background-image: var\(--champagne-wash\) !important;/);
-  // warm hairlines, ink and shadows
-  assert.match(theme, /--border-subtle:\s+rgba\(124, 101, 54, 0\.17\);/);
-  assert.match(theme, /--text-dim:\s+#4C4435;/);
-  assert.match(theme, /--shadow-sm:\s+0 1px 2px rgba\(86, 68, 33/);
-  // tailwind neutrals harmonised, light end left alone
+  assert.match(theme, /--border-subtle:\s+rgba\(15, 23, 42, 0\.09\);/);
+  assert.match(theme, /--text-dim:\s+#46516A;/);
   for (const u of ["\\.bg-slate-50", "\\.bg-slate-100", "\\.border-slate-200", "\\.text-slate-500", "\\.text-slate-600"])
     assert.match(theme, new RegExp(u + "\\s"), u);
   assert.doesNotMatch(theme, /\.text-slate-(100|200|300)\s/, "light text on dark surfaces is untouched");
   assert.doesNotMatch(theme, /^\.bg-white\s*\{/m, "cards stay pure white");
-  // business colours untouched
-  const brand = css.match(/--brand:\s+#d71920;/);
-  assert.ok(brand, "brand red unchanged");
-  assert.doesNotMatch(theme, /--brand/, "the theme block redefines no brand colour");
+  // the old golden palette is gone
+  assert.doesNotMatch(css, /champagne|--mt-gold:\s+#A8842C|#F8F4EA/i, "no champagne / gold surface left");
+  // brand is cobalt, not red
+  assert.match(css, /--brand:\s+#2E50D6;/);
   // reports print on white paper
   assert.match(theme, /@media print \{[\s\S]*?background-image: none !important;/);
 });

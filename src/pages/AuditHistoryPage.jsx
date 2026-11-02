@@ -23,24 +23,24 @@ const TYPE_META = {
   login:                 { label: "Login",                color: "#15803d" },
   login_failed:          { label: "Failed Login",         color: "#b91c1c" },
   logout:                { label: "Logout",               color: "#64748b" },
-  password_change:       { label: "Password Changed",     color: "#D71920" },
-  profile_update:        { label: "Profile Updated",      color: "#D71920" },
+  password_change:       { label: "Password Changed",     color: "#2E50D6" },
+  profile_update:        { label: "Profile Updated",      color: "#2E50D6" },
   user_create:           { label: "User Created",         color: "#15803d" },
-  user_edit:             { label: "User Updated",         color: "#D71920" },
+  user_edit:             { label: "User Updated",         color: "#2E50D6" },
   user_delete:           { label: "User Deleted",         color: "#b91c1c" },
   user_disabled:         { label: "User Disabled",        color: "#b45309" },
   user_enabled:          { label: "User Enabled",         color: "#15803d" },
   user_password_reset:   { label: "Password Reset (admin)", color: "#6d28d9" },
   role_create:           { label: "Role Created",         color: "#15803d" },
-  role_edit:             { label: "Role Updated",         color: "#D71920" },
+  role_edit:             { label: "Role Updated",         color: "#2E50D6" },
   role_delete:           { label: "Role Deleted",         color: "#b91c1c" },
   role_reset:            { label: "Roles Reset",          color: "#64748b" },
   role_changed:          { label: "Role Changed",         color: "#6d28d9" },
-  po_created:            { label: "PO Created",           color: "#D71920" },
-  po_edited:             { label: "PO Edited",            color: "#D71920" },
+  po_created:            { label: "PO Created",           color: "#2E50D6" },
+  po_edited:             { label: "PO Edited",            color: "#2E50D6" },
   po_approved:           { label: "PO Approved",          color: "#15803d" },
   po_rejected:           { label: "PO Rejected",          color: "#b91c1c" },
-  po_ordered:            { label: "Order Placed",         color: "#B01218" },
+  po_ordered:            { label: "Order Placed",         color: "#2640B0" },
   po_received:           { label: "PO Received",          color: "#047857" },
   po_receive_reversed:   { label: "Receive Reversed",     color: "#b45309" },
   po_deleted:            { label: "PO Deleted",           color: "#64748b" },
@@ -48,7 +48,7 @@ const TYPE_META = {
   followup_done:         { label: "Follow-Up Done",       color: "#b45309" },
   inventory_correction:  { label: "Inventory Correction", color: "#b45309" },
   inventory_add:         { label: "Item Added",           color: "#15803d" },
-  inventory_edit:        { label: "Item Updated",         color: "#D71920" },
+  inventory_edit:        { label: "Item Updated",         color: "#2E50D6" },
   inventory_delete:      { label: "Item Deleted",         color: "#b91c1c" },
   stock_adjust:          { label: "Stock Adjusted",       color: "#6d28d9" },
   inward_manual:         { label: "Manual Inward",        color: "#047857" },
@@ -59,12 +59,12 @@ const TYPE_META = {
   bom_updated:           { label: "BOM Updated",          color: "#b45309" },
   bom_created:           { label: "BOM Created",          color: "#15803d" },
   bom_renamed:           { label: "BOM Renamed",          color: "#6d28d9" },
-  machine_created:       { label: "Machine Created",      color: "#D71920" },
-  machine_stage:         { label: "Stage Updated",        color: "#B01218" },
+  machine_created:       { label: "Machine Created",      color: "#2E50D6" },
+  machine_stage:         { label: "Stage Updated",        color: "#2640B0" },
   machine_completed:     { label: "Machine Completed",    color: "#15803d" },
   production_started:    { label: "Production Started",   color: "#15803d" },
   vendor_add:            { label: "Vendor Added",         color: "#15803d" },
-  vendor_edit:           { label: "Vendor Updated",       color: "#D71920" },
+  vendor_edit:           { label: "Vendor Updated",       color: "#2E50D6" },
   vendor_delete:         { label: "Vendor Deleted",       color: "#b91c1c" },
 };
 
@@ -358,7 +358,7 @@ export default function AuditHistoryPage() {
                     </td>
                   </tr>
                   {isExpanded && (
-                    <tr style={{ background: "rgba(176, 18, 24,0.04)" }}>
+                    <tr style={{ background: "rgba(38, 64, 176,0.04)" }}>
                       <td colSpan={7} className="px-6 py-3">
                         <div className="grid grid-cols-2 gap-4">
                           <div>
