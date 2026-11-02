@@ -84,7 +84,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-02-transfer-no-signature";
+const APP_BUILD = "2026-11-02-manual-check-points";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -16869,7 +16869,7 @@ const cleanPendingJobs = (rows) => (Array.isArray(rows) ? rows : []).map(normali
     reason: j.reason.trim(),
     critical: !!j.critical,
     partSerialNo: (j.partSerialNo || "").trim(),
-    criticalChecks: (j.critical && !(j.partSerialNo || "").trim() && j.criticalChecks && Array.isArray(j.criticalChecks.points) && j.criticalChecks.points.length) ? j.criticalChecks : null,
+    criticalChecks: (j.critical && j.criticalChecks && Array.isArray(j.criticalChecks.points) && j.criticalChecks.points.length) ? j.criticalChecks : null,
   }));
 
 // 2026-11-01 — every Machine Tracker popup gets a visible close control in
@@ -16950,29 +16950,41 @@ function PendingJobRows({ rows, onChange, inventory = [], accent = "#b45309", ad
                      onChange={(e) => set(i, { partSerialNo: e.target.value })}
                      placeholder="Part serial no. (optional)" className={`${inp} font-mono flex-1 min-w-[140px]`} style={bd} />
             </div>
-            {/* Critical = Yes and no serial typed: the Item Master check points
-                for this item (matched by its name) as a checklist. A serial
-                number, when entered, replaces it. Serial stays optional. */}
-            {r.critical && !r.partSerialNo.trim() && (() => {
-              const nm = r.itemName.trim().toLowerCase();
-              const hit = nm ? codes.find((it) => (it.name || "").trim().toLowerCase() === nm || (it.code || "").trim().toLowerCase() === nm) : null;
-              const pts = hit && Array.isArray(hit.checkPoints) ? hit.checkPoints.filter(Boolean) : [];
-              const ticks = r.ticks || {};
+            {/* Critical = Yes: the operator types the check points for THIS part
+                (it is not in Item Master) — as many as needed, each with its own
+                checkbox. Nothing is looked up from Item Master. Serial stays
+                optional. Critical = No shows none of this. */}
+            {r.critical && (() => {
+              const pts = Array.isArray(r.cpList) ? r.cpList : [];
+              const addPoint = () => {
+                const t = (r.cpDraft || "").trim();
+                if (!t || pts.some((x) => x.text.toLowerCase() === t.toLowerCase())) { set(i, { cpDraft: "" }); return; }
+                set(i, { cpList: [...pts, { text: t, ok: false }], cpDraft: "" });
+              };
               return (
-                <div data-critical-checks className="rounded-lg px-2.5 py-2 space-y-1" style={{ background: "rgba(239,68,68,0.05)", border: "1px solid rgba(239,68,68,0.28)" }}>
-                  <div className="text-[10.5px] font-black" style={{ color: "#b91c1c" }}>Critical item check points</div>
-                  {pts.length === 0 ? (
-                    <div data-critical-checks-none className="text-[10.5px] text-slate-500">
-                      {hit ? "No check points are set for this item in Item Master." : "No Item Master item with this name — no check points to show. Type a serial number or save without."}
+                <div data-critical-checks className="rounded-lg px-2.5 py-2 space-y-1.5" style={{ background: "rgba(239,68,68,0.05)", border: "1px solid rgba(239,68,68,0.28)" }}>
+                  <div className="text-[10.5px] font-black" style={{ color: "#b91c1c" }}>Critical check points (optional)</div>
+                  {pts.map((cp, k) => (
+                    <div key={k} className="flex items-start gap-2" data-critical-check-row>
+                      <label className="flex items-start gap-2 text-[11.5px] text-slate-800 cursor-pointer flex-1 min-w-0">
+                        <input type="checkbox" data-critical-check checked={!!cp.ok} disabled={disabled}
+                               onChange={(e) => set(i, { cpList: pts.map((x, n) => n === k ? { ...x, ok: e.target.checked } : x) })}
+                               className="w-4 h-4 mt-0.5 accent-emerald-600" />
+                        <span className="break-words">{cp.text}</span>
+                      </label>
+                      <button type="button" disabled={disabled} data-critical-check-remove aria-label="Remove check point"
+                              onClick={() => set(i, { cpList: pts.filter((_, n) => n !== k) })}
+                              className="text-[11px] text-slate-400 hover:text-red-600 px-1">✕</button>
                     </div>
-                  ) : pts.map((cp, k) => (
-                    <label key={k} className="flex items-start gap-2 text-[11.5px] text-slate-800 cursor-pointer">
-                      <input type="checkbox" data-critical-check checked={!!ticks[cp]} disabled={disabled}
-                             onChange={(e) => set(i, { ticks: { ...ticks, [cp]: e.target.checked } })}
-                             className="w-4 h-4 mt-0.5 accent-emerald-600" />
-                      <span>{cp}</span>
-                    </label>
                   ))}
+                  <div className="flex gap-1.5">
+                    <input value={r.cpDraft || ""} disabled={disabled} data-critical-check-input
+                           onChange={(e) => set(i, { cpDraft: e.target.value })}
+                           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addPoint(); } }}
+                           placeholder="Add a check point, e.g. nameplate matches order" className={`${inp} flex-1`} style={bd} />
+                    <button type="button" disabled={disabled || !(r.cpDraft || "").trim()} data-critical-check-add onClick={addPoint}
+                            className="text-[11px] font-bold px-3 rounded-lg border border-slate-300 text-slate-700 disabled:opacity-40">+ Add</button>
+                  </div>
                 </div>
               );
             })()}
@@ -16980,15 +16992,15 @@ function PendingJobRows({ rows, onChange, inventory = [], accent = "#b45309", ad
               <button type="button" disabled={disabled} data-pending-item-save
                       onClick={() => {
                         if (!r.itemName.trim() || !(Number(r.qty) > 0)) return;
-                        // Snapshot the check points with their ticks (critical, no serial only).
+                        // The check points typed for this part, with their ticks (Critical = Yes only).
                         let criticalChecks = null;
-                        if (r.critical && !r.partSerialNo.trim()) {
-                          const nm = r.itemName.trim().toLowerCase();
-                          const hit = codes.find((it) => (it.name || "").trim().toLowerCase() === nm || (it.code || "").trim().toLowerCase() === nm);
-                          const pts = hit && Array.isArray(hit.checkPoints) ? hit.checkPoints.filter(Boolean) : [];
-                          if (pts.length) criticalChecks = { points: pts.map((t) => ({ text: t, ok: !!(r.ticks || {})[t] })) };
+                        if (r.critical) {
+                          const pts = (Array.isArray(r.cpList) ? r.cpList : []).slice();
+                          const draft = (r.cpDraft || "").trim();
+                          if (draft && !pts.some((x) => x.text.toLowerCase() === draft.toLowerCase())) pts.push({ text: draft, ok: false });
+                          if (pts.length) criticalChecks = { points: pts };
                         }
-                        set(i, { saved: true, criticalChecks });
+                        set(i, { saved: true, criticalChecks, cpDraft: "", cpList: criticalChecks ? criticalChecks.points : [] });
                       }}
                       className="text-[11px] font-black text-white px-4 py-1.5 rounded-lg transition-all disabled:opacity-50"
                       style={{ background: (r.itemName.trim() && Number(r.qty) > 0) ? "#15803d" : "#94a3b8", color: "#ffffff" }}
