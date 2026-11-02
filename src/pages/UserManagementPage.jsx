@@ -15,7 +15,14 @@ function genId() {
 // is a finished machine; neither is a place where anyone works.
 const WORK_DEPARTMENTS = DEPARTMENT_SEQUENCE.filter((d) => d !== "BOM Issued" && d !== "Ready");
 
-const EMPTY_FORM = { mobile: "", username: "", password: "", role: "Admin", status: "active", departments: [] };
+// Role given automatically to a Department Staff login (see migration 059): the
+// floor permissions of "Production" — Accept, Finish & Transfer, Part Received,
+// Work Completed — without issuing BOMs, and nothing administrative.
+export const DEPARTMENT_STAFF_ROLE = "dept_staff";
+
+// `kind` is only used when adding: "department" is the short Department Staff
+// form (username, password, department); "other" is the full form with a Role.
+const EMPTY_FORM = { kind: "department", mobile: "", username: "", password: "", role: "Admin", status: "active", departments: [] };
 
 export default function UserManagementPage({ canDo }) {
   const { currentUser, users, setUsers, roles } = useAuth();
@@ -64,6 +71,7 @@ export default function UserManagementPage({ canDo }) {
     if (!editUser && !form.password) e.password = "Required";
     const dup = users.find((x) => x.username === u && x.id !== editUser?.id);
     if (dup) e.username = `Username "${u}" is already taken`;
+    if (!editUser && form.kind === "department" && (form.departments || []).length !== 1) e.department = "Pick a department";
     return e;
   };
 
@@ -117,10 +125,13 @@ export default function UserManagementPage({ canDo }) {
         showToast(`Updated ${username}`);
       } else if (isSupabaseEnabled()) {
         const username = form.username.trim().toLowerCase();
+        const staff = form.kind === "department";
         const res = await adminCreateUser({
           username, password: form.password,
-          mobile: form.mobile.trim(), roleKey: form.role, status: form.status,
-          departments: form.departments,
+          mobile: staff ? "" : form.mobile.trim(),
+          roleKey: staff ? DEPARTMENT_STAFF_ROLE : form.role,
+          status: staff ? "active" : form.status,
+          departments: staff ? form.departments : (roleWorksOnFloor ? form.departments : []),
         });
         if (!res.success) {
           console.error("[UserManagement] create-user failed:", res);
@@ -138,7 +149,7 @@ export default function UserManagementPage({ canDo }) {
         const list = await fetchAllUsers(); if (list) setUsers(list);
         // Newer Edge Function saves departments at creation; this second step is an idempotent fallback for older deployments.
         const created = (list || []).find((u) => u.username === username);
-        if (created && form.departments.length) {
+        if (created && form.departments.length && (form.kind === "department" || roleWorksOnFloor)) {
           await persistDepartments(created.id, form.departments);
           appendAuditWithUser({
             type: "user_create", module: "User Mgmt",
@@ -149,10 +160,11 @@ export default function UserManagementPage({ canDo }) {
         showToast(`Created ${username}`);
       } else {
         const username = form.username.trim().toLowerCase();
+        const staff = form.kind === "department";
         const newUser = {
           id: genId(), username, fullName: username,
-          mobile: form.mobile.trim(), password: hashPassword(form.password),
-          role: form.role, status: form.status, lastLogin: null,
+          mobile: staff ? "" : form.mobile.trim(), password: hashPassword(form.password),
+          role: staff ? DEPARTMENT_STAFF_ROLE : form.role, status: staff ? "active" : form.status, lastLogin: null,
           departments: [...form.departments],
         };
         setUsers((prev) => [...prev, newUser]);
@@ -435,6 +447,20 @@ export default function UserManagementPage({ canDo }) {
             </div>
 
             <form onSubmit={(ev) => { ev.preventDefault(); if (!submitting) handleSave(); }} className="space-y-3.5">
+              {!editUser && (
+                <div className="flex gap-1.5" role="tablist" aria-label="Type of login">
+                  {[["department", "Department Staff"], ["other", "Other role"]].map(([k, label]) => (
+                    <button key={k} type="button" role="tab" aria-selected={form.kind === k}
+                      onClick={() => setForm((f) => ({ ...f, kind: k, departments: [] }))}
+                      className="flex-1 text-[11px] font-semibold px-3 py-1.5 rounded-lg transition-all"
+                      style={form.kind === k
+                        ? { background: "rgba(215, 25, 32,0.12)", border: "1px solid rgba(215, 25, 32,0.5)", color: "#B01218" }
+                        : { background: "rgba(26,31,46,0.04)", border: "1px solid rgba(26,31,46,0.12)", color: "#64748b" }}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
               <div>
                 <label className="block text-[10px] font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Username *</label>
                 <input value={form.username} autoFocus
@@ -461,6 +487,7 @@ export default function UserManagementPage({ canDo }) {
                   placeholder={editUser ? "Leave blank to keep current" : "Enter password"} className={inputCls} style={inputStyle} />
                 {errors.password && <div className="text-red-600 text-[10px] mt-1">{errors.password}</div>}
               </div>
+              {(editUser || form.kind === "other") && (
               <div>
                 <label className="block text-[10px] font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Role *</label>
                 <select value={form.role} onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
@@ -470,11 +497,33 @@ export default function UserManagementPage({ canDo }) {
                   ))}
                 </select>
               </div>
+              )}
               {/* Department(s) this login belongs to. Only meaningful for a role
                   that works on the Machine Tracker: it decides which machines
                   that login opens on. An Admin or Purchase Manager has no
                   department, so the picker is not shown to them at all. */}
-              {roleWorksOnFloor && (
+              {!editUser && form.kind === "department" && (
+              <div>
+                <label className="block text-[10px] font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Department *</label>
+                <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Department">
+                  {WORK_DEPARTMENTS.map((d) => {
+                    const on = (form.departments || [])[0] === d;
+                    return (
+                      <button key={d} type="button" role="radio" aria-checked={on}
+                              onClick={() => setForm((f) => ({ ...f, departments: [d] }))}
+                              className="text-[11px] font-semibold px-3 py-1.5 rounded-lg transition-all"
+                              style={on
+                                ? { background: "rgba(215, 25, 32,0.12)", border: "1px solid rgba(215, 25, 32,0.5)", color: "#B01218" }
+                                : { background: "rgba(26,31,46,0.04)", border: "1px solid rgba(26,31,46,0.12)", color: "#64748b" }}>
+                        {d}
+                      </button>
+                    );
+                  })}
+                </div>
+                {errors.department && <div className="text-red-600 text-[10px] mt-1">{errors.department}</div>}
+              </div>
+              )}
+              {(editUser || form.kind === "other") && roleWorksOnFloor && (
               <div>
                 <label className="block text-[10px] font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">
                   Department
