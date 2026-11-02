@@ -84,7 +84,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-02-hold-unselected";
+const APP_BUILD = "2026-11-02-slim-pending-item";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -11886,7 +11886,9 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
   // pending quantity (Critical / Normal is always set). Blank rows are ignored.
   const extraPendingProblem = (Array.isArray(extraPending) ? extraPending : []).map(normalizePendingJob).filter((j) => !pendingJobIsBlank(j))
     .some((j) => !(j.itemName.trim() || j.itemCode.trim()) || !(Number(j.qty) > 0))
-    ? "Each pending item needs an item name and a pending quantity." : "";
+    ? "Each pending item needs an item name and a quantity."
+    : (Array.isArray(extraPending) ? extraPending : []).map(normalizePendingJob).filter((j) => !pendingJobIsBlank(j)).some((j) => !j.saved)
+      ? "Press Save on each pending item before issuing." : "";
   const canSubmit      = checkedE.some((i) => i.issueQty > 0) && !extraPendingProblem;
 
   const SC = { green: "#22c55e", orange: "#D97706", red: "#ef4444" };
@@ -16851,6 +16853,7 @@ function JobHistory({ item, users = [], compact = false }) {
 // the Item Master, and carries the operator's Critical / Normal call plus the
 // part's own (optional) serial number.
 const emptyPendingJob = () => ({ description: "", itemCode: "", itemName: "", qty: "", reason: "", critical: false, partSerialNo: "" });
+// (a row may also carry `saved: true` — set by Save in the Add Pending Item form)
 const normalizePendingJob = (r) => typeof r === "string" ? { ...emptyPendingJob(), description: r } : { ...emptyPendingJob(), ...(r || {}) };
 const pendingJobIsBlank = (r) => { const j = normalizePendingJob(r); return !j.description.trim() && !j.itemCode.trim() && !j.itemName.trim() && !j.reason.trim(); };
 // Rows worth saving, with a description guaranteed (a part alone is enough).
@@ -16889,6 +16892,85 @@ function PendingJobRows({ rows, onChange, inventory = [], accent = "#b45309", ad
   const listId = "pending-job-codes";
   const inp = "min-w-0 w-full rounded-lg px-2.5 py-2 text-[12px] text-slate-800 outline-none";
   const bd = { background: "var(--surface-elevated)", border: `1px solid ${accent}66` };
+  // 2026-11-02 — Add Pending Item (BOM Outward) is a deliberately small form:
+  // Item Name*, Quantity*, Critical Yes / No, an OPTIONAL part serial (never
+  // required, not even for a Critical item) and Save. No item code, inventory
+  // list, reason or note. Saved rows are linked to the machine's serial when
+  // the BOM is issued and then appear in Pending Jobs.
+  if (itemMode) {
+    return (
+      <div className="space-y-2" data-pending-item-form>
+        {list.map((r, i) => r.saved ? (
+          <div key={i} data-pending-item-saved className="rounded-lg px-2.5 py-2 flex items-center gap-2 flex-wrap"
+               style={{ background: `${accent}0d`, border: `1px solid ${accent}40` }}>
+            <span className="text-[12px] font-bold text-slate-800">✓ {r.itemName.trim()} × {r.qty}</span>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                  style={r.critical ? { background: "#dc26261a", color: "#dc2626" } : { background: "#15803d1a", color: "#15803d" }}>
+              {r.critical ? "Critical" : "Not critical"}
+            </span>
+            {r.partSerialNo && <span className="text-[10.5px] font-mono text-slate-600">S/N {r.partSerialNo}</span>}
+            <span className="ml-auto flex gap-1.5">
+              <button type="button" disabled={disabled} data-pending-item-edit onClick={() => set(i, { saved: false })}
+                      className="text-[11px] font-bold text-slate-600 px-2 rounded-lg border border-slate-200">Edit</button>
+              <button type="button" disabled={disabled} onClick={() => onChange(list.filter((_, idx) => idx !== i))}
+                      className="text-[11px] font-bold text-slate-500 hover:text-red-600 px-2 rounded-lg border border-slate-200">Remove</button>
+            </span>
+          </div>
+        ) : (
+          <div key={i} className="rounded-lg p-2 space-y-1.5" style={{ background: `${accent}0d`, border: `1px solid ${accent}40` }}>
+            <div className="grid grid-cols-[1fr_96px] gap-1.5">
+              <input value={r.itemName} disabled={disabled} data-job-name
+                     onChange={(e) => set(i, { itemName: e.target.value })}
+                     placeholder="Item name *" className={inp} style={bd} />
+              <input type="number" min="0" step="any" value={r.qty} disabled={disabled} data-job-qty-input
+                     onChange={(e) => set(i, { qty: e.target.value })}
+                     placeholder="Quantity *" className={`${inp} text-right`} style={bd} />
+            </div>
+            <div className="flex items-center gap-1.5 flex-wrap" data-job-class>
+              <span className="text-[10.5px] font-bold text-slate-600 mr-0.5">Critical item?</span>
+              {[["normal", "No"], ["critical", "Yes"]].map(([k, label]) => {
+                const on = (k === "critical") === !!r.critical;
+                const col = k === "critical" ? "#dc2626" : "#15803d";
+                return (
+                  <button key={k} type="button" disabled={disabled} data-job-critical={k}
+                          aria-pressed={on} onClick={() => set(i, { critical: k === "critical" })}
+                          className="text-[10.5px] font-bold px-2.5 py-1 rounded-lg border transition-all disabled:opacity-50"
+                          style={on ? { background: `${col}1a`, borderColor: `${col}66`, color: col }
+                                    : { background: "var(--surface-elevated)", borderColor: "var(--border-subtle)", color: "var(--text-dim)" }}>
+                    {label}
+                  </button>
+                );
+              })}
+              <input value={r.partSerialNo} disabled={disabled} data-job-serial
+                     onChange={(e) => set(i, { partSerialNo: e.target.value })}
+                     placeholder="Part serial no. (optional)" className={`${inp} font-mono flex-1 min-w-[140px]`} style={bd} />
+            </div>
+            <div className="flex gap-2 items-center">
+              <button type="button" disabled={disabled} data-pending-item-save
+                      onClick={() => {
+                        if (!r.itemName.trim() || !(Number(r.qty) > 0)) return;
+                        set(i, { saved: true });
+                      }}
+                      className="text-[11px] font-black text-white px-4 py-1.5 rounded-lg transition-all disabled:opacity-50"
+                      style={{ background: (r.itemName.trim() && Number(r.qty) > 0) ? "#15803d" : "#94a3b8", color: "#ffffff" }}
+                      title={(r.itemName.trim() && Number(r.qty) > 0) ? "Save this pending item" : "Enter the item name and quantity first"}>
+                Save
+              </button>
+              <button type="button" disabled={disabled} onClick={() => onChange(list.filter((_, idx) => idx !== i))}
+                      className="text-[11px] font-bold text-slate-500 hover:text-red-600 px-2 rounded-lg border border-slate-200">
+                Remove
+              </button>
+            </div>
+          </div>
+        ))}
+        <button type="button" disabled={disabled} onClick={() => onChange([...list, emptyPendingJob()])}
+                className="text-[11px] font-bold px-3 py-1.5 rounded-lg border transition-all disabled:opacity-50"
+                style={{ background: `${accent}14`, border: `1px solid ${accent}66`, color: accent }}>
+          {addLabel}
+        </button>
+      </div>
+    );
+  }
   return (
     <div className="space-y-2">
       {codes.length > 0 && (
