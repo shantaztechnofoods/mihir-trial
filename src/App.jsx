@@ -16859,7 +16859,10 @@ function JobHistory({ item, users = [], compact = false }) {
 // 2026-11-01 (migration 052) — a pending row can name a part that is not in
 // the Item Master, and carries the operator's Critical / Normal call plus the
 // part's own (optional) serial number.
-const emptyPendingJob = () => ({ description: "", itemCode: "", itemName: "", qty: "", reason: "", critical: false, partSerialNo: "" });
+const emptyPendingJob = () => ({ description: "", itemCode: "", itemName: "", qty: "", reason: "", critical: false, partSerialNo: "", criticalMode: "both" });
+// criticalMode (Critical = Yes only): "checks" | "serial" | "both" — which extra fields the operator uses.
+const CRITICAL_MODES = [["checks", "Check Points"], ["serial", "Serial Number"], ["both", "Both"]];
+const critModeOf = (r) => (r && ["checks", "serial", "both"].includes(r.criticalMode)) ? r.criticalMode : "both";
 // (a row may also carry `saved: true` — set by Save in the Add Pending Item form)
 const normalizePendingJob = (r) => typeof r === "string" ? { ...emptyPendingJob(), description: r } : { ...emptyPendingJob(), ...(r || {}) };
 const pendingJobIsBlank = (r) => { const j = normalizePendingJob(r); return !j.description.trim() && !j.itemCode.trim() && !j.itemName.trim() && !j.reason.trim(); };
@@ -16872,8 +16875,11 @@ const cleanPendingJobs = (rows) => (Array.isArray(rows) ? rows : []).map(normali
     qty: j.qty === "" || j.qty == null ? null : Number(j.qty),
     reason: j.reason.trim(),
     critical: !!j.critical,
-    partSerialNo: (j.partSerialNo || "").trim(),
-    criticalChecks: (j.critical && j.criticalChecks && Array.isArray(j.criticalChecks.points) && j.criticalChecks.points.length) ? j.criticalChecks : null,
+    partSerialNo: (j.critical && critModeOf(j) === "checks") ? "" : (j.partSerialNo || "").trim(),
+    // Critical = Yes keeps the chosen option with its check points: { mode, points }.
+    criticalChecks: j.critical
+      ? { mode: critModeOf(j), points: critModeOf(j) === "serial" ? [] : ((j.criticalChecks && Array.isArray(j.criticalChecks.points)) ? j.criticalChecks.points : []) }
+      : null,
   }));
 
 // 2026-11-01 — every Machine Tracker popup gets a visible close control in
@@ -16916,8 +16922,9 @@ function PendingJobRows({ rows, onChange, inventory = [], accent = "#b45309", ad
                   style={r.critical ? { background: "#dc26261a", color: "#dc2626" } : { background: "#15803d1a", color: "#15803d" }}>
               {r.critical ? "Critical" : "Not critical"}
             </span>
+            {r.critical && <span data-pending-item-mode className="text-[10.5px] text-slate-600">{(CRITICAL_MODES.find(([k]) => k === critModeOf(r)) || [])[1]}</span>}
             {r.partSerialNo && <span className="text-[10.5px] font-mono text-slate-600">S/N {r.partSerialNo}</span>}
-            {r.criticalChecks && <span data-pending-item-checks className="text-[10.5px] text-slate-600">{r.criticalChecks.points.filter((x) => x.ok).length}/{r.criticalChecks.points.length} check points ticked</span>}
+            {r.criticalChecks && r.criticalChecks.points.length > 0 && <span data-pending-item-checks className="text-[10.5px] text-slate-600">{r.criticalChecks.points.filter((x) => x.ok).length}/{r.criticalChecks.points.length} check points ticked</span>}
             <span className="ml-auto flex gap-1.5">
               <button type="button" disabled={disabled} data-pending-item-edit onClick={() => set(i, { saved: false })}
                       className="text-[11px] font-bold text-slate-600 px-2 rounded-lg border border-slate-200">Edit</button>
@@ -16942,7 +16949,7 @@ function PendingJobRows({ rows, onChange, inventory = [], accent = "#b45309", ad
                 const col = k === "critical" ? "#dc2626" : "#15803d";
                 return (
                   <button key={k} type="button" disabled={disabled} data-job-critical={k}
-                          aria-pressed={on} onClick={() => set(i, { critical: k === "critical" })}
+                          aria-pressed={on} onClick={() => set(i, { critical: k === "critical", ...(k === "critical" && !r.criticalMode ? { criticalMode: "both" } : {}) })}
                           className="text-[10.5px] font-bold px-2.5 py-1 rounded-lg border transition-all disabled:opacity-50"
                           style={on ? { background: `${col}1a`, borderColor: `${col}66`, color: col }
                                     : { background: "var(--surface-elevated)", borderColor: "var(--border-subtle)", color: "var(--text-dim)" }}>
@@ -16950,15 +16957,23 @@ function PendingJobRows({ rows, onChange, inventory = [], accent = "#b45309", ad
                   </button>
                 );
               })}
-              <input value={r.partSerialNo} disabled={disabled} data-job-serial
-                     onChange={(e) => set(i, { partSerialNo: e.target.value })}
-                     placeholder="Part serial no. (optional)" className={`${inp} font-mono flex-1 min-w-[140px]`} style={bd} />
+              {r.critical && (
+                <select value={critModeOf(r)} disabled={disabled} data-critical-mode aria-label="Critical item option"
+                        onChange={(e) => set(i, { criticalMode: e.target.value })} className={inp} style={bd}>
+                  {CRITICAL_MODES.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+                </select>
+              )}
+              {(!r.critical || critModeOf(r) !== "checks") && (
+                <input value={r.partSerialNo} disabled={disabled} data-job-serial
+                       onChange={(e) => set(i, { partSerialNo: e.target.value })}
+                       placeholder="Part serial no. (optional)" className={`${inp} font-mono flex-1 min-w-[140px]`} style={bd} />
+              )}
             </div>
             {/* Critical = Yes: the operator types the check points for THIS part
                 (it is not in Item Master) — as many as needed, each with its own
                 checkbox. Nothing is looked up from Item Master. Serial stays
                 optional. Critical = No shows none of this. */}
-            {r.critical && (() => {
+            {r.critical && critModeOf(r) !== "serial" && (() => {
               const pts = Array.isArray(r.cpList) ? r.cpList : [];
               const addPoint = () => {
                 const t = (r.cpDraft || "").trim();
@@ -16998,13 +17013,14 @@ function PendingJobRows({ rows, onChange, inventory = [], accent = "#b45309", ad
                         if (!r.itemName.trim() || !(Number(r.qty) > 0)) return;
                         // The check points typed for this part, with their ticks (Critical = Yes only).
                         let criticalChecks = null;
+                        const mode = critModeOf(r);
                         if (r.critical) {
-                          const pts = (Array.isArray(r.cpList) ? r.cpList : []).slice();
-                          const draft = (r.cpDraft || "").trim();
+                          const pts = mode === "serial" ? [] : (Array.isArray(r.cpList) ? r.cpList : []).slice();
+                          const draft = mode === "serial" ? "" : (r.cpDraft || "").trim();
                           if (draft && !pts.some((x) => x.text.toLowerCase() === draft.toLowerCase())) pts.push({ text: draft, ok: false });
-                          if (pts.length) criticalChecks = { points: pts };
+                          criticalChecks = { mode, points: pts };
                         }
-                        set(i, { saved: true, criticalChecks, cpDraft: "", cpList: criticalChecks ? criticalChecks.points : [] });
+                        set(i, { saved: true, criticalChecks, criticalMode: mode, partSerialNo: (r.critical && mode === "checks") ? "" : r.partSerialNo, cpDraft: "", cpList: criticalChecks ? criticalChecks.points : [] });
                       }}
                       className="text-[11px] font-black text-white px-4 py-1.5 rounded-lg transition-all disabled:opacity-50"
                       style={{ background: (r.itemName.trim() && Number(r.qty) > 0) ? "#15803d" : "#94a3b8", color: "#ffffff" }}
@@ -17756,7 +17772,12 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                   {!p.itemCode && p.itemName ? " · not in Item Master" : ""}
                                 </div>
                               )}
-                              {p.criticalChecks && Array.isArray(p.criticalChecks.points) && (
+                              {p.critical && p.criticalChecks && p.criticalChecks.mode && (
+                                <div data-job-mode className="mt-1 text-[10.5px] text-slate-500">
+                                  Critical option: {(CRITICAL_MODES.find(([k]) => k === p.criticalChecks.mode) || [])[1]}
+                                </div>
+                              )}
+                              {p.criticalChecks && Array.isArray(p.criticalChecks.points) && p.criticalChecks.points.length > 0 && (
                                 <div data-job-checks className="mt-1 text-[10.5px] text-slate-600">
                                   Check points at Outward: {p.criticalChecks.points.filter((x) => x.ok).length}/{p.criticalChecks.points.length} ticked
                                   {" — "}{p.criticalChecks.points.map((x) => `${x.ok ? "✓" : "☐"} ${x.text}`).join(" · ")}
@@ -20487,7 +20508,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                       {checkPoints.map((cp, i) => <li key={i} className="flex gap-1.5"><span className="text-slate-400">•</span>{cp}</li>)}
                     </ul>
                   )}
-                  {checkPoints.length === 0 && p.criticalChecks && Array.isArray(p.criticalChecks.points) && (
+                  {checkPoints.length === 0 && p.criticalChecks && Array.isArray(p.criticalChecks.points) && p.criticalChecks.points.length > 0 && (
                     <ul data-receive-saved-checks className="text-[11px] text-slate-700 space-y-0.5">
                       {p.criticalChecks.points.map((cp, i) => <li key={i} className="flex gap-1.5"><span className="text-slate-400">{cp.ok ? "✓" : "☐"}</span>{cp.text}</li>)}
                     </ul>
