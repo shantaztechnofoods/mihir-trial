@@ -1,5 +1,6 @@
 import React, { useRef, useState } from "react";
 import { useAuth } from "../auth/AuthContext.jsx";
+import BrandLogo from "../components/BrandLogo.jsx";
 
 // Login (rewritten 2026-10-31 — login field bug).
 //
@@ -71,13 +72,9 @@ export default function LoginPage({ notice = "", onRetry = null }) {
              style={{ background: "#0C1424", color: "#E6EBF5" }} aria-hidden="true">
         <div className="absolute inset-0 pointer-events-none"
              style={{ background: "radial-gradient(900px 500px at 0% 0%, rgba(58,91,232,0.28), transparent 60%)" }} />
-        <div className="relative flex items-center gap-3">
-          <div className="w-10 h-10 rounded-[10px] flex items-center justify-center text-white text-lg font-bold"
-               style={{ background: "linear-gradient(145deg,#3A5BE8,#2640B0)", boxShadow: "0 4px 12px rgba(46,80,214,0.45)" }}>S</div>
-          <div>
-            <div className="text-[15px] font-bold tracking-[0.12em]" style={{ color: "#F4F7FD" }}>SHANTAZ</div>
-            <div className="text-[10px] font-medium tracking-[0.18em]" style={{ color: "#8E9AB5" }}>TECHNOFOODS ERP</div>
-          </div>
+        <div className="relative">
+          <BrandLogo size={168} rounded={22} />
+          <div className="mt-5 text-[11px] font-semibold tracking-[0.2em]" style={{ color: "#8E9AB5" }}>TECHNOFOODS ERP</div>
         </div>
         <div className="relative max-w-[420px]">
           <h1 className="text-[32px] leading-[1.15] font-semibold tracking-[-0.025em]" style={{ color: "#F4F7FD" }}>
@@ -97,13 +94,9 @@ export default function LoginPage({ notice = "", onRetry = null }) {
 
       <main className="flex-1 flex items-center justify-center px-5 py-10">
         <div className="w-full max-w-[380px]">
-          <div className="lg:hidden flex items-center gap-3 mb-8">
-            <div className="w-10 h-10 rounded-[10px] flex items-center justify-center text-white text-lg font-bold"
-                 style={{ background: "linear-gradient(145deg,#3A5BE8,#2640B0)", boxShadow: "0 4px 12px rgba(46,80,214,0.35)" }}>S</div>
-            <div>
-              <div className="text-[15px] font-bold tracking-[0.12em]" style={{ color: "#0B1220" }}>SHANTAZ</div>
-              <div className="text-[10px] font-medium tracking-[0.18em]" style={{ color: "#556077" }}>TECHNOFOODS ERP</div>
-            </div>
+          <div className="lg:hidden flex items-center gap-4 mb-8">
+            <BrandLogo size={88} rounded={16} />
+            <div className="text-[10px] font-semibold tracking-[0.18em]" style={{ color: "#556077" }}>TECHNOFOODS ERP</div>
           </div>
 
           <div className="mb-7">
