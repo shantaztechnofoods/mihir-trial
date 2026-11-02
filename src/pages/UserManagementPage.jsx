@@ -120,6 +120,7 @@ export default function UserManagementPage({ canDo }) {
         const res = await adminCreateUser({
           username, password: form.password,
           mobile: form.mobile.trim(), roleKey: form.role, status: form.status,
+          departments: form.departments,
         });
         if (!res.success) {
           console.error("[UserManagement] create-user failed:", res);
@@ -135,7 +136,7 @@ export default function UserManagementPage({ canDo }) {
           return;
         }
         const list = await fetchAllUsers(); if (list) setUsers(list);
-        // adminCreateUser does not take departments, so set them right after.
+        // Newer Edge Function saves departments at creation; this second step is an idempotent fallback for older deployments.
         const created = (list || []).find((u) => u.username === username);
         if (created && form.departments.length) {
           await persistDepartments(created.id, form.departments);
