@@ -315,7 +315,7 @@ test("App: Accept Machine on the card reuses the accept modal and refuses duplic
   // department, on whichever tab (no hop to Transfer & Accept needed). Same
   // role/department check; an overdue (ON HOLD) hand-over is released by
   // accepting it, which still demands the hold reason.
-  assert.match(app, /const cardCanAccept = !!h && h\.status === "pending" && canAcceptHandover\(canDo, h\.toDepartment\) && !!onAcceptHandover;/);
+  assert.match(app, /const cardCanAccept = !!h && h\.status === "pending" && !machine\.holdActive && canAcceptHandover\(canDo, h\.toDepartment\) && !!onAcceptHandover;/);
   assert.doesNotMatch(app, /const cardCanAccept = mtTab/);
   assert.match(app, /machineOverdue \? "✓ Accept · release from hold" : "✓ Accept Machine"/);
   assert.match(app, /data-card-accept=\{h\.id\}\n\s+onClick=\{\(\) => \{ if \(!acceptModal\) openAcceptModal\(h\); \}\}/);

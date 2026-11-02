@@ -58,6 +58,12 @@ function fromRow(r) {
     trialCertificate:    (r.trial_certificate && typeof r.trial_certificate === "object") ? r.trial_certificate : null,
     // Migration 045 — rack slot id, null for legacy rows (placed oldest-first).
     rackSlot:            r.rack_slot || null,
+    // Migration 055 — manual ON HOLD (separate from the automatic "hand-over
+    // not accepted in time" hold, which is computed from the hand-over).
+    holdActive:          r.hold_active === true,
+    holdReason:          r.hold_reason || "",
+    holdBy:              r.hold_by || null,
+    holdAt:              r.hold_at || null,
   };
 }
 
@@ -171,6 +177,11 @@ export async function updateMachine(id, updates) {
   if (updates.trialCertificate      !== undefined) row.trial_certificate     = updates.trialCertificate     || null;
   // Migration 045 — rack slot (may be null to clear).
   if (updates.rackSlot              !== undefined) row.rack_slot             = updates.rackSlot             || null;
+  // Migration 055 — manual ON HOLD. The database trigger decides who may do
+  // this and stamps hold_by / hold_at itself. Deliberately NOT stripped on the
+  // missing-column retry below: a hold that cannot be saved must fail loudly.
+  if (updates.holdActive            !== undefined) row.hold_active           = !!updates.holdActive;
+  if (updates.holdReason            !== undefined) row.hold_reason           = updates.holdReason           || null;
 
   // `.select()` is not decoration. Without it, PostgREST answers an UPDATE that
   // matched ZERO rows with no error and no data, and this function reported
