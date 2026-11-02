@@ -90,7 +90,8 @@ INSERT INTO public.handover_events (machine_id,bom_key,serial_no,from_department
  SELECT 101,'M-10','SN-A1','Assembly','Mechanical',:SA,now(),10,10,'pending',30,false WHERE false;
 SELECT pg_temp.chk('no new hand-over can be sent while on hold',
   pg_temp.as_user(:ASM, format($q$INSERT INTO public.handover_events (machine_id,bom_key,serial_no,from_department,to_department,sent_by,sent_at,expected_duration_minutes,actual_duration_minutes,status,accept_timeout_minutes,release_required) VALUES (101,'M-10','SN-A1','Assembly','Mechanical',%L,now(),10,10,'pending',30,false)$q$, :ASM)) LIKE '55000%');
-SELECT pg_temp.as_user(:MEC, $q$UPDATE public.machine_log SET hold_active=false WHERE id=101$q$) AS r1 \gset
+-- 058: a department user may only release a hold on a machine that is in THEIR department (101 is in Assembly)
+SELECT pg_temp.as_user(:ASM, $q$UPDATE public.machine_log SET hold_active=false WHERE id=101$q$) AS r1 \gset
 SELECT pg_temp.chk('release works for a permitted user', :'r1' = '00000' AND (SELECT NOT hold_active FROM public.machine_log WHERE id=101));
 SELECT pg_temp.chk('hand-over can be sent after release',
   pg_temp.as_user(:ASM, format($q$INSERT INTO public.handover_events (machine_id,bom_key,serial_no,from_department,to_department,sent_by,sent_at,expected_duration_minutes,actual_duration_minutes,status,accept_timeout_minutes,release_required) VALUES (101,'M-10','SN-A1','Assembly','Mechanical',%L,now(),10,10,'pending',30,false)$q$, :ASM)) = '00000');

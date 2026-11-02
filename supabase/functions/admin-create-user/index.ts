@@ -1,5 +1,5 @@
 // admin-create-user (username-based architecture)
-// Body: { username, password, mobile?, roleKey, status? }
+// Body: { username, password, mobile?, roleKey, status?, departments? }
 //
 // - Validates username shape + uniqueness in public.users BEFORE creating auth user.
 // - Synthesizes internal email: ${username}@users.shantaz.local
@@ -44,7 +44,7 @@ serve(async (req: Request) => {
   if (!caller || caller.status !== "active" || caller.role_key !== "super_admin")
     return json(403, { error: "Super Admin only" });
 
-  let body: { username?: string; password?: string; mobile?: string; roleKey?: string; status?: string };
+  let body: { username?: string; password?: string; mobile?: string; roleKey?: string; status?: string; departments?: string[] };
   try { body = await req.json(); } catch { return json(400, { error: "Invalid JSON body" }); }
 
   const { password, mobile, roleKey, status } = body;
@@ -71,6 +71,13 @@ serve(async (req: Request) => {
     .select("id, username").eq("username", cleanUsername).maybeSingle();
   if (lookupErr) return json(500, { error: `Username lookup failed: ${lookupErr.message}` });
   if (existing)  return json(409, { error: `Username "${cleanUsername}" is already taken. Please choose a different username.` });
+
+  // Departments (optional): validated against the known work departments.
+  const WORK_DEPTS = ["Assembly","Mechanical","Electrical","Trial"];
+  const departments = Array.isArray(body.departments)
+    ? Array.from(new Set(body.departments.map((d) => String(d)))) : [];
+  const badDept = departments.find((d) => !WORK_DEPTS.includes(d));
+  if (badDept) return json(400, { error: `Unknown department "${badDept}"` });
 
   // Synthesize internal email (never exposed to user)
   const email = `${cleanUsername}@${INTERNAL_EMAIL_DOMAIN}`;
@@ -100,6 +107,7 @@ serve(async (req: Request) => {
     mobile:    mobile || null,
     role_key:  roleKey,
     status:    status || "active",
+    departments,
   };
   const { error: upsertErr } = await service.from("users").upsert(profilePayload, { onConflict: "id" });
   if (upsertErr) {

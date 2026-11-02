@@ -142,10 +142,13 @@ SELECT pg_temp.chk('staff edits own name', pg_temp.as_user(:MEC, format($q$UPDAT
 SELECT pg_temp.chk('staff cannot change own role', pg_temp.as_user(:MEC, format($q$UPDATE public.users SET role_key='super_admin' WHERE id=%L$q$, :MEC)) LIKE '42501%');
 SELECT pg_temp.chk('staff role unchanged', (SELECT role_key='Production' FROM public.users WHERE id=:MEC));
 SELECT pg_temp.chk('staff cannot change own departments/status', pg_temp.as_user(:MEC, format($q$UPDATE public.users SET departments='{Trial}' WHERE id=%L$q$, :MEC)) LIKE '42501%');
-SELECT pg_temp.chk('Admin cannot grant super_admin', pg_temp.as_user(:ADM, format($q$UPDATE public.users SET role_key='super_admin' WHERE id=%L$q$, :MEC)) LIKE '42501%');
+SELECT pg_temp.as_user(:ADM, format($q$UPDATE public.users SET role_key='super_admin' WHERE id=%L$q$, :MEC));
+SELECT pg_temp.chk('Admin cannot grant super_admin (058: refused outright)', (SELECT role_key='Production' FROM public.users WHERE id=:MEC));
 SELECT pg_temp.chk('Admin cannot change own role', pg_temp.as_user(:ADM, format($q$UPDATE public.users SET role_key='Production' WHERE id=%L$q$, :ADM)) LIKE '42501%');
-SELECT pg_temp.chk('Admin cannot disable a super admin', pg_temp.as_user(:ADM, format($q$UPDATE public.users SET status='disabled' WHERE id=%L$q$, :SA)) LIKE '42501%');
-SELECT pg_temp.chk('Admin can change a staff role (not super)', pg_temp.as_user(:ADM, format($q$UPDATE public.users SET role_key='Store Manager' WHERE id=%L$q$, :STO)) = '00000');
+SELECT pg_temp.as_user(:ADM, format($q$UPDATE public.users SET status='disabled' WHERE id=%L$q$, :SA));
+SELECT pg_temp.chk('Admin cannot disable a super admin', (SELECT status='active' FROM public.users WHERE id=:SA));
+SELECT pg_temp.as_user(:ADM, format($q$UPDATE public.users SET role_key='Production' WHERE id=%L$q$, :STO));
+SELECT pg_temp.chk('058: only a super admin manages users — Admin cannot change a staff role', (SELECT role_key='Store Manager' FROM public.users WHERE id=:STO));
 SELECT pg_temp.chk('super admin can grant super_admin', pg_temp.as_user(:SA, format($q$UPDATE public.users SET role_key='super_admin' WHERE id=%L$q$, :ADM)) = '00000');
 UPDATE public.users SET role_key='Admin' WHERE id=:ADM;
 
