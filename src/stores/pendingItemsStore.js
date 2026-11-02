@@ -70,7 +70,39 @@ const fromRow = (r) => ({
   critical:             r.critical === true,
   partSerialNo:         r.part_serial_no || "",
   source:               r.source || "",
+  // Migration 054 — running total received across all receipts. Remaining
+  // pending = qty − receivedQty (see pendingItemRemaining). Receipts
+  // themselves are attached by fetchPendingItems as `receipts`.
+  receivedQty:          r.received_qty == null ? 0 : Number(r.received_qty),
+  receipts:             [],
 });
+
+const receiptFromRow = (r) => ({
+  id:                   r.id,
+  pendingItemId:        r.pending_item_id,
+  machineId:            r.machine_id,
+  itemCode:             r.item_code || "",
+  itemName:             r.item_name || "",
+  qtyReceived:          Number(r.qty_received),
+  remainingQty:         r.remaining_qty == null ? null : Number(r.remaining_qty),
+  receivedAt:           r.received_at || null,
+  receivedBy:           r.received_by || null,
+  receivedByName:       r.received_by_name || "",
+  receivedInDepartment: r.received_in_department || "",
+  notes:                r.notes || "",
+  verification:         r.verification || null,
+  stockInwarded:        r.stock_inwarded === true,
+  stockAfter:           r.stock_after == null ? null : Number(r.stock_after),
+});
+
+// Quantity still pending on a job: nothing once it is fully received or
+// completed; null when the job has no quantity; otherwise qty − received so far.
+export function pendingItemRemaining(p) {
+  if (!p) return 0;
+  if (p.status === "resolved" || p.receivedAt) return 0;
+  if (p.qty == null) return null;
+  return Math.max(0, Number(p.qty) - (Number(p.receivedQty) || 0));
+}
 
 // The job's permanent history, oldest first: Reported → Part received →
 // Completed. Each entry comes from its own columns, so a later entry never
@@ -82,7 +114,15 @@ export function pendingItemHistory(p) {
     at: p.raisedAt || null, by: p.raisedBy || null, department: p.raisedInDepartment || "",
     text: p.reason || "", detail: p.description || "",
   }];
-  if (p.receivedAt) out.push({
+  // Migration 054 — one entry per receipt (never merged or overwritten).
+  const receipts = Array.isArray(p.receipts) ? p.receipts : [];
+  if (receipts.length) {
+    for (const r of receipts) out.push({
+      kind: "received", label: `Part received × ${r.qtyReceived}`,
+      at: r.receivedAt, by: r.receivedBy || null, byName: r.receivedByName || "", department: r.receivedInDepartment || "",
+      text: r.notes || "", detail: "", receipt: r,
+    });
+  } else if (p.receivedAt) out.push({
     kind: "received", label: "Part received",
     at: p.receivedAt, by: p.receivedBy || null, department: p.receivedInDepartment || "",
     text: p.receivedNotes || "", detail: "",
@@ -100,6 +140,7 @@ export function pendingItemStage(p) {
   if (!p) return "awaiting";
   if (p.status === "resolved") return "completed";
   if (p.receivedAt) return "received";
+  if ((Number(p.receivedQty) || 0) > 0) return "partial";
   return "awaiting";
 }
 
@@ -129,6 +170,16 @@ export async function fetchPendingItems() {
   const { data, error } = await c.from("pending_handover_items").select("*").order("raised_at", { ascending: false });
   if (error) { console.warn("[pending_items] load failed", error); return getLocal(); }
   const out = (data || []).map(fromRow);
+  // Migration 054 — attach each job's receipts. A missing table (054 not
+  // applied yet) just means no receipts.
+  try {
+    const rc = await c.from("pending_item_receipts").select("*").order("received_at", { ascending: true }).order("id", { ascending: true });
+    if (!rc.error) {
+      const by = new Map();
+      for (const r of (rc.data || []).map(receiptFromRow)) { if (!by.has(r.pendingItemId)) by.set(r.pendingItemId, []); by.get(r.pendingItemId).push(r); }
+      for (const j of out) j.receipts = by.get(j.id) || [];
+    }
+  } catch (e) { console.warn("[pending_items] receipts load failed", e); }
   setLocal(out);
   return out;
 }
@@ -215,4 +266,49 @@ export async function receivePendingItem(id, { receivedBy, notes, receivedInDepa
   if (error) { console.error("[pending_items:receive] failed", error); return { success: false, error: error.message }; }
   if (!data)  return { success: false, error: "This job is already received or completed." };
   return { success: true, item: fromRow(data) };
+}
+
+// Migration 054 — record ONE receipt (partial or final) for a pending part.
+// Atomic in the database (receive_pending_part): checks the quantity against
+// what is still pending, writes the receipt row, inwards that quantity into
+// stock when the part is in the Item Master, and updates the running total.
+// Local mode keeps the same rules on the localStorage copy (stock is moved by
+// the caller there).
+export async function receivePendingPart(id, { qty, notes = "", verification = null, department = "", receivedBy = null, receivedByName = "" }) {
+  const n = Number(qty);
+  if (!Number.isFinite(n) || n <= 0) return { success: false, error: "Enter the quantity that was actually received." };
+  if (!isSupabaseEnabled()) {
+    const all = getLocal();
+    const job = all.find((p) => p.id === id);
+    if (!job) return { success: false, error: "Pending job not found." };
+    if (job.status !== "open") return { success: false, error: "This pending job is already completed." };
+    if (job.receivedAt) return { success: false, error: "This part is already fully received." };
+    const remaining = pendingItemRemaining(job);
+    if (remaining != null && n > remaining) return { success: false, error: `Only ${remaining} is still pending — you entered ${n}.` };
+    const nowIso = new Date().toISOString();
+    const newRecv = (Number(job.receivedQty) || 0) + n;
+    const newRem = job.qty == null ? null : Math.max(0, Number(job.qty) - newRecv);
+    const full = job.qty == null || newRem <= 0;
+    const receipt = { id: Date.now(), pendingItemId: id, machineId: job.machineId, itemCode: job.itemCode || "", itemName: job.itemName || "",
+      qtyReceived: n, remainingQty: newRem, receivedAt: nowIso, receivedBy, receivedByName, receivedInDepartment: department || "",
+      notes: notes || "", verification, stockInwarded: false, stockAfter: null };
+    const next = { ...job, receivedQty: newRecv, receipts: [...(job.receipts || []), receipt],
+      ...(full ? { receivedAt: nowIso, receivedBy, receivedNotes: notes || "", receivedInDepartment: department || "" } : {}) };
+    setLocal(all.map((p) => (p.id === id ? next : p)));
+    return { success: true, item: next, receipt, remainingQty: newRem, fullyReceived: full, stockInwarded: false };
+  }
+  const c = getSupabase(); if (!c) return { success: false, error: "no client" };
+  const { data, error } = await c.rpc("receive_pending_part", {
+    p_item_id: id, p_qty: n, p_notes: notes || null, p_verification: verification || null, p_department: department || null,
+  });
+  if (error) { console.error("[pending_items:receive_part] failed", error); return { success: false, error: error.message }; }
+  const r = data || {};
+  return {
+    success: true,
+    receipt: { id: r.receipt_id, pendingItemId: id, qtyReceived: n, remainingQty: r.remaining_qty == null ? null : Number(r.remaining_qty),
+      receivedAt: r.received_at || new Date().toISOString(), receivedBy, receivedByName, receivedInDepartment: department || "",
+      notes: notes || "", verification, stockInwarded: r.stock_inwarded === true, stockAfter: r.stock_after == null ? null : Number(r.stock_after) },
+    receivedQty: Number(r.received_qty), remainingQty: r.remaining_qty == null ? null : Number(r.remaining_qty),
+    fullyReceived: r.fully_received === true, stockInwarded: r.stock_inwarded === true,
+  };
 }
