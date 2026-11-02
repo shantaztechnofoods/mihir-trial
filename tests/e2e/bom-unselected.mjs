@@ -27,6 +27,20 @@ await p.locator("input[placeholder^='e.g. SHT']").fill("SN-UNSEL-1"); await p.ge
 const dlg = () => p.evaluate(() => { const d = [...document.querySelectorAll(".modal-backdrop, [role=dialog], .fixed.inset-0")].filter(e=>e.innerText.length>50).pop() || document.body; return d.innerText.slice(0,700).replace(/\n/g," | ") + " ##BTN " + [...d.querySelectorAll("button")].map(x=>x.innerText.trim().slice(0,28)).filter(Boolean).join(" ; "); });
 const boxes = p.locator("input[type=checkbox]");
 await boxes.nth(1).uncheck(); await boxes.nth(2).uncheck(); await p.waitForTimeout(300);
+// Add Pending Item: only Item name, Quantity, Critical Yes/No, optional part serial, Save
+await p.locator("[data-add-pending-item]").click(); await p.waitForTimeout(300);
+const form = p.locator("[data-pending-item-form]");
+const fields = await form.evaluate((f) => ({ ph: [...f.querySelectorAll("input")].map((i) => i.placeholder), btn: [...f.querySelectorAll("button")].map((b) => b.innerText.trim()), list: f.querySelectorAll("datalist,select,textarea").length }));
+ok("form has exactly Item name*, Quantity*, optional part serial; Yes/No; Save", JSON.stringify(fields.ph) === JSON.stringify(["Item name *", "Quantity *", "Part serial no. (optional)"]) && fields.btn.includes("Save") && fields.btn.includes("Yes") && fields.btn.includes("No") && fields.list === 0, JSON.stringify(fields));
+ok("no item code, reason, note or inventory dropdown anywhere in the form", !/code|reason|note/i.test(fields.ph.join("|")));
+await p.locator("[data-pending-item-save]").click({ force: true }); await p.waitForTimeout(200);
+ok("Save refuses an empty item", await p.locator("[data-pending-item-saved]").count() === 0);
+await p.locator("[data-job-name]").fill("Special coupling"); await p.locator("[data-job-qty-input]").fill("2");
+await p.locator('[data-job-critical="critical"]').click();
+await p.getByRole("button", { name: /Issue Stock/ }).first().click({ trial: true }).catch(() => {});
+ok("unsaved pending item blocks the issue with a clear message", /Press Save on each pending item/.test(await p.locator("body").innerText()));
+await p.locator("[data-pending-item-save]").click(); await p.waitForTimeout(300);
+ok("Save locks the row (critical, no serial needed)", await p.locator("[data-pending-item-saved]").count() === 1 && /Critical/.test(await p.locator("[data-pending-item-saved]").innerText()));
 await p.getByRole("button", { name: /Issue Stock/ }).first().click(); await p.waitForTimeout(1000);
 await p.getByRole("button", { name: /Confirm Issue/ }).click(); await p.waitForTimeout(1000);
 await p.getByRole("button", { name: /Save Durations/ }).click(); await p.waitForTimeout(1500);
@@ -35,18 +49,20 @@ const jobs = await ls("erp_pending_handover_items"), machines = await ls("erp_ma
 const stock = (c) => Object.values(items).flat().find((i) => i.code === c).stock;
 ok("machine SN-UNSEL-1 was created", machines.length === 1 && machines[0].serialNo === "SN-UNSEL-1");
 ok("only the selected line left stock (NC-1 50→48); unselected lines untouched", stock("NC-1") === 48 && stock("NC-2") === 50 && stock("CR-1") === 50);
+const manual = jobs.find((j) => j.itemName === "Special coupling");
 const nc2 = jobs.find((j) => j.itemCode === "NC-2"), cr1 = jobs.find((j) => j.itemCode === "CR-1");
-ok("EVERY unselected line became a pending job (non-critical AND critical), none for the selected line", jobs.length === 2 && nc2 && cr1 && !jobs.some((j) => j.itemCode === "NC-1"));
+ok("EVERY unselected line became a pending job (non-critical AND critical), none for the selected line", jobs.filter((j) => j.itemCode).length === 2 && nc2 && cr1 && !jobs.some((j) => j.itemCode === "NC-1"));
 ok("job carries item name, quantity, machine, department and reason", nc2.itemName === "Cover sheet" && nc2.qty === 3 && String(nc2.machineId) === String(machines[0].id) && nc2.assignedDepartment === "Stores" && /Not selected at BOM Outward/.test(nc2.reason || "") && /SN-UNSEL-1/.test(nc2.description));
 ok("Critical flag follows the Item Master (NC-2 normal, CR-1 critical)", nc2.critical === false && cr1.critical === true && cr1.qty === 1);
+ok("the saved Add Pending Item is a job on SN-UNSEL-1: name, qty 2, Critical, no serial, no code/reason", manual && manual.qty === 2 && manual.critical === true && !manual.partSerialNo && !manual.itemCode && !manual.reason && String(manual.machineId) === String(machines[0].id) && /SN-UNSEL-1|Special coupling/.test(manual.description));
 ok("none of them went to Pending Stock", !(pstock || []).length);
 await p.locator("button, a").filter({ hasText: /^Machine Tracker/ }).first().click(); await p.waitForTimeout(1000);
 await p.locator("[data-summary-card=\"active\"]").first().click(); await p.waitForTimeout(600);
 const chip = p.locator("[data-card-jobs]");
-ok("the machine card shows the Pending Jobs button with both jobs", await chip.count() === 1 && /Pending Jobs · 2/.test(await chip.first().innerText()));
+ok("the machine card shows the Pending Jobs button with all three jobs", await chip.count() === 1 && /Pending Jobs · 3/.test(await chip.first().innerText()));
 await chip.first().click(); await p.waitForTimeout(700);
 const drawer = await p.locator("[data-jobs-drawer]").innerText();
-ok("opening Pending Jobs lists both jobs with name, qty and reason", /Cover sheet/.test(drawer) && /Gearbox/.test(drawer) && /Not selected at BOM Outward/.test(drawer));
+ok("opening Pending Jobs lists both jobs with name, qty and reason", /Cover sheet/.test(drawer) && /Gearbox/.test(drawer) && /Special coupling/.test(drawer) && /Not selected at BOM Outward/.test(drawer));
 ok("no page errors", errs.length === 0, errs.join(" | "));
 await b.close();
 

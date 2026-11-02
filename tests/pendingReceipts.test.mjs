@@ -138,7 +138,7 @@ test("app: Pending Jobs view shows every department's job with origin, qty progr
 
 test("app: Add Pending Item at BOM Outward — item name, Critical Yes/No, pending quantity", () => {
   assert.match(app, /mode="item" \/>/);
-  assert.match(app, /Each pending item needs an item name and a pending quantity\./);
+  assert.match(app, /Each pending item needs an item name and a quantity\./);
   assert.match(app, /const canSubmit      = checkedE\.some\(\(i\) => i\.issueQty > 0\) && !extraPendingProblem;/);
   assert.match(app, /source: "not_issued"/);
 });
