@@ -41,6 +41,21 @@ await p.getByRole("button", { name: /Issue Stock/ }).first().click({ trial: true
 ok("unsaved pending item blocks the issue with a clear message", /Press Save on each pending item/.test(await p.locator("body").innerText()));
 await p.locator("[data-pending-item-save]").click(); await p.waitForTimeout(300);
 ok("Save locks the row (critical, no serial needed)", await p.locator("[data-pending-item-saved]").count() === 1 && /Critical/.test(await p.locator("[data-pending-item-saved]").innerText()));
+ok("Save did NOT issue or release anything (no machine yet)", (await p.evaluate(() => JSON.parse(localStorage.getItem("erp_machines") || "[]").length)) === 0 && (await p.evaluate(() => JSON.parse(localStorage.getItem("erp_pending_handover_items") || "[]").length)) === 0);
+// several items: add a second, save it, Edit then Remove it; edit the first one's quantity
+await p.locator("button", { hasText: /^\+ Add Pending Item$/ }).click(); await p.waitForTimeout(200);
+await p.locator("[data-job-name]").fill("Temp bracket"); await p.locator("[data-job-qty-input]").fill("5"); await p.locator("[data-pending-item-save]").click(); await p.waitForTimeout(200);
+ok("a second item can be added and saved (two summaries)", await p.locator("[data-pending-item-saved]").count() === 2);
+await p.locator("[data-pending-item-edit]").nth(1).click(); await p.waitForTimeout(200);
+ok("Edit reopens the row with its values", (await p.locator("[data-job-name]").inputValue()) === "Temp bracket");
+await p.locator("[data-job-qty-input]").fill("6"); await p.locator("[data-pending-item-save]").click(); await p.waitForTimeout(200);
+await p.locator("[data-pending-item-saved]").nth(1).locator("button", { hasText: /^Remove$/ }).click(); await p.waitForTimeout(200);
+ok("Remove drops only that item", await p.locator("[data-pending-item-saved]").count() === 1 && /Special coupling/.test(await p.locator("[data-pending-item-saved]").innerText()));
+await p.locator("button", { hasText: /^\+ Add Pending Item$/ }).click(); await p.waitForTimeout(200);
+await p.locator("[data-job-qty-input]").fill("3");
+ok("a half-filled row (quantity only) blocks the issue instead of being dropped", /item name and a quantity/.test(await p.locator("body").innerText()));
+await p.locator("[data-pending-item-form] button", { hasText: /^Remove$/ }).last().click(); await p.waitForTimeout(200);
+ok("review step: BOM lines and the saved item are both still on screen before issuing", /Bolt set/.test(await p.locator("body").innerText()) && await p.locator("[data-pending-item-saved]").count() === 1);
 await p.getByRole("button", { name: /Issue Stock/ }).first().click(); await p.waitForTimeout(1000);
 await p.getByRole("button", { name: /Confirm Issue/ }).click(); await p.waitForTimeout(1000);
 await p.getByRole("button", { name: /Save Durations/ }).click(); await p.waitForTimeout(1500);
@@ -54,6 +69,7 @@ const nc2 = jobs.find((j) => j.itemCode === "NC-2"), cr1 = jobs.find((j) => j.it
 ok("EVERY unselected line became a pending job (non-critical AND critical), none for the selected line", jobs.filter((j) => j.itemCode).length === 2 && nc2 && cr1 && !jobs.some((j) => j.itemCode === "NC-1"));
 ok("job carries item name, quantity, machine, department and reason", nc2.itemName === "Cover sheet" && nc2.qty === 3 && String(nc2.machineId) === String(machines[0].id) && nc2.assignedDepartment === "Stores" && /Not selected at BOM Outward/.test(nc2.reason || "") && /SN-UNSEL-1/.test(nc2.description));
 ok("Critical flag follows the Item Master (NC-2 normal, CR-1 critical)", nc2.critical === false && cr1.critical === true && cr1.qty === 1);
+ok("exactly ONE job for the saved item (no duplicates), none for the removed one", jobs.filter((j) => j.itemName === "Special coupling").length === 1 && !jobs.some((j) => j.itemName === "Temp bracket") && jobs.length === 3);
 ok("the saved Add Pending Item is a job on SN-UNSEL-1: name, qty 2, Critical, no serial, no code/reason", manual && manual.qty === 2 && manual.critical === true && !manual.partSerialNo && !manual.itemCode && !manual.reason && String(manual.machineId) === String(machines[0].id) && /SN-UNSEL-1|Special coupling/.test(manual.description));
 ok("none of them went to Pending Stock", !(pstock || []).length);
 await p.locator("button, a").filter({ hasText: /^Machine Tracker/ }).first().click(); await p.waitForTimeout(1000);
