@@ -103,5 +103,14 @@ SELECT pg_temp.as_user('', 'UPDATE public.machine_log SET hold_active=false WHER
 SELECT pg_temp.chk('disabled user / anon cannot release (still on hold afterwards)', (SELECT hold_active FROM public.machine_log WHERE id=101));
 SELECT pg_temp.chk('Admin releases', pg_temp.as_user(:ADM, 'UPDATE public.machine_log SET hold_active=false WHERE id=101') = '00000');
 
+-- ── Finish & Transfer: empty worker list + signed-in main employee ──────────
+INSERT INTO public.machine_log (id,issue_id,bom_key,bom_label,serial_no,stage,status,created_date,history,current_department) VALUES (102,NULL,'M-10','Kneading','SN-A2','Assembly','active',current_date,'[]','Assembly');
+SELECT pg_temp.as_user(:ASM, format($q$INSERT INTO public.handover_events (machine_id,bom_key,serial_no,from_department,to_department,sent_by,sent_at,expected_duration_minutes,actual_duration_minutes,status,accept_timeout_minutes,release_required,worked_by,main_employee_id)
+  VALUES (102,'M-10','SN-A2','Assembly','Mechanical',%L,now(),10,10,'pending',30,false,'{}',%L)$q$, :ASM, :ASM)) AS w1 \gset
+SELECT pg_temp.chk('worked_by {} + main employee violates handover_main_in_worked (the old payload)', :'w1' LIKE '23514%');
+SELECT pg_temp.as_user(:ASM, format($q$INSERT INTO public.handover_events (machine_id,bom_key,serial_no,from_department,to_department,sent_by,sent_at,expected_duration_minutes,actual_duration_minutes,status,accept_timeout_minutes,release_required,worked_by,main_employee_id)
+  VALUES (102,'M-10','SN-A2','Assembly','Mechanical',%L,now(),10,10,'pending',30,false,NULL,%L)$q$, :ASM, :ASM)) AS w2 \gset
+SELECT pg_temp.chk('worked_by NULL + main employee is accepted (the fixed payload)', :'w2' = '00000');
+
 SELECT 'FAILED: ' || count(*) FROM t_results WHERE NOT ok;
 SELECT 'PASSED: ' || count(*) FROM t_results WHERE ok;

@@ -30,7 +30,13 @@ function toRow(h) {
   // Migration 029 — department-wise employees + Main Employee signature.
   // Only attach when the caller supplied them so the isMissingColumnError
   // retry in createHandover can strip them for pre-029 schemas.
-  if (h.workedBy                  !== undefined) row.worked_by                   = Array.isArray(h.workedBy) ? h.workedBy : null;
+  // An EMPTY list is stored as NULL, never as '{}': the CHECK constraint
+  // handover_main_in_worked (029) exempts worked_by IS NULL, but rejects a
+  // Main Employee that is not inside an empty array. Transfer logs no worker
+  // names (2026-11-02) yet records the signed-in user as main_employee_id, so
+  // '{}' + a main employee failed with "Main Employee must be one of the
+  // selected workers".
+  if (h.workedBy                  !== undefined) row.worked_by                   = (Array.isArray(h.workedBy) && h.workedBy.length > 0) ? h.workedBy : null;
   if (h.workedBySnapshot          !== undefined) row.worked_by_snapshot          = h.workedBySnapshot || null;
   if (h.mainEmployeeId            !== undefined) row.main_employee_id            = h.mainEmployeeId || null;
   // Migration 050 — Main Employee without an ERP login.
