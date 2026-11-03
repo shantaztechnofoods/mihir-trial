@@ -75,6 +75,10 @@ import {
 import { mapRow as vendorMapRow, parseRows as vendorParseRows } from "./utils/vendorImport.js";
 import { parseRows as itemParseRows, generateItemCode, buildRowsFromSheet as itemBuildRowsFromSheet } from "./utils/itemImport.js";
 import { parseBomPaste } from "./utils/bomPaste.js";
+import { countDelayReasons, DELAY_PERIODS, DELAY_OTHER, DELAY_TOOK_LONGER } from "./utils/delayReasons.js";
+import { useOnline } from "./components/OfflineBanner.jsx";
+import { pulseOffline } from "./utils/online.js";
+import { isReadyPopupRole, newReadySince, readyAtOf, trialSignedBy, readLastSeenReady, writeLastSeenReady, formatReadyWhen } from "./utils/readyPopup.js";
 import { receivedPoRates, bomCostLines, bomCostSummary, validateBomLines, formatINR, RATE_SOURCE_LABEL } from "./utils/bomCost.js";
 import { VOICE_MAX_SECONDS, VOICE_LANGS as VN_LANGS, VOICE_LANG_KEY, pickVoiceMime, baseMime, voiceFileName, voiceCaption, isVoiceAttachment, voiceNotesFor, formatClock, micErrorMessage, fillVoiceText, clearVoiceText, appendTranscript, readVoiceLang } from "./utils/voiceNote.js";
 import { PHYSICAL_RACK_LAYOUT, rackOfBom, physicalRackFamily, physicalRackSlots, rackCapacityFor, buildFamilyRacks, firstFreeSlot, canAssignSlot, slotLabel, rackKeyNorm, rackViewLog, setSlotOf, setLabel, pairSlotOf, bomFillCheck, rCrateIssues, rackBoms, freeSlotsFor, tierOfSlot } from "./utils/rackSlots.js";
@@ -11222,7 +11226,7 @@ function SenderUndoButton({ handover, user, onUndo }) {
   }, [st.allowed]);
   if (!st.allowed) return null;
   return (
-    <button type="button" data-sender-undo={handover.id} onClick={() => onUndo(handover)}
+    <button data-needs-net type="button" data-sender-undo={handover.id} onClick={() => onUndo(handover)}
             className="min-h-[48px] self-start sm:self-auto px-4 rounded-xl text-[15px] font-black transition-all active:scale-[0.97] inline-flex items-center justify-center gap-1.5 shrink-0"
             style={{ background: "#f59e0b", color: "#1f1300" }}>
       ↩ Undo <span className="tabular-nums" data-sender-undo-clock>({formatUndoCountdown(st.remainingMs)})</span>
@@ -12693,31 +12697,7 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
 
             {/* 2026-11-03 — Edit BOM organised into numbered steps. Same
                 state, same handlers, same Save BOM; only the order and the
-                headings changed. Counts below are read-only summaries. */}
-            {(() => {
-              const tpl = (checklistTemplates || []).filter((t) => t && t.active !== false && t.bomKey === bomKey);
-              const deptsWithList = CHECKLIST_DEPTS.filter((d) => tpl.some((t) => t.department === d));
-              const timeSet = DURATION_DEPTS.filter((d) => (Number(editDurations?.[d]?.days) || 0) + (Number(editDurations?.[d]?.hours) || 0) > 0).length;
-              const steps = [
-                ["details", "Details", !!(editKey || "").trim() && !!(editLabel || "").trim()],
-                ["parts", "Parts", editItems.length > 0],
-                ["time", "Time", timeSet === DURATION_DEPTS.length],
-                ["checklists", "Checklists", deptsWithList.length === CHECKLIST_DEPTS.length],
-                ["photo", "Photo", !!editPhoto],
-              ];
-              return (
-                <nav className="org-step-nav" aria-label="Edit BOM steps">
-                  {steps.map(([id, label, done], i) => (
-                    <button key={id} type="button" data-org-step-link={id}
-                            onClick={() => document.getElementById(`org-step-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" })}>
-                      <span className="org-step-nav-num" data-done={done ? "1" : "0"}>{done ? "✓" : i + 1}</span>
-                      <span className="org-step-nav-label">{label}</span>
-                    </button>
-                  ))}
-                </nav>
-              );
-            })()}
-
+                headings changed. */}
             {/* ── 1 Details ── */}
             <OrgStep n={1} id="details" title="Details" hint="BOM key, machine model name and its production rack.">
               <div className="space-y-3">
@@ -15001,6 +14981,7 @@ function AtoZMachineReport({
         </div>
         <div className="mr-docid">
           <div className="mr-doctitle">Machine production report</div>
+          <div className="mr-label" data-report-title>Company full report · internal</div>
           <div className="mr-label mr-mono">{reportRef}</div>
           <div className="mr-label">Issued {fmtDT(new Date())}</div>
         </div>
@@ -15165,6 +15146,9 @@ function AtoZMachineReport({
                     <div>{h.acceptedAt ? fmtDT(h.acceptedAt) : h.status === "pending" ? "Waiting" : "—"}</div>
                     {(h.acceptedByName || userName(h.acceptedBy)) && <div className="mr-label" data-report-accepted-by>by {h.acceptedByName || userName(h.acceptedBy)}</div>}
                     {h.acceptedAt && (h.acceptedInDepartment || h.toDepartment) && <div className="mr-label">into {h.acceptedInDepartment || h.toDepartment}</div>}
+                    {show.showEmployees !== false && Array.isArray(h.acceptedByTeamSnapshot) && h.acceptedByTeamSnapshot.length > 0 && (
+                      <div className="mr-label" data-report-accept-team>team: {h.acceptedByTeamSnapshot.map((x) => (x && (x.fullName || x.username || x.name)) || "").filter(Boolean).join(", ")}</div>
+                    )}
                     <div className="mr-label">Accept window {dur(h.acceptTimeoutMinutes)}</div>
                   </div></div>
                   <div className="mr-td" data-l="Time / target"><div>
@@ -15196,6 +15180,39 @@ function AtoZMachineReport({
           })}
         </div>
       )}
+      {/* 2026-11-03 — holds and late reasons for this machine (read-only). */}
+      {(() => {
+        const holds = collectHoldEvents({ machineLog: [machine], handovers: machineHandovers, auditLog, allUsers });
+        const late = machineHandovers.filter((h) => h.overrunNarration);
+        return (
+          <div className="rpt-sub" data-report-holds>
+            <div className="rpt-subh">Holds and late reasons <span className="mr-count">{holds.length + late.length}</span></div>
+            {holds.length + late.length === 0 ? <p className="mr-empty">No holds and no late work recorded.</p> : (
+              <div className="mr-table">
+                <div className="mr-tr mr-th" style={{ gridTemplateColumns: "1.3fr 1.3fr 0.9fr 2.4fr 1.1fr" }}><div>What</div><div>Where / when</div><div className="text-right">Length</div><div>Reason</div><div>Who</div></div>
+                {holds.map((r) => (
+                  <div key={r.key} className="mr-tr" style={{ gridTemplateColumns: "1.3fr 1.3fr 0.9fr 2.4fr 1.1fr" }}>
+                    <div className="mr-td" data-l="What"><span className={r.open ? "mr-red font-semibold" : "mr-amber font-semibold"}>{r.label}{r.open ? " · open" : ""}</span></div>
+                    <div className="mr-td" data-l="Where / when"><div><div>{r.to ? `${r.from} → ${r.to}` : r.from}</div><div className="mr-label">{fmtDT(r.startAt)}</div></div></div>
+                    <div className="mr-td md:text-right" data-l="Length">{r.minutes != null ? dur(r.minutes) : "—"}</div>
+                    <div className="mr-td" data-l="Reason">{r.reason || <span className="mr-muted">No reason given</span>}</div>
+                    <div className="mr-td" data-l="Who">{r.by || "—"}{r.releasedBy ? <div className="mr-label">released by {r.releasedBy}</div> : null}</div>
+                  </div>
+                ))}
+                {late.map((h) => (
+                  <div key={`ov-${h.id}`} className="mr-tr" style={{ gridTemplateColumns: "1.3fr 1.3fr 0.9fr 2.4fr 1.1fr" }}>
+                    <div className="mr-td" data-l="What"><span className="mr-amber font-semibold">Work over target</span></div>
+                    <div className="mr-td" data-l="Where / when"><div><div>{h.fromDepartment}</div><div className="mr-label">{fmtDT(h.sentAt)}</div></div></div>
+                    <div className="mr-td md:text-right" data-l="Length">{dur(h.overrunMinutes)}</div>
+                    <div className="mr-td" data-l="Reason">{h.overrunNarration}</div>
+                    <div className="mr-td" data-l="Who">{userName(h.sentBy) || "—"}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
     </Sec>
   );
 
@@ -15272,21 +15289,56 @@ function AtoZMachineReport({
           <div className="mr-tr mr-th" style={{ gridTemplateColumns: "3fr 1.5fr 1.2fr" }}><div>File</div><div>Department</div><div>Added</div></div>
           {machineAttach.map((a) => (
             <div key={a.id} className="mr-tr" style={{ gridTemplateColumns: "3fr 1.5fr 1.2fr" }}>
-              <div className="mr-td" data-l="File">{isVoiceAttachment(a) ? <span data-report-voice-note><VoiceNoteLine attachment={a} userName={userName} /></span> : (a.name || a.kind || "attachment")}</div>
+              <div className="mr-td" data-l="File">{isVoiceAttachment(a)
+                ? <span data-report-voice-note><VoiceNoteLine attachment={a} userName={userName} /></span>
+                : <div><div>{a.name || a.fileName || a.caption || a.kind || "attachment"}</div><div className="mr-label">{a.kind === "audio" ? "Voice note" : a.kind === "image" ? "Photo" : a.kind || "File"}{a.isCustomerVisible ? " · shown to customer" : " · internal"}</div></div>}</div>
               <div className="mr-td" data-l="Department">{a.department || "—"}</div>
-              <div className="mr-td" data-l="Added">{fmtD(a.createdAt) || "—"}</div>
+              <div className="mr-td" data-l="Added">{fmtD(a.createdAt || a.uploadedAt) || "—"}</div>
             </div>
           ))}
         </div>
       )}
-      {machineAttach.length > 0 && <p className="mr-label mt-1">Files open from the machine card in Machine Tracker.</p>}
+      {machineAttach.some((a) => a.kind === "audio") && (
+        <div className="rpt-sub" data-report-voice>
+          <div className="rpt-subh">Voice notes <span className="mr-count">{machineAttach.filter((a) => a.kind === "audio").length}</span></div>
+          {machineAttach.filter((a) => a.kind === "audio").map((a) => (
+            <div key={`v-${a.id}`} className="mr-check-row"><span className="mr-muted">♪</span><div className="min-w-0">{a.caption || a.fileName || a.name || "Voice note"}<span className="mr-label"> · {a.department || "—"} · {fmtDT(a.uploadedAt || a.createdAt)}{userName(a.uploadedBy) ? ` · ${userName(a.uploadedBy)}` : ""}</span></div></div>
+          ))}
+        </div>
+      )}
+      {machineAttach.length > 0 && <p className="mr-label mt-1">Files and voice notes open from the machine card in Machine Tracker.</p>}
     </Sec>
   );
+
+  // 2026-11-03 — every captured signature in one tidy table, each in the
+  // same small box (120 × 40), so none prints large.
+  const sigRows = [
+    ...machineHandovers.flatMap((h) => [
+      h.mainEmployeeSignatureSvg ? { k: `t-${h.id}`, role: "Transferred (sign-off)", name: nameFromSnap(h.mainEmployeeId, h.workedBySnapshot) || h.mainEmployeeName || userName(h.sentBy), dept: h.fromDepartment, when: h.sentAt, src: svgDataUri(h.mainEmployeeSignatureSvg) } : null,
+      h.acceptedSignatureSvg ? { k: `a-${h.id}`, role: "Accepted", name: h.acceptedByName || userName(h.acceptedBy), dept: h.acceptedInDepartment || h.toDepartment, when: h.acceptedAt, src: svgDataUri(h.acceptedSignatureSvg) } : null,
+    ]),
+    machine.trialCertificate && tcSigSrc(machine.trialCertificate.trialBySignature) ? { k: "tc-trial", role: "Trial certificate · set and trial by", name: machine.trialCertificate.trialByName, dept: "Trial", when: machine.trialCertificate.trialDate, src: tcSigSrc(machine.trialCertificate.trialBySignature) } : null,
+    machine.trialCertificate && tcSigSrc(machine.trialCertificate.checkBySignature) ? { k: "tc-check", role: "Trial certificate · checked by", name: machine.trialCertificate.checkByName, dept: "Service", when: machine.trialCertificate.trialDate, src: tcSigSrc(machine.trialCertificate.checkBySignature) } : null,
+  ].filter(Boolean);
 
   // D7 — the release sign-off for the paper copy.
   const SignOff = () => (
     <Sec n="07" title="Release sign-off" cls="mr-avoid">
-      <div data-report-signoff className="mr-signoff">
+      {sigRows.length > 0 && (
+        <div className="mr-table rpt-sigtable" data-report-signatures>
+          <div className="mr-tr mr-th" style={{ gridTemplateColumns: "1.6fr 1.3fr 1fr 1.2fr 136px" }}><div>Signed for</div><div>Name</div><div>Department</div><div>Date</div><div>Signature</div></div>
+          {sigRows.map((r) => (
+            <div key={r.k} className="mr-tr" style={{ gridTemplateColumns: "1.6fr 1.3fr 1fr 1.2fr 136px" }}>
+              <div className="mr-td" data-l="Signed for">{r.role}</div>
+              <div className="mr-td font-semibold" data-l="Name">{r.name || "—"}</div>
+              <div className="mr-td" data-l="Department">{r.dept || "—"}</div>
+              <div className="mr-td" data-l="Date">{fmtDT(r.when) || fmtD(r.when) || "—"}</div>
+              <div className="mr-td" data-l="Signature"><div className="rpt-sigbox" data-report-sigbox><img src={r.src} alt={`Signature: ${r.name || r.role}`} /></div></div>
+            </div>
+          ))}
+        </div>
+      )}
+      <div data-report-signoff className="mr-signoff" style={sigRows.length ? { marginTop: 18 } : undefined}>
         {[["Prepared by", "Production"], ["Checked by", "Quality / trial"], ["Approved by", "Management"]].map(([r, d]) => (
           <div key={r}><div className="mr-sign-line" /><div className="font-semibold">{r}</div><div className="mr-label">{d} · name, signature, date</div></div>
         ))}
@@ -15342,6 +15394,346 @@ function AtoZMachineReport({
         </td></tr></tbody>
       </table>
     </div>
+  );
+}
+
+// ─── FOUR PDF REPORTS (2026-11-03) ────────────────────────────────────────
+// Customer report (per machine), Company full report (the A-to-Z report
+// above), On Hold report (period) and Pending Jobs report. All four use the
+// same A4 sheet (.mr-doc): Shantaz letterhead, report title, generated
+// date / by, hairline tables, colour only for status, page numbers on paper.
+// They only READ records already loaded — nothing here writes anything.
+const rptFmtDT = (v) => { if (v == null || v === "") return ""; const d = new Date(v); return isNaN(d) ? String(v) : d.toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }); };
+const rptFmtD  = (v) => { if (v == null || v === "") return ""; const d = new Date(v); return isNaN(d) ? String(v) : d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }); };
+const rptDur = (min) => {
+  const m = Math.max(0, Math.round(Number(min) || 0));
+  if (m < 60) return `${m} min`;
+  if (m < 1440) { const h = Math.floor(m / 60), r = m % 60; return r ? `${h} h ${r} min` : `${h} h`; }
+  const d = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60);
+  return `${d} day${d === 1 ? "" : "s"}${h ? ` ${h} h` : ""}`;
+};
+const rptCompany = (settings) => { try { return getActiveCompany(settings) || {}; } catch { return {}; } };
+const rptUserName = (allUsers, id) => { if (!id) return ""; const u = (allUsers || []).find((x) => String(x.id) === String(id)); return u ? (u.fullName || u.username || "") : ""; };
+const rptMs = (v) => { if (v == null || v === "") return null; const t = typeof v === "number" ? v : Date.parse(v); return Number.isFinite(t) ? t : null; };
+// Report periods for the On Hold report (default: this month).
+const RPT_PERIODS = [["this_month", "This month"], ["last_month", "Last month"], ["last_90", "Last 90 days"], ["this_year", "This year"], ["all", "All time"]];
+function rptPeriodRange(key, now = new Date()) {
+  const y = now.getFullYear(), mo = now.getMonth();
+  if (key === "last_month") return { from: new Date(y, mo - 1, 1).getTime(), to: new Date(y, mo, 1).getTime() - 1 };
+  if (key === "last_90")    return { from: now.getTime() - 90 * 86400000, to: now.getTime() };
+  if (key === "this_year")  return { from: new Date(y, 0, 1).getTime(), to: now.getTime() };
+  if (key === "all")        return { from: -Infinity, to: Infinity };
+  return { from: new Date(y, mo, 1).getTime(), to: now.getTime() };
+}
+
+// Every hold a machine went through, read from three places:
+//   1. manual ON HOLD / release        → audit rows machine_hold_set / machine_hold_released
+//      (plus the machine's own holdAt when a hold is active with no audit row loaded)
+//   2. hand-overs accepted late         → handover sentAt + accept window vs acceptedAt,
+//      with the late reason the receiver typed (audit details.holdReason)
+//   3. hand-overs waiting past the window right now (shown as HOLD in the tracker)
+function collectHoldEvents({ machineLog = [], handovers = [], auditLog = [], allUsers = [], nowMs = Date.now() }) {
+  const byId = new Map((machineLog || []).map((m) => [String(m.id), m]));
+  const rows = [];
+  const audit = (auditLog || []).slice().sort((a, b) => String(a.ts || "").localeCompare(String(b.ts || "")));
+  const sets = audit.filter((a) => a.type === "machine_hold_set" && a.details && a.details.machineId != null);
+  const rels = audit.filter((a) => a.type === "machine_hold_released" && a.details && a.details.machineId != null);
+  const usedRel = new Set();
+  sets.forEach((s) => {
+    const mid = String(s.details.machineId); const m = byId.get(mid) || {};
+    const rel = rels.find((r) => !usedRel.has(r.id) && String(r.details.machineId) === mid && String(r.ts || "") >= String(s.ts || ""));
+    if (rel) usedRel.add(rel.id);
+    const start = rptMs(s.ts); const end = rel ? rptMs(rel.ts) : (m.holdActive ? nowMs : null);
+    rows.push({ key: `set-${s.id}`, kind: "manual", label: "Manual ON HOLD", machineId: mid, bomKey: m.bomKey || s.ref, serialNo: m.serialNo || s.serialNo,
+      from: s.details.department || m.currentDepartment || "", to: "", startAt: start, endAt: rel ? end : null, open: !rel && !!m.holdActive,
+      minutes: start != null && end != null ? Math.max(0, Math.round((end - start) / 60000)) : null,
+      reason: s.details.reason || "", by: s.user || "", releasedBy: rel ? rel.user || "" : "" });
+  });
+  (machineLog || []).forEach((m) => {
+    if (!m.holdActive) return;
+    if (rows.some((r) => r.kind === "manual" && r.machineId === String(m.id) && r.open)) return;
+    const start = rptMs(m.holdAt);
+    rows.push({ key: `active-${m.id}`, kind: "manual", label: "Manual ON HOLD", machineId: String(m.id), bomKey: m.bomKey, serialNo: m.serialNo,
+      from: m.currentDepartment || m.stage || "", to: "", startAt: start, endAt: null, open: true,
+      minutes: start != null ? Math.max(0, Math.round((nowMs - start) / 60000)) : null,
+      reason: m.holdReason || "", by: rptUserName(allUsers, m.holdBy), releasedBy: "" });
+  });
+  (handovers || []).forEach((h) => {
+    if (h.status === "cancelled") return;
+    const sent = rptMs(h.sentAt); const timeout = Math.max(0, Number(h.acceptTimeoutMinutes) || 0);
+    if (sent == null || !timeout) return;
+    const m = byId.get(String(h.machineId)) || {};
+    if (h.status === "accepted" && h.acceptedAt) {
+      const late = heldMinutes(h.sentAt, timeout, rptMs(h.acceptedAt));
+      if (late <= 0) return;
+      const a = audit.find((x) => (x.type === "handover_accepted" || x.type === "machine_completed") && x.details && String(x.details.handoverId) === String(h.id));
+      rows.push({ key: `late-${h.id}`, kind: "late", label: "Accepted late", machineId: String(h.machineId), bomKey: h.bomKey || m.bomKey, serialNo: h.serialNo || m.serialNo,
+        from: h.fromDepartment, to: h.toDepartment, startAt: sent + timeout * 60000, endAt: rptMs(h.acceptedAt), open: false, minutes: late,
+        reason: (a && a.details && a.details.holdReason) || "", by: h.acceptedByName || rptUserName(allUsers, h.acceptedBy) || (a && a.user) || "", releasedBy: "" });
+    } else if (h.status === "pending" && !(h.releaseRequired && !h.releasedAt)) {
+      const late = heldMinutes(h.sentAt, timeout, nowMs);
+      if (late <= 0) return;
+      rows.push({ key: `wait-${h.id}`, kind: "overdue", label: "Waiting to be accepted", machineId: String(h.machineId), bomKey: h.bomKey || m.bomKey, serialNo: h.serialNo || m.serialNo,
+        from: h.fromDepartment, to: h.toDepartment, startAt: sent + timeout * 60000, endAt: null, open: true, minutes: late,
+        reason: "", by: rptUserName(allUsers, h.sentBy), releasedBy: "" });
+    }
+  });
+  return rows.sort((a, b) => (a.startAt || 0) - (b.startAt || 0));
+}
+
+// The common A4 frame: running header (repeats on every printed page),
+// letterhead, title block, and the closing footnote.
+function ReportSheet({ kind, settings = {}, title, subtitle = "", refText = "", generatedBy = "", children }) {
+  const company = rptCompany(settings);
+  const issued = rptFmtDT(new Date());
+  return (
+    <div className={`mr-doc rpt-doc rpt-${kind}`} data-report-kind={kind}>
+      <table className="mr-frame">
+        <thead><tr><td><div className="mr-runhead"><span>{company.name || "Shantaz Technofoods"} · {title}</span><span className="mr-mono">{refText}</span></div></td></tr></thead>
+        <tbody><tr><td>
+          <div data-report-header className="mr-letterhead rpt-letterhead">
+            <div className="flex items-center gap-3 min-w-0">
+              {company.logo ? <img src={company.logo} alt="" className="mr-logo" /> : <div className="rpt-mark" aria-hidden="true">S</div>}
+              <div className="min-w-0">
+                <div className="mr-company">{company.name || "Shantaz Technofoods"}</div>
+                <div className="mr-label">{[company.address, company.gst ? `GSTIN ${company.gst}` : ""].filter(Boolean).join(" · ") || "Food processing machinery"}</div>
+              </div>
+            </div>
+            <div className="mr-docid">
+              <div className="mr-doctitle" data-report-title>{title}</div>
+              {subtitle && <div className="mr-label">{subtitle}</div>}
+              {refText && <div className="mr-label mr-mono">{refText}</div>}
+              <div className="mr-label" data-report-generated>Generated {issued}{generatedBy ? ` · by ${generatedBy}` : ""}</div>
+            </div>
+          </div>
+          {children}
+          <div className="mr-footnote">Generated from ERP records on {issued}{generatedBy ? ` by ${generatedBy}` : ""}{refText ? ` · ${refText}` : ""}.</div>
+        </td></tr></tbody>
+      </table>
+    </div>
+  );
+}
+const RptSec = ({ n, title, count, extra, children, cls = "", attr = {} }) => (
+  <section className={`mr-sec ${cls}`} {...attr}>
+    <h3 className="mr-h"><span className="mr-num">{n}</span>{title}{count != null && <span className="mr-count">{count}</span>}{extra}</h3>
+    {children}
+  </section>
+);
+
+// ── 1. Customer report — only what a customer should see ────────────────
+// No employee names, delays, holds, ratings, internal remarks or pending
+// jobs. Dates per stage, quality checks as passed-point summaries, the trial
+// certificate, the files marked "show customer", and a sign-off block.
+function CustomerMachineReport({ machineId, machineLog = [], bomDefs = {}, handovers = [], checklistResponses = [], attachments = [], settings = {}, generatedBy = "" }) {
+  const machine = (machineLog || []).find((m) => String(m.id) === String(machineId)) || null;
+  if (!machine) return <p className="mr-empty">Pick a machine to see its customer report.</p>;
+  const bom = bomDefs[machine.bomKey] || {};
+  const isReady = machine.status === "completed";
+  const hops = (handovers || []).filter((h) => String(h.machineId) === String(machine.id) && h.status === "accepted")
+    .slice().sort((a, b) => String(a.acceptedAt || "").localeCompare(String(b.acceptedAt || "")));
+  const STAGES = ["Assembly", "Mechanical", "Electrical", "Trial", "Ready"];
+  const cur = isReady ? "Ready" : (machine.currentDepartment || machine.stage);
+  const curIdx = STAGES.indexOf(cur);
+  const startOf = (d) => d === "Assembly" ? machine.createdDate : d === "Ready" ? machine.completedDate : (hops.find((h) => h.toDepartment === d) || {}).acceptedAt;
+  const endOf   = (d) => d === "Ready" ? machine.completedDate : (hops.find((h) => h.fromDepartment === d) || {}).acceptedAt;
+  const stateOf = (i) => isReady || i < curIdx ? "done" : i === curIdx ? "current" : "pending";
+  const checks = (checklistResponses || []).filter((cr) => String(cr.machineId) === String(machine.id));
+  const byDept = STAGES.slice(0, 4).map((d) => {
+    const list = checks.filter((cr) => cr.department === d);
+    const ans = list.flatMap((cr) => cr.answers || []);
+    return { d, n: list.length, total: ans.length, passed: ans.filter((a) => a.checked).length };
+  }).filter((r) => r.n > 0);
+  const docs = (attachments || []).filter((a) => String(a.machineId) === String(machine.id) && a.isCustomerVisible && a.kind !== "audio");
+  const cert = machine.trialCertificate || null;
+  const ref = `CR-${machine.bomKey}-${machine.serialNo || machine.id}`;
+  const buildDays = (() => { const a = rptMs(machine.createdDate); const b = machine.completedDate ? rptMs(machine.completedDate) : null; return a != null && b != null && b >= a ? Math.max(1, Math.round((b - a) / 86400000)) : null; })();
+  return (
+    <ReportSheet kind="customer" settings={settings} title="Customer machine report" refText={ref} generatedBy={generatedBy}>
+      <div className="rpt-hero" data-report-customer-hero>
+        <div className="rpt-photo">{bom.photoUrl ? <img src={bom.photoUrl} alt={`${machine.bomKey} machine`} data-report-photo /> : <span className="mr-label">Machine photo</span>}</div>
+        <div className="min-w-0">
+          <div className="mr-label">Machine</div>
+          <div className="mr-machine">{machine.bomLabel || bom.label || machine.bomKey}</div>
+          <div className="mr-facts rpt-facts-3">
+            {[["Model", machine.bomKey], ["Serial no.", machine.serialNo || "—", true], ["Build started", rptFmtD(machine.createdDate) || "—"],
+              ["Ready on", rptFmtD(machine.completedDate) || "In production"], ["Build time", buildDays ? `${buildDays} day${buildDays === 1 ? "" : "s"}` : "—"],
+              ["Trial", cert ? `Passed · ${rptFmtD(cert.trialDate) || "certified"}` : "Scheduled"]].map(([k, v, mono]) => (
+              <div key={k} className="min-w-0"><div className="mr-label">{k}</div><div className={`mr-fact ${mono ? "mr-mono" : ""}`}>{v}</div></div>
+            ))}
+          </div>
+          <div className={`mr-stamp rpt-stamp ${isReady ? "is-done" : "is-progress"}`} data-report-status>{isReady ? "Ready for dispatch" : `In production · ${cur}`}</div>
+        </div>
+      </div>
+      <RptSec n="01" title="Build journey" attr={{ "data-report-journey": "" }}>
+        <div className="mr-strip">
+          {STAGES.map((d, i) => <div key={d} className={`mr-step is-${stateOf(i)}`}><div className="mr-step-name">{d}</div><div className="mr-label">{stateOf(i) === "done" ? (rptFmtD(endOf(d) || startOf(d)) || "Done") : stateOf(i) === "current" ? "In progress" : "Upcoming"}</div></div>)}
+        </div>
+        <div className="mr-table">
+          <div className="mr-tr mr-th" style={{ gridTemplateColumns: "1.4fr 1.2fr 1.2fr 1fr" }}><div>Stage</div><div>Started</div><div>Completed</div><div>Status</div></div>
+          {STAGES.map((d, i) => { const st = stateOf(i); return (
+            <div key={d} className="mr-tr" style={{ gridTemplateColumns: "1.4fr 1.2fr 1.2fr 1fr" }}>
+              <div className="mr-td font-semibold" data-l="Stage">{d === "Ready" ? "Final inspection · Ready" : d}</div>
+              <div className="mr-td" data-l="Started">{st === "pending" ? "—" : rptFmtD(startOf(d)) || "—"}</div>
+              <div className="mr-td" data-l="Completed">{st === "done" ? rptFmtD(endOf(d)) || "✓" : "—"}</div>
+              <div className="mr-td" data-l="Status"><span className={st === "done" ? "mr-green" : st === "current" ? "mr-amber" : "mr-muted"}>{st === "done" ? "✓ Completed" : st === "current" ? "In progress" : "Upcoming"}</span></div>
+            </div>); })}
+        </div>
+      </RptSec>
+      <RptSec n="02" title="Quality checks" attr={{ "data-report-quality": "" }}>
+        {byDept.length === 0 ? <p className="mr-empty">Quality checks are recorded at every stage as the machine moves forward.</p> : (
+          <div className="mr-table">
+            <div className="mr-tr mr-th" style={{ gridTemplateColumns: "1.4fr 1fr 2fr" }}><div>Stage</div><div>Inspections</div><div>Result</div></div>
+            {byDept.map((r) => (
+              <div key={r.d} className="mr-tr" style={{ gridTemplateColumns: "1.4fr 1fr 2fr" }}>
+                <div className="mr-td font-semibold" data-l="Stage">{r.d}</div>
+                <div className="mr-td" data-l="Inspections">{r.n}</div>
+                <div className="mr-td" data-l="Result"><span className={r.passed === r.total ? "mr-green" : ""}>{r.passed === r.total ? `✓ All ${r.total} check points passed` : `${r.passed} of ${r.total} check points verified`}</span></div>
+              </div>
+            ))}
+          </div>
+        )}
+      </RptSec>
+      <RptSec n="03" title="Trial certificate" cls={cert ? "mr-cert-sec" : ""} attr={{ "data-report-trial": "" }}>
+        {cert ? <div className="mr-cert"><style>{TC_SHEET_CSS}</style><TrialCertificateSheet machine={machine} cert={cert} /></div>
+              : <p className="mr-empty">The machine is run under load at Trial; its certificate is added here when the trial is complete.</p>}
+      </RptSec>
+      <RptSec n="04" title="Documents for you" count={docs.length} attr={{ "data-report-docs": "" }}>
+        {docs.length === 0 ? <p className="mr-empty">No documents shared yet.</p> : (
+          <div className="mr-table">
+            <div className="mr-tr mr-th" style={{ gridTemplateColumns: "3fr 1fr 1.2fr" }}><div>Document</div><div>Type</div><div>Date</div></div>
+            {docs.map((a) => (
+              <div key={a.id} className="mr-tr" style={{ gridTemplateColumns: "3fr 1fr 1.2fr" }}>
+                <div className="mr-td" data-l="Document">{a.caption || a.fileName || a.name || "Document"}</div>
+                <div className="mr-td" data-l="Type">{a.kind === "image" ? "Photo" : a.kind === "video" ? "Video" : "Document"}</div>
+                <div className="mr-td" data-l="Date">{rptFmtD(a.uploadedAt || a.createdAt) || "—"}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </RptSec>
+      <RptSec n="05" title="Final sign-off" cls="mr-avoid" attr={{ "data-report-customer-signoff": "" }}>
+        <p className="mr-small" style={{ marginBottom: 14 }}>We certify that the machine described above, serial no. <b className="mr-mono">{machine.serialNo || "—"}</b>, was built to its approved bill of materials, inspected at every stage and {cert ? "run on trial before release" : "will be run on trial before release"}.</p>
+        <div className="mr-signoff">
+          {[["Quality & trial", "name, signature, date"], ["Authorised signatory", "for Shantaz Technofoods"], ["Received by customer", "name, signature, date"]].map(([r, d]) => (
+            <div key={r}><div className="mr-sign-line" /><div className="font-semibold">{r}</div><div className="mr-label">{d}</div></div>
+          ))}
+        </div>
+      </RptSec>
+    </ReportSheet>
+  );
+}
+
+// ── 3. On Hold report — period, totals by department and by reason ───────
+function OnHoldReport({ period = "this_month", machineLog = [], handovers = [], auditLog = [], allUsers = [], settings = {}, generatedBy = "" }) {
+  const now = Date.now();
+  const { from, to } = rptPeriodRange(period, new Date(now));
+  const all = collectHoldEvents({ machineLog, handovers, auditLog, allUsers, nowMs: now });
+  // In the period = the hold started in it, or is still running.
+  const rows = all.filter((r) => (r.startAt != null && r.startAt >= from && r.startAt <= to) || (r.open && period !== "last_month"));
+  const machines = new Set(rows.map((r) => r.machineId));
+  const totalMin = rows.reduce((s, r) => s + (r.minutes || 0), 0);
+  const group = (keyOf) => {
+    const g = {};
+    rows.forEach((r) => { const k = keyOf(r) || "—"; g[k] = g[k] || { k, n: 0, min: 0, machines: new Set() }; g[k].n++; g[k].min += r.minutes || 0; g[k].machines.add(r.machineId); });
+    return Object.values(g).sort((a, b) => b.n - a.n || b.min - a.min);
+  };
+  const byDept = group((r) => r.kind === "manual" ? r.from : r.to);
+  const byReason = group((r) => (r.reason || (r.kind === "overdue" ? "Not yet accepted" : "No reason given")).trim());
+  const label = (RPT_PERIODS.find(([k]) => k === period) || [null, "This month"])[1];
+  const periodText = from === -Infinity ? "All time" : `${label} · ${rptFmtD(from)} to ${rptFmtD(Math.min(to, now))}`;
+  return (
+    <ReportSheet kind="hold" settings={settings} title="On hold report" subtitle={periodText} refText={`HOLD-${new Date(now).toISOString().slice(0, 7)}`} generatedBy={generatedBy}>
+      <div className="mr-summary rpt-summary-4" data-report-glance>
+        {[{ k: "Machines held", v: machines.size }, { k: "Hold events", v: rows.length }, { k: "Still on hold", v: rows.filter((r) => r.open).length, red: rows.some((r) => r.open) }, { k: "Total time held", v: rows.length ? rptDur(totalMin) : "—" }]
+          .map((g) => <div key={g.k} className={`mr-sum ${g.red ? "is-red" : ""}`}><div className="mr-sum-v">{g.v}</div><div className="mr-label">{g.k}</div></div>)}
+      </div>
+      <RptSec n="01" title="Holds in this period" count={rows.length} attr={{ "data-report-hold-list": "" }}>
+        {rows.length === 0 ? <p className="mr-empty">No machine went on hold in this period.</p> : (
+          <div className="mr-table">
+            <div className="mr-tr mr-th" style={{ gridTemplateColumns: "1.5fr 1.3fr 1.2fr 0.9fr 2fr 1.1fr" }}><div>Machine</div><div>Where</div><div>Since</div><div className="text-right">How long</div><div>Reason</div><div>Who</div></div>
+            {rows.map((r) => (
+              <div key={r.key} className="mr-tr" data-report-hold-row={r.kind} style={{ gridTemplateColumns: "1.5fr 1.3fr 1.2fr 0.9fr 2fr 1.1fr" }}>
+                <div className="mr-td" data-l="Machine"><div><div className="font-semibold">{r.bomKey}</div><div className="mr-label mr-mono">{r.serialNo || "—"}</div></div></div>
+                <div className="mr-td" data-l="Where"><div><div>{r.to ? `${r.from} → ${r.to}` : r.from || "—"}</div><div className={`mr-label ${r.open ? "mr-red" : ""}`}>{r.label}{r.open ? " · open" : ""}</div></div></div>
+                <div className="mr-td" data-l="Since"><div><div>{rptFmtDT(r.startAt) || "—"}</div>{r.endAt ? <div className="mr-label">to {rptFmtDT(r.endAt)}</div> : null}</div></div>
+                <div className={`mr-td md:text-right ${r.open ? "mr-red font-semibold" : ""}`} data-l="How long">{r.minutes != null ? rptDur(r.minutes) : "—"}</div>
+                <div className="mr-td" data-l="Reason">{r.reason || <span className="mr-muted">{r.kind === "overdue" ? "Waiting for the next department" : "No reason given"}</span>}</div>
+                <div className="mr-td" data-l="Who"><div><div>{r.by || "—"}</div>{r.releasedBy ? <div className="mr-label">released by {r.releasedBy}</div> : null}</div></div>
+              </div>
+            ))}
+          </div>
+        )}
+      </RptSec>
+      <div className="rpt-two">
+        {[["02", "Totals by department", byDept, "data-report-hold-by-dept", "Department"], ["03", "Totals by reason", byReason, "data-report-hold-by-reason", "Reason"]].map(([n, t, list, attr, col]) => (
+          <RptSec key={n} n={n} title={t} attr={{ [attr]: "" }}>
+            {list.length === 0 ? <p className="mr-empty">Nothing to total.</p> : (
+              <div className="mr-table">
+                <div className="mr-tr mr-th" style={{ gridTemplateColumns: "2fr 0.7fr 0.8fr 1.1fr" }}><div>{col}</div><div className="text-right">Holds</div><div className="text-right">Machines</div><div className="text-right">Time held</div></div>
+                {list.map((g) => (
+                  <div key={g.k} className="mr-tr" style={{ gridTemplateColumns: "2fr 0.7fr 0.8fr 1.1fr" }}>
+                    <div className="mr-td" data-l={col}>{g.k}</div><div className="mr-td md:text-right mr-mono" data-l="Holds">{g.n}</div>
+                    <div className="mr-td md:text-right mr-mono" data-l="Machines">{g.machines.size}</div><div className="mr-td md:text-right" data-l="Time held">{rptDur(g.min)}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </RptSec>
+        ))}
+      </div>
+      <p className="mr-label" style={{ marginTop: 10 }}>Holds counted: a manual ON HOLD from the machine card, a hand-over accepted after its accept window (time over the window), and a hand-over still waiting past its window today.</p>
+    </ReportSheet>
+  );
+}
+
+// ── 4. Pending Jobs report — parts and work per machine and department ──
+function PendingJobsReport({ includeDone = false, dept = "", machineLog = [], pendingHandoverItems = [], allUsers = [], settings = {}, generatedBy = "" }) {
+  const now = Date.now();
+  const byId = new Map((machineLog || []).map((m) => [String(m.id), m]));
+  const list = (pendingHandoverItems || [])
+    .filter((p) => includeDone || pendingItemIsOpen(p))
+    .filter((p) => !dept || (p.assignedDepartment || "Unassigned") === dept)
+    .slice().sort((a, b) => String(a.raisedAt || "").localeCompare(String(b.raisedAt || "")));
+  const STAGE = { awaiting: ["Awaiting", "mr-red"], partial: ["Part received", "mr-amber"], received: ["Received · work to do", "mr-amber"], completed: ["Work done", "mr-green"] };
+  const order = (d) => { const i = DEPARTMENT_SEQUENCE.indexOf(d); return i < 0 ? 99 : i; };
+  const depts = [...new Set(list.map((p) => p.assignedDepartment || "Unassigned"))].sort((a, b) => order(a) - order(b) || a.localeCompare(b));
+  const counts = list.reduce((c, p) => { const s = pendingItemStage(p); c[s] = (c[s] || 0) + 1; return c; }, {});
+  const age = (p) => { const t = rptMs(p.raisedAt); if (t == null) return "—"; const end = p.status === "resolved" ? (rptMs(p.resolvedAt) || now) : now; return rptDur(Math.max(0, (end - t) / 60000)); };
+  const critOpen = list.filter((p) => p.critical && pendingItemIsOpen(p)).length;
+  return (
+    <ReportSheet kind="pending" settings={settings} title="Pending jobs report" subtitle={`${includeDone ? "Open and completed" : "Open"} jobs${dept ? ` · ${dept}` : " · all departments"}`} refText={`PJ-${new Date(now).toISOString().slice(0, 10)}`} generatedBy={generatedBy}>
+      <div className="mr-summary rpt-summary-4" data-report-glance>
+        {[{ k: "Jobs listed", v: list.length }, { k: "Awaiting part / work", v: counts.awaiting || 0, red: (counts.awaiting || 0) > 0 }, { k: "Received, work to do", v: (counts.partial || 0) + (counts.received || 0) }, { k: "Critical open", v: critOpen, red: critOpen > 0 }]
+          .map((g) => <div key={g.k} className={`mr-sum ${g.red ? "is-red" : ""}`}><div className="mr-sum-v">{g.v}</div><div className="mr-label">{g.k}</div></div>)}
+      </div>
+      {list.length === 0 && <p className="mr-empty" style={{ marginTop: 18 }}>No {includeDone ? "" : "open "}pending jobs.</p>}
+      {depts.map((d, i) => {
+        const rows = list.filter((p) => (p.assignedDepartment || "Unassigned") === d);
+        return (
+          <RptSec key={d} n={String(i + 1).padStart(2, "0")} title={d} count={`${rows.length} job${rows.length === 1 ? "" : "s"}`} attr={{ "data-report-pending-dept": d }}>
+            <div className="mr-table">
+              <div className="mr-tr mr-th" style={{ gridTemplateColumns: "1.3fr 2.4fr 0.8fr 1.4fr 0.9fr" }}><div>Machine</div><div>Part / work</div><div className="text-right">Qty</div><div>Status</div><div className="text-right">Age</div></div>
+              {rows.map((p) => {
+                const m = byId.get(String(p.machineId)) || {}; const st = pendingItemStage(p); const [lbl, cls] = STAGE[st] || STAGE.awaiting;
+                const isPart = !!(p.itemCode || p.itemName || p.qty != null);
+                return (
+                  <div key={p.id} className="mr-tr" data-report-pending-row={st} style={{ gridTemplateColumns: "1.3fr 2.4fr 0.8fr 1.4fr 0.9fr" }}>
+                    <div className="mr-td" data-l="Machine"><div><div className="font-semibold">{m.bomKey || p.bomKey || "—"}</div><div className="mr-label mr-mono">{m.serialNo || p.serialNo || ""}</div></div></div>
+                    <div className="mr-td" data-l="Part / work"><div>
+                      <div>{p.critical ? <span className="mr-tag">Critical</span> : null}{p.itemName || p.description}</div>
+                      <div className="mr-label">{isPart ? "Part" : "Work"}{p.itemCode ? <> · <span className="mr-mono">{p.itemCode}</span></> : null}{p.itemName && p.description && p.description !== p.itemName ? ` · ${p.description}` : ""} · raised in {p.raisedInDepartment || "—"}, {rptFmtD(p.raisedAt)}</div>
+                    </div></div>
+                    <div className="mr-td md:text-right mr-mono" data-l="Qty">{p.qty != null ? <div><div>{p.qty}</div>{(Number(p.receivedQty) || 0) > 0 && <div className="mr-label">{p.receivedQty} recd</div>}</div> : "—"}</div>
+                    <div className="mr-td" data-l="Status"><div><div className={`${cls} font-semibold`}>{lbl}</div>{st === "completed" && <div className="mr-label">{rptFmtD(p.resolvedAt)}{rptUserName(allUsers, p.resolvedBy) ? ` · ${rptUserName(allUsers, p.resolvedBy)}` : ""}</div>}</div></div>
+                    <div className="mr-td md:text-right" data-l="Age">{age(p)}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </RptSec>
+        );
+      })}
+    </ReportSheet>
   );
 }
 
@@ -17683,6 +18075,107 @@ function PendingJobRows({ rows, onChange, inventory = [], accent = "#b45309", ad
   );
 }
 
+// 2026-11-03 — "Why machines got delayed" (admin only, read-only). Counts the
+// reasons already saved on late acceptance, manual ON HOLD and Finish &
+// Transfer delay notes — by REASON and by DEPARTMENT, never by person. The
+// aim is to see where work gets stuck so the process can be fixed.
+function DelayReasonsCard({ machines = [], handovers = [], pendingItems = [] }) {
+  const [open, setOpen] = useState(() => {
+    try { const v = localStorage.getItem("erp_mt_delay_open"); if (v !== null) return v === "1"; } catch {}
+    return typeof window === "undefined" || window.innerWidth >= 768;
+  });
+  const toggle = () => setOpen((v) => { try { localStorage.setItem("erp_mt_delay_open", v ? "0" : "1"); } catch {} return !v; });
+  const [period, setPeriod] = useState("month");
+  const [showTexts, setShowTexts] = useState(null);
+  const data = useMemo(() => countDelayReasons({ machines, handovers, period }), [machines, handovers, period]);
+  const periodLabel = (DELAY_PERIODS.find((x) => x.key === period) || DELAY_PERIODS[0]).label;
+  const max = Math.max(1, ...data.byReason.map((r) => r.count));
+  const waitingParts = (pendingItems || []).filter((p) => pendingItemIsOpen(p) && pendingItemIsPart(p)).length;
+  return (
+    <div className="section-card no-lift delay-card p-4 sm:p-5" data-delay-card>
+      <button type="button" onClick={toggle} aria-expanded={open} data-delay-toggle
+              className="w-full flex items-center gap-3 text-left" style={{ minHeight: 44 }}>
+        <div className="sec-icon" style={{ background: "rgba(100,116,139,0.10)", color: "#475569" }}><Hourglass size={16} /></div>
+        <div className="flex-1 min-w-0">
+          <div className="text-[15px] font-bold" style={{ color: "var(--text-strong)" }}>Why machines got delayed</div>
+          <div className="text-[12px]" style={{ color: "var(--text-dim)" }}>Where work gets stuck — to fix the process</div>
+        </div>
+        <span data-delay-total className="text-[22px] font-black tabular-nums" style={{ color: "var(--text-strong)" }}>{data.total}</span>
+        <span className="text-[14px] transition-transform" style={{ color: "var(--text-dim)", transform: open ? "rotate(180deg)" : "none" }}>▾</span>
+      </button>
+      {open && (
+        <div className="mt-4 space-y-4">
+          <div className="grid grid-cols-3 gap-2" role="group" aria-label="Period">
+            {DELAY_PERIODS.map((p) => (
+              <button key={p.key} type="button" data-delay-period={p.key} aria-pressed={period === p.key}
+                      onClick={() => { setPeriod(p.key); setShowTexts(null); }}
+                      className="rounded-lg text-[13px] font-semibold px-2 transition-colors"
+                      style={{ minHeight: 44, background: period === p.key ? "#2640B0" : "var(--surface-card)", color: period === p.key ? "#fff" : "var(--text-strong)",
+                               border: `1px solid ${period === p.key ? "#2640B0" : "var(--border-subtle)"}` }}>
+                {p.label}
+              </button>
+            ))}
+          </div>
+          {data.total === 0 ? (
+            <div data-delay-empty className="rounded-xl py-5 text-center text-[15px] font-semibold" style={{ background: "rgba(21,128,61,0.06)", color: "#15803d" }}>
+              No delays {periodLabel.toLowerCase()} 🎉
+            </div>
+          ) : (
+            <>
+              <div className="grid gap-2.5 lg:grid-cols-2 lg:gap-x-6">
+                {data.byReason.map((r) => {
+                  const hasTexts = r.texts.length > 0;
+                  const isOpen = showTexts === r.reason;
+                  return (
+                    <div key={r.reason} className={isOpen ? "lg:col-span-2" : ""}>
+                      <button type="button" data-delay-reason={r.reason} disabled={!hasTexts} aria-expanded={hasTexts ? isOpen : undefined}
+                              onClick={() => hasTexts && setShowTexts(isOpen ? null : r.reason)}
+                              className="w-full text-left rounded-lg px-3 py-2 transition-colors"
+                              style={{ minHeight: 52, background: "var(--surface-card)", border: "1px solid var(--border-subtle)", cursor: hasTexts ? "pointer" : "default" }}>
+                        <div className="flex items-center gap-2">
+                          <span className="flex-1 min-w-0 text-[14px] font-semibold truncate" style={{ color: "var(--text-strong)" }}>
+                            {r.reason}{hasTexts && <span className="text-[11px] font-semibold ml-1.5" style={{ color: "#2640B0" }}>{isOpen ? "hide" : "see notes"}</span>}
+                          </span>
+                          <span data-delay-count className="text-[22px] font-extrabold tabular-nums leading-none" style={{ color: "var(--text-strong)" }}>{r.count}</span>
+                        </div>
+                        <div className="mt-1.5 h-2.5 rounded-full overflow-hidden" style={{ background: "rgba(148,163,184,0.18)" }}>
+                          <div className="delay-bar h-full rounded-full" style={{ width: `${Math.round((r.count / max) * 100)}%`, background: "#64748b" }} />
+                        </div>
+                      </button>
+                      {isOpen && (
+                        <ul data-delay-texts className="mt-1.5 rounded-xl px-3 py-2 space-y-1.5" style={{ background: "rgba(148,163,184,0.08)", border: "1px solid var(--border-subtle)" }}>
+                          {r.texts.map((t, i) => (
+                            <li key={i} className="text-[13px]" style={{ color: "var(--text-strong)" }}>
+                              “{t.text}” <span className="text-[11px]" style={{ color: "var(--text-dim)" }}>· {t.department}{isNaN(t.at) ? "" : ` · ${fmtDate(new Date(t.at))}`}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              <div data-delay-depts className="flex items-center flex-wrap gap-2 text-[13px]">
+                <span className="font-bold" style={{ color: "var(--text-dim)" }}>By department:</span>
+                {data.byDepartment.map((d) => (
+                  <span key={d.department} data-delay-dept={d.department} className="rounded-full px-3 py-1 font-bold" style={{ background: "rgba(100,116,139,0.10)", color: "var(--text-strong)" }}>
+                    {d.department} <span className="tabular-nums font-black">{d.count}</span>
+                  </span>
+                ))}
+              </div>
+            </>
+          )}
+          {waitingParts > 0 && (
+            <div data-delay-waiting-parts className="text-[12px] font-semibold" style={{ color: "var(--text-dim)" }}>
+              Right now {waitingParts} part{waitingParts === 1 ? " is" : "s are"} still awaited (Pending Jobs).
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Staff "My Dashboard" (2026-11-03, owner approved) ────────────────────────
 // Read-only scorecard for a department login: the department's average stars,
 // time taken per machine it finished (handed over), and how many machines it
@@ -17827,7 +18320,10 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
   // already recorded as a `pending_fulfilled` audit row, but nothing told the
   // department waiting on it that it had arrived — they found out by asking.
   // Read-only: the badge is derived, nothing new is stored.
-  auditLog = [] }) {
+  auditLog = [],
+  // 2026-11-03 — { filter, n }: the admin Ready popup's "View in Machine
+  // Tracker" opens this page on a given filter (n changes per request).
+  filterRequest = null }) {
   const [filter,   setFilter]   = useState("active");
   // 2026-10-30 — page layout: two tabs (Production / Transfer & Accept), the
   // Departments Called panel behind a header bell, and a collapsible BOM
@@ -17835,6 +18331,10 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
   // per-browser preference.
   const [mtTab,       setMtTab]       = useState("production");
   const [searchQ,     setSearchQ]     = useState("");
+  useEffect(() => {
+    if (!filterRequest || !filterRequest.filter) return;
+    setMtTab("production"); setSearchQ(""); setFilter(filterRequest.filter);
+  }, [filterRequest?.n]); // eslint-disable-line react-hooks/exhaustive-deps
   const [showCalled,  setShowCalled]  = useState(false);
   // Open by default on a wide screen; on a phone the six BOM cards would push
   // the machines a full screen down, so it starts folded there. An explicit
@@ -17859,6 +18359,26 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
   const printMachineReport = () => {
     const m = machineLog.find((x) => String(x.id) === String(reportMachineId));
     printWithTitle(machineReportRef(m), { bodyClass: "print-machine-report" });
+  };
+  // 2026-11-03 — the four PDF reports. reportsMenu = the "Reports" chooser is
+  // open; reportDoc = { kind: "customer"|"company"|"hold"|"pending", machineId }
+  // is the report on screen (the Company report also opens via reportMachineId).
+  const [reportsMenu, setReportsMenu] = useState(false);
+  const [reportDoc, setReportDoc] = useState(null);
+  const [reportPick, setReportPick] = useState("");
+  const [holdPeriod, setHoldPeriod] = useState("this_month");
+  const [pendIncludeDone, setPendIncludeDone] = useState(false);
+  const [pendDept, setPendDept] = useState("");
+  const openReport = (kind, machineId = null) => { setReportsMenu(false); setReportMachineId(null); setReportDoc({ kind, machineId }); };
+  const closeReports = () => { setReportDoc(null); setReportMachineId(null); };
+  const printReportDoc = () => {
+    if (!reportDoc) return;
+    const m = machineLog.find((x) => String(x.id) === String(reportDoc.machineId));
+    const day = new Date().toISOString().slice(0, 10);
+    const title = reportDoc.kind === "customer" ? `CR-${m ? `${m.bomKey}-${m.serialNo || m.id}` : day}`
+      : reportDoc.kind === "company" ? machineReportRef(m)
+      : reportDoc.kind === "hold" ? `On-hold-report-${holdPeriod}-${day}` : `Pending-jobs-report-${day}`;
+    printWithTitle(title, { bodyClass: "print-machine-report" });
   };
   // 2026-10-30 — pending jobs: part lookup + receive/complete actions.
   // Item Master by code — the rack crate face and the rack details panel both
@@ -17967,6 +18487,9 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
   // Migration 028 — During-Work checklist runtime modal.
   const [duringWorkModal, setDuringWorkModal] = useState(null); // { machine, template, answers, busy, error }
   const [acceptModal, setAcceptModal] = useState(null); // { handover, password, sigSvg, busy, error }
+  // 2026-11-03 — offline: Confirm Acceptance is disabled (popup keeps the
+  // signature / team / ticks) and a tap pulses the "No internet" banner.
+  const online = useOnline();
   const [transferBusy, setTransferBusy] = useState(false);
 
   // Pending handovers filtered to those awaiting acceptance.
@@ -18351,6 +18874,111 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
   const [myDashOpen, setMyDashOpen] = useState(false);
   const canReleaseFromRack = canDo("machines", "release") || isAdminUser;
   const [rackTakeBusy, setRackTakeBusy] = useState(null);
+  // 2026-11-03 — ARRIVAL ALERT (client-side only, nothing stored but the
+  // on/off choice). When a NEW hand-over for one of my departments appears
+  // (To accept, or On the rack for you) the phone vibrates, plays a short
+  // two-tone chime, speaks the message, and a big banner shows. Fed by the
+  // same `handovers` state the realtime / refresh path already updates.
+  const [arrivalOn, setArrivalOn] = useState(() => { try { return localStorage.getItem("erp_arrival_alert") !== "0"; } catch { return true; } });
+  const toggleArrival = () => setArrivalOn((v) => { try { localStorage.setItem("erp_arrival_alert", v ? "0" : "1"); } catch {} return !v; });
+  const [arrival, setArrival] = useState(null); // { id, rack, text }
+  const arrivalSeenRef = useRef(null);
+  const arrivalMountRef = useRef(Date.now());
+  const arrivalWatch = (staffMode && !isProdHead && hasDepartments)
+    ? (handovers || []).filter((h) => h && h.status === "pending" && myDepartments.includes(h.toDepartment))
+    : [];
+  const arrivalKey = arrivalWatch.map((h) => String(h.id)).sort().join("|");
+  const handoversLoaded = (handovers || []).length > 0 || (Date.now() - arrivalMountRef.current) > 8000;
+  // Vibrate + two-tone chime + spoken message (Hindi voice if the phone has
+  // one, else Indian English). Used by the arrival and near-deadline alerts.
+  const ringAlert = (hiText, enText, noVibrate) => {
+    if (!noVibrate) { try { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch { /* not supported */ } }
+    // Browsers allow sound only after the user has touched the page once:
+    // until then, keep the sound for the first touch.
+    let activated = false;
+    try { activated = navigator.userActivation ? !!navigator.userActivation.hasBeenActive : true; } catch { activated = false; }
+    if (!activated) {
+      const once = () => {
+        window.removeEventListener("pointerdown", once, true); window.removeEventListener("keydown", once, true);
+        ringAlert(hiText, enText, true);
+      };
+      try { window.addEventListener("pointerdown", once, true); window.addEventListener("keydown", once, true); } catch { /* ignore */ }
+      return;
+    }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) {
+        const ctx = new AC();
+        if (ctx.state === "suspended" && ctx.resume) ctx.resume().catch(() => {});
+        [[659.25, 0], [880, 0.18]].forEach(([f, at]) => {
+          const o = ctx.createOscillator(); const g = ctx.createGain();
+          o.type = "sine"; o.frequency.value = f;
+          const t0 = ctx.currentTime + at;
+          g.gain.setValueAtTime(0.0001, t0);
+          g.gain.exponentialRampToValueAtTime(0.25, t0 + 0.02);
+          g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.32);
+          o.connect(g); g.connect(ctx.destination); o.start(t0); o.stop(t0 + 0.34);
+        });
+        setTimeout(() => { try { ctx.close && ctx.close(); } catch {} }, 900);
+      }
+    } catch { /* no audio */ }
+    setTimeout(() => {
+      try {
+        const ss = window.speechSynthesis;
+        if (!ss || typeof window.SpeechSynthesisUtterance !== "function") return;
+        const voices = (ss.getVoices && ss.getVoices()) || [];
+        const hi = voices.find((v) => /^hi[-_]IN/i.test(v.lang || "")) || voices.find((v) => /^hi\b/i.test(v.lang || ""));
+        const en = voices.find((v) => /^en[-_]IN/i.test(v.lang || ""));
+        const u = new window.SpeechSynthesisUtterance(hi ? hiText : enText);
+        u.lang = hi ? "hi-IN" : "en-IN";
+        if (hi) u.voice = hi; else if (en) u.voice = en;
+        ss.speak(u);
+      } catch { /* no speech */ }
+    }, 650);
+  };
+  useEffect(() => {
+    const ids = arrivalKey ? arrivalKey.split("|") : [];
+    const prev = arrivalSeenRef.current;
+    if (prev === null) {
+      // The very first load (or a Supabase hydration still on its way) is
+      // the baseline — nothing "arrived".
+      if (handoversLoaded) arrivalSeenRef.current = new Set(ids);
+      return;
+    }
+    arrivalSeenRef.current = new Set(ids);
+    const fresh = ids.filter((id) => !prev.has(id));
+    if (!fresh.length) return;
+    const h = arrivalWatch.find((x) => String(x.id) === fresh[fresh.length - 1]);
+    if (!h) return;
+    const m = (machineLog || []).find((x) => String(x.id) === String(h.machineId)) || null;
+    const name = (m && m.bomKey) || h.bomKey || "Machine";
+    const serial = (m && m.serialNo) || h.serialNo || "";
+    const rack = isAwaitingRelease(h);
+    setArrival({ id: h.id, rack, text: `📥 ${name}${serial ? ` · ${serial}` : ""} has come to ${h.toDepartment} — ${rack ? "Take from Rack" : "Accept"}` });
+    if (!arrivalOn) return;
+    ringAlert(`आपकी मशीन आ गई है — ${name}${serial ? `, सीरियल ${serial}` : ""}`,
+              `Your machine has arrived — ${name}${serial ? `, serial ${serial}` : ""}`);
+  }, [arrivalKey, handoversLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!arrival) return;
+    const t = setTimeout(() => setArrival(null), 15000);
+    return () => clearTimeout(t);
+  }, [arrival]);
+  const openArrival = () => {
+    const a = arrival; setArrival(null);
+    if (!a) return;
+    try {
+      const el = (a.machineId != null && document.querySelector(`[data-staff-timer="${a.machineId}"]`))
+        || document.querySelector(`[data-staff-accept="${a.id}"]`) || document.querySelector(`[data-staff-take="${a.id}"]`)
+        || document.querySelector(a.rack ? "[data-staff-section='On the rack for you']" : "[data-staff-section='To accept']");
+      if (!el) return;
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      const card = el.closest(".mt-card") || el;
+      card.classList.add("arrival-flash");
+      setTimeout(() => card.classList.remove("arrival-flash"), 2400);
+      if (el.tagName === "BUTTON") el.focus({ preventScroll: true });
+    } catch { /* ignore */ }
+  };
   // The first department that actually does work — machines are started onto
   // it from the rack. Derived, so adding a stage ahead of Assembly keeps this
   // correct.
@@ -18427,6 +19055,45 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
     const h = machineHandover(m);
     return h && isAwaitingRelease(h);
   });
+  // 2026-11-03 — NEAR-DEADLINE REMINDER (staff). The department timer on the
+  // staff card — same target, same computeOverrun (closed days pause it). At
+  // 80% of the target the chip turns amber with the time left; over 100% it
+  // is red. One alert per machine per threshold, remembered in localStorage
+  // so a refresh does not repeat it.
+  const deptTimerOf = (m) => {
+    const dept   = m.currentDepartment || m.stage;
+    const cfg    = (m.deptDurations && m.deptDurations[dept]) || workflow.dept_durations[dept];
+    const target = (cfg && cfg.minutes) || 0;
+    const t      = m.departmentEnteredAt ? computeOverrun(m.departmentEnteredAt, target, nowTick) : null;
+    const level  = !t || !target ? 0 : t.isOverrun ? 100 : t.actualMinutes >= target * 0.8 ? 80 : 0;
+    return { dept, target, t, level, leftMinutes: t ? Math.max(0, target - t.actualMinutes) : 0 };
+  };
+  const deadlineWatch = (staffMode && !isProdHead && hasDepartments)
+    ? myWorking.map((m) => ({ m, ...deptTimerOf(m) })).filter((x) => x.level > 0)
+    : [];
+  const deadlineKey = deadlineWatch.map((x) => `${x.m.id}|${x.dept}|${x.m.departmentEnteredAt}|${x.level}`).sort().join("~");
+  useEffect(() => {
+    if (!deadlineKey) return;
+    let fired = [];
+    try { fired = JSON.parse(localStorage.getItem("erp_deadline_alerts") || "[]"); if (!Array.isArray(fired)) fired = []; } catch { fired = []; }
+    const seen = new Set(fired);
+    const fresh = deadlineWatch.filter((x) => !seen.has(`${x.m.id}|${x.dept}|${x.m.departmentEnteredAt}|${x.level}`));
+    if (!fresh.length) return;
+    fresh.forEach((x) => fired.push(`${x.m.id}|${x.dept}|${x.m.departmentEnteredAt}|${x.level}`));
+    try { localStorage.setItem("erp_deadline_alerts", JSON.stringify(fired.slice(-300))); } catch { /* ignore */ }
+    const x = fresh.find((y) => y.level === 100) || fresh[0];
+    const name = x.m.bomKey || "Machine"; const serial = x.m.serialNo || "";
+    const late = x.level === 100;
+    setArrival({ machineId: x.m.id, deadline: true, text: late
+      ? `⏰ ${name}${serial ? ` · ${serial}` : ""} is late in ${x.dept} — by ${formatDuration(x.t.overrunMinutes)}`
+      : `⏳ ${name}${serial ? ` · ${serial}` : ""} — ${formatDuration(x.leftMinutes)} left in ${x.dept}` });
+    if (!arrivalOn) return;
+    const hrs = Math.round(x.leftMinutes / 60);
+    const hiLeft = hrs >= 1 ? `${hrs} घंटे बाकी` : `${x.leftMinutes} मिनट बाकी`;
+    const enLeft = hrs >= 1 ? `${hrs} hour${hrs === 1 ? "" : "s"} left` : `${x.leftMinutes} minutes left`;
+    if (late) ringAlert(`${name} ${serial} का समय खत्म हो गया है`, `${name} ${serial} time is over`);
+    else ringAlert(`${name} ${serial} का समय खत्म होने वाला है, ${hiLeft}`, `${name} ${serial} time is almost over, ${enLeft}`);
+  }, [deadlineKey]); // eslint-disable-line react-hooks/exhaustive-deps
   // Transfer & Accept lists every machine still moving through the line —
   // the ones to finish & transfer, release, or accept — whatever summary
   // tile was last clicked on the Production tab.
@@ -18508,14 +19175,14 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                               )}
                               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: chip.bg, color: chip.fg }}>{chip.label}</span>
                               {onReceivePendingItem && canReceiveJob(p) && p.status === "open" && !p.receivedAt && (
-                                <button type="button" onClick={() => setJobAction({ item: p, action: "receive", notes: "", busy: false, error: "" })}
+                                <button data-needs-net type="button" onClick={() => setJobAction({ item: p, action: "receive", notes: "", busy: false, error: "" })}
                                         className="text-[10.5px] font-bold px-2.5 py-1 rounded-lg border transition-all"
                                         style={{ background: "rgba(37,99,235,0.08)", border: "1px solid rgba(37,99,235,0.35)", color: "#1d4ed8" }}>
                                   Part received
                                 </button>
                               )}
                               {canAct && onResolvePendingItem && p.status === "open" && (
-                                <button type="button" onClick={() => setJobAction({ item: p, action: "complete", notes: "", busy: false, error: "" })}
+                                <button data-needs-net type="button" onClick={() => setJobAction({ item: p, action: "complete", notes: "", busy: false, error: "" })}
                                         className="text-[10.5px] font-bold px-2.5 py-1 rounded-lg border transition-all"
                                         style={{ background: "rgba(22,163,74,0.08)", border: "1px solid rgba(22,163,74,0.35)", color: "#15803d" }}>
                                   Work completed
@@ -18676,7 +19343,9 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
       const steps = [
         [jobAction,          () => !jobAction?.busy && setJobAction(null)],
         [reportMachineId,    () => setReportMachineId(null)],
-        [trialCertModal,     () => setTrialCertModal(null)],
+        [reportDoc,          () => setReportDoc(null)],
+        [reportsMenu,        () => setReportsMenu(false)],
+        [trialCertModal,    () => setTrialCertModal(null)],
         [trialCertViewModal, () => setTrialCertViewModal(null)],
         [finishModal,        () => !transferBusy && setFinishModal(null)],
         [acceptModal,        () => !acceptModal?.busy && setAcceptModal(null)],
@@ -18695,7 +19364,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [jobAction, reportMachineId, trialCertModal, trialCertViewModal, finishModal, transferBusy, acceptModal, duringWorkModal,
+  }, [jobAction, reportMachineId, reportDoc, reportsMenu, trialCertModal, trialCertViewModal, finishModal, transferBusy, acceptModal, duringWorkModal,
       removeRackConfirm, pullBack, undoAsk, raiseModal, raiseBusy, jobsDrawer, rackPanel, issuePopup, showCalled]);
   // Pending part awaiting "Confirm issue" in the rack panel, and the one in flight.
   const [pendIssueAsk, setPendIssueAsk] = useState(null);
@@ -18806,6 +19475,16 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
        to this page only — the rest of the ERP keeps its standard white. */
     <div className="flex-1 overflow-y-auto mt-premium">
 
+      {/* Arrival alert banner (staff only) — tap to go to that machine's card. */}
+      {staffMode && arrival && (
+        <div className="arrival-banner" role="alert" data-arrival-banner>
+          <button type="button" className="arrival-banner-main" onClick={openArrival} data-arrival-open>
+            {arrival.text}
+          </button>
+          <button type="button" className="arrival-banner-close" aria-label="Close" onClick={() => setArrival(null)}>✕</button>
+        </div>
+      )}
+
       {toast && (() => {
         const prio = toast.priority || "info";
         const icon = prio === "urgent" ? "🔴" : prio === "warning" ? "🟡" : "🟢";
@@ -18828,11 +19507,13 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
 
       <Topbar title="Machine Tracker" subtitle="Mechanical → Electrical → Trial → Ready">
         {/* 2026-10-31 — the Report Center opens from here (no sidebar entry). */}
+        {/* 2026-11-03 — one Reports menu: the four PDF reports, plus the full
+            Report Center link inside it. */}
         {canView("reports") && (
-          <button type="button" data-open-reports onClick={() => onNavigate("reports")}
+          <button type="button" data-reports-menu onClick={() => { setReportsMenu(true); setReportPick((prev) => prev || String(((machineLog || []).slice().reverse()[0] || {}).id || "")); }}
                   className="h-9 px-3 rounded-lg text-[12px] font-black flex items-center gap-1.5"
                   style={{ background: "rgba(46, 80, 214,0.10)", color: "#2640B0", border: "1px solid rgba(46, 80, 214,0.35)" }}
-                  title="Open the Report Center">
+                  title="Customer, company, on hold and pending jobs reports">
             📄 Reports
           </button>
         )}
@@ -18890,6 +19571,39 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
             )}
           </div>
         )}
+
+        {/* 2026-11-03 — admin "Today" line: the day in one sentence, from the
+            same lists the count boxes use. Each chip applies that box's filter. */}
+        {!staffMode && (() => {
+          const parts = [
+            { key: "hold",          tab: "transfer",   icon: "🔴", n: onHold.length,        word: "late",              color: "#b91c1c", bg: "rgba(239,68,68,0.08)",  bd: "rgba(239,68,68,0.40)" },
+            { key: "pendingAccept", tab: "transfer",   icon: "🟠", n: pendingAccept.length, word: "waiting to accept", color: "#b45309", bg: "rgba(217,119,6,0.08)",  bd: "rgba(217,119,6,0.40)" },
+            { key: "completed",     tab: "production", icon: "🟢", n: completed.length,     word: "ready",             color: "#15803d", bg: "rgba(21,128,61,0.08)",  bd: "rgba(21,128,61,0.35)" },
+          ].filter((x) => x.n > 0);
+          return (
+            <div className="mt-today flex items-center gap-2 flex-wrap" data-mt-today>
+              <span className="text-[16px] font-black mr-1" style={{ color: "var(--text-strong)" }}>Today:</span>
+              {parts.length === 0 && (
+                <span className="text-[16px] font-black" style={{ color: "#15803d" }} data-mt-today-ok>✅ All machines on time</span>
+              )}
+              {parts.map((x) => {
+                const isOn = !searchText && mtTab === x.tab && filter === x.key;
+                return (
+                  <button key={x.key} type="button" data-mt-today-chip={x.key} aria-pressed={isOn}
+                          onClick={() => {
+                            setSearchQ(""); setMtTab(x.tab); setFilter(x.key);
+                            setTimeout(() => { try { document.querySelector("[data-view-header]")?.scrollIntoView({ behavior: "smooth", block: "start" }); } catch { /* ignore */ } }, 80);
+                          }}
+                          className="min-h-[44px] px-4 rounded-full text-[15px] font-bold inline-flex items-center gap-1.5 transition-all active:scale-[0.97]"
+                          style={{ background: x.bg, color: x.color, border: `${isOn ? 2 : 1}px solid ${isOn ? x.color : x.bd}` }}>
+                    <span aria-hidden="true">{x.icon}</span>
+                    <span className="tabular-nums">{x.n}</span> {x.word}
+                  </button>
+                );
+              })}
+            </div>
+          );
+        })()}
 
         {/* ── BOM Outward (2026-10-30) ──
             The Outward page's own BOM section, embedded: issuing here and
@@ -18998,6 +19712,17 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                   {isProdHead ? "Rack release" : myDepartments.join(", ")}
                 </span>
                 {currentUser?.fullName && <span className="text-[12px] ml-auto" style={{ color: "var(--text-dim)" }}>{currentUser.fullName}</span>}
+                {!isProdHead && (
+                  <button type="button" data-arrival-toggle aria-pressed={arrivalOn} onClick={toggleArrival}
+                          aria-label={arrivalOn ? "Arrival alert on — tap to turn off" : "Arrival alert off — tap to turn on"}
+                          title={arrivalOn ? "Alert sound ON" : "Alert sound OFF"}
+                          className={`${currentUser?.fullName ? "" : "ml-auto "}min-w-[44px] h-[44px] px-3 rounded-xl text-[15px] font-black inline-flex items-center justify-center gap-1 transition-all active:scale-[0.97]`}
+                          style={arrivalOn
+                            ? { background: "rgba(21,128,61,0.10)", color: "#15803d", border: "1px solid rgba(21,128,61,0.35)" }
+                            : { background: "var(--surface-card)", color: "var(--text-dim)", border: "1px solid var(--border-subtle)" }}>
+                    {arrivalOn ? "🔔 On" : "🔕 Off"}
+                  </button>
+                )}
               </div>
 
               {/* Production Head: machines assembled on the rack, waiting to be sent on */}
@@ -19049,7 +19774,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                             </div>
                           </div>)}
                           {canTakeFromRack && canAccept ? (
-                            <button type="button" data-staff-take={h.id} className={btn} style={{ background: "#4338ca", color: "#fff" }}
+                            <button data-needs-net type="button" data-staff-take={h.id} className={btn} style={{ background: "#4338ca", color: "#fff" }}
                                     disabled={!!acceptModal || rackTakeBusy === h.id}
                                     onClick={async () => {
                                       if (acceptModal || rackTakeBusy) return;
@@ -19091,7 +19816,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                             {voiceBadge(m) && <div className="mt-2">{voiceBadge(m)}</div>}
                           </div>)}
                           {canAccept && (
-                            <button type="button" data-staff-accept={h.id} className={btn} style={{ background: "#15803d", color: "#fff" }}
+                            <button data-needs-net type="button" data-staff-accept={h.id} className={btn} style={{ background: "#15803d", color: "#fff" }}
                                     disabled={!!acceptModal} onClick={() => { if (!acceptModal) openAcceptModal(h); }}>
                               ✓ Accept into {h.toDepartment}
                             </button>
@@ -19111,9 +19836,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                     {myWorking.map((m) => {
                       const dept   = m.currentDepartment || m.stage;
                       const next   = nextDepartment(dept);
-                      const cfg    = (m.deptDurations && m.deptDurations[dept]) || workflow.dept_durations[dept];
-                      const target = (cfg && cfg.minutes) || 0;
-                      const t      = m.departmentEnteredAt ? computeOverrun(m.departmentEnteredAt, target, nowTick) : null;
+                      const { target, t, level, leftMinutes } = deptTimerOf(m);
                       const jobs   = openJobsOf(m);
                       const during = !!onSubmitDuringWorkChecklist && !!pickTemplate(checklistTemplates, m.bomKey, dept, "during_work");
                       return (
@@ -19123,9 +19846,14 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                             <div className="text-[13px] mt-0.5" style={{ color: "var(--text-dim)" }}>{m.bomLabel || ""}{m.bomLabel ? " · " : ""}in {dept}</div>
                             <div className="flex items-center gap-2 flex-wrap mt-2">
                               {t && (
-                                <span className="text-[13px] font-bold px-2.5 py-1 rounded-full"
-                                      style={t.isOverrun ? { background: "rgba(239,68,68,0.1)", color: "#b91c1c", border: "1px solid rgba(239,68,68,0.35)" } : { background: "rgba(21,128,61,0.08)", color: "#15803d", border: "1px solid rgba(21,128,61,0.3)" }}>
-                                  ⏱ {formatDuration(t.actualMinutes)}{target ? ` / ${formatDuration(target)}` : ""}{t.isOverrun ? ` · DELAYED ${formatDuration(t.overrunMinutes)}` : ""}
+                                <span className="text-[13px] font-bold px-2.5 py-1 rounded-full" data-staff-timer={m.id} data-timer-level={level}
+                                      title={`⏱ ${formatDuration(t.actualMinutes)}${target ? ` / ${formatDuration(target)}` : ""}`}
+                                      style={t.isOverrun ? { background: "rgba(239,68,68,0.1)", color: "#b91c1c", border: "1px solid rgba(239,68,68,0.35)" }
+                                           : level === 80 ? { background: "rgba(217,119,6,0.12)", color: "#b45309", border: "1px solid rgba(217,119,6,0.45)" }
+                                           : { background: "rgba(21,128,61,0.08)", color: "#15803d", border: "1px solid rgba(21,128,61,0.3)" }}>
+                                  {t.isOverrun ? `⏰ Late by ${formatDuration(t.overrunMinutes)}`
+                                    : level === 80 ? `⏳ ${formatDuration(leftMinutes)} left`
+                                    : `⏱ ${formatDuration(t.actualMinutes)}${target ? ` / ${formatDuration(target)}` : ""}`}
                                 </span>
                               )}
                               {jobs.length > 0 && (
@@ -19158,7 +19886,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                               </button>
                             )}
                             {next && canFinish && (
-                              <button type="button" data-staff-finish={m.id} className={btn} style={{ background: "#15803d", color: "#fff" }} onClick={() => openFinishModal(m)}>
+                              <button data-needs-net type="button" data-staff-finish={m.id} className={btn} style={{ background: "#15803d", color: "#fff" }} onClick={() => openFinishModal(m)}>
                                 ✓ Finish → {next}
                               </button>
                             )}
@@ -19215,13 +19943,13 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                           {canJobs && (
                             <div className="flex flex-col sm:flex-row gap-2">
                               {onReceivePendingItem && canReceiveJob(p) && !p.receivedAt && (
-                                <button type="button" className={btn} style={{ background: "rgba(37,99,235,0.08)", border: "1px solid rgba(37,99,235,0.4)", color: "#1d4ed8" }}
+                                <button data-needs-net type="button" className={btn} style={{ background: "rgba(37,99,235,0.08)", border: "1px solid rgba(37,99,235,0.4)", color: "#1d4ed8" }}
                                         onClick={() => setJobAction({ item: p, action: "receive", notes: "", busy: false, error: "" })}>
                                   Part received
                                 </button>
                               )}
                               {onResolvePendingItem && (
-                                <button type="button" className={btn} style={{ background: "#15803d", color: "#fff" }}
+                                <button data-needs-net type="button" className={btn} style={{ background: "#15803d", color: "#fff" }}
                                         onClick={() => setJobAction({ item: p, action: "complete", notes: "", busy: false, error: "" })}>
                                   ✓ Work completed
                                 </button>
@@ -19346,7 +20074,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                       </button>
                     )}
                     {canAccept && onAcceptHandover ? (
-                      <button onClick={() => openAcceptModal(h)}
+                      <button onClick={() => openAcceptModal(h)} data-needs-net
                               className="text-[12px] font-black text-slate-900 px-5 py-2.5 rounded-xl transition-all hover:scale-105"
                               style={{ background: "#15803d", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", minWidth: 160, color: "#ffffff" }}>
                         ✓ Accept Machine
@@ -19734,6 +20462,11 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
           );
         })()}
 
+        {/* 2026-11-03 — admin-only, read-only: why machines got delayed. */}
+        {isAdminUser && !staffMode && (
+          <DelayReasonsCard machines={machineLog} handovers={handovers} pendingItems={pendingHandoverItems} />
+        )}
+
         {/* ── Production Rack View ──
             Machines waiting on the rack to be started. Starting a build is the
             first working department's job, so a floor login elsewhere in the
@@ -19876,7 +20609,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                     <div className="text-[9px] font-bold mt-1 px-1.5 py-0.5 rounded-full inline-block"
                                          style={{ background: "rgba(21,128,61,0.10)", color: "#15803d" }}>✓ Assembled{niN ? ` · ${niN} part${niN === 1 ? "" : "s"} owed` : ""}</div>
                                     {faceCanSend && (
-                                      <button type="button" data-rack-send={sl.id} onClick={faceSend}
+                                      <button data-needs-net type="button" data-rack-send={sl.id} onClick={faceSend}
                                               className="mt-1.5 w-full rounded-lg px-2 py-1.5 text-[10px] font-black text-white"
                                               style={{ background: "#15803d" }}
                                               title={`Send ${m.serialNo || m.bomKey} to ${faceHo.toDepartment} — this rack becomes empty`}>
@@ -20017,7 +20750,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                 const busy = pendIssueBusy === p2.id;
                                 if (p2.receivedAt) {
                                   return canFinishTransfer(canDo) && onResolvePendingItem ? (
-                                    <button type="button" data-pending-action="complete" disabled={busy}
+                                    <button data-needs-net type="button" data-pending-action="complete" disabled={busy}
                                             onClick={async () => { setPendIssueBusy(p2.id); const r = await onResolvePendingItem(p2.id, { notes: "Part fitted — completed from Rack View" }); setPendIssueBusy(null); if (!r || r.success === false) showToast("Could not complete", (r && r.error) || "", "urgent"); else showToast("Pending part completed", p2.itemName || p2.itemCode || ""); }}
                                             className="text-[10.5px] font-bold px-2 py-1 rounded-md text-white disabled:opacity-50" style={{ background: "#15803d" }}>✓ Mark completed</button>
                                   ) : null;
@@ -20028,7 +20761,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                 if (pendIssueAsk === p2.id) {
                                   return (
                                     <span className="inline-flex items-center gap-1">
-                                      <button type="button" data-pending-action="confirm" disabled={busy}
+                                      <button data-needs-net type="button" data-pending-action="confirm" disabled={busy}
                                               onClick={async () => { setPendIssueBusy(p2.id); const r = await onIssuePendingPart(p2.id); setPendIssueBusy(null); setPendIssueAsk(null);
                                                 if (!r || r.success === false) showToast("Could not issue", (r && r.error) || "", "urgent");
                                                 else showToast(`${p2.itemName || p2.itemCode} × ${p2.qty} issued`, r.partial ? r.error : `${m.serialNo || m.bomKey} — stock deducted once, job completed`); }}
@@ -20038,7 +20771,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                   );
                                 }
                                 return (
-                                  <button type="button" data-pending-action="issue" disabled={!enough}
+                                  <button data-needs-net type="button" data-pending-action="issue" disabled={!enough}
                                           title={enough ? "Part is physically available — issue it from stock to this machine" : "Not enough stock yet"}
                                           onClick={() => setPendIssueAsk(p2.id)}
                                           className="text-[10.5px] font-bold px-2 py-1 rounded-md border disabled:opacity-40 disabled:cursor-not-allowed"
@@ -20546,7 +21279,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                       )}
                       {!isComplete && onSetMachineHold && (isAdminUser || canFinishTransfer(canDo) || canDo("machines", "updateStage")) && (
                         machine.holdActive ? (
-                          <button type="button" data-card-release-hold={machine.id}
+                          <button data-needs-net type="button" data-card-release-hold={machine.id}
                                   onClick={() => setHoldModal({ machine, release: true, reason: "", busy: false, error: "" })}
                                   className="text-[11px] font-black px-3 py-1.5 rounded-lg border transition-all"
                                   style={{ background: "rgba(21,128,61,0.10)", border: "1px solid rgba(21,128,61,0.4)", color: "#15803d" }}
@@ -20554,7 +21287,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                             ▶ Release ON HOLD
                           </button>
                         ) : (
-                          <button type="button" data-card-hold={machine.id}
+                          <button data-needs-net type="button" data-card-hold={machine.id}
                                   onClick={() => setHoldModal({ machine, release: false, reason: "", busy: false, error: "" })}
                                   className="text-[11px] font-black px-3 py-1.5 rounded-lg border transition-all"
                                   style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.4)", color: "#b91c1c" }}
@@ -20575,7 +21308,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
         </button>
       )}
       {!isComplete && nextDepartment(machine.currentDepartment || machine.stage) && !machine.pendingHandoverId && !machine.holdActive && canFinishTransfer(canDo) && onFinishTransfer && (
-                        <button onClick={() => openFinishModal(machine)}
+                        <button data-needs-net onClick={() => openFinishModal(machine)}
                                 className={`font-black text-white rounded-lg transition-all ${isFloorLogin ? "text-[14px] px-5 py-2.5" : "text-[11px] px-3 py-1.5"}`}
                                 style={{ background: "#15803d", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}
                                 title={`Finish ${machine.currentDepartment || machine.stage} → ${nextDepartment(machine.currentDepartment || machine.stage)}`}>
@@ -20632,7 +21365,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                               </span>
                             )}
                             {cardCanAccept && (
-                              <button type="button" data-card-accept={h.id}
+                              <button data-needs-net type="button" data-card-accept={h.id}
                                       onClick={() => { if (!acceptModal) openAcceptModal(h); }}
                                       disabled={!!acceptModal}
                                       className="text-[11px] font-black text-white px-3 py-1.5 rounded-lg transition-all disabled:opacity-50"
@@ -20692,8 +21425,16 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                         <button type="button" data-card-report={machine.id} onClick={() => setReportMachineId(machine.id)}
                                 className="text-[11px] font-black px-3 py-1.5 rounded-lg border transition-all"
                                 style={{ background: "rgba(21,128,61,0.08)", border: "1px solid rgba(21,128,61,0.35)", color: "#15803d" }}
-                                title="Complete production report — BOM to Ready">
-                          📄 Report
+                                title="Company full report — BOM to Ready, internal">
+                          Company report
+                        </button>
+                      )}
+                      {isAdminUser && (
+                        <button type="button" data-card-customer-report={machine.id} onClick={() => openReport("customer", machine.id)}
+                                className="text-[11px] font-black px-3 py-1.5 rounded-lg border transition-all"
+                                style={{ background: "var(--surface-card)", border: "1px solid var(--border-rim)", color: "var(--text-strong)" }}
+                                title="Customer report — clean PDF to send to the customer">
+                          Customer report
                         </button>
                       )}
                       <button onClick={() => setExpanded(isExpanded ? null : machine.id)}
@@ -20727,7 +21468,12 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                           {isAdminUser && <button type="button" data-history-report={machine.id} onClick={() => setReportMachineId(machine.id)}
                                   className="text-[11px] font-bold px-2.5 py-1 rounded-lg border ml-auto"
                                   style={{ borderColor: "var(--border-rim)", color: "var(--text-strong)", background: "var(--surface-card)" }}>
-                            📄 Open full machine report
+                            Company full report
+                          </button>}
+                          {isAdminUser && <button type="button" data-history-customer-report={machine.id} onClick={() => openReport("customer", machine.id)}
+                                  className="text-[11px] font-bold px-2.5 py-1 rounded-lg border"
+                                  style={{ borderColor: "var(--border-rim)", color: "var(--text-strong)", background: "var(--surface-card)" }}>
+                            Customer report
                           </button>}
                           {ratingSummary.average != null && (
                             <span className="text-[12px] font-black" style={{ color: ratingSummary.average >= 4.5 ? "#15803d" : ratingSummary.average >= 3.5 ? "#b45309" : "#dc2626" }}>
@@ -20974,14 +21720,14 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                           {p.receivedAt ? "Part received · finish work" : (Number(p.receivedQty) || 0) > 0 ? `Partly received · ${pendingItemRemaining(p)} left` : p.itemCode ? "Awaiting part" : "Awaiting work"}
                                         </span>
                                         {onReceivePendingItem && canReceiveJob(p) && !p.receivedAt && (
-                                          <button onClick={() => setJobAction({ item: p, action: "receive", notes: "", busy: false, error: "" })}
+                                          <button data-needs-net onClick={() => setJobAction({ item: p, action: "receive", notes: "", busy: false, error: "" })}
                                                   className="text-[10px] font-bold px-2 py-0.5 rounded border"
                                                   style={{ color: "#1d4ed8", borderColor: "rgba(37,99,235,0.4)", background: "rgba(37,99,235,0.08)" }}>
                                             Part received
                                           </button>
                                         )}
                                         {canFinishTransfer(canDo) && onResolvePendingItem && (
-                                          <button onClick={() => setJobAction({ item: p, action: "complete", notes: "", busy: false, error: "" })}
+                                          <button data-needs-net onClick={() => setJobAction({ item: p, action: "complete", notes: "", busy: false, error: "" })}
                                                   className="text-[10px] font-bold px-2 py-0.5 rounded border"
                                                   style={{ color: "#15803d", borderColor: "rgba(22,163,74,0.4)", background: "rgba(22,163,74,0.08)" }}>
                                             Work completed
@@ -21017,7 +21763,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                               <div className="flex gap-2">
                                 {[{ k: "photo", icon: "📷", text: "Take photo", cap: "environment", acc: "image/*" },
                                   { k: "file", icon: "📎", text: "Add file", cap: undefined, acc: "image/*,video/*,application/pdf" }].map((b) => (
-                                  <label key={b.k} data-attach-btn={b.k} className="text-[13px] font-black cursor-pointer rounded-xl flex items-center gap-1.5 px-4"
+                                  <label data-needs-net key={b.k} data-attach-btn={b.k} className="text-[13px] font-black cursor-pointer rounded-xl flex items-center gap-1.5 px-4"
                                          style={{ minHeight: 46, background: "#1d4ed8", color: "#fff" }}>
                                     <span style={{ fontSize: 18 }}>{b.icon}</span>{b.text}
                                     <input type="file" className="hidden" accept={b.acc} capture={b.cap}
@@ -21158,6 +21904,119 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
         </div>
       )}
 
+      {/* ── Reports chooser (2026-11-03) — the four PDF reports ── */}
+      {reportsMenu && (() => {
+        const sorted = (machineLog || []).slice().sort((a, b) => String(a.bomKey || "").localeCompare(String(b.bomKey || "")) || String(a.serialNo || "").localeCompare(String(b.serialNo || "")));
+        const pickOk = sorted.some((m) => String(m.id) === String(reportPick));
+        const machineSelect = (
+          <select data-report-machine-pick value={pickOk ? reportPick : ""} onChange={(e) => setReportPick(e.target.value)} onClick={(e) => e.stopPropagation()}
+                  className="rpt-menu-select" aria-label="Machine">
+            {!pickOk && <option value="">Choose a machine…</option>}
+            {sorted.map((m) => <option key={m.id} value={m.id}>{m.bomKey}{m.serialNo ? ` · ${m.serialNo}` : ""} — {m.status === "completed" ? "Ready" : (m.currentDepartment || m.stage)}</option>)}
+          </select>
+        );
+        const items = [
+          { kind: "customer", title: "Customer report", sub: "Clean report for the customer: photo, build dates, quality checks, trial certificate, sign-off.", machine: true },
+          { kind: "company",  title: "Company full report", sub: "Internal: route with times vs target, who transferred and accepted, every checklist, holds, pending jobs, signatures.", machine: true, admin: true },
+          { kind: "hold",     title: "On hold report", sub: "Machines that went on hold in a period, how long, why and who — totals by department and reason." },
+          { kind: "pending",  title: "Pending jobs report", sub: "Open parts and work per machine and department: quantity, critical flag, status and age." },
+        ].filter((x) => !x.admin || isAdminUser);
+        return (
+          <div data-reports-chooser className="modal-backdrop fixed inset-0 z-[90] flex items-center justify-center p-4"
+               style={{ background: "rgba(17,24,39,0.45)", backdropFilter: "blur(6px)" }}
+               onClick={(e) => e.target === e.currentTarget && setReportsMenu(false)}>
+            <div className="w-full max-w-xl rounded-2xl p-5 rpt-menu" style={{ background: "var(--surface-elevated)", border: "1px solid var(--border-subtle)", boxShadow: "0 24px 60px rgba(17,24,39,0.22)" }}>
+              <div className="flex items-start gap-3 mb-4">
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-[17px] font-black" style={{ color: "var(--text-strong)" }}>Reports</h3>
+                  <p className="text-[12px]" style={{ color: "var(--text-dim)" }}>A4 reports — open one, then Print or save as PDF.</p>
+                </div>
+                <ModalX onClose={() => setReportsMenu(false)} />
+              </div>
+              <div className="space-y-2.5">
+                {items.map((x) => (
+                  <div key={x.kind} className="rpt-menu-item" data-report-option={x.kind}>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[14px] font-black" style={{ color: "var(--text-strong)" }}>{x.title}</div>
+                      <div className="text-[12px] leading-snug" style={{ color: "var(--text-dim)" }}>{x.sub}</div>
+                      {x.machine && <div className="mt-2">{machineSelect}</div>}
+                    </div>
+                    <button type="button" data-report-open={x.kind} disabled={x.machine && !pickOk}
+                            onClick={() => openReport(x.kind, x.machine ? reportPick : null)}
+                            className="rpt-menu-open">Open</button>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 pt-3 flex items-center justify-between gap-3" style={{ borderTop: "1px solid var(--border-subtle)" }}>
+                <span className="text-[12px]" style={{ color: "var(--text-dim)" }}>Production, department-wise and monthly tables</span>
+                <button type="button" data-open-reports onClick={() => onNavigate("reports")}
+                        className="h-9 px-3 rounded-lg text-[12px] font-bold"
+                        style={{ border: "1px solid var(--border-rim)", color: "var(--text-strong)", background: "var(--surface-card)" }}>
+                  Report Center →
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ── Report viewer for the four reports (2026-11-03) — same full-screen
+          sheet and print rules as the machine report above. ── */}
+      {reportDoc && (() => {
+        const m = machineLog.find((x) => String(x.id) === String(reportDoc.machineId));
+        const by = currentUser?.fullName || currentUser?.name || currentUser?.username || "";
+        const heading = { customer: "Customer report", company: "Company full report", hold: "On hold report", pending: "Pending jobs report" }[reportDoc.kind];
+        const deptOptions = [...new Set((pendingHandoverItems || []).map((p) => p.assignedDepartment || "Unassigned"))].sort();
+        return (
+          <div className="mt-report-modal fixed inset-0 z-[95] flex flex-col" role="dialog" aria-label={heading} data-report-viewer={reportDoc.kind}
+               style={{ background: "rgba(17,24,39,0.55)", backdropFilter: "blur(6px)" }}>
+            <div className="mt-report-bar flex items-center gap-2 px-3 sm:px-5 py-2.5 flex-shrink-0 flex-wrap"
+                 style={{ background: "var(--surface-card)", borderBottom: "1px solid var(--border-subtle)" }}>
+              <button type="button" data-report-doc-back onClick={() => { setReportDoc(null); setReportsMenu(true); }}
+                      className="h-9 px-3 rounded-lg text-[12px] font-black flex items-center gap-1.5"
+                      style={{ border: "1px solid var(--border-rim)", color: "var(--text-strong)" }}>← Reports</button>
+              <div className={`text-[13px] font-black truncate flex-1 min-w-0 ${reportDoc.kind === "hold" || reportDoc.kind === "pending" ? "max-sm:invisible" : ""}`} style={{ color: "var(--text-strong)" }}>
+                {heading}{m && (reportDoc.kind === "customer" || reportDoc.kind === "company") ? ` · ${m.bomKey}${m.serialNo ? ` · ${m.serialNo}` : ""}` : ""}
+              </div>
+              {reportDoc.kind === "hold" && (
+                <select data-report-period value={holdPeriod} onChange={(e) => setHoldPeriod(e.target.value)} className="rpt-bar-select" aria-label="Period">
+                  {RPT_PERIODS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+                </select>
+              )}
+              {reportDoc.kind === "pending" && (
+                <>
+                  <select data-report-dept value={pendDept} onChange={(e) => setPendDept(e.target.value)} className="rpt-bar-select" aria-label="Department">
+                    <option value="">All departments</option>
+                    {deptOptions.map((d) => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                  <label className="text-[12px] font-bold flex items-center gap-1.5 px-1" style={{ color: "var(--text-strong)" }}>
+                    <input type="checkbox" data-report-include-done checked={pendIncludeDone} onChange={(e) => setPendIncludeDone(e.target.checked)} /> Include completed
+                  </label>
+                </>
+              )}
+              <button type="button" data-report-doc-print onClick={printReportDoc}
+                      className="h-9 px-3 rounded-lg text-[12px] font-black text-white flex items-center gap-1.5"
+                      style={{ background: "#2640B0" }}>Print / PDF</button>
+              <button type="button" aria-label="Close report" onClick={closeReports}
+                      className="w-9 h-9 rounded-full flex items-center justify-center text-[15px] font-black"
+                      style={{ background: "rgba(17,24,39,0.07)", color: "var(--text-dim)" }}>✕</button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-2 sm:p-6" onClick={(e) => e.target === e.currentTarget && closeReports()}>
+              <div className="mt-report-sheet mx-auto w-full max-w-4xl rounded-xl p-4 sm:p-8" style={{ background: "#fff", boxShadow: "0 24px 60px rgba(17,24,39,0.25)" }}>
+                {reportDoc.kind === "customer" && <CustomerMachineReport machineId={reportDoc.machineId} machineLog={machineLog} bomDefs={bomDefs} handovers={handovers}
+                                                     checklistResponses={checklistResponses} attachments={attachments} settings={settings} generatedBy={by} />}
+                {reportDoc.kind === "company" && <AtoZMachineReport machineId={reportDoc.machineId} machineLog={machineLog} bomDefs={bomDefs} handovers={handovers}
+                                                     pendingHandoverItems={pendingHandoverItems} deptRatings={deptRatings} checklistResponses={checklistResponses}
+                                                     outwardLog={outwardLog} items={items} attachments={attachments} settings={settings}
+                                                     auditLog={auditLog} allUsers={allUsers} />}
+                {reportDoc.kind === "hold" && <OnHoldReport period={holdPeriod} machineLog={machineLog} handovers={handovers} auditLog={auditLog} allUsers={allUsers} settings={settings} generatedBy={by} />}
+                {reportDoc.kind === "pending" && <PendingJobsReport includeDone={pendIncludeDone} dept={pendDept} machineLog={machineLog} pendingHandoverItems={pendingHandoverItems} allUsers={allUsers} settings={settings} generatedBy={by} />}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {deleteModal && (() => {
         const m = deleteModal.machine;
         const submit = async () => {
@@ -21230,7 +22089,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
               {holdModal.error && <div className="mt-3 text-[11px] font-bold px-3 py-2 rounded-lg" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.4)", color: "#dc2626" }}>{holdModal.error}</div>}
               <div className="flex gap-2 mt-4">
                 <button type="button" onClick={() => setHoldModal(null)} disabled={holdModal.busy} className="flex-1 h-11 rounded-lg text-[13px] font-bold text-slate-600 border transition-all disabled:opacity-40" style={{ borderColor: "rgba(17,24,39,0.12)" }}>Cancel</button>
-                <button type="button" data-hold-confirm onClick={submit} disabled={holdModal.busy} className="flex-[2] h-11 rounded-lg text-[13px] font-black text-white transition-all disabled:opacity-50" style={{ background: holdModal.release ? "#15803d" : "#dc2626", color: "#ffffff" }}>
+                <button data-needs-net type="button" data-hold-confirm onClick={submit} disabled={holdModal.busy} className="flex-[2] h-11 rounded-lg text-[13px] font-black text-white transition-all disabled:opacity-50" style={{ background: holdModal.release ? "#15803d" : "#dc2626", color: "#ffffff" }}>
                   {holdModal.busy ? "Saving…" : holdModal.release ? "▶ Release ON HOLD" : "⏸ Put ON HOLD"}
                 </button>
               </div>
@@ -21302,7 +22161,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                 <button type="button" onClick={() => setUndoAsk(null)} disabled={undoAsk.busy}
                         className="flex-1 min-h-[48px] rounded-xl text-[15px] font-bold border transition-all active:scale-[0.97] disabled:opacity-40"
                         style={{ borderColor: "rgba(17,24,39,0.15)", color: "#334155" }}>No</button>
-                <button type="button" data-sender-undo-yes onClick={yes} disabled={undoAsk.busy}
+                <button data-needs-net type="button" data-sender-undo-yes onClick={yes} disabled={undoAsk.busy}
                         className="flex-[2] min-h-[48px] rounded-xl text-[15px] font-black transition-all active:scale-[0.97] disabled:opacity-80"
                         style={{ background: "#f59e0b", color: "#1f1300" }}>
                   {undoAsk.busy ? "⏳ Please wait…" : "Yes, take it back"}
@@ -21527,7 +22386,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                         className="flex-1 h-11 rounded-lg text-[13px] font-bold text-slate-600 border transition-all disabled:opacity-40" style={{ borderColor: "rgba(17,24,39,0.12)" }}>
                   Cancel
                 </button>
-                <button type="button" data-job-submit onClick={submit} disabled={jobAction.busy || (isReceive && !receiveReady)}
+                <button data-needs-net type="button" data-job-submit onClick={submit} disabled={jobAction.busy || (isReceive && !receiveReady)}
                         title={isReceive && !receiveReady ? receiveWhy : ""}
                         className="flex-[2] h-11 rounded-lg text-[13px] font-black text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                         style={{ background: isReceive ? "#1d4ed8" : "linear-gradient(135deg,#16a34a,#15803d)", color: "#ffffff" }}>
@@ -22069,7 +22928,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                   Cancel
                 </button>
                 <span onClick={() => { if ((!transferBusy && isOverrun && !narration.trim())) flagField("[data-transfer-delay]"); }}>
-                <button onClick={submitFinishTransfer} disabled={transferBusy || (isOverrun && !narration.trim())}
+                <button data-needs-net onClick={submitFinishTransfer} disabled={transferBusy || (isOverrun && !narration.trim())}
                         className="text-[12px] font-bold text-slate-900 bg-amber-600 hover:bg-amber-700 px-5 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed" style={{ color: "#fff", pointerEvents: (!transferBusy && isOverrun && !narration.trim()) ? "none" : undefined }}>
                   {transferBusy ? "⏳ Please wait…" : rackReturn ? `✓ Assembled · Return to ${slotLabel(machine.rackSlot)}` : `Finish & Transfer → ${toDepartment}`}
                 </button>
@@ -22338,15 +23197,16 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                   Cancel
                 </button>
                 <span onClick={() => {
+                        if (!busy && !online) { pulseOffline(); return; }
                         if (busy || !whyNot) return;
                         flagField(acceptDeptEmps.length > 0 && selectedTeam.filter(Boolean).length === 0 ? "[data-accept-people]"
                           : !sigSvg ? "[data-accept-signature]" : "[data-accept-confirm]");
                       }}>
                 {(
-                  <button data-accept-confirm onClick={submitAcceptHandover}
-                          disabled={busy || !sigSvg || (acceptDeptEmps.length > 0 && selectedTeam.filter(Boolean).length === 0) || (workflow.require_password_at_accept && !password)}
-                          className={`text-[15px] font-black px-7 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed ${whyNot || busy ? "" : "accept-ready"}`}
-                          style={{ pointerEvents: (busy || !whyNot) ? undefined : "none", minHeight: 50, background: "#15803d", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
+                  <button data-accept-confirm data-needs-net onClick={submitAcceptHandover}
+                          disabled={busy || !online || !sigSvg || (acceptDeptEmps.length > 0 && selectedTeam.filter(Boolean).length === 0) || (workflow.require_password_at_accept && !password)}
+                          className={`text-[15px] font-black px-7 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed ${whyNot || busy || !online ? "" : "accept-ready"}`}
+                          style={{ pointerEvents: busy || (online && !whyNot) ? undefined : "none", minHeight: 50, background: "#15803d", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
                     {busy ? "⏳ Please wait…" : (workflow.require_password_at_accept ? "Verify & Accept" : "Confirm Acceptance")}
                   </button>
                 )}
@@ -24524,6 +25384,57 @@ function GlobalSearch({ items, pos, vendorList, machineLog, onClose, onNavigate 
 
 // ─── NOTIFICATION PANEL ───────────────────────────────────────────────────────
 
+// 2026-11-03 — Admin "Ready machines" popup. Shows machines that became READY
+// since the admin last pressed OK / View (first ever open: last 24 hours).
+// Read-only; both buttons only record "seen" (and View opens the Ready list).
+function ReadyMachinesPopup({ items = [], bomDefs = {}, onOk, onView }) {
+  const okRef = useRef(null);
+  useEffect(() => {
+    try { okRef.current?.focus({ preventScroll: true }); } catch { /* ignore */ }
+    const onKey = (e) => { if (e.key === "Escape") { e.preventDefault(); onOk?.(); } };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onOk]);
+  const n = items.length;
+  const now = Date.now();
+  return (
+    <div className="rp-backdrop no-print" data-ready-popup role="dialog" aria-modal="true" aria-labelledby="rp-title">
+      <div className="rp-card">
+        <div className="rp-head">
+          <div className="rp-seal" aria-hidden="true"><CircleCheckBig size={26} strokeWidth={2.2} /></div>
+          <div className="min-w-0">
+            <h2 id="rp-title" className="rp-title" data-ready-title>🎉 {n} machine{n === 1 ? " is" : "s are"} Ready</h2>
+            <p className="rp-sub">Finished since you last looked</p>
+          </div>
+        </div>
+        <ul className="rp-list">
+          {items.map(({ machine: m, readyAt, exact }) => {
+            const signer = trialSignedBy(m);
+            return (
+              <li key={m.id} className="rp-row" data-ready-row={m.id}>
+                <BomPhotoThumb url={(bomDefs || {})[m.bomKey]?.photoUrl} size={52}
+                  fallback={<div className="rp-ph" aria-hidden="true"><Cog size={22} /></div>} />
+                <div className="min-w-0 flex-1">
+                  <div className="rp-name">{m.bomLabel || m.bomKey || "Machine"}</div>
+                  <div className="rp-meta">{m.bomKey}{m.serialNo ? <> · S/N <b>{m.serialNo}</b></> : null}</div>
+                  <div className="rp-meta">
+                    <span className="rp-when">Ready {formatReadyWhen(readyAt, now, exact)}</span>
+                    {signer ? <> · Trial signed by <b>{signer}</b></> : null}
+                  </div>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+        <div className="rp-foot">
+          <button type="button" className="rp-btn rp-btn-ghost" data-ready-view onClick={onView}>View in Machine Tracker</button>
+          <button type="button" ref={okRef} className="rp-btn rp-btn-primary" data-ready-ok onClick={onOk}>OK</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function NotificationPanel({ notifications, dismissed, onClose, onNavigate, onDismiss, onDismissAll }) {
   const TYPE_CFG = {
     critical:      { label: "Critical Stock",     icon: "🔴", color: "#b91c1c", nav: "inventory" },
@@ -24908,6 +25819,15 @@ export default function App() {
   // Phase A — handovers refresh. Falls back silently if table doesn't exist
   // (store handles the error).
   const rtHandovers = useCallback(() => { fetchHandovers().then((h) => { if (h) setHandovers(h); }); }, []);
+  // 2026-11-03 — local (offline-dev) mode has no realtime channel: pick up a
+  // hand-over written by another tab of this browser, so the staff arrival
+  // alert works there too. Supabase mode is untouched (realtime above).
+  useEffect(() => {
+    if (isSupabaseEnabled()) return;
+    const onStorage = (e) => { if (e && e.key === "erp_handovers") rtHandovers(); };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [rtHandovers]);
   // Migration 053 — the four Machine Tracker side tables. Same shape as the
   // login hydration below; also used as the rollback path when one of these
   // writes fails after an optimistic update.
@@ -25096,6 +26016,42 @@ export default function App() {
     return () => window.removeEventListener("keydown", handler);
   }, [showShortcuts, showSearch, showNotifs, canView]);
 
+  // ── 2026-11-03 — Admin "Ready machines" popup (owner-approved) ──
+  // Read-only: derived from machineLog (status + the accept-into-Ready history
+  // row). The only thing stored is a per-user "last seen" time in localStorage.
+  // Machines Ready before this session started → the popup (on Dashboard /
+  // Machine Tracker); machines turning Ready while the app is open → a toast
+  // plus the bell list. Staff never see either.
+  const readyAdmin = isReadyPopupRole(currentUser);
+  const readyUid   = currentUser ? String(currentUser.id || currentUser.username || "") : "";
+  const [readySeen, setReadySeen] = useState({ uid: "", at: null, since: 0 });
+  useEffect(() => {
+    if (!readyUid) return;
+    setReadySeen({ uid: readyUid, at: readLastSeenReady(readyUid), since: Date.now() });
+  }, [readyUid]);
+  const readyNew = useMemo(() => (
+    readyAdmin && readySeen.uid === readyUid ? newReadySince(machineLog, readySeen.at) : []
+  ), [readyAdmin, readyUid, readySeen, machineLog]);
+  const readyPopupItems = readyNew.filter((r) => r.readyAt < readySeen.since);
+  const markReadySeen = useCallback(() => {
+    const now = Date.now();
+    writeLastSeenReady(readyUid, now);
+    setReadySeen((prev) => ({ ...prev, at: now }));
+  }, [readyUid]);
+  const [mtFilterReq, setMtFilterReq] = useState(null);
+  const readyToasted = useRef(new Set());
+  useEffect(() => {
+    for (const r of readyNew) {
+      if (r.readyAt < readySeen.since) continue;
+      const key = String(r.machine.id);
+      if (readyToasted.current.has(key)) continue;
+      readyToasted.current.add(key);
+      const m = r.machine;
+      addToast("success", `🎉 Machine Ready: ${m.bomLabel || m.bomKey || ""}`,
+        `${m.bomKey || ""}${m.serialNo ? ` · S/N ${m.serialNo}` : ""}${trialSignedBy(m) ? ` · Trial signed by ${trialSignedBy(m)}` : ""}`);
+    }
+  }, [readyNew, readySeen.since, addToast]);
+
   // Auth gate — after all hooks.
   //
   // Order matters:
@@ -25198,11 +26154,23 @@ export default function App() {
       title: `${safePending.length} Pending Material${safePending.length > 1 ? "s" : ""} Awaiting`,
       desc:  `${[...new Set(safePending.map((p) => p?.bomKey).filter(Boolean))].slice(0, 3).join(", ")}${safePending.length > 3 ? "…" : ""}`,
     }] : []),
-    ...safeMachines.filter((m) => m?.status === "completed" && m?.stage === "Ready").slice(0, 3).map((m) => ({
+    // 2026-11-03 — for admins the bell lists the newest Ready machines first and
+    // every one that is new since they last looked (Ready popup); staff keep
+    // the original list.
+    ...(readyAdmin ? (() => {
+      const fresh = new Set(readyNew.map((r) => String(r.machine.id)));
+      const rows = safeMachines.filter((m) => m?.status === "completed" && m?.stage === "Ready")
+        .map((m) => ({ m, t: readyAtOf(m) ?? 0 })).sort((a, b) => b.t - a.t);
+      return rows.slice(0, Math.min(8, Math.max(3, fresh.size))).map(({ m }) => ({
+        id: `machine_ready-${m.id}`, type: "machine_ready",
+        title: `${fresh.has(String(m.id)) ? "New · " : ""}Machine Ready: ${m.bomKey || ""}`,
+        desc:  `${m.bomLabel || ""}${m.serialNo ? " · S/N: " + m.serialNo : ""} · Completed ${m.completedDate || ""}${trialSignedBy(m) ? ` · Trial signed by ${trialSignedBy(m)}` : ""}`,
+      }));
+    })() : safeMachines.filter((m) => m?.status === "completed" && m?.stage === "Ready").slice(0, 3).map((m) => ({
       id: `machine_ready-${m.id}`, type: "machine_ready",
       title: `Machine Ready: ${m.bomKey || ""}`,
       desc:  `${m.bomLabel || ""}${m.serialNo ? " · S/N: " + m.serialNo : ""} · Completed ${m.completedDate || ""}`,
-    })),
+    }))),
   ];
   const activeNotifs = notifications.filter((n) => !dismissedIds.has(n.id));
 
@@ -28239,7 +29207,7 @@ export default function App() {
                               isSuperAdmin={currentUser?.role === "super_admin"}
                               onReverseReceive={handleReverseReceive}
                               onSetItemDefaultRate={handleSetItemDefaultRate} />,
-    machines:  <MachinePage   machineLog={machineLog} checklistResponses={checklistResponses} outwardLog={outwardLog} onUpdateTrialCertificate={handleUpdateTrialCertificate} canView={canView} onUpdateStage={handleUpdateMachineStage} onNavigate={setActivePage} canDo={canDo}
+    machines:  <MachinePage   machineLog={machineLog} checklistResponses={checklistResponses} filterRequest={mtFilterReq} outwardLog={outwardLog} onUpdateTrialCertificate={handleUpdateTrialCertificate} canView={canView} onUpdateStage={handleUpdateMachineStage} onNavigate={setActivePage} canDo={canDo}
                               items={items}
                               /* 2026-10-30 — BOM Outward, embedded at the top. Shown
                                  only to roles that may issue a BOM, same as Outward. */
@@ -28385,6 +29353,20 @@ export default function App() {
           onNavigate={(page) => { setActivePage(page); setShowNotifs(false); }}
           onDismiss={dismissNotif}
           onDismissAll={dismissAllNotifs}
+        />
+      )}
+
+      {/* ── 2026-11-03 — Admin Ready popup (Dashboard / Machine Tracker) ── */}
+      {readyAdmin && readyPopupItems.length > 0 && (activePage === "dashboard" || activePage === "machines") && (
+        <ReadyMachinesPopup
+          items={readyPopupItems}
+          bomDefs={bomDefs}
+          onOk={markReadySeen}
+          onView={() => {
+            markReadySeen();
+            setActivePage("machines");
+            setMtFilterReq({ filter: "completed", n: Date.now() });
+          }}
         />
       )}
 

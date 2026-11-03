@@ -14,7 +14,12 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 REPO="shantaztechnofoods/purchase_inventory_os"
 SESSION_URL="${CLAUDE_SESSION_URL:-https://claude.ai/code/session_011Kbdu9cV9BoczPpaspZYws}"
-PORT="${E2E_PORT:-5183}"; DIST="${E2E_DIST:-/tmp/dist-e2e}"; LOGS="$(mktemp -d /tmp/ship.XXXX)"
+LOGS="$(mktemp -d /tmp/ship.XXXX)"
+# Each run gets its own build folder and its own free port, so several sessions
+# / agents can ship at the same time without testing each other's builds.
+DIST="${E2E_DIST:-$LOGS/dist}"
+PORT="${E2E_PORT:-$(python3 -c 'import socket;s=socket.socket();s.bind(("127.0.0.1",0));print(s.getsockname()[1]);s.close()')}"
+export E2E_BASE="${E2E_BASE:-http://localhost:$PORT/}"
 c_ok=$'\e[32m'; c_bad=$'\e[31m'; c_dim=$'\e[2m'; c_off=$'\e[0m'
 say(){ printf '%s\n' "$*"; }; die(){ printf '%s✗ %s%s\n' "$c_bad" "$*" "$c_off" >&2; exit 1; }
 t0=$(date +%s); el(){ echo $(( $(date +%s) - t0 ))s; }
@@ -49,10 +54,14 @@ cmd_check(){
   for j in unit build e2ebuild; do [ "$(cat "$LOGS/$j.rc")" = 0 ] || { say "${c_bad}✗ $j failed${c_off} — $LOGS/$j.log"; tail -15 "$LOGS/$j.log"; bad=1; }; done
   [ $bad = 0 ] || die "stopped before the browser suites"
   grep -E '^# (pass|fail)' "$LOGS/unit.log" | tr '\n' ' '; say; say "${c_ok}✓ unit + build ($(el))${c_off}"
-  curl -s "localhost:$PORT" >/dev/null || { (setsid npx vite preview --outDir "$DIST" --port "$PORT" --strictPort >"$LOGS/preview.log" 2>&1 &); for i in 1 2 3 4 5 6 7 8; do curl -s "localhost:$PORT" >/dev/null && break; sleep 1; done; }
+  curl -s "localhost:$PORT" >/dev/null && die "port $PORT is already in use — another preview is running there; pick another E2E_PORT"
+  (setsid npx vite preview --outDir "$DIST" --port "$PORT" --strictPort >"$LOGS/preview.log" 2>&1 & echo $! >"$LOGS/preview.pid")
+  for i in $(seq 1 20); do curl -s "localhost:$PORT" >/dev/null && break; sleep 0.5; done
+  trap 'pkill -f -- "--port $PORT --strictPort" 2>/dev/null || true' EXIT
   say "running browser suites in parallel ..."
-  local s; for s in tests/e2e/*.mjs; do [ -n "${E2E_ONLY:-}" ] && [[ "$(basename "$s" .mjs)" != *"$E2E_ONLY"* ]] && continue; job "e2e-$(basename "$s" .mjs)" timeout 420 node "$s"; done
+  local s; for s in tests/e2e/*.mjs; do [ -n "${E2E_ONLY:-}" ] && [[ "$(basename "$s" .mjs)" != *"$E2E_ONLY"* ]] && continue; while [ "$(jobs -rp | wc -l)" -ge "${E2E_PAR:-4}" ]; do sleep 0.5; done; job "e2e-$(basename "$s" .mjs)" timeout 420 node "$s"; done
   wait
+  git checkout -- tests/screenshots 2>/dev/null || true   # e2e screenshots are not part of a change
   for s in "$LOGS"/e2e-*.rc; do j=$(basename "$s" .rc); printf '%-34s %s\n' "$j" "$(tail -1 "$LOGS/$j.log" | tr -d '\n')"; [ "$(cat "$s")" = 0 ] || bad=1; done
   [ $bad = 0 ] || die "a browser suite failed — logs in $LOGS"
   say "${c_ok}✓ ALL GREEN in $(el)${c_off}  ${c_dim}(logs: $LOGS)${c_off}"
@@ -62,7 +71,7 @@ cmd_pr(){
   preflight; guards; git add -A
   git diff --cached --quiet || git commit -q -m "$title
 
-Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Co-Authored-By: ${SHIP_MODEL:-Claude Opus 5.5} <noreply@anthropic.com>
 Claude-Session: $SESSION_URL" || die "commit failed"
   local br; br=$(git rev-parse --abbrev-ref HEAD); git push -q -u origin "$br" || die "push failed (never force-push)"
   python3 - "$title" "$br" "$body" "$SESSION_URL" >"$LOGS/pr.json" <<'PY'

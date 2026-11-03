@@ -178,6 +178,12 @@ const PAGE_COMPONENTS = [
   // BOMDrawer Edit and the Create BOM modal. Losing it silently sends the
   // operator back to adding forty BOM lines one at a time.
   "BOMPasteLines",
+  // 2026-11-03 — the four PDF reports (Company full = AtoZMachineReport).
+  "AtoZMachineReport",
+  "CustomerMachineReport",
+  "OnHoldReport",
+  "PendingJobsReport",
+  "ReportSheet",
 ];
 
 for (const name of PAGE_COMPONENTS) {
