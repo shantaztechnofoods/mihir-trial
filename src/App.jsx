@@ -28857,7 +28857,7 @@ export default function App() {
                               isSuperAdmin={currentUser?.role === "super_admin"}
                               onReverseReceive={handleReverseReceive}
                               onSetItemDefaultRate={handleSetItemDefaultRate} />,
-    machines:  <MachinePage   filterRequest={mtFilterReq} machineLog={machineLog} checklistResponses={checklistResponses} outwardLog={outwardLog} onUpdateTrialCertificate={handleUpdateTrialCertificate} canView={canView} onUpdateStage={handleUpdateMachineStage} onNavigate={setActivePage} canDo={canDo}
+    machines:  <MachinePage   machineLog={machineLog} checklistResponses={checklistResponses} filterRequest={mtFilterReq} outwardLog={outwardLog} onUpdateTrialCertificate={handleUpdateTrialCertificate} canView={canView} onUpdateStage={handleUpdateMachineStage} onNavigate={setActivePage} canDo={canDo}
                               items={items}
                               /* 2026-10-30 — BOM Outward, embedded at the top. Shown
                                  only to roles that may issue a BOM, same as Outward. */
