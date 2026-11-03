@@ -86,7 +86,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-03-phone-count-boxes";
+const APP_BUILD = "2026-11-03-late-reason-buttons";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -21335,10 +21335,25 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                       🚦 On hold · {formatDuration(heldMinutes(handover.sentAt, handover.acceptTimeoutMinutes, nowTick))} past the acceptance window
                     </div>
                     <label className="text-[11px] font-bold text-slate-700 block mb-1">Reason for late acceptance <span className="text-red-500">*</span></label>
-                    <textarea rows={2} value={acceptModal.holdReason || ""} disabled={acceptModal.busy}
-                              onChange={(e) => setField({ holdReason: e.target.value, error: "" })}
-                              placeholder="e.g. machine was on the rack behind two others; operator on leave"
-                              className="w-full bg-white border border-red-200 rounded-lg px-3 py-2 text-[12px] text-slate-900 outline-none focus:border-red-400" />
+                    <div className="grid grid-cols-2 gap-2 mb-2" data-late-reasons>
+                      {[["👷", "Worker on leave"], ["📦", "Parts missing"], ["🔧", "Other machine first"], ["✏️", "Other"]].map(([icon, label]) => {
+                        const on = (acceptModal.holdPick || "") === label;
+                        return (
+                          <button key={label} type="button" data-late-reason={label} disabled={acceptModal.busy}
+                                  onClick={() => setField({ holdPick: label, holdReason: label === "Other" ? "" : label, error: "" })}
+                                  className={`rounded-xl text-[13px] font-bold flex items-center justify-center gap-1.5 px-2 transition-all ${on ? "accept-pop" : ""}`}
+                                  style={{ minHeight: 48, background: on ? "#dc2626" : "#fff", color: on ? "#fff" : "#7f1d1d", border: `2px solid ${on ? "#dc2626" : "rgba(239,68,68,0.35)"}` }}>
+                            <span style={{ fontSize: 17 }}>{icon}</span>{label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {(acceptModal.holdPick === "Other" || (!acceptModal.holdPick && (acceptModal.holdReason || ""))) && (
+                      <textarea rows={2} value={acceptModal.holdReason || ""} disabled={acceptModal.busy} autoFocus
+                                onChange={(e) => setField({ holdReason: e.target.value, error: "" })}
+                                placeholder="Write the reason"
+                                className="w-full bg-white border-2 border-red-200 rounded-lg px-3 py-2 text-[14px] text-slate-900 outline-none focus:border-red-400" />
+                    )}
                   </div>
                 )}
                 {(
