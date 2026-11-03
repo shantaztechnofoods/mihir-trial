@@ -92,7 +92,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-03-part-received";
+const APP_BUILD = "2026-11-03-mt-polish-1";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -22228,9 +22228,11 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
           setRackSendAsk((prev) => prev ? { ...prev, busy: true } : prev);
           try { await rackSendAsk.run(); } finally { setRackSendAsk(null); }
         };
+        // zIndex inline: .modal-backdrop is z 50 in index.css, and this must
+        // sit above the rack panel (z 65) it can be opened from.
         return (
           <div className="modal-backdrop fixed inset-0 z-[75] flex items-end sm:items-center justify-center p-3 sm:p-4" data-rack-send-ask
-               style={{ background: "rgba(17,24,39,0.45)", backdropFilter: "blur(12px)" }}
+               style={{ background: "rgba(17,24,39,0.45)", backdropFilter: "blur(12px)", zIndex: 75 }}
                onClick={(e) => e.target === e.currentTarget && !rackSendAsk.busy && setRackSendAsk(null)}>
             <div role="dialog" aria-modal="true" aria-label="Confirm send" className="w-full max-w-md rounded-2xl p-5" style={{ background: "var(--surface-raised)", border: "1px solid rgba(21,128,61,0.45)", boxShadow: "0 24px 70px rgba(17,24,39,0.2)", paddingBottom: "max(20px, env(safe-area-inset-bottom))" }}>
               <h3 className="text-[17px] font-black" style={{ color: "var(--text-strong)" }}>Are you sure?</h3>
