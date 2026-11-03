@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # SHANTAZ ERP — fast, safe ship script.   Usage: scripts/ship.sh <command> [args]
 #   check                 preflight + guards + npm test, build and ALL browser suites IN PARALLEL
+#                         (E2E_ONLY=<name-part> scripts/ship.sh check  → only matching browser suites, for quick loops; always run the full check before `pr`)
 #   bump <tag>            set APP_BUILD (src/App.jsx) and APP_BUILD_TAG (src/main.jsx) to the same tag
 #   pr "<title>" <body-file>   commit everything, push, open the PR (body file = markdown; attribution is appended)
 #   wait [pr#]            poll CI until every check finishes (exit 1 on failure)
@@ -50,7 +51,7 @@ cmd_check(){
   grep -E '^# (pass|fail)' "$LOGS/unit.log" | tr '\n' ' '; say; say "${c_ok}✓ unit + build ($(el))${c_off}"
   curl -s "localhost:$PORT" >/dev/null || { (setsid npx vite preview --outDir "$DIST" --port "$PORT" --strictPort >"$LOGS/preview.log" 2>&1 &); for i in 1 2 3 4 5 6 7 8; do curl -s "localhost:$PORT" >/dev/null && break; sleep 1; done; }
   say "running browser suites in parallel ..."
-  local s; for s in tests/e2e/*.mjs; do job "e2e-$(basename "$s" .mjs)" timeout 420 node "$s"; done
+  local s; for s in tests/e2e/*.mjs; do [ -n "${E2E_ONLY:-}" ] && [[ "$(basename "$s" .mjs)" != *"$E2E_ONLY"* ]] && continue; job "e2e-$(basename "$s" .mjs)" timeout 420 node "$s"; done
   wait
   for s in "$LOGS"/e2e-*.rc; do j=$(basename "$s" .rc); printf '%-34s %s\n' "$j" "$(tail -1 "$LOGS/$j.log" | tr -d '\n')"; [ "$(cat "$s")" = 0 ] || bad=1; done
   [ $bad = 0 ] || die "a browser suite failed — logs in $LOGS"
