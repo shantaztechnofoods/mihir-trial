@@ -76,6 +76,8 @@ import { mapRow as vendorMapRow, parseRows as vendorParseRows } from "./utils/ve
 import { parseRows as itemParseRows, generateItemCode, buildRowsFromSheet as itemBuildRowsFromSheet } from "./utils/itemImport.js";
 import { parseBomPaste } from "./utils/bomPaste.js";
 import { countDelayReasons, DELAY_PERIODS, DELAY_OTHER, DELAY_TOOK_LONGER } from "./utils/delayReasons.js";
+import { useOnline } from "./components/OfflineBanner.jsx";
+import { pulseOffline } from "./utils/online.js";
 import { receivedPoRates, bomCostLines, bomCostSummary, validateBomLines, formatINR, RATE_SOURCE_LABEL } from "./utils/bomCost.js";
 import { PHYSICAL_RACK_LAYOUT, rackOfBom, physicalRackFamily, physicalRackSlots, rackCapacityFor, buildFamilyRacks, firstFreeSlot, canAssignSlot, slotLabel, rackKeyNorm, rackViewLog, setSlotOf, setLabel, pairSlotOf, bomFillCheck, rCrateIssues, rackBoms, freeSlotsFor, tierOfSlot } from "./utils/rackSlots.js";
 import { getActiveCompany, normalizePOSettings, openPOPdf, PO_TEMPLATE_OPTIONS } from "./utils/poTemplate.js";
@@ -88,7 +90,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-03-ship-isolated";
+const APP_BUILD = "2026-11-03-offline-safe";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -11222,7 +11224,7 @@ function SenderUndoButton({ handover, user, onUndo }) {
   }, [st.allowed]);
   if (!st.allowed) return null;
   return (
-    <button type="button" data-sender-undo={handover.id} onClick={() => onUndo(handover)}
+    <button data-needs-net type="button" data-sender-undo={handover.id} onClick={() => onUndo(handover)}
             className="min-h-[48px] self-start sm:self-auto px-4 rounded-xl text-[15px] font-black transition-all active:scale-[0.97] inline-flex items-center justify-center gap-1.5 shrink-0"
             style={{ background: "#f59e0b", color: "#1f1300" }}>
       ↩ Undo <span className="tabular-nums" data-sender-undo-clock>({formatUndoCountdown(st.remainingMs)})</span>
@@ -17734,6 +17736,9 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
   // Migration 028 — During-Work checklist runtime modal.
   const [duringWorkModal, setDuringWorkModal] = useState(null); // { machine, template, answers, busy, error }
   const [acceptModal, setAcceptModal] = useState(null); // { handover, password, sigSvg, busy, error }
+  // 2026-11-03 — offline: Confirm Acceptance is disabled (popup keeps the
+  // signature / team / ticks) and a tap pulses the "No internet" banner.
+  const online = useOnline();
   const [transferBusy, setTransferBusy] = useState(false);
 
   // Pending handovers filtered to those awaiting acceptance.
@@ -18275,14 +18280,14 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                               )}
                               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: chip.bg, color: chip.fg }}>{chip.label}</span>
                               {onReceivePendingItem && canReceiveJob(p) && p.status === "open" && !p.receivedAt && (
-                                <button type="button" onClick={() => setJobAction({ item: p, action: "receive", notes: "", busy: false, error: "" })}
+                                <button data-needs-net type="button" onClick={() => setJobAction({ item: p, action: "receive", notes: "", busy: false, error: "" })}
                                         className="text-[10.5px] font-bold px-2.5 py-1 rounded-lg border transition-all"
                                         style={{ background: "rgba(37,99,235,0.08)", border: "1px solid rgba(37,99,235,0.35)", color: "#1d4ed8" }}>
                                   Part received
                                 </button>
                               )}
                               {canAct && onResolvePendingItem && p.status === "open" && (
-                                <button type="button" onClick={() => setJobAction({ item: p, action: "complete", notes: "", busy: false, error: "" })}
+                                <button data-needs-net type="button" onClick={() => setJobAction({ item: p, action: "complete", notes: "", busy: false, error: "" })}
                                         className="text-[10.5px] font-bold px-2.5 py-1 rounded-lg border transition-all"
                                         style={{ background: "rgba(22,163,74,0.08)", border: "1px solid rgba(22,163,74,0.35)", color: "#15803d" }}>
                                   Work completed
@@ -18810,7 +18815,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                             </div>
                           </div>)}
                           {canTakeFromRack && canAccept ? (
-                            <button type="button" data-staff-take={h.id} className={btn} style={{ background: "#4338ca", color: "#fff" }}
+                            <button data-needs-net type="button" data-staff-take={h.id} className={btn} style={{ background: "#4338ca", color: "#fff" }}
                                     disabled={!!acceptModal || rackTakeBusy === h.id}
                                     onClick={async () => {
                                       if (acceptModal || rackTakeBusy) return;
@@ -18851,7 +18856,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                             {late && <div className="text-[13px] font-black mt-1" style={{ color: "#dc2626" }}><LeadIcon e="🚦" />ON HOLD — accept deadline passed</div>}
                           </div>)}
                           {canAccept && (
-                            <button type="button" data-staff-accept={h.id} className={btn} style={{ background: "#15803d", color: "#fff" }}
+                            <button data-needs-net type="button" data-staff-accept={h.id} className={btn} style={{ background: "#15803d", color: "#fff" }}
                                     disabled={!!acceptModal} onClick={() => { if (!acceptModal) openAcceptModal(h); }}>
                               ✓ Accept into {h.toDepartment}
                             </button>
@@ -18917,7 +18922,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                               </button>
                             )}
                             {next && canFinish && (
-                              <button type="button" data-staff-finish={m.id} className={btn} style={{ background: "#15803d", color: "#fff" }} onClick={() => openFinishModal(m)}>
+                              <button data-needs-net type="button" data-staff-finish={m.id} className={btn} style={{ background: "#15803d", color: "#fff" }} onClick={() => openFinishModal(m)}>
                                 ✓ Finish → {next}
                               </button>
                             )}
@@ -18974,13 +18979,13 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                           {canJobs && (
                             <div className="flex flex-col sm:flex-row gap-2">
                               {onReceivePendingItem && canReceiveJob(p) && !p.receivedAt && (
-                                <button type="button" className={btn} style={{ background: "rgba(37,99,235,0.08)", border: "1px solid rgba(37,99,235,0.4)", color: "#1d4ed8" }}
+                                <button data-needs-net type="button" className={btn} style={{ background: "rgba(37,99,235,0.08)", border: "1px solid rgba(37,99,235,0.4)", color: "#1d4ed8" }}
                                         onClick={() => setJobAction({ item: p, action: "receive", notes: "", busy: false, error: "" })}>
                                   Part received
                                 </button>
                               )}
                               {onResolvePendingItem && (
-                                <button type="button" className={btn} style={{ background: "#15803d", color: "#fff" }}
+                                <button data-needs-net type="button" className={btn} style={{ background: "#15803d", color: "#fff" }}
                                         onClick={() => setJobAction({ item: p, action: "complete", notes: "", busy: false, error: "" })}>
                                   ✓ Work completed
                                 </button>
@@ -19105,7 +19110,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                       </button>
                     )}
                     {canAccept && onAcceptHandover ? (
-                      <button onClick={() => openAcceptModal(h)}
+                      <button onClick={() => openAcceptModal(h)} data-needs-net
                               className="text-[12px] font-black text-slate-900 px-5 py-2.5 rounded-xl transition-all hover:scale-105"
                               style={{ background: "#15803d", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", minWidth: 160, color: "#ffffff" }}>
                         ✓ Accept Machine
@@ -19640,7 +19645,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                     <div className="text-[9px] font-bold mt-1 px-1.5 py-0.5 rounded-full inline-block"
                                          style={{ background: "rgba(21,128,61,0.10)", color: "#15803d" }}>✓ Assembled{niN ? ` · ${niN} part${niN === 1 ? "" : "s"} owed` : ""}</div>
                                     {faceCanSend && (
-                                      <button type="button" data-rack-send={sl.id} onClick={faceSend}
+                                      <button data-needs-net type="button" data-rack-send={sl.id} onClick={faceSend}
                                               className="mt-1.5 w-full rounded-lg px-2 py-1.5 text-[10px] font-black text-white"
                                               style={{ background: "#15803d" }}
                                               title={`Send ${m.serialNo || m.bomKey} to ${faceHo.toDepartment} — this rack becomes empty`}>
@@ -19781,7 +19786,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                 const busy = pendIssueBusy === p2.id;
                                 if (p2.receivedAt) {
                                   return canFinishTransfer(canDo) && onResolvePendingItem ? (
-                                    <button type="button" data-pending-action="complete" disabled={busy}
+                                    <button data-needs-net type="button" data-pending-action="complete" disabled={busy}
                                             onClick={async () => { setPendIssueBusy(p2.id); const r = await onResolvePendingItem(p2.id, { notes: "Part fitted — completed from Rack View" }); setPendIssueBusy(null); if (!r || r.success === false) showToast("Could not complete", (r && r.error) || "", "urgent"); else showToast("Pending part completed", p2.itemName || p2.itemCode || ""); }}
                                             className="text-[10.5px] font-bold px-2 py-1 rounded-md text-white disabled:opacity-50" style={{ background: "#15803d" }}>✓ Mark completed</button>
                                   ) : null;
@@ -19792,7 +19797,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                 if (pendIssueAsk === p2.id) {
                                   return (
                                     <span className="inline-flex items-center gap-1">
-                                      <button type="button" data-pending-action="confirm" disabled={busy}
+                                      <button data-needs-net type="button" data-pending-action="confirm" disabled={busy}
                                               onClick={async () => { setPendIssueBusy(p2.id); const r = await onIssuePendingPart(p2.id); setPendIssueBusy(null); setPendIssueAsk(null);
                                                 if (!r || r.success === false) showToast("Could not issue", (r && r.error) || "", "urgent");
                                                 else showToast(`${p2.itemName || p2.itemCode} × ${p2.qty} issued`, r.partial ? r.error : `${m.serialNo || m.bomKey} — stock deducted once, job completed`); }}
@@ -19802,7 +19807,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                   );
                                 }
                                 return (
-                                  <button type="button" data-pending-action="issue" disabled={!enough}
+                                  <button data-needs-net type="button" data-pending-action="issue" disabled={!enough}
                                           title={enough ? "Part is physically available — issue it from stock to this machine" : "Not enough stock yet"}
                                           onClick={() => setPendIssueAsk(p2.id)}
                                           className="text-[10.5px] font-bold px-2 py-1 rounded-md border disabled:opacity-40 disabled:cursor-not-allowed"
@@ -20310,7 +20315,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                       )}
                       {!isComplete && onSetMachineHold && (isAdminUser || canFinishTransfer(canDo) || canDo("machines", "updateStage")) && (
                         machine.holdActive ? (
-                          <button type="button" data-card-release-hold={machine.id}
+                          <button data-needs-net type="button" data-card-release-hold={machine.id}
                                   onClick={() => setHoldModal({ machine, release: true, reason: "", busy: false, error: "" })}
                                   className="text-[11px] font-black px-3 py-1.5 rounded-lg border transition-all"
                                   style={{ background: "rgba(21,128,61,0.10)", border: "1px solid rgba(21,128,61,0.4)", color: "#15803d" }}
@@ -20318,7 +20323,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                             ▶ Release ON HOLD
                           </button>
                         ) : (
-                          <button type="button" data-card-hold={machine.id}
+                          <button data-needs-net type="button" data-card-hold={machine.id}
                                   onClick={() => setHoldModal({ machine, release: false, reason: "", busy: false, error: "" })}
                                   className="text-[11px] font-black px-3 py-1.5 rounded-lg border transition-all"
                                   style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.4)", color: "#b91c1c" }}
@@ -20339,7 +20344,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
         </button>
       )}
       {!isComplete && nextDepartment(machine.currentDepartment || machine.stage) && !machine.pendingHandoverId && !machine.holdActive && canFinishTransfer(canDo) && onFinishTransfer && (
-                        <button onClick={() => openFinishModal(machine)}
+                        <button data-needs-net onClick={() => openFinishModal(machine)}
                                 className={`font-black text-white rounded-lg transition-all ${isFloorLogin ? "text-[14px] px-5 py-2.5" : "text-[11px] px-3 py-1.5"}`}
                                 style={{ background: "#15803d", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}
                                 title={`Finish ${machine.currentDepartment || machine.stage} → ${nextDepartment(machine.currentDepartment || machine.stage)}`}>
@@ -20396,7 +20401,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                               </span>
                             )}
                             {cardCanAccept && (
-                              <button type="button" data-card-accept={h.id}
+                              <button data-needs-net type="button" data-card-accept={h.id}
                                       onClick={() => { if (!acceptModal) openAcceptModal(h); }}
                                       disabled={!!acceptModal}
                                       className="text-[11px] font-black text-white px-3 py-1.5 rounded-lg transition-all disabled:opacity-50"
@@ -20738,14 +20743,14 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                           {p.receivedAt ? "Part received · finish work" : (Number(p.receivedQty) || 0) > 0 ? `Partly received · ${pendingItemRemaining(p)} left` : p.itemCode ? "Awaiting part" : "Awaiting work"}
                                         </span>
                                         {onReceivePendingItem && canReceiveJob(p) && !p.receivedAt && (
-                                          <button onClick={() => setJobAction({ item: p, action: "receive", notes: "", busy: false, error: "" })}
+                                          <button data-needs-net onClick={() => setJobAction({ item: p, action: "receive", notes: "", busy: false, error: "" })}
                                                   className="text-[10px] font-bold px-2 py-0.5 rounded border"
                                                   style={{ color: "#1d4ed8", borderColor: "rgba(37,99,235,0.4)", background: "rgba(37,99,235,0.08)" }}>
                                             Part received
                                           </button>
                                         )}
                                         {canFinishTransfer(canDo) && onResolvePendingItem && (
-                                          <button onClick={() => setJobAction({ item: p, action: "complete", notes: "", busy: false, error: "" })}
+                                          <button data-needs-net onClick={() => setJobAction({ item: p, action: "complete", notes: "", busy: false, error: "" })}
                                                   className="text-[10px] font-bold px-2 py-0.5 rounded border"
                                                   style={{ color: "#15803d", borderColor: "rgba(22,163,74,0.4)", background: "rgba(22,163,74,0.08)" }}>
                                             Work completed
@@ -20781,7 +20786,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                               <div className="flex gap-2">
                                 {[{ k: "photo", icon: "📷", text: "Take photo", cap: "environment", acc: "image/*" },
                                   { k: "file", icon: "📎", text: "Add file", cap: undefined, acc: "image/*,video/*,application/pdf" }].map((b) => (
-                                  <label key={b.k} data-attach-btn={b.k} className="text-[13px] font-black cursor-pointer rounded-xl flex items-center gap-1.5 px-4"
+                                  <label data-needs-net key={b.k} data-attach-btn={b.k} className="text-[13px] font-black cursor-pointer rounded-xl flex items-center gap-1.5 px-4"
                                          style={{ minHeight: 46, background: "#1d4ed8", color: "#fff" }}>
                                     <span style={{ fontSize: 18 }}>{b.icon}</span>{b.text}
                                     <input type="file" className="hidden" accept={b.acc} capture={b.cap}
@@ -20986,7 +20991,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
               {holdModal.error && <div className="mt-3 text-[11px] font-bold px-3 py-2 rounded-lg" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.4)", color: "#dc2626" }}>{holdModal.error}</div>}
               <div className="flex gap-2 mt-4">
                 <button type="button" onClick={() => setHoldModal(null)} disabled={holdModal.busy} className="flex-1 h-11 rounded-lg text-[13px] font-bold text-slate-600 border transition-all disabled:opacity-40" style={{ borderColor: "rgba(17,24,39,0.12)" }}>Cancel</button>
-                <button type="button" data-hold-confirm onClick={submit} disabled={holdModal.busy} className="flex-[2] h-11 rounded-lg text-[13px] font-black text-white transition-all disabled:opacity-50" style={{ background: holdModal.release ? "#15803d" : "#dc2626", color: "#ffffff" }}>
+                <button data-needs-net type="button" data-hold-confirm onClick={submit} disabled={holdModal.busy} className="flex-[2] h-11 rounded-lg text-[13px] font-black text-white transition-all disabled:opacity-50" style={{ background: holdModal.release ? "#15803d" : "#dc2626", color: "#ffffff" }}>
                   {holdModal.busy ? "Saving…" : holdModal.release ? "▶ Release ON HOLD" : "⏸ Put ON HOLD"}
                 </button>
               </div>
@@ -21058,7 +21063,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                 <button type="button" onClick={() => setUndoAsk(null)} disabled={undoAsk.busy}
                         className="flex-1 min-h-[48px] rounded-xl text-[15px] font-bold border transition-all active:scale-[0.97] disabled:opacity-40"
                         style={{ borderColor: "rgba(17,24,39,0.15)", color: "#334155" }}>No</button>
-                <button type="button" data-sender-undo-yes onClick={yes} disabled={undoAsk.busy}
+                <button data-needs-net type="button" data-sender-undo-yes onClick={yes} disabled={undoAsk.busy}
                         className="flex-[2] min-h-[48px] rounded-xl text-[15px] font-black transition-all active:scale-[0.97] disabled:opacity-80"
                         style={{ background: "#f59e0b", color: "#1f1300" }}>
                   {undoAsk.busy ? "⏳ Please wait…" : "Yes, take it back"}
@@ -21283,7 +21288,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                         className="flex-1 h-11 rounded-lg text-[13px] font-bold text-slate-600 border transition-all disabled:opacity-40" style={{ borderColor: "rgba(17,24,39,0.12)" }}>
                   Cancel
                 </button>
-                <button type="button" data-job-submit onClick={submit} disabled={jobAction.busy || (isReceive && !receiveReady)}
+                <button data-needs-net type="button" data-job-submit onClick={submit} disabled={jobAction.busy || (isReceive && !receiveReady)}
                         title={isReceive && !receiveReady ? receiveWhy : ""}
                         className="flex-[2] h-11 rounded-lg text-[13px] font-black text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                         style={{ background: isReceive ? "#1d4ed8" : "linear-gradient(135deg,#16a34a,#15803d)", color: "#ffffff" }}>
@@ -21813,7 +21818,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                   Cancel
                 </button>
                 <span onClick={() => { if ((!transferBusy && isOverrun && !narration.trim())) flagField("[data-transfer-delay]"); }}>
-                <button onClick={submitFinishTransfer} disabled={transferBusy || (isOverrun && !narration.trim())}
+                <button data-needs-net onClick={submitFinishTransfer} disabled={transferBusy || (isOverrun && !narration.trim())}
                         className="text-[12px] font-bold text-slate-900 bg-amber-600 hover:bg-amber-700 px-5 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed" style={{ color: "#fff", pointerEvents: (!transferBusy && isOverrun && !narration.trim()) ? "none" : undefined }}>
                   {transferBusy ? "⏳ Please wait…" : rackReturn ? `✓ Assembled · Return to ${slotLabel(machine.rackSlot)}` : `Finish & Transfer → ${toDepartment}`}
                 </button>
@@ -22073,15 +22078,16 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                   Cancel
                 </button>
                 <span onClick={() => {
+                        if (!busy && !online) { pulseOffline(); return; }
                         if (busy || !whyNot) return;
                         flagField(acceptDeptEmps.length > 0 && selectedTeam.filter(Boolean).length === 0 ? "[data-accept-people]"
                           : !sigSvg ? "[data-accept-signature]" : "[data-accept-confirm]");
                       }}>
                 {(
-                  <button data-accept-confirm onClick={submitAcceptHandover}
-                          disabled={busy || !sigSvg || (acceptDeptEmps.length > 0 && selectedTeam.filter(Boolean).length === 0) || (workflow.require_password_at_accept && !password)}
-                          className={`text-[15px] font-black px-7 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed ${whyNot || busy ? "" : "accept-ready"}`}
-                          style={{ pointerEvents: (busy || !whyNot) ? undefined : "none", minHeight: 50, background: "#15803d", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
+                  <button data-accept-confirm data-needs-net onClick={submitAcceptHandover}
+                          disabled={busy || !online || !sigSvg || (acceptDeptEmps.length > 0 && selectedTeam.filter(Boolean).length === 0) || (workflow.require_password_at_accept && !password)}
+                          className={`text-[15px] font-black px-7 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed ${whyNot || busy || !online ? "" : "accept-ready"}`}
+                          style={{ pointerEvents: busy || (online && !whyNot) ? undefined : "none", minHeight: 50, background: "#15803d", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
                     {busy ? "⏳ Please wait…" : (workflow.require_password_at_accept ? "Verify & Accept" : "Confirm Acceptance")}
                   </button>
                 )}
