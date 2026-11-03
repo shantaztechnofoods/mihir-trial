@@ -3561,3 +3561,37 @@ html.erp-offline [data-needs-net]::after {
 .rack-set > .rack-crate > div:first-of-type > [data-rack-fill],
 .rack-set > .rack-crate > div:first-of-type > [data-rack-send] { margin-top: auto; }
 .rack-crate .whitespace-nowrap { white-space: normal; max-width: 100%; justify-content: center; text-align: center; line-height: 1.15; }
+
+/* 2026-11-03 — Machine Tracker polish (part 1).
+   Rack overlap: a long serial (SHZ/RM10/2026-27/000123-A) made its crate wider
+   than its column and it slid over the neighbour. Every track and every crate
+   may shrink; the serial truncates (full text in its title). The #97 row
+   alignment above is unchanged. */
+.rack-shelf > .rack-set { min-width: 0; }
+.rack-set { grid-template-columns: minmax(0, 1fr); }
+.rack-set > .rack-crate { min-width: 0; overflow: hidden; }
+.rack-set > .rack-crate > div:first-of-type { min-width: 0; max-width: 100%; }
+.rack-set > .rack-crate > div:first-of-type > * { max-width: 100%; }
+.rack-set > .rack-crate .font-mono.truncate { display: block; width: 100%; }
+
+/* Popups: the build tag never sits on a dialog (desktop and phone). */
+body:has([role="dialog"]) #erp-build-badge,
+body:has(.modal-backdrop) #erp-build-badge,
+body:has(.rack-panel-backdrop) #erp-build-badge,
+body:has(.mt-report-modal) #erp-build-badge { display: none !important; }
+/* One Cancel size in every Machine Tracker popup. */
+.mt-cancel { min-height: 48px !important; min-width: 96px; padding-left: 16px !important; padding-right: 16px !important;
+  font-size: 14px !important; font-weight: 700 !important; color: #334155 !important; background: #fff !important;
+  border: 1px solid rgba(17,24,39,0.18) !important; border-radius: 12px !important; display: inline-flex; align-items: center; justify-content: center; }
+.mt-cancel:hover { background: #f8fafc !important; }
+@media (max-width: 767.98px) {
+  /* The last field of a scrolling body clears the footer with room to spare. */
+  .modal-backdrop > div > .overflow-y-auto { padding-bottom: 24px; }
+  /* The pinned action row of a one-panel dialog: no half-width grey line,
+     the content fades out above it instead. */
+  .modal-backdrop > div:not(.flex-col):not([class*="flex-col"]) > div:last-child:has(> button) { box-shadow: none !important; }
+  .modal-backdrop > div:not(.flex-col):not([class*="flex-col"]) > div:last-child:has(> button)::before {
+    content: ""; position: absolute; left: 0; right: 0; top: -18px; height: 18px; pointer-events: none;
+    background: linear-gradient(to bottom, rgba(255,255,255,0), #fff);
+  }
+}
