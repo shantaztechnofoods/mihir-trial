@@ -90,7 +90,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-03-delay-reasons";
+const APP_BUILD = "2026-11-03-offline-safe";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -19134,7 +19134,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                       </button>
                     )}
                     {canAccept && onAcceptHandover ? (
-                      <button data-needs-net onClick={() => openAcceptModal(h)}
+                      <button onClick={() => openAcceptModal(h)} data-needs-net
                               className="text-[12px] font-black text-slate-900 px-5 py-2.5 rounded-xl transition-all hover:scale-105"
                               style={{ background: "#15803d", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", minWidth: 160, color: "#ffffff" }}>
                         ✓ Accept Machine
