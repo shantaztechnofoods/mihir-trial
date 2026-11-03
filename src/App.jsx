@@ -86,7 +86,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-02-mobile-fix";
+const APP_BUILD = "2026-11-03-delete-machine";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -17133,7 +17133,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
   checklistResponses = [],
   // 2026-10-30 — Item Master, so a pending job can name the missing part by code.
   items = {},
-  onUploadAttachment, onDeleteAttachment, onResolvePendingItem, onReceivePendingItem, onPullBackHandover, onSetMachineHold,
+  onUploadAttachment, onDeleteAttachment, onResolvePendingItem, onReceivePendingItem, onPullBackHandover, onSetMachineHold, onDeleteMachine = null,
   // Migration 028 — During-Work checklist handler. Optional; button hides when
   // no template is configured for the machine's current department.
   onSubmitDuringWorkChecklist,
@@ -17200,6 +17200,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
   const [jobsDrawer, setJobsDrawer] = useState(null); // machine id
   const [jobsView,  setJobsView]  = useState("open"); // Pending Jobs tab: open | done | all
   const [pullBack,  setPullBack]  = useState(null);   // { handover, reason, busy, error } — admin pull back
+  const [deleteModal, setDeleteModal] = useState(null); // { machine, reason, busy, error } — Super Admin machine deletion (2026-11-03)
   const [holdModal, setHoldModal]  = useState(null);   // { machine, release, reason, busy, error } — manual ON HOLD / release (2026-11-02)
   const [raiseText,  setRaiseText]  = useState("");
   const [raiseDept,  setRaiseDept]  = useState("");
@@ -19754,7 +19755,18 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                           </button>
                         )
                       )}
-                      {!isComplete && nextDepartment(machine.currentDepartment || machine.stage) && !machine.pendingHandoverId && !machine.holdActive && canFinishTransfer(canDo) && onFinishTransfer && (
+                      {/* 2026-11-03 — Super Admin only: delete an Active Build or a Ready
+          machine. The database function refuses anyone else. */}
+      {currentUser?.role === "super_admin" && onDeleteMachine && machine.stage !== "BOM Issued" && (
+        <button type="button" data-card-delete={machine.id}
+                onClick={() => setDeleteModal({ machine, reason: "", busy: false, error: "" })}
+                className="text-[11px] font-black px-3 py-1.5 rounded-lg border transition-all"
+                style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.4)", color: "#b91c1c" }}
+                title="Delete this machine (Super Admin only)">
+          <Trash2 size={13} className="inline -mt-0.5 mr-1" aria-hidden="true" />Delete
+        </button>
+      )}
+      {!isComplete && nextDepartment(machine.currentDepartment || machine.stage) && !machine.pendingHandoverId && !machine.holdActive && canFinishTransfer(canDo) && onFinishTransfer && (
                         <button onClick={() => openFinishModal(machine)}
                                 className={`font-black text-white rounded-lg transition-all ${isFloorLogin ? "text-[14px] px-5 py-2.5" : "text-[11px] px-3 py-1.5"}`}
                                 style={{ background: "#15803d", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}
@@ -20289,6 +20301,45 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
           </div>
         </div>
       )}
+
+      {deleteModal && (() => {
+        const m = deleteModal.machine;
+        const submit = async () => {
+          if (deleteModal.busy) return;
+          setDeleteModal((prev) => prev ? { ...prev, busy: true, error: "" } : prev);
+          const r = await onDeleteMachine({ machineId: m.id, reason: deleteModal.reason.trim() });
+          if (r && r.success === false) { setDeleteModal((prev) => prev ? { ...prev, busy: false, error: r.error || "Could not delete." } : prev); return; }
+          setDeleteModal(null);
+          showToast(`${m.bomKey}${m.serialNo ? ` · S/N ${m.serialNo}` : ""} deleted`);
+        };
+        return (
+          <div data-delete-modal className="modal-backdrop fixed inset-0 z-[72] flex items-center justify-center p-4"
+               style={{ background: "rgba(17,24,39,0.45)", backdropFilter: "blur(12px)" }}
+               onClick={(e) => e.target === e.currentTarget && !deleteModal.busy && setDeleteModal(null)}>
+            <div className="w-full max-w-md rounded-2xl p-5" style={{ background: "var(--surface-raised)", border: "1px solid rgba(239,68,68,0.35)", boxShadow: "0 24px 70px rgba(17,24,39,0.2)" }}>
+              <h3 className="text-base font-black text-red-700 mb-1">Delete this machine?</h3>
+              <div data-delete-target className="rounded-lg px-3 py-2.5 mb-3" style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.3)" }}>
+                <div className="text-[14px] font-black text-slate-900">{m.bomKey}</div>
+                <div className="text-[12px] text-slate-700">Serial number: <span className="font-bold">{m.serialNo || "—"}</span> · {m.status === "completed" ? "Ready" : `now in ${m.currentDepartment || m.stage}`}</div>
+              </div>
+              <p className="text-[11px] text-slate-600 mb-3">The machine and its hand-over, checklist, rating and pending-job records are removed. Stock, the BOM, the rack set-up and every other machine are not touched. Who deleted it, when and what it was is kept in the Audit Trail. This cannot be undone.</p>
+              <label className="block text-[11px] font-bold text-slate-600 mb-1">Reason (optional)</label>
+              <textarea data-delete-reason rows={2} value={deleteModal.reason} disabled={deleteModal.busy}
+                        onChange={(e) => setDeleteModal((prev) => prev ? { ...prev, reason: e.target.value, error: "" } : prev)}
+                        placeholder="e.g. test machine"
+                        className="w-full rounded-lg px-3 py-2.5 text-[13px] text-slate-800 outline-none"
+                        style={{ background: "var(--surface-elevated)", border: "1px solid rgba(17,24,39,0.12)" }} />
+              {deleteModal.error && <div className="mt-3 text-[11px] font-bold px-3 py-2 rounded-lg" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.4)", color: "#dc2626" }}>{deleteModal.error}</div>}
+              <div className="flex gap-2 mt-4">
+                <button type="button" onClick={() => setDeleteModal(null)} disabled={deleteModal.busy} className="flex-1 h-11 rounded-lg text-[13px] font-bold text-slate-600 border transition-all disabled:opacity-40" style={{ borderColor: "rgba(17,24,39,0.15)" }}>Cancel</button>
+                <button type="button" data-delete-confirm onClick={submit} disabled={deleteModal.busy} className="flex-[2] h-11 rounded-lg text-[13px] font-black text-white transition-all disabled:opacity-50" style={{ background: "#dc2626" }}>
+                  {deleteModal.busy ? "Deleting…" : "Delete machine"}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {holdModal && (() => {
         const m = holdModal.machine;
@@ -26747,6 +26798,36 @@ export default function App() {
     return { success: true };
   };
 
+  // 2026-11-03 — Super Admin only. The database function delete_machine_super_admin
+  // is the authority (active super_admin, one machine, linked records cascade,
+  // audit snapshot written in the same transaction); the check here only keeps
+  // the button honest. Stock and every other record are left alone.
+  const handleDeleteMachine = async ({ machineId, reason }) => {
+    if (currentUser?.role !== "super_admin") return { success: false, error: "Only a Super Admin can delete a machine." };
+    const m = machineLog.find((x) => String(x.id) === String(machineId));
+    if (!m) return { success: false, error: "Machine not found" };
+    if (isSupabaseEnabled()) {
+      const c = getSupabase();
+      if (!c) return { success: false, error: "Not connected to the database." };
+      let error;
+      try { ({ error } = await c.rpc("delete_machine_super_admin", { p_machine_id: Number(machineId), p_reason: reason || "" })); }
+      catch (e) { error = e; }
+      if (error) { console.error("[App] handleDeleteMachine failed", error); return { success: false, error: error.message || "Delete failed" }; }
+    } else {
+      await machineDelete(machineId);
+      logAudit({
+        type: "machine_deleted", module: "Machine",
+        action: `Machine deleted by Super Admin: ${m.bomKey}${m.serialNo ? ` [${m.serialNo}]` : ""} (stage ${m.stage})`,
+        ref: m.bomKey, serialNo: m.serialNo || "",
+        details: { machineId: m.id, reason: reason || "", stage: m.stage },
+      });
+    }
+    setMachineLog((prev) => prev.filter((x) => String(x.id) !== String(machineId)));
+    setPendingHandoverItems((prev) => prev.filter((p) => String(p.machineId) !== String(machineId)));
+    setHandovers((prev) => prev.filter((h) => String(h.machineId) !== String(machineId)));
+    return { success: true };
+  };
+
   const handleReleaseHandover = async (handoverId) => {
     if (!currentUser?.id) return { success: false, error: "Not authenticated" };
     // 2026-10-31 — no Production Manager login yet: an Admin may release.
@@ -27211,7 +27292,7 @@ export default function App() {
                               onReceivePendingItem={handleReceivePendingItem}
                               onIssuePendingPart={handleIssuePendingPart}
                               onPullBackHandover={handlePullBackHandover}
-                              onSetMachineHold={handleSetMachineHold}
+                              onDeleteMachine={handleDeleteMachine} onSetMachineHold={handleSetMachineHold}
                               /* Phase 1 — raise a fault mid-work */
                               onRaisePendingItem={handleRaisePendingItem}
                               /* Migration 036 — release a machine off the rack */
