@@ -18123,6 +18123,99 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
   const [myDashOpen, setMyDashOpen] = useState(false);
   const canReleaseFromRack = canDo("machines", "release") || isAdminUser;
   const [rackTakeBusy, setRackTakeBusy] = useState(null);
+  // 2026-11-03 — ARRIVAL ALERT (client-side only, nothing stored but the
+  // on/off choice). When a NEW hand-over for one of my departments appears
+  // (To accept, or On the rack for you) the phone vibrates, plays a short
+  // two-tone chime, speaks the message, and a big banner shows. Fed by the
+  // same `handovers` state the realtime / refresh path already updates.
+  const [arrivalOn, setArrivalOn] = useState(() => { try { return localStorage.getItem("erp_arrival_alert") !== "0"; } catch { return true; } });
+  const toggleArrival = () => setArrivalOn((v) => { try { localStorage.setItem("erp_arrival_alert", v ? "0" : "1"); } catch {} return !v; });
+  const [arrival, setArrival] = useState(null); // { id, rack, text }
+  const arrivalSeenRef = useRef(null);
+  const arrivalMountRef = useRef(Date.now());
+  const arrivalWatch = (staffMode && !isProdHead && hasDepartments)
+    ? (handovers || []).filter((h) => h && h.status === "pending" && myDepartments.includes(h.toDepartment))
+    : [];
+  const arrivalKey = arrivalWatch.map((h) => String(h.id)).sort().join("|");
+  const handoversLoaded = (handovers || []).length > 0 || (Date.now() - arrivalMountRef.current) > 8000;
+  useEffect(() => {
+    const ids = arrivalKey ? arrivalKey.split("|") : [];
+    const prev = arrivalSeenRef.current;
+    if (prev === null) {
+      // The very first load (or a Supabase hydration still on its way) is
+      // the baseline — nothing "arrived".
+      if (handoversLoaded) arrivalSeenRef.current = new Set(ids);
+      return;
+    }
+    arrivalSeenRef.current = new Set(ids);
+    const fresh = ids.filter((id) => !prev.has(id));
+    if (!fresh.length) return;
+    const h = arrivalWatch.find((x) => String(x.id) === fresh[fresh.length - 1]);
+    if (!h) return;
+    const m = (machineLog || []).find((x) => String(x.id) === String(h.machineId)) || null;
+    const name = (m && m.bomKey) || h.bomKey || "Machine";
+    const serial = (m && m.serialNo) || h.serialNo || "";
+    const rack = isAwaitingRelease(h);
+    setArrival({ id: h.id, rack, text: `📥 ${name}${serial ? ` · ${serial}` : ""} has come to ${h.toDepartment} — ${rack ? "Take from Rack" : "Accept"}` });
+    if (!arrivalOn) return;
+    try { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch { /* not supported */ }
+    // Browsers allow sound only after the user has touched the page once.
+    let activated = false;
+    try { activated = navigator.userActivation ? !!navigator.userActivation.hasBeenActive : true; } catch { activated = false; }
+    if (!activated) return;
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) {
+        const ctx = new AC();
+        if (ctx.state === "suspended" && ctx.resume) ctx.resume().catch(() => {});
+        [[659.25, 0], [880, 0.18]].forEach(([f, at]) => {
+          const o = ctx.createOscillator(); const g = ctx.createGain();
+          o.type = "sine"; o.frequency.value = f;
+          const t0 = ctx.currentTime + at;
+          g.gain.setValueAtTime(0.0001, t0);
+          g.gain.exponentialRampToValueAtTime(0.25, t0 + 0.02);
+          g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.32);
+          o.connect(g); g.connect(ctx.destination); o.start(t0); o.stop(t0 + 0.34);
+        });
+        setTimeout(() => { try { ctx.close && ctx.close(); } catch {} }, 900);
+      }
+    } catch { /* no audio */ }
+    // Then speak it: Hindi when the phone has a Hindi voice, else Indian English.
+    setTimeout(() => {
+      try {
+        const ss = window.speechSynthesis;
+        if (!ss || typeof window.SpeechSynthesisUtterance !== "function") return;
+        const voices = (ss.getVoices && ss.getVoices()) || [];
+        const hi = voices.find((v) => /^hi[-_]IN/i.test(v.lang || "")) || voices.find((v) => /^hi\b/i.test(v.lang || ""));
+        const en = voices.find((v) => /^en[-_]IN/i.test(v.lang || ""));
+        const u = new window.SpeechSynthesisUtterance(hi
+          ? `आपकी मशीन आ गई है — ${name}${serial ? `, सीरियल ${serial}` : ""}`
+          : `Your machine has arrived — ${name}${serial ? `, serial ${serial}` : ""}`);
+        u.lang = hi ? "hi-IN" : "en-IN";
+        if (hi) u.voice = hi; else if (en) u.voice = en;
+        ss.speak(u);
+      } catch { /* no speech */ }
+    }, 650);
+  }, [arrivalKey, handoversLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!arrival) return;
+    const t = setTimeout(() => setArrival(null), 15000);
+    return () => clearTimeout(t);
+  }, [arrival]);
+  const openArrival = () => {
+    const a = arrival; setArrival(null);
+    if (!a) return;
+    try {
+      const el = document.querySelector(`[data-staff-accept="${a.id}"]`) || document.querySelector(`[data-staff-take="${a.id}"]`)
+        || document.querySelector(a.rack ? "[data-staff-section='On the rack for you']" : "[data-staff-section='To accept']");
+      if (!el) return;
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      const card = el.closest(".mt-card") || el;
+      card.classList.add("arrival-flash");
+      setTimeout(() => card.classList.remove("arrival-flash"), 2400);
+      if (el.tagName === "BUTTON") el.focus({ preventScroll: true });
+    } catch { /* ignore */ }
+  };
   // The first department that actually does work — machines are started onto
   // it from the rack. Derived, so adding a stage ahead of Assembly keeps this
   // correct.
@@ -18578,6 +18671,16 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
        to this page only — the rest of the ERP keeps its standard white. */
     <div className="flex-1 overflow-y-auto mt-premium">
 
+      {/* Arrival alert banner (staff only) — tap to go to that machine's card. */}
+      {staffMode && arrival && (
+        <div className="arrival-banner" role="alert" data-arrival-banner>
+          <button type="button" className="arrival-banner-main" onClick={openArrival} data-arrival-open>
+            {arrival.text}
+          </button>
+          <button type="button" className="arrival-banner-close" aria-label="Close" onClick={() => setArrival(null)}>✕</button>
+        </div>
+      )}
+
       {toast && (() => {
         const prio = toast.priority || "info";
         const icon = prio === "urgent" ? "🔴" : prio === "warning" ? "🟡" : "🟢";
@@ -18662,6 +18765,39 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
             )}
           </div>
         )}
+
+        {/* 2026-11-03 — admin "Today" line: the day in one sentence, from the
+            same lists the count boxes use. Each chip applies that box's filter. */}
+        {!staffMode && (() => {
+          const parts = [
+            { key: "hold",          tab: "transfer",   icon: "🔴", n: onHold.length,        word: "late",              color: "#b91c1c", bg: "rgba(239,68,68,0.08)",  bd: "rgba(239,68,68,0.40)" },
+            { key: "pendingAccept", tab: "transfer",   icon: "🟠", n: pendingAccept.length, word: "waiting to accept", color: "#b45309", bg: "rgba(217,119,6,0.08)",  bd: "rgba(217,119,6,0.40)" },
+            { key: "completed",     tab: "production", icon: "🟢", n: completed.length,     word: "ready",             color: "#15803d", bg: "rgba(21,128,61,0.08)",  bd: "rgba(21,128,61,0.35)" },
+          ].filter((x) => x.n > 0);
+          return (
+            <div className="mt-today flex items-center gap-2 flex-wrap" data-mt-today>
+              <span className="text-[18px] font-black mr-1" style={{ color: "var(--text-strong)" }}>Today:</span>
+              {parts.length === 0 && (
+                <span className="text-[18px] font-black" style={{ color: "#15803d" }} data-mt-today-ok>✅ All machines on time</span>
+              )}
+              {parts.map((x) => {
+                const isOn = !searchText && mtTab === x.tab && filter === x.key;
+                return (
+                  <button key={x.key} type="button" data-mt-today-chip={x.key} aria-pressed={isOn}
+                          onClick={() => {
+                            setSearchQ(""); setMtTab(x.tab); setFilter(x.key);
+                            setTimeout(() => { try { document.querySelector("[data-view-header]")?.scrollIntoView({ behavior: "smooth", block: "start" }); } catch { /* ignore */ } }, 80);
+                          }}
+                          className="min-h-[44px] px-4 rounded-full text-[17px] font-black inline-flex items-center gap-1.5 transition-all active:scale-[0.97]"
+                          style={{ background: x.bg, color: x.color, border: `${isOn ? 2 : 1}px solid ${isOn ? x.color : x.bd}` }}>
+                    <span aria-hidden="true">{x.icon}</span>
+                    <span className="tabular-nums">{x.n}</span> {x.word}
+                  </button>
+                );
+              })}
+            </div>
+          );
+        })()}
 
         {/* ── BOM Outward (2026-10-30) ──
             The Outward page's own BOM section, embedded: issuing here and
@@ -18764,6 +18900,17 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                   {isProdHead ? "Rack release" : myDepartments.join(", ")}
                 </span>
                 {currentUser?.fullName && <span className="text-[12px] ml-auto" style={{ color: "var(--text-dim)" }}>{currentUser.fullName}</span>}
+                {!isProdHead && (
+                  <button type="button" data-arrival-toggle aria-pressed={arrivalOn} onClick={toggleArrival}
+                          aria-label={arrivalOn ? "Arrival alert on — tap to turn off" : "Arrival alert off — tap to turn on"}
+                          title={arrivalOn ? "Alert sound ON" : "Alert sound OFF"}
+                          className={`${currentUser?.fullName ? "" : "ml-auto "}min-w-[44px] h-[44px] px-3 rounded-xl text-[15px] font-black inline-flex items-center justify-center gap-1 transition-all active:scale-[0.97]`}
+                          style={arrivalOn
+                            ? { background: "rgba(21,128,61,0.10)", color: "#15803d", border: "1px solid rgba(21,128,61,0.35)" }
+                            : { background: "var(--surface-card)", color: "var(--text-dim)", border: "1px solid var(--border-subtle)" }}>
+                    {arrivalOn ? "🔔 On" : "🔕 Off"}
+                  </button>
+                )}
               </div>
 
               {/* Production Head: machines assembled on the rack, waiting to be sent on */}
@@ -24649,6 +24796,15 @@ export default function App() {
   // Phase A — handovers refresh. Falls back silently if table doesn't exist
   // (store handles the error).
   const rtHandovers = useCallback(() => { fetchHandovers().then((h) => { if (h) setHandovers(h); }); }, []);
+  // 2026-11-03 — local (offline-dev) mode has no realtime channel: pick up a
+  // hand-over written by another tab of this browser, so the staff arrival
+  // alert works there too. Supabase mode is untouched (realtime above).
+  useEffect(() => {
+    if (isSupabaseEnabled()) return;
+    const onStorage = (e) => { if (e && e.key === "erp_handovers") rtHandovers(); };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [rtHandovers]);
   // Migration 053 — the four Machine Tracker side tables. Same shape as the
   // login hydration below; also used as the rollback path when one of these
   // writes fails after an optimistic update.
