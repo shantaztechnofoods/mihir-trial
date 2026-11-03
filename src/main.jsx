@@ -4,6 +4,7 @@ import App from './App.jsx'
 import './index.css'
 import { AuthProvider } from './auth/AuthContext.jsx'
 import RootErrorBoundary from './components/RootErrorBoundary.jsx'
+import OfflineBanner from './components/OfflineBanner.jsx'
 
 // ── Boot build marker ──────────────────────────────────────────────────────────
 // Page-independent proof of which bundle is live. Shows a small green badge in the
@@ -32,6 +33,7 @@ try {
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <RootErrorBoundary>
+      <OfflineBanner />
       <AuthProvider>
         <App />
       </AuthProvider>
