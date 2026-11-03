@@ -3404,6 +3404,7 @@ html.erp-offline [data-needs-net]::after {
   .offline-banner { transition: opacity .15s linear; transform: none; }
   .offline-banner:not(.is-shown) { visibility: hidden; }
   .offline-banner-card, .offline-banner-card.is-pulse { animation: none; transition: none; }
+}
 
 /* ── 2026-11-03 Arrival alert banner (staff) + admin "Today" line ──────────
    Banner sits above the phone tab bar (40) and below modals (50). */
