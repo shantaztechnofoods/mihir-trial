@@ -11190,7 +11190,7 @@ function BomPhotoField({ value, onChange }) {
       <div className="flex items-center gap-4 flex-wrap">
         <div className="w-32 h-32 sm:w-40 sm:h-40 rounded-xl overflow-hidden flex items-center justify-center flex-shrink-0"
              style={{ background: "rgba(17,24,39,0.04)", border: "1px solid var(--border-rim)" }}>
-          {value ? <img data-bom-photo-preview src={value} alt="Machine photo" className="w-full h-full object-cover" />
+          {value ? <img data-bom-photo-preview src={value} alt="Machine photo" className="w-full h-full object-contain bg-white" />
                  : <span className="text-[11px] text-slate-400 text-center px-2">No photo yet</span>}
         </div>
         <div className="flex flex-col gap-2 min-w-[140px]">
@@ -11240,8 +11240,8 @@ function BomPhotoThumb({ url, size = 64, fallback = null, className = "" }) {
   if (!url || broken) return fallback;
   return (
     <img data-bom-photo src={url} alt="" loading="lazy" onError={() => setBroken(true)}
-         className={`rounded-xl object-cover flex-shrink-0 ${className}`}
-         style={{ width: size, height: size, border: "1px solid var(--border-rim)", background: "rgba(17,24,39,0.04)" }} />
+         className={`rounded-xl object-contain flex-shrink-0 ${className}`}
+         style={{ width: size, height: size, padding: 3, border: "1px solid var(--border-rim)", background: "#ffffff" }} />
   );
 }
 
