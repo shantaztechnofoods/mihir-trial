@@ -171,7 +171,10 @@ ok("Production Head sees rack release + rack view only (no accept/finish/report)
 await p.locator("[data-staff-release]").first().click(); await p.waitForTimeout(700);
 const sendBtn = p.locator(".rack-panel button", { hasText: /Transfer to Mechanical|Send to Mechanical/ }).first();
 ok("rack panel offers the transfer to Mechanical", await sendBtn.count() > 0);
-await sendBtn.click(); await p.waitForTimeout(1000);
+await sendBtn.click(); await p.waitForTimeout(400);
+// 2026-11-03 — sending from the rack asks "Are you sure?" first; Yes runs the same handler.
+ok("rack send asks 'Are you sure?' before sending", await p.locator("[data-rack-send-ask]").count() === 1 && !(await ls(p, "erp_handovers")).find((h) => h.id === 22)?.releasedAt);
+await p.locator("[data-rack-send-yes]").click(); await p.waitForTimeout(1000);
 hs = await ls(p, "erp_handovers");
 ok("hand-over 22 released by the Production Head", hs.find((h) => h.id === 22)?.releasedAt != null);
 ok("SN-104 rack slot cleared after release", !(await ls(p, "erp_machines")).find((m) => m.id === 4)?.rackSlot);

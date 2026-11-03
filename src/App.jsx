@@ -92,7 +92,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-03-voice-transcribe";
+const APP_BUILD = "2026-11-03-mt-polish-1";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -19439,6 +19439,10 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
   const [fillSlot, setFillSlot] = useState(null); // { slotId, family, rack }
   // 2026-10-31 rack units — the unit whose details panel is open, and its tab.
   const [rackPanel, setRackPanel] = useState(null);
+  // 2026-11-03 — "Are you sure?" before a rack machine is sent on (owner rule
+  // for actions that cannot be undone). { name, to, run, busy } — run is the
+  // unchanged send handler, called only after Yes.
+  const [rackSendAsk, setRackSendAsk] = useState(null);
   const [rackPanelTab, setRackPanelTab] = useState("bom");
   // 2026-11-01 — Escape closes the top-most popup, in the same order they
   // stack on screen; a popup that is saving ignores it, like its Cancel.
@@ -20643,11 +20647,13 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                         if (!bomOpen) toggleBom();
                         setTimeout(() => { try { document.getElementById("mt-bom-section")?.scrollIntoView({ behavior: "smooth", block: "start" }); } catch {} }, 60);
                       };
-                      const faceSend = async (e) => {
+                      const faceSend = (e) => {
                         e.stopPropagation();
+                        setRackSendAsk({ name: `${m.bomKey}${m.serialNo ? ` · ${m.serialNo}` : ""}`, to: faceHo.toDepartment, run: async () => {
                         const r = await onReleaseHandover(faceHo.id);
                         if (r && r.success === false) { showToast("Could not send", r.error || "", "urgent"); return; }
                         showToast(`${m.bomKey}${m.serialNo ? ` — ${m.serialNo}` : ""}`, `Transferred to ${faceHo.toDepartment}. ${slotLabel(sl.id)} is empty again.`);
+                        } });
                       };
                       const crateSt = null; // M and R units are independent (2026-10-31)
                       const niN = notIssuedOpenFor(m).length;
@@ -20796,12 +20802,14 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                 openFinishModal(m);
               }
             };
-            const doSend = async () => {
+            const doSend = () => {
               if (!ho) return;
+              setRackSendAsk({ name: `${m.bomKey}${m.serialNo ? ` · ${m.serialNo}` : ""}`, to: ho.toDepartment, run: async () => {
               const r = await onReleaseHandover(ho.id);
               if (r && r.success === false) { showToast("Could not send", r.error || "", "urgent"); return; }
               showToast(`${m.bomKey}${m.serialNo ? ` — ${m.serialNo}` : ""}`, `Transferred to ${ho.toDepartment}. ${slotLabel(sl.id)} is empty again.`);
               setRackPanel(null);
+              } });
             };
             const assembleLabel = sl.status === "assembling" ? "Mark Assembled" : "Assemble";
             const assembleOk = (sl.status === "set" && pend.length === 0 && crate.state !== "pending" && canDo("machines", "updateStage")) || (sl.status === "assembling" && !!m && !m.pendingHandoverId && canFinishTransfer(canDo));
@@ -22153,7 +22161,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
               {deleteModal.error && <div className="mt-3 text-[11px] font-bold px-3 py-2 rounded-lg" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.4)", color: "#dc2626" }}>{deleteModal.error}</div>}
               <div className="flex gap-2 mt-4">
                 <button type="button" onClick={() => setDeleteModal(null)} disabled={deleteModal.busy} className="flex-1 h-11 rounded-lg text-[13px] font-bold text-slate-600 border transition-all disabled:opacity-40" style={{ borderColor: "rgba(17,24,39,0.15)" }}>Cancel</button>
-                <button type="button" data-delete-confirm onClick={submit} disabled={deleteModal.busy} className="flex-[2] h-11 rounded-lg text-[13px] font-black text-white transition-all disabled:opacity-50" style={{ background: "#dc2626" }}>
+                <button type="button" data-delete-confirm onClick={submit} disabled={deleteModal.busy} className="flex-[2] min-h-[48px] rounded-xl text-[14px] font-black text-white transition-all disabled:opacity-50" style={{ background: "#dc2626" }}>
                   {deleteModal.busy ? "Deleting…" : "Delete machine"}
                 </button>
               </div>
@@ -22195,7 +22203,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
               {holdModal.error && <div className="mt-3 text-[11px] font-bold px-3 py-2 rounded-lg" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.4)", color: "#dc2626" }}>{holdModal.error}</div>}
               <div className="flex gap-2 mt-4">
                 <button type="button" onClick={() => setHoldModal(null)} disabled={holdModal.busy} className="flex-1 h-11 rounded-lg text-[13px] font-bold text-slate-600 border transition-all disabled:opacity-40" style={{ borderColor: "rgba(17,24,39,0.12)" }}>Cancel</button>
-                <button data-needs-net type="button" data-hold-confirm onClick={submit} disabled={holdModal.busy} className="flex-[2] h-11 rounded-lg text-[13px] font-black text-white transition-all disabled:opacity-50" style={{ background: holdModal.release ? "#15803d" : "#dc2626", color: "#ffffff" }}>
+                <button data-needs-net type="button" data-hold-confirm onClick={submit} disabled={holdModal.busy} className="flex-[2] min-h-[48px] rounded-xl text-[14px] font-black text-white transition-all disabled:opacity-50" style={{ background: holdModal.release ? "#15803d" : "#dc2626", color: "#ffffff" }}>
                   {holdModal.busy ? "Saving…" : holdModal.release ? "▶ Release ON HOLD" : "⏸ Put ON HOLD"}
                 </button>
               </div>
@@ -22232,7 +22240,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
               {pullBack.error && <div className="mt-3 text-[11px] font-bold px-3 py-2 rounded-lg" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.4)", color: "#dc2626" }}>{pullBack.error}</div>}
               <div className="flex gap-2 mt-4">
                 <button type="button" onClick={() => setPullBack(null)} disabled={pullBack.busy} className="flex-1 h-11 rounded-lg text-[13px] font-bold text-slate-600 border transition-all disabled:opacity-40" style={{ borderColor: "rgba(17,24,39,0.12)" }}>Cancel</button>
-                <button type="button" onClick={submit} disabled={pullBack.busy} className="flex-[2] h-11 rounded-lg text-[13px] font-black text-white transition-all disabled:opacity-50" style={{ background: "#dc2626", color: "#ffffff" }}>
+                <button type="button" onClick={submit} disabled={pullBack.busy} className="flex-[2] min-h-[48px] rounded-xl text-[14px] font-black text-white transition-all disabled:opacity-50" style={{ background: "#dc2626", color: "#ffffff" }}>
                   {pullBack.busy ? "Pulling back…" : "↩ Pull back machine"}
                 </button>
               </div>
@@ -22245,6 +22253,37 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
           machine takes it back within 5 minutes, before it is accepted. Same
           path as the admin Pull back (onPullBackHandover), re-checked on a
           fresh read inside the handler. */}
+      {rackSendAsk && (() => {
+        const yes = async () => {
+          if (rackSendAsk.busy) return;
+          setRackSendAsk((prev) => prev ? { ...prev, busy: true } : prev);
+          try { await rackSendAsk.run(); } finally { setRackSendAsk(null); }
+        };
+        // zIndex inline: .modal-backdrop is z 50 in index.css, and this must
+        // sit above the rack panel (z 65) it can be opened from.
+        return (
+          <div className="modal-backdrop fixed inset-0 z-[75] flex items-end sm:items-center justify-center p-3 sm:p-4" data-rack-send-ask
+               style={{ background: "rgba(17,24,39,0.45)", backdropFilter: "blur(12px)", zIndex: 75 }}
+               onClick={(e) => e.target === e.currentTarget && !rackSendAsk.busy && setRackSendAsk(null)}>
+            <div role="dialog" aria-modal="true" aria-label="Confirm send" className="w-full max-w-md rounded-2xl p-5" style={{ background: "var(--surface-raised)", border: "1px solid rgba(21,128,61,0.45)", boxShadow: "0 24px 70px rgba(17,24,39,0.2)", paddingBottom: "max(20px, env(safe-area-inset-bottom))" }}>
+              <h3 className="text-[17px] font-black" style={{ color: "var(--text-strong)" }}>Are you sure?</h3>
+              <p className="text-[15px] font-semibold mt-1" style={{ color: "var(--text-strong)" }}>Send {rackSendAsk.name} to {rackSendAsk.to}?</p>
+              <p className="text-[12.5px] mt-1" style={{ color: "var(--text-dim)" }}>The rack becomes empty.</p>
+              <div className="flex gap-2 mt-4">
+                <button type="button" data-rack-send-no onClick={() => setRackSendAsk(null)} disabled={rackSendAsk.busy}
+                        className="flex-1 min-h-[48px] rounded-xl text-[15px] font-bold border transition-all active:scale-[0.97] disabled:opacity-40"
+                        style={{ borderColor: "rgba(17,24,39,0.15)", color: "#334155" }}>No</button>
+                <button data-needs-net type="button" data-rack-send-yes onClick={yes} disabled={rackSendAsk.busy}
+                        className="flex-[2] min-h-[48px] rounded-xl text-[15px] font-black text-white transition-all active:scale-[0.97] disabled:opacity-80"
+                        style={{ background: "#15803d" }}>
+                  {rackSendAsk.busy ? "⏳ Please wait…" : `Yes, send to ${rackSendAsk.to}`}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {undoAsk && (() => {
         const h = undoAsk.handover;
         const name = `${h.bomKey || "Machine"}${h.serialNo ? ` · ${h.serialNo}` : ""}`;
@@ -22508,13 +22547,13 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
               )}
               <div className="flex gap-2 mt-4">
                 <button type="button" onClick={() => setJobAction(null)} disabled={jobAction.busy}
-                        className="flex-1 h-11 rounded-lg text-[13px] font-bold text-slate-600 border transition-all disabled:opacity-40" style={{ borderColor: "rgba(17,24,39,0.12)" }}>
+                        className="mt-cancel flex-1 h-11 rounded-lg text-[13px] font-bold text-slate-600 border transition-all disabled:opacity-40" style={{ borderColor: "rgba(17,24,39,0.12)" }}>
                   Cancel
                 </button>
                 <span className="flex-[2] flex" onClick={() => { if (blocked) flagMissing(); }}>
                 <button data-needs-net type="button" data-job-submit onClick={submit} disabled={jobAction.busy || (isReceive && !receiveReady) || remarkMissing || partNotReceived}
                         title={isReceive && !receiveReady ? receiveWhy : remarkMissing ? "Write what was done" : ""}
-                        className="flex-1 h-11 rounded-lg text-[13px] font-black text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex-1 min-h-[48px] rounded-xl text-[14px] font-black text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                         style={{ background: isReceive ? "#1d4ed8" : "linear-gradient(135deg,#16a34a,#15803d)", color: "#ffffff", pointerEvents: blocked ? "none" : undefined }}>
                   {jobAction.busy ? "⏳ Please wait…" : isReceive ? (remaining != null && recvQty > 0 && recvQty < remaining ? `✓ Receive ${recvQty} · ${remaining - recvQty} stays pending` : "✓ Part received") : "✓ Work completed"}
                 </button>
@@ -22649,12 +22688,12 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
 
             <div className="flex gap-2 mt-5">
               <button type="button" onClick={() => { if (voiceRecRef.current) { voiceRecRef.current.stop(); voiceRecRef.current = null; setVoiceActive(false); } setRaiseModal(null); }} disabled={raiseBusy}
-                      className="flex-1 h-11 rounded-lg text-[13px] font-bold text-slate-600 border transition-all disabled:opacity-40"
+                      className="mt-cancel flex-1 h-11 rounded-lg text-[13px] font-bold text-slate-600 border transition-all disabled:opacity-40"
                       style={{ borderColor: "rgba(17,24,39,0.12)" }}>
                 Cancel
               </button>
               <button type="button" onClick={submit} disabled={raiseBusy}
-                      className="flex-[2] h-11 rounded-lg text-[13px] font-black text-slate-900 transition-all disabled:opacity-50"
+                      className="flex-[2] min-h-[48px] rounded-xl text-[14px] font-black text-slate-900 transition-all disabled:opacity-50"
                       style={{ background: "#dc2626", color: "#ffffff" }}>
                 {raiseBusy ? "Sending…" : (raiseDept ? `Call ${raiseDept}` : "Send")}
               </button>
@@ -22842,7 +22881,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
 
             <div className="flex gap-2">
               <button onClick={() => setStartProd(null)}
-                className="flex-1 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 transition-all"
+                className="mt-cancel flex-1 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 transition-all"
                 style={{ background: "rgba(17,24,39,0.04)", border: "1px solid var(--border-rim)" }}>
                 Cancel
               </button>
@@ -22886,7 +22925,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
             <div className="px-5 py-4 border-t border-slate-200 flex gap-2" style={{ background: "#f8f9fb" }}>
               <button autoFocus
                       onClick={() => setRemoveRackConfirm(null)}
-                      className="text-[11px] font-bold px-3 py-1.5 rounded-lg text-slate-400 border border-slate-200 bg-slate-50 hover:bg-slate-100 hover:text-slate-900 transition-all">
+                      className="mt-cancel text-[11px] font-bold px-3 py-1.5 rounded-lg text-slate-400 border border-slate-200 bg-slate-50 hover:bg-slate-100 hover:text-slate-900 transition-all">
                 Cancel
               </button>
               <div className="flex-1" />
@@ -23040,7 +23079,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
               </div>
               <div className="px-5 py-3 border-t border-slate-100 flex items-center justify-between flex-shrink-0 bg-white">
                 <button onClick={() => !transferBusy && setFinishModal(null)} disabled={transferBusy}
-                        className="text-[12px] font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                        className="mt-cancel text-[12px] font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                   Cancel
                 </button>
                 <span onClick={() => { if ((!transferBusy && isOverrun && !narration.trim())) flagField("[data-transfer-delay]"); }}>
@@ -23303,7 +23342,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
               <div className="px-5 py-3 border-t border-slate-200 flex items-center justify-between flex-shrink-0"
                    style={{ background: "#f8f9fb" }}>
                 <button onClick={() => !busy && setAcceptModal(null)} disabled={busy}
-                        className="text-[11px] font-bold px-3 py-1.5 rounded-lg text-slate-400 border border-slate-200 bg-slate-50 hover:bg-slate-100 hover:text-slate-900 transition-all disabled:opacity-50">
+                        className="mt-cancel text-[11px] font-bold px-3 py-1.5 rounded-lg text-slate-400 border border-slate-200 bg-slate-50 hover:bg-slate-100 hover:text-slate-900 transition-all disabled:opacity-50">
                   Cancel
                 </button>
                 <span onClick={() => {
@@ -23379,7 +23418,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
               <div className="px-5 py-3 border-t border-slate-200 flex items-center justify-between flex-shrink-0"
                    style={{ background: "#f8f9fb" }}>
                 <button onClick={() => !busy && setDuringWorkModal(null)} disabled={busy}
-                        className="text-[11px] font-bold px-3 py-1.5 rounded-lg text-slate-400 border border-slate-200 bg-slate-50 hover:bg-slate-100 hover:text-slate-900 transition-all disabled:opacity-50">
+                        className="mt-cancel text-[11px] font-bold px-3 py-1.5 rounded-lg text-slate-400 border border-slate-200 bg-slate-50 hover:bg-slate-100 hover:text-slate-900 transition-all disabled:opacity-50">
                   Cancel
                 </button>
                 <button onClick={submitDuringWork} disabled={busy}
