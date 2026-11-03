@@ -439,6 +439,14 @@ const USER_FACING_STRINGS = [
   "Correct the code in Excel and paste again.",
   "Bad quantity (",
   "Quantity must be more than 0.",
+  // 2026-11-03 — voice notes (🎤 Record) in Machine Tracker
+  "🎤 Voice note",
+  "Recording… ",
+  "Are you sure? Remove this voice note?",
+  "Typing by voice not supported on this phone — audio saved",
+  "VoiceNoteRecorder",
+  "VoicePlayButton",
+  "data-staff-voice",
 ];
 
 for (const s of USER_FACING_STRINGS) {

@@ -162,7 +162,7 @@ html, body, #root {
   padding: 0;
   background: var(--surface-page);
   color: var(--text);
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: 'Inter', 'Noto Sans Devanagari', 'Noto Sans Gujarati', system-ui, -apple-system, sans-serif;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -208,7 +208,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
 
 /* ── Typography & Forms ──────────────────────────────────────────────────────── */
 input, button, select, textarea {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: 'Inter', 'Noto Sans Devanagari', 'Noto Sans Gujarati', system-ui, -apple-system, sans-serif;
 }
 
 input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
@@ -269,7 +269,7 @@ button:active:not(:disabled) { transform: scale(0.975); }
 
 /* ── Modal input ─────────────────────────────────────────────────────────────── */
 .modal-input {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: 'Inter', 'Noto Sans Devanagari', 'Noto Sans Gujarati', system-ui, -apple-system, sans-serif;
   font-size: 13px;
   color: #111827;
   background: #ffffff !important;
@@ -3261,3 +3261,9 @@ input:focus, select:focus, textarea:focus { box-shadow: 0 0 0 3px rgba(46,80,214
   .mt-premium .rack-panel-backdrop [role="tab"]{flex:1 0 auto;white-space:nowrap}
   .mt-premium .modal-backdrop > div{width:100%!important;max-width:none!important}
 }
+
+/* Voice notes (2026-11-03) — 🎤 Record in Machine Tracker */
+@keyframes vnPulse{0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,.55)}50%{box-shadow:0 0 0 10px rgba(220,38,38,0)}}
+.vn-live{animation:vnPulse 1.4s ease-out infinite}
+.vn-dot{width:12px;height:12px;border-radius:999px;background:#fff;flex-shrink:0;animation:pulseDot 1s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.vn-live,.vn-dot{animation:none}}

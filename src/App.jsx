@@ -75,6 +75,7 @@ import { mapRow as vendorMapRow, parseRows as vendorParseRows } from "./utils/ve
 import { parseRows as itemParseRows, generateItemCode, buildRowsFromSheet as itemBuildRowsFromSheet } from "./utils/itemImport.js";
 import { parseBomPaste } from "./utils/bomPaste.js";
 import { receivedPoRates, bomCostLines, bomCostSummary, validateBomLines, formatINR, RATE_SOURCE_LABEL } from "./utils/bomCost.js";
+import { VOICE_MAX_SECONDS, VOICE_LANGS as VN_LANGS, VOICE_LANG_KEY, pickVoiceMime, baseMime, voiceFileName, voiceCaption, isVoiceAttachment, voiceNotesFor, formatClock, micErrorMessage, fillVoiceText, clearVoiceText, appendTranscript, readVoiceLang } from "./utils/voiceNote.js";
 import { PHYSICAL_RACK_LAYOUT, rackOfBom, physicalRackFamily, physicalRackSlots, rackCapacityFor, buildFamilyRacks, firstFreeSlot, canAssignSlot, slotLabel, rackKeyNorm, rackViewLog, setSlotOf, setLabel, pairSlotOf, bomFillCheck, rCrateIssues, rackBoms, freeSlotsFor, tierOfSlot } from "./utils/rackSlots.js";
 import { getActiveCompany, normalizePOSettings, openPOPdf, PO_TEMPLATE_OPTIONS } from "./utils/poTemplate.js";
 import {
@@ -86,7 +87,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-03-bom-photo";
+const APP_BUILD = "2026-11-03-voice-notes";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -15103,7 +15104,7 @@ function AtoZMachineReport({
           <div className="mr-tr mr-th" style={{ gridTemplateColumns: "3fr 1.5fr 1.2fr" }}><div>File</div><div>Department</div><div>Added</div></div>
           {machineAttach.map((a) => (
             <div key={a.id} className="mr-tr" style={{ gridTemplateColumns: "3fr 1.5fr 1.2fr" }}>
-              <div className="mr-td" data-l="File">{a.name || a.kind || "attachment"}</div>
+              <div className="mr-td" data-l="File">{isVoiceAttachment(a) ? <span data-report-voice-note><VoiceNoteLine attachment={a} userName={userName} /></span> : (a.name || a.kind || "attachment")}</div>
               <div className="mr-td" data-l="Department">{a.department || "—"}</div>
               <div className="mr-td" data-l="Added">{fmtD(a.createdAt) || "—"}</div>
             </div>
@@ -16059,6 +16060,302 @@ function AttachmentLink({ attachment }) {
   );
 }
 
+// ── Voice notes (2026-11-03) ──────────────────────────────────────────────
+// A voice note is an ordinary machine attachment (audio/*), uploaded through
+// the same onUploadAttachment path as photos. The recorder also types what
+// the worker says into the text box (Web Speech API, in the language picked:
+// Gujarati / Hindi / English — no translation). Text fields save exactly as
+// before; the transcript is just text the worker can edit.
+
+// Shared language choice (same localStorage key as Report Issue dictation).
+const VN_LANG_EVENT = "erp-voice-lang";
+function useVoiceLang() {
+  const [lang, setLang] = useState(() => { try { return readVoiceLang(window.localStorage); } catch { return "hi-IN"; } });
+  useEffect(() => {
+    const on = (e) => setLang(e.detail);
+    window.addEventListener(VN_LANG_EVENT, on);
+    return () => window.removeEventListener(VN_LANG_EVENT, on);
+  }, []);
+  const pick = (l) => {
+    try { window.localStorage.setItem(VOICE_LANG_KEY, l); } catch {}
+    setLang(l);
+    try { window.dispatchEvent(new CustomEvent(VN_LANG_EVENT, { detail: l })); } catch {}
+  };
+  return [lang, pick];
+}
+
+// Plays one saved voice note (signed URL in Supabase mode, data: URL locally).
+function VoicePlayButton({ attachment, big = false, label = "" }) {
+  const [state, setState] = useState("idle"); // idle | loading | playing | error
+  const audioRef = useRef(null);
+  useEffect(() => () => { try { audioRef.current && audioRef.current.pause(); } catch {} }, []);
+  const toggle = async (e) => {
+    e.preventDefault(); e.stopPropagation();
+    if (state === "playing" && audioRef.current) { audioRef.current.pause(); setState("idle"); return; }
+    setState("loading");
+    const url = attachment.storagePath && attachment.storagePath.startsWith("data:") ? attachment.storagePath : await signedUrlFor(attachment);
+    if (!url) { setState("error"); return; }
+    try {
+      const a = audioRef.current || new Audio();
+      audioRef.current = a;
+      a.src = url;
+      a.onended = () => setState("idle");
+      a.onerror = () => setState("error");
+      await a.play();
+      setState("playing");
+    } catch { setState("error"); }
+  };
+  const size = big ? 48 : 40;
+  return (
+    <button type="button" data-voice-play={attachment.id} onClick={toggle} aria-label={state === "playing" ? "Pause voice note" : "Play voice note"}
+            className="vn-play rounded-full flex items-center justify-center gap-1 font-black flex-shrink-0 transition-transform active:scale-[0.97]"
+            style={{ minWidth: size, height: size, padding: label ? "0 14px" : 0, background: state === "error" ? "#fee2e2" : "#2640B0", color: state === "error" ? "#b91c1c" : "#fff", fontSize: big ? 18 : 15 }}>
+      {state === "loading" ? "…" : state === "playing" ? "⏸" : state === "error" ? "!" : "▶"}{label ? <span className="text-[13px]">{label}</span> : null}
+    </button>
+  );
+}
+
+// "🎤 Voice note · <place> · <who> · <time>" with a play button.
+function VoiceNoteLine({ attachment, userName }) {
+  const who = (userName && userName(attachment.uploadedBy)) || "";
+  const when = attachment.uploadedAt ? new Date(attachment.uploadedAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false }) : "";
+  return (
+    <div data-voice-note={attachment.id} className="flex items-center gap-2 min-w-0">
+      <VoicePlayButton attachment={attachment} />
+      <div className="min-w-0 text-[12px] leading-snug" style={{ color: "var(--text-strong, #0f172a)" }}>
+        <span className="font-black">🎤 Voice note</span>
+        {attachment.caption ? <span> · {attachment.caption}</span> : null}
+        {who ? <span style={{ color: "var(--text-dim, #64748b)" }}> · {who}</span> : null}
+        {when ? <span style={{ color: "var(--text-dim, #64748b)" }}> · {when}</span> : null}
+      </div>
+    </div>
+  );
+}
+
+// Big 🎤 Record button + live recording + player. `setText(updater)` gets the
+// spoken words and, if the box is still empty after saving, "🎤 Voice note".
+function VoiceNoteRecorder({ machineId, department, place, item = "", onUpload, onDelete = null, canRemove = false, setText = null, disabled = false, compact = false, langs = true }) {
+  const [phase, setPhase] = useState("idle"); // idle | starting | recording | saving | saved | error
+  const [secs, setSecs]   = useState(0);
+  const [err, setErr]     = useState("");
+  const [srNote, setSrNote] = useState("");
+  const [att, setAtt]     = useState(null);
+  const [localUrl, setLocalUrl] = useState("");
+  const [playing, setPlaying]   = useState(false);
+  const [askRemove, setAskRemove] = useState(false);
+  const [removing, setRemoving]   = useState(false);
+  const [lang, pickLang] = useVoiceLang();
+  const r = useRef({ rec: null, sr: null, stream: null, timer: null, t0: 0, chunks: [], discard: false, live: false, file: null });
+  const audioRef = useRef(null);
+  const textRef = useRef(setText); textRef.current = setText;
+  const SRCls = typeof window !== "undefined" ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null;
+  const langLabel = (VN_LANGS.find(([c]) => c === lang) || [null, lang])[1];
+
+  const stopAll = () => {
+    const s = r.current;
+    s.live = false;
+    if (s.timer) { clearInterval(s.timer); s.timer = null; }
+    try { s.sr && s.sr.stop(); } catch {}
+    s.sr = null;
+    try { if (s.rec && s.rec.state !== "inactive") s.rec.stop(); } catch {}
+  };
+  useEffect(() => () => {
+    r.current.discard = true; stopAll();
+    try { r.current.stream && r.current.stream.getTracks().forEach((t) => t.stop()); } catch {}
+    try { audioRef.current && audioRef.current.pause(); } catch {}
+  }, []);
+  useEffect(() => () => { if (localUrl) { try { URL.revokeObjectURL(localUrl); } catch {} } }, [localUrl]);
+
+  const upload = async (file) => {
+    setPhase("saving"); setErr("");
+    const res = await onUpload({ machineId, department, stage: department, file, caption: voiceCaption(place, item), isCustomerVisible: false });
+    if (!res || res.success === false) {
+      r.current.file = file;
+      setPhase("error"); setErr(`NOT SAVED — ${(res && res.error) || "try again"}`);
+      return;
+    }
+    r.current.file = null;
+    setAtt(res.attachment || null);
+    setPhase("saved");
+    if (textRef.current) textRef.current((prev) => fillVoiceText(prev));
+  };
+
+  const finish = () => {
+    const s = r.current;
+    try { s.stream && s.stream.getTracks().forEach((t) => t.stop()); } catch {}
+    s.stream = null;
+    if (s.discard) return;
+    const type = baseMime((s.rec && s.rec.mimeType) || "") || "audio/webm";
+    const blob = new Blob(s.chunks, { type });
+    s.chunks = [];
+    if (!blob.size) { setPhase("error"); setErr("Nothing was recorded — try again"); return; }
+    const name = voiceFileName(place, Date.now(), type);
+    let file;
+    try { file = new File([blob], name, { type }); } catch { file = blob; try { file.name = name; } catch {} }
+    try { setLocalUrl(URL.createObjectURL(blob)); } catch {}
+    upload(file);
+  };
+
+  const startSR = () => {
+    if (!SRCls || !textRef.current) return;
+    try {
+      const sr = new SRCls();
+      // Read fresh: the Report Issue chips write the same key.
+      let useLang = lang; try { useLang = readVoiceLang(window.localStorage); } catch {}
+      if (useLang !== lang) pickLang(useLang);
+      sr.lang = useLang; sr.continuous = true; sr.interimResults = false;
+      sr.onresult = (e) => {
+        let txt = "";
+        for (let i = e.resultIndex; i < e.results.length; i++) if (e.results[i].isFinal) txt += e.results[i][0].transcript;
+        if (txt.trim() && textRef.current) textRef.current((prev) => appendTranscript(prev, txt));
+      };
+      sr.onerror = (e) => {
+        if (e && (e.error === "aborted" || e.error === "no-speech")) return;
+        setSrNote("Typing by voice stopped — audio is still recording");
+      };
+      // Chrome ends recognition after a pause; keep it going while recording.
+      sr.onend = () => { if (r.current.live && r.current.sr === sr) { try { sr.start(); } catch {} } };
+      sr.start();
+      r.current.sr = sr;
+    } catch { setSrNote("Typing by voice did not start — audio is still recording"); }
+  };
+
+  const start = async () => {
+    if (disabled || phase === "recording" || phase === "starting" || phase === "saving") return;
+    setErr(""); setSrNote(""); setAskRemove(false);
+    const md = typeof navigator !== "undefined" ? navigator.mediaDevices : null;
+    if (!md || !md.getUserMedia || typeof window.MediaRecorder === "undefined") { setPhase("error"); setErr(micErrorMessage({ name: "unsupported" })); return; }
+    setPhase("starting");
+    let stream;
+    try { stream = await md.getUserMedia({ audio: true }); }
+    catch (e) { setPhase("error"); setErr(micErrorMessage(e)); return; }
+    const s = r.current;
+    if (s.discard) { stream.getTracks().forEach((t) => t.stop()); return; }
+    const mime = pickVoiceMime((m) => window.MediaRecorder.isTypeSupported(m));
+    let rec;
+    try { rec = new window.MediaRecorder(stream, mime ? { mimeType: mime } : undefined); }
+    catch { try { rec = new window.MediaRecorder(stream); } catch (e2) { stream.getTracks().forEach((t) => t.stop()); setPhase("error"); setErr(micErrorMessage(e2)); return; } }
+    s.stream = stream; s.rec = rec; s.chunks = []; s.live = true; s.t0 = Date.now();
+    rec.ondataavailable = (ev) => { if (ev.data && ev.data.size) s.chunks.push(ev.data); };
+    rec.onstop = finish;
+    rec.start(1000);
+    setSecs(0); setPhase("recording");
+    s.timer = setInterval(() => {
+      const el = (Date.now() - s.t0) / 1000;
+      setSecs(el);
+      if (el >= VOICE_MAX_SECONDS) stopAll();
+    }, 200);
+    if (SRCls) startSR();
+    else if (textRef.current) setSrNote("Typing by voice not supported on this phone — audio saved");
+  };
+
+  const togglePlay = () => {
+    const a = audioRef.current; if (!a) return;
+    if (playing) { a.pause(); setPlaying(false); return; }
+    a.currentTime = 0;
+    const p = a.play(); setPlaying(true);
+    if (p && p.catch) p.catch(() => setPlaying(false));
+  };
+
+  const doRemove = async () => {
+    if (!att || !onDelete) return;
+    setRemoving(true);
+    const res = await onDelete(att.id);
+    setRemoving(false);
+    if (res && res.success === false) { setErr("Could not remove — ask your admin"); setAskRemove(false); return; }
+    try { audioRef.current && audioRef.current.pause(); } catch {}
+    setAtt(null); setLocalUrl(""); setAskRemove(false); setPlaying(false); setErr(""); setPhase("idle");
+    if (textRef.current) textRef.current((prev) => clearVoiceText(prev));
+  };
+
+  const chips = langs && SRCls && textRef.current && (phase === "idle" || phase === "error") && (compact ? (
+    <button type="button" data-voice-lang-cycle disabled={disabled}
+            onClick={() => { const i = VN_LANGS.findIndex(([c]) => c === lang); pickLang(VN_LANGS[(i + 1) % VN_LANGS.length][0]); }}
+            className="vn-lang rounded-xl text-[13px] font-bold px-3 border-2"
+            style={{ minHeight: 44, borderColor: "rgba(17,24,39,0.15)", background: "#fff", color: "#334155" }}
+            aria-label="Speak in (tap to change)">
+      {langLabel} ⇆
+    </button>
+  ) : (
+    <div className="flex gap-1.5 flex-wrap" role="group" aria-label="Speak in" data-voice-langs>
+      {VN_LANGS.map(([code, label]) => (
+        <button key={code} type="button" disabled={disabled} aria-pressed={lang === code} data-voice-lang={code}
+                onClick={() => pickLang(code)}
+                className="vn-lang rounded-xl text-[14px] font-bold px-3 border-2 transition-all"
+                style={lang === code ? { minHeight: 44, background: "#dc2626", borderColor: "#dc2626", color: "#fff" } : { minHeight: 44, background: "#fff", borderColor: "rgba(17,24,39,0.15)", color: "#334155" }}>
+          {label}
+        </button>
+      ))}
+    </div>
+  ));
+
+  return (
+    <div className="vn-box mt-2" data-voice-recorder={place}>
+      {(phase === "idle" || phase === "starting" || phase === "error") && !att && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <button type="button" data-voice-record disabled={disabled || phase === "starting"} onClick={start}
+                  className="vn-rec rounded-2xl font-black flex items-center justify-center gap-2 transition-transform active:scale-[0.97] disabled:opacity-60"
+                  style={{ minHeight: compact ? 48 : 56, padding: "0 18px", background: "#fff", color: "#dc2626", border: "2px solid #dc2626", fontSize: compact ? 15 : 17 }}>
+            <span style={{ fontSize: compact ? 20 : 24 }}>🎤</span>{phase === "starting" ? "Please wait…" : "Record"}
+          </button>
+          {chips}
+        </div>
+      )}
+      {phase === "recording" && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <div data-voice-live className="vn-live flex-1 min-w-[180px] rounded-2xl flex items-center gap-2 px-4 font-black text-white"
+               style={{ minHeight: 56, background: "#dc2626", fontSize: 17 }}>
+            <span className="vn-dot" aria-hidden="true" />
+            Recording… <span className="tabular-nums" data-voice-clock>{formatClock(secs)}</span>
+            <span className="text-[12px] font-bold opacity-80 ml-auto tabular-nums">/ {formatClock(VOICE_MAX_SECONDS)}</span>
+          </div>
+          <button type="button" data-voice-stop onClick={stopAll}
+                  className="rounded-2xl font-black text-white flex items-center justify-center gap-2 px-5 active:scale-[0.97]"
+                  style={{ minHeight: 56, background: "#111827", fontSize: 17 }}>⏹ Stop</button>
+          {SRCls && textRef.current && <div className="w-full text-[12px] font-bold" style={{ color: "#b91c1c" }}>Speak in {langLabel} — words appear in the box</div>}
+        </div>
+      )}
+      {phase === "saving" && (
+        <div className="rounded-2xl flex items-center gap-2 px-4 font-black" style={{ minHeight: 52, background: "rgba(38,64,176,0.08)", color: "#2640B0", fontSize: 15 }}>⏳ Saving voice note…</div>
+      )}
+      {att && (phase === "saved" || phase === "error") && (
+        <div data-voice-player className="rounded-2xl flex items-center gap-2 px-2 py-1.5 flex-wrap" style={{ background: "rgba(21,128,61,0.07)", border: "1px solid rgba(21,128,61,0.35)" }}>
+          {localUrl ? (
+            <>
+              <audio ref={audioRef} src={localUrl} preload="metadata" onEnded={() => setPlaying(false)} />
+              <button type="button" data-voice-local-play onClick={togglePlay} aria-label={playing ? "Pause" : "Play"}
+                      className="rounded-full flex items-center justify-center font-black text-white active:scale-[0.97]"
+                      style={{ width: 48, height: 48, background: "#2640B0", fontSize: 18 }}>{playing ? "⏸" : "▶"}</button>
+            </>
+          ) : <VoicePlayButton attachment={att} big />}
+          <span className="text-[14px] font-black" style={{ color: "#15803d" }} data-voice-saved>✓ Saved</span>
+          <span className="text-[12px] tabular-nums" style={{ color: "#475569" }}>{formatClock(secs)}</span>
+          {canRemove && onDelete && !askRemove && (
+            <button type="button" data-voice-remove onClick={() => setAskRemove(true)} aria-label="Remove voice note"
+                    className="ml-auto rounded-full flex items-center justify-center"
+                    style={{ width: 44, height: 44, background: "#fff", border: "1px solid rgba(220,38,38,0.4)", fontSize: 18 }}>🗑</button>
+          )}
+          {askRemove && (
+            <div className="w-full flex items-center gap-2 flex-wrap pt-1" data-voice-remove-ask>
+              <span className="text-[13px] font-black text-slate-900">Are you sure? Remove this voice note?</span>
+              <button type="button" data-voice-remove-yes disabled={removing} onClick={doRemove}
+                      className="rounded-xl font-black text-white px-4" style={{ minHeight: 44, background: "#dc2626" }}>{removing ? "⏳ Please wait…" : "Yes, remove"}</button>
+              <button type="button" disabled={removing} onClick={() => setAskRemove(false)}
+                      className="rounded-xl font-black text-slate-800 px-4 bg-white border-2 border-slate-300" style={{ minHeight: 44 }}>No, keep</button>
+            </div>
+          )}
+        </div>
+      )}
+      {phase === "error" && !att && r.current.file && (
+        <button type="button" data-voice-retry onClick={() => upload(r.current.file)}
+                className="mt-2 rounded-xl font-black text-white px-4" style={{ minHeight: 44, background: "#2640B0" }}>↻ Try saving again</button>
+      )}
+      {err && <div data-voice-error className="mt-1.5 text-[13px] font-bold" style={{ color: "#b91c1c" }}>{err}</div>}
+      {srNote && (phase === "saved" || (phase === "recording" && SRCls)) && <div data-voice-sr-note className="mt-1 text-[12px] font-semibold" style={{ color: "#92400e" }}>{srNote}</div>}
+    </div>
+  );
+}
+
 // ─── Machine Trial Certificate — module-scope helpers + components ───────────
 // Redesigned 2026-10-27: a white A4 certificate with an explicit
 // Fill → Preview → Confirm flow. The stored shape (mkTrialCert) and every
@@ -16993,7 +17290,7 @@ function ModalX({ onClose, disabled = false, label = "Close" }) {
   );
 }
 
-function PendingJobRows({ rows, onChange, inventory = [], accent = "#b45309", addLabel = "+ Add pending job", disabled = false, mode = "job" }) {
+function PendingJobRows({ rows, onChange, inventory = [], accent = "#b45309", addLabel = "+ Add pending job", disabled = false, mode = "job", renderVoice = null }) {
   // mode "item" (BOM Outward → Add Pending Item): an item with a name, a
   // pending quantity and a Critical Yes / No choice; the free-text line is a
   // note. mode "job" (Finish & Transfer, Accept, Report Issue): unchanged.
@@ -17041,6 +17338,8 @@ function PendingJobRows({ rows, onChange, inventory = [], accent = "#b45309", ad
                      onChange={(e) => set(i, { qty: e.target.value })}
                      placeholder="Quantity *" className={`${inp} text-right`} style={bd} />
             </div>
+            {/* 2026-11-03 — optional 🎤 voice note explaining this item (name + qty stay required). */}
+            {renderVoice && renderVoice(i, r)}
             <div className="flex items-center gap-1.5 flex-wrap" data-job-class>
               <span className="text-[10.5px] font-bold text-slate-600 mr-0.5">Critical item?</span>
               {[["normal", "No"], ["critical", "Yes"]].map(([k, label]) => {
@@ -17418,6 +17717,16 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
   const [raisePart,  setRaisePart]  = useState(emptyPendingJob()); // optional missing part on a reported issue
   const [voiceActive, setVoiceActive] = useState(false);
   const voiceRecRef = React.useRef(null);
+  // 2026-11-03 — voice notes: the 🎤 Record button saves an audio attachment
+  // through the same upload path (and permission) as photos.
+  const canVoice = !!onUploadAttachment && canFinishTransfer(canDo);
+  const vnProps = (machineId, department) => ({ machineId, department, onUpload: onUploadAttachment, onDelete: onDeleteAttachment, canRemove: canConfigureDept(canDo) });
+  const voiceUserName = (id) => {
+    if (!id) return "";
+    const u = (allUsers || []).find((x) => x.id === id);
+    if (u) return u.fullName || u.username || "";
+    return currentUser && currentUser.id === id ? (currentUser.fullName || currentUser.username || "") : "";
+  };
 
   // Voice input helper — Web Speech API (Hindi + English fallback)
   // 2026-10-30 — voice-to-text language: Gujarati, Hindi or English (Indian).
@@ -17425,6 +17734,8 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
   const VOICE_LANGS = [["gu-IN", "ગુજરાતી"], ["hi-IN", "हिंदी"], ["en-IN", "English"]];
   const [voiceLang, setVoiceLang] = useState(() => { try { return localStorage.getItem("erp_voice_lang") || "hi-IN"; } catch { return "hi-IN"; } });
   const pickVoiceLang = (l) => { setVoiceLang(l); try { localStorage.setItem("erp_voice_lang", l); } catch {} };
+  // Keep in step with the 🎤 Record chips elsewhere (same key).
+  useEffect(() => { const on = (e) => setVoiceLang(e.detail); window.addEventListener(VN_LANG_EVENT, on); return () => window.removeEventListener(VN_LANG_EVENT, on); }, []);
   const voiceLangRef = React.useRef(voiceLang); voiceLangRef.current = voiceLang;
   const toggleVoice = React.useCallback((targetSetter) => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -18467,6 +18778,12 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
           const Card  = ({ children, tone }) => (
             <div className="mt-card no-lift p-4 flex flex-col gap-3" style={tone ? { borderColor: tone } : undefined}>{children}</div>
           );
+          // 2026-11-03 — "▶ 🎤 2": the machine has voice notes; tap plays the latest.
+          const voiceBadge = (m) => {
+            const vs = m ? voiceNotesFor(attachments, m.id) : [];
+            if (!vs.length) return null;
+            return <span data-staff-voice={m.id} className="inline-flex" title="Play the latest voice note"><VoicePlayButton attachment={vs[0]} label={`🎤 ${vs.length}`} /></span>;
+          };
           // Migration 061 — the BOM's machine photo (64px) at the left of the
           // card's title block, so workers recognise the machine at a glance.
           const withPhoto  = (m, h, body) => {
@@ -18601,6 +18918,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                               {m?.bomLabel ? `${m.bomLabel} · ` : ""}from {h.fromDepartment} → {h.toDepartment}{waited ? ` · waiting ${waited}` : ""}
                             </div>
                             {late && <div className="text-[13px] font-black mt-1" style={{ color: "#dc2626" }}><LeadIcon e="🚦" />ON HOLD — accept deadline passed</div>}
+                            {voiceBadge(m) && <div className="mt-2">{voiceBadge(m)}</div>}
                           </div>)}
                           {canAccept && (
                             <button type="button" data-staff-accept={h.id} className={btn} style={{ background: "#15803d", color: "#fff" }}
@@ -18647,6 +18965,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                   ⚠ {jobs.length} open job{jobs.length === 1 ? "" : "s"}
                                 </button>
                               )}
+                              {voiceBadge(m)}
                             </div>
                           </div>)}
                           <div className="flex flex-col sm:flex-row gap-2 sm:flex-wrap">
@@ -20534,7 +20853,15 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                           )}
                           {machineAttachments.length > 0 && (
                             <ul className="space-y-1 text-[11px]">
-                              {machineAttachments.map((a) => (
+                              {machineAttachments.map((a) => isVoiceAttachment(a) ? (
+                                <li key={a.id} className="flex items-center gap-2" data-card-voice-note>
+                                  <div className="flex-1 min-w-0"><VoiceNoteLine attachment={a} userName={voiceUserName} /></div>
+                                  {canConfigureDept(canDo) && onDeleteAttachment && (
+                                    <button onClick={() => setAttachAsk({ kind: "delete", a, busy: false })}
+                                            className="text-[16px] font-black text-slate-500 hover:text-red-500 px-2" aria-label="Delete voice note">×</button>
+                                  )}
+                                </li>
+                              ) : (
                                 <li key={a.id} className="flex items-center gap-2 flex-wrap">
                                   <span className="text-slate-400">
                                     {a.kind === "photo" ? "🖼" : a.kind === "video" ? "🎞" : a.kind === "trial_report" ? "📄" : "📎"}
@@ -21068,6 +21395,9 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                 ))}
               </div>
             )}
+            {canVoice && (
+              <VoiceNoteRecorder {...vnProps(m.id, here)} place="Report Issue" setText={setRaiseText} disabled={raiseBusy || voiceActive} langs={false} />
+            )}
 
             {/* 2026-10-30 — optional missing part, so the job is traceable. */}
             <div className="block text-[11px] font-bold text-slate-600 mt-4 mb-1.5">Missing part (optional)</div>
@@ -21446,6 +21776,10 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                       autoFocus
                       className="w-full bg-white border border-red-300 rounded-lg px-3 py-2 text-[12px] text-slate-900 placeholder-slate-400 outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100 transition-colors"
                     />
+                    {canVoice && (
+                      <VoiceNoteRecorder {...vnProps(machine.id, fromDepartment)} place="Delay reason" disabled={transferBusy}
+                                         setText={(fn) => setFinishModal((prev) => prev ? { ...prev, narration: fn(prev.narration || "") } : prev)} />
+                    )}
                   </div>
                 )}
 
@@ -21485,6 +21819,10 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                    placeholder="Reason not done (required — saved as a pending job)"
                                    className="w-full mt-2 bg-white border border-slate-300 rounded px-2 py-1.5 text-[11px] text-slate-900 placeholder-slate-400 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100 transition-colors" />
                           )}
+                          {!a.checked && canVoice && (
+                            <VoiceNoteRecorder {...vnProps(machine.id, fromDepartment)} place="Transfer checklist" item={a.label} compact disabled={transferBusy}
+                                               setText={(fn) => setFinishModal((prev) => prev ? { ...prev, answers: setAnswerRemark(prev.answers, i, fn((prev.answers[i] || {}).remark || "")) } : prev)} />
+                          )}
                         </div>
                       ))}
                     </div>
@@ -21504,6 +21842,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                   </div>
                   <PendingJobRows rows={finishModal.owedItems || []} inventory={inventoryFlat} disabled={transferBusy}
                                   addLabel="+ Add Pending Item" mode="item"
+                                  renderVoice={canVoice ? (i, r) => <VoiceNoteRecorder {...vnProps(machine.id, fromDepartment)} place="Pending item" item={r.itemName} compact disabled={transferBusy} /> : null}
                                   onChange={(rows) => setFinishModal((prev) => prev ? { ...prev, owedItems: rows } : prev)} />
                   {pendingItemsProblem(finishModal.owedItems) && <div data-pending-item-problem className="mt-1.5 text-[11px] font-semibold" style={{ color: "#b45309" }}>{pendingItemsProblem(finishModal.owedItems)}</div>}
                 </div>
@@ -21621,6 +21960,10 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                 onChange={(e) => setField({ holdReason: e.target.value, error: "" })}
                                 placeholder="Write the reason"
                                 className="w-full bg-white border-2 border-red-200 rounded-lg px-3 py-2 text-[14px] text-slate-900 outline-none focus:border-red-400" />
+                    )}
+                    {acceptModal.holdPick === "Other" && canVoice && (
+                      <VoiceNoteRecorder {...vnProps(handover.machineId, handover.toDepartment)} place="Late reason" disabled={!!acceptModal.busy}
+                                         setText={(fn) => setAcceptModal((prev) => prev ? { ...prev, holdReason: fn(prev.holdReason || ""), error: "" } : prev)} />
                     )}
                   </div>
                 )}
@@ -21743,6 +22086,10 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                        placeholder="Reason not done (required — saved as a pending job)"
                                        className="mt-1 w-full bg-slate-50 border border-slate-200 rounded px-2 py-1 text-[11px] text-slate-900 placeholder-slate-500 outline-none focus:border-blue-500/60" />
                               )}
+                              {!a.checked && canVoice && (
+                                <VoiceNoteRecorder {...vnProps(handover.machineId, handover.toDepartment)} place="Accept checklist" item={a.label} compact disabled={!!busy}
+                                                   setText={(fn) => setAcceptModal((prev) => prev ? { ...prev, error: "", checklistAnswers: setAnswerRemark(prev.checklistAnswers, i, fn(((prev.checklistAnswers || [])[i] || {}).remark || "")) } : prev)} />
+                              )}
                             </div>
                           ))}
                         </div>
@@ -21755,6 +22102,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                       <div className="text-[11px] font-bold text-slate-500 mb-1.5">Optional. Any work from {handover.fromDepartment} still pending? (optional)</div>
                       <PendingJobRows rows={acceptModal.pendingItemsToRaise || []} inventory={inventoryFlat} disabled={acceptModal.busy}
                                       accent="#dc2626" addLabel="+ Add Pending Item" mode="item"
+                                      renderVoice={canVoice ? (i, r) => <VoiceNoteRecorder {...vnProps(handover.machineId, handover.toDepartment)} place="Pending item" item={r.itemName} compact disabled={!!acceptModal.busy} /> : null}
                                       onChange={(rows) => setField({ pendingItemsToRaise: rows })} />
                       {pendingItemsProblem(acceptModal.pendingItemsToRaise) && <div data-pending-item-problem className="mt-1.5 text-[11px] font-semibold" style={{ color: "#b45309" }}>{pendingItemsProblem(acceptModal.pendingItemsToRaise)}</div>}
                     </div>
