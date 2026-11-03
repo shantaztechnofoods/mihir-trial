@@ -3215,3 +3215,49 @@ input:focus, select:focus, textarea:focus { box-shadow: 0 0 0 3px rgba(46,80,214
 @keyframes fieldShake{0%,100%{transform:none}20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
 .field-bad{outline:3px solid #dc2626!important;outline-offset:2px;background-color:rgba(220,38,38,.06)!important;animation:fieldShake .45s ease-in-out;border-radius:12px}
 @media (prefers-reduced-motion:reduce){.field-bad{animation:none}}
+
+/* Machine Tracker — phone polish (2026-11-03). Layout only, desktop untouched.
+   Big, easy tap targets; racks packed tighter; no sideways scrolling. */
+@media (max-width: 767px){
+  .mt-premium{overflow-x:hidden}
+  /* small colour legend next to "Production Rack View" — the rack faces already say it */
+  .mt-premium .mt-rack-legend{display:none!important}
+  /* rack view: tighter so more racks fit on one screen */
+  .mt-premium .rack-shelf{padding:6px!important;column-gap:6px!important;row-gap:8px!important}
+  .mt-premium .rack-set{padding:4px!important;gap:6px!important}
+  .mt-premium .rack-shelf .rack-crate{padding:6px!important;padding-top:12px!important}
+  .mt-premium .rack-shelf .rack-crate > div:first-of-type{padding:6px 4px!important}
+  .mt-premium .rack-shelf .rack-crate > div:last-child{display:none}
+  .mt-premium .rack-shelf [data-rack-fill],
+  .mt-premium .rack-shelf [data-rack-send]{min-height:44px;font-size:13px!important;margin-top:6px!important;white-space:normal;line-height:1.15}
+  /* machine card: big buttons, two per row, main action full width */
+  .mt-premium .mt-card-actions{gap:8px!important;align-items:stretch!important}
+  .mt-premium .mt-card-actions > button,
+  .mt-premium .mt-card-actions > select{flex:1 1 calc(50% - 4px);min-height:44px;font-size:13px!important;justify-content:center;text-align:center}
+  .mt-premium .mt-card-actions > span{flex:1 1 100%;text-align:center;padding-top:8px!important;padding-bottom:8px!important;font-size:12px!important}
+  .mt-premium .mt-card-actions > div{flex:1 1 100%;gap:8px!important}
+  .mt-premium .mt-card-actions > div > button{flex:1 1 100%;min-height:44px;font-size:14px!important}
+  .mt-premium .mt-card-actions > div > span{flex:1 1 100%;text-align:center;padding-top:8px!important;padding-bottom:8px!important;font-size:12px!important}
+  /* main action first and full width; Delete last, half width, so it is never the biggest button */
+  .mt-premium .mt-card-actions > button[title^="Finish "]{flex-basis:100%;font-size:15px!important;order:-2}
+  .mt-premium .mt-card-actions > div{order:-1}
+  .mt-premium .mt-card-actions > button[data-card-delete]{order:10;flex:0 0 calc(50% - 4px);margin-left:auto}
+  /* top bar: Reports / bell / Settings share one even row of big buttons */
+  .mt-premium > .page-header .nav-menu-btn{min-width:44px;min-height:44px}
+  .mt-premium > .page-header .page-header-actions{width:100%;flex-wrap:nowrap}
+  .mt-premium > .page-header .page-header-actions > button{flex:1 1 0;min-height:44px;justify-content:center;font-size:13px}
+  .mt-premium > .page-header .page-header-actions > button[aria-label^="Departments called"]{flex:0 0 52px}
+  /* Issue-a-BOM box, "All Machines" chip */
+  .mt-premium #mt-bom-section button{min-height:44px}
+  .mt-premium #mt-bom-section button:not(:has(> *:not(svg))){min-width:44px}
+  .mt-premium .mt-chip{min-height:44px}
+  /* pop-ups and drawers: every button easy to hit with a thumb */
+  .mt-premium .modal-backdrop button,
+  .mt-premium .rack-panel-backdrop button{min-height:44px}
+  .mt-premium .modal-backdrop button[aria-label="Close"],
+  .mt-premium .rack-panel-backdrop button[aria-label="Close"],
+  .mt-premium .modal-backdrop button.w-8, .mt-premium .modal-backdrop button.w-9{min-width:44px;min-height:44px}
+  .mt-premium .rack-panel-backdrop [role="tablist"]{overflow-x:auto;scrollbar-width:none}
+  .mt-premium .rack-panel-backdrop [role="tab"]{flex:1 0 auto;white-space:nowrap}
+  .mt-premium .modal-backdrop > div{width:100%!important;max-width:none!important}
+}
