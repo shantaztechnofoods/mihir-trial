@@ -89,6 +89,62 @@ export function appendTranscript(text, phrase) {
   return cur.trim() ? `${cur.replace(/\s+$/, "")} ${add}` : add;
 }
 
+// ── Server transcription (2026-11-03, owner): every voice note becomes TEXT,
+// even where browser dictation does not work (iPhone Safari, Firefox). The
+// Edge Function `voice-transcribe` returns { text } or { error }.
+export const VOICE_TRANSCRIBE_FN = "voice-transcribe";
+export const VOICE_TRANSCRIBE_MAX_BYTES = 2 * 1024 * 1024;
+export const VOICE_WRITING_TEXT = "✍️ Writing your words…";
+export const VOICE_WRITE_PROMPT = "Audio saved — now write the same in words in the box";
+
+export function bytesToBase64(bytes) {
+  const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes || []);
+  let bin = "";
+  const CH = 0x8000; // String.fromCharCode arg limit
+  for (let i = 0; i < u8.length; i += CH) bin += String.fromCharCode.apply(null, u8.subarray(i, i + CH));
+  return btoa(bin);
+}
+
+export async function blobToBase64(blob) {
+  return bytesToBase64(new Uint8Array(await blob.arrayBuffer()));
+}
+
+// supabase-js invoke result → { ok, text, error }. FunctionsHttpError hides
+// the function's own { error } on error.context (a Response).
+export async function readTranscribeResult(res) {
+  const { data, error } = res || {};
+  if (error) {
+    let detail = error.message || "request failed";
+    try { const b = await error.context?.json(); if (b && b.error) detail = b.error; } catch {}
+    return { ok: false, text: "", error: detail };
+  }
+  if (data && typeof data.error === "string" && data.error) return { ok: false, text: "", error: data.error };
+  const text = data && typeof data.text === "string" ? data.text.trim() : "";
+  if (!text) return { ok: false, text: "", error: "No words heard" };
+  return { ok: true, text, error: "" };
+}
+
+// invoke = (name, { body }) => Promise<{ data, error }> (supabase.functions.invoke).
+export async function transcribeVoiceBlob(blob, invoke) {
+  if (typeof invoke !== "function") return { ok: false, text: "", error: "offline" };
+  if (!blob || !blob.size) return { ok: false, text: "", error: "empty audio" };
+  if (blob.size > VOICE_TRANSCRIBE_MAX_BYTES) return { ok: false, text: "", error: "audio too long" };
+  try {
+    const audioBase64 = await blobToBase64(blob);
+    const res = await invoke(VOICE_TRANSCRIBE_FN, { body: { audioBase64, mimeType: baseMime(blob.type) || "audio/webm" } });
+    return await readTranscribeResult(res);
+  } catch (e) {
+    return { ok: false, text: "", error: (e && e.message) || "request failed" };
+  }
+}
+
+// Put the transcript into the box only if it is still empty (or holds our
+// old placeholder); never overwrite what the worker typed meanwhile.
+export function fillTranscript(prev, text) {
+  const cur = clearVoiceText(String(prev || ""));
+  return cur.trim() ? prev : String(text || "").trim();
+}
+
 export function readVoiceLang(storage) {
   try { const v = storage && storage.getItem(VOICE_LANG_KEY); if (v && VOICE_LANGS.some(([c]) => c === v)) return v; } catch {}
   return VOICE_LANG_DEFAULT;

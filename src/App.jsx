@@ -80,7 +80,7 @@ import { useOnline } from "./components/OfflineBanner.jsx";
 import { pulseOffline } from "./utils/online.js";
 import { isReadyPopupRole, newReadySince, readyAtOf, trialSignedBy, readLastSeenReady, writeLastSeenReady, formatReadyWhen } from "./utils/readyPopup.js";
 import { receivedPoRates, bomCostLines, bomCostSummary, validateBomLines, formatINR, RATE_SOURCE_LABEL } from "./utils/bomCost.js";
-import { VOICE_MAX_SECONDS, VOICE_LANGS as VN_LANGS, VOICE_LANG_KEY, pickVoiceMime, baseMime, voiceFileName, voiceCaption, isVoiceAttachment, voiceNotesFor, formatClock, micErrorMessage, fillVoiceText, clearVoiceText, appendTranscript, readVoiceLang } from "./utils/voiceNote.js";
+import { VOICE_MAX_SECONDS, VOICE_LANGS as VN_LANGS, VOICE_LANG_KEY, pickVoiceMime, baseMime, voiceFileName, voiceCaption, isVoiceAttachment, voiceNotesFor, formatClock, micErrorMessage, clearVoiceText, appendTranscript, readVoiceLang, transcribeVoiceBlob, fillTranscript, VOICE_WRITING_TEXT, VOICE_WRITE_PROMPT } from "./utils/voiceNote.js";
 import { PHYSICAL_RACK_LAYOUT, rackOfBom, physicalRackFamily, physicalRackSlots, rackCapacityFor, buildFamilyRacks, firstFreeSlot, canAssignSlot, slotLabel, rackKeyNorm, rackViewLog, setSlotOf, setLabel, pairSlotOf, bomFillCheck, rCrateIssues, rackBoms, freeSlotsFor, tierOfSlot } from "./utils/rackSlots.js";
 import { getActiveCompany, normalizePOSettings, openPOPdf, PO_TEMPLATE_OPTIONS } from "./utils/poTemplate.js";
 import {
@@ -92,7 +92,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-03-voice-text";
+const APP_BUILD = "2026-11-03-voice-transcribe";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -16692,20 +16692,37 @@ function VoiceNoteLine({ attachment, userName }) {
   );
 }
 
+// Server transcription of a saved voice note (Edge Function voice-transcribe).
+// Local/offline mode has no server: returns { ok:false }. `window.__erpVoiceTranscribe`
+// is a test seam with the same shape as supabase.functions.invoke (e2e only).
+function transcribeVoice(blob) {
+  const hook = typeof window !== "undefined" ? window.__erpVoiceTranscribe : null;
+  let invoke = typeof hook === "function" ? hook : null;
+  if (!invoke && isSupabaseEnabled()) {
+    const client = getSupabase();
+    if (client) invoke = (name, opts) => client.functions.invoke(name, opts);
+  }
+  return transcribeVoiceBlob(blob, invoke);
+}
+
 // Big 🎤 Record button + live recording + player. `setText(updater)` gets the
-// spoken words and, if the box is still empty after saving, "🎤 Voice note".
+// spoken words (live dictation where the browser has it). If the box is still
+// empty after saving, the audio is sent for server transcription and the words
+// are put in the box; if that fails the worker is asked to type them (the
+// box stays required — 2026-11-03 owner: reports need TEXT).
 function VoiceNoteRecorder({ machineId, department, place, item = "", onUpload, onDelete = null, canRemove = false, setText = null, disabled = false, compact = false, langs = true }) {
   const [phase, setPhase] = useState("idle"); // idle | starting | recording | saving | saved | error
   const [secs, setSecs]   = useState(0);
   const [err, setErr]     = useState("");
   const [srNote, setSrNote] = useState("");
+  const [writing, setWriting] = useState(false);
   const [att, setAtt]     = useState(null);
   const [localUrl, setLocalUrl] = useState("");
   const [playing, setPlaying]   = useState(false);
   const [askRemove, setAskRemove] = useState(false);
   const [removing, setRemoving]   = useState(false);
   const [lang, pickLang] = useVoiceLang();
-  const r = useRef({ rec: null, sr: null, stream: null, timer: null, t0: 0, chunks: [], discard: false, live: false, file: null });
+  const r = useRef({ rec: null, sr: null, stream: null, timer: null, t0: 0, chunks: [], discard: false, live: false, file: null, tx: 0, heard: false });
   const audioRef = useRef(null);
   const textRef = useRef(setText); textRef.current = setText;
   const SRCls = typeof window !== "undefined" ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null;
@@ -16738,11 +16755,23 @@ function VoiceNoteRecorder({ machineId, department, place, item = "", onUpload, 
     setAtt(res.attachment || null);
     setPhase("saved");
     // 2026-11-03 (owner) — reports and screens read TEXT, not audio: the box is
-    // never auto-filled with a placeholder. If dictation produced no words, the
-    // worker is asked to type them; the field's own "required" check stays.
-    if (textRef.current) textRef.current((prev) => {
+    // never auto-filled with a placeholder. Live dictation already put words in
+    // the box → done. Otherwise the saved audio goes to the voice-transcribe
+    // Edge Function and its words fill a still-empty box (editable). If that
+    // fails (or local/offline mode), the worker is asked to type them; the
+    // field's own "required" check stays.
+    if (!textRef.current || r.current.heard) return;
+    const tx = ++r.current.tx;
+    setWriting(true); setErr("");
+    const out = await transcribeVoice(file);
+    if (r.current.discard || tx !== r.current.tx) return;
+    setWriting(false);
+    if (!textRef.current) return;
+    // fillTranscript only fills a still-empty box; never overwrites typing.
+    if (out.ok) { textRef.current((prev) => fillTranscript(prev, out.text)); return; }
+    textRef.current((prev) => {
       if (!String(prev || "").trim() || String(prev).trim() === "🎤 Voice note") {
-        setTimeout(() => setErr("Audio saved — now write the same in words in the box"), 0);
+        setTimeout(() => setErr(VOICE_WRITE_PROMPT), 0);
         return "";
       }
       return prev;
@@ -16776,7 +16805,7 @@ function VoiceNoteRecorder({ machineId, department, place, item = "", onUpload, 
       sr.onresult = (e) => {
         let txt = "";
         for (let i = e.resultIndex; i < e.results.length; i++) if (e.results[i].isFinal) txt += e.results[i][0].transcript;
-        if (txt.trim() && textRef.current) textRef.current((prev) => appendTranscript(prev, txt));
+        if (txt.trim() && textRef.current) { r.current.heard = true; textRef.current((prev) => appendTranscript(prev, txt)); }
       };
       sr.onerror = (e) => {
         if (e && (e.error === "aborted" || e.error === "no-speech")) return;
@@ -16804,7 +16833,7 @@ function VoiceNoteRecorder({ machineId, department, place, item = "", onUpload, 
     let rec;
     try { rec = new window.MediaRecorder(stream, mime ? { mimeType: mime } : undefined); }
     catch { try { rec = new window.MediaRecorder(stream); } catch (e2) { stream.getTracks().forEach((t) => t.stop()); setPhase("error"); setErr(micErrorMessage(e2)); return; } }
-    s.stream = stream; s.rec = rec; s.chunks = []; s.live = true; s.t0 = Date.now();
+    s.stream = stream; s.rec = rec; s.chunks = []; s.live = true; s.t0 = Date.now(); s.heard = false;
     rec.ondataavailable = (ev) => { if (ev.data && ev.data.size) s.chunks.push(ev.data); };
     rec.onstop = finish;
     rec.start(1000);
@@ -16833,6 +16862,7 @@ function VoiceNoteRecorder({ machineId, department, place, item = "", onUpload, 
     setRemoving(false);
     if (res && res.success === false) { setErr("Could not remove — ask your admin"); setAskRemove(false); return; }
     try { audioRef.current && audioRef.current.pause(); } catch {}
+    r.current.tx++; setWriting(false);
     setAtt(null); setLocalUrl(""); setAskRemove(false); setPlaying(false); setErr(""); setPhase("idle");
     if (textRef.current) textRef.current((prev) => clearVoiceText(prev));
   };
@@ -16919,6 +16949,7 @@ function VoiceNoteRecorder({ machineId, department, place, item = "", onUpload, 
         <button type="button" data-voice-retry onClick={() => upload(r.current.file)}
                 className="mt-2 rounded-xl font-black text-white px-4" style={{ minHeight: 44, background: "#2640B0" }}>↻ Try saving again</button>
       )}
+      {writing && <div data-voice-writing className="mt-1.5 text-[13px] font-bold" style={{ color: "#2640B0" }}>{VOICE_WRITING_TEXT}</div>}
       {err && <div data-voice-error className="mt-1.5 text-[13px] font-bold" style={{ color: "#b91c1c" }}>{err}</div>}
       {srNote && (phase === "saved" || (phase === "recording" && SRCls)) && <div data-voice-sr-note className="mt-1 text-[12px] font-semibold" style={{ color: "#92400e" }}>{srNote}</div>}
     </div>
