@@ -86,7 +86,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-03-transfer-pending-item";
+const APP_BUILD = "2026-11-03-accept-people-first";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -17547,9 +17547,13 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
     );
     // 2026-11-02 — the signature pad is ALWAYS shown: every acceptance carries
     // its own drawn signature (data-accept-signature), never a stored one.
-    setAcceptModal({ handover, password: "", sigSvg: null, busy: false, error: "",
+    const acceptMe = currentUser?.fullName || currentUser?.username || "";
+    const hasDeptEmps = (settings?.employeeMembers || []).some((m) => m && m.active && Array.isArray(m.departments) && m.departments.includes(toDept));
+    const acceptMain = hasDeptEmps ? acceptMe : "";
+    const acceptTeamFinal = hasDeptEmps && acceptMe ? [acceptMe, ...acceptTeamMembers.filter((n) => n !== acceptMe)] : acceptTeamMembers;
+    setAcceptModal({ handover, password: "", sigSvg: null, busy: false, error: "", acceptMain,
                      pendingItemsToRaise: [], newPendingText: "", holdReason: "",
-                     checklistTemplate, checklistAnswers, acceptTeamMembers });
+                     checklistTemplate, checklistAnswers, acceptTeamMembers: acceptTeamFinal });
   };
 
   const submitAcceptHandover = async () => {
@@ -21225,6 +21229,25 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
             : [...selectedTeam, name];
           setField({ acceptTeamMembers: next });
         };
+        // Main person (the logged-in head, or whoever really accepts) + others.
+        const meName = currentUser?.fullName || currentUser?.username || "";
+        const deptNames = acceptDeptEmps.map((m) => m.name);
+        const mainName = acceptModal.acceptMain || selectedTeam[0] || "";
+        const mainOptions = Array.from(new Set([...(meName ? [meName] : []), ...deptNames, ...(mainName ? [mainName] : [])]));
+        const others = selectedTeam.filter((n) => n !== mainName);
+        const addableOthers = deptNames.filter((n) => n !== mainName && !selectedTeam.includes(n));
+        const setMain = (name) => setField({ acceptMain: name, acceptTeamMembers: [name, ...selectedTeam.filter((n) => n !== name && n !== mainName)], error: "" });
+        const hasChecklist = !!(acceptModal.checklistTemplate && (acceptModal.checklistAnswers || []).length > 0);
+        const stepBase = acceptDeptEmps.length > 0 ? 2 : 1;
+        const stepHead = (n, title, done) => (
+          <div className="flex items-center gap-2 mb-2">
+            <span className={done ? "accept-pop" : ""} style={{ width: 26, height: 26, borderRadius: 999, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 900, color: "#fff", background: done ? "#15803d" : "#1f2937" }}>{done ? "✓" : n}</span>
+            <span className="text-[15px] font-black text-slate-900">{title}</span>
+          </div>
+        );
+        const whyNot = busy ? "" : (acceptDeptEmps.length > 0 && selectedTeam.filter(Boolean).length === 0) ? "Pick who is accepting."
+          : !sigSvg ? "Please sign above and press Save Signature."
+          : (workflow.require_password_at_accept && !password) ? "Enter your password." : "";
         return (
           <div className="modal-backdrop fixed inset-0 z-[90] flex items-center justify-center p-4"
                style={{ background: "rgba(17,24,39,0.45)", backdropFilter: "blur(10px)" }}
@@ -21279,6 +21302,63 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                         </div>
                       </div>
                     )}
+                    {acceptDeptEmps.length > 0 && (
+                      <div data-accept-people className="accept-step rounded-xl px-3 py-3" style={{ background: "rgba(99,102,241,0.05)", border: `2px solid ${selectedTeam.length ? "rgba(34,197,94,0.45)" : "rgba(99,102,241,0.3)"}` }}>
+                        {stepHead(1, "Receiving employees", selectedTeam.length > 0)}
+                        <label className="text-[12px] font-bold text-slate-700 block mb-1">Main person (who is accepting)</label>
+                        <select data-accept-main value={mainName} disabled={busy}
+                                onChange={(e) => setMain(e.target.value)}
+                                className="w-full bg-white border-2 border-slate-300 rounded-xl px-3 text-[15px] font-bold text-slate-900 outline-none focus:border-indigo-500"
+                                style={{ minHeight: 50 }}>
+                          {mainOptions.map((n) => <option key={n} value={n}>{n}</option>)}
+                        </select>
+                        <div className="text-[11px] text-slate-500 mt-1">Your name is here. If you are not there, pick the person who is accepting.</div>
+                        <label className="text-[12px] font-bold text-slate-700 block mt-3 mb-1">Other people working on this machine</label>
+                        {others.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mb-2">
+                            {others.map((n) => (
+                              <button key={n} type="button" data-accept-other={n} disabled={busy} onClick={() => toggleTeamMember(n)}
+                                      className="accept-pop text-[13px] font-bold px-3 rounded-full"
+                                      style={{ minHeight: 40, background: "rgba(34,197,94,0.14)", border: "2px solid rgba(34,197,94,0.5)", color: "#15803d" }}>
+                                ✓ {n}  ✕
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        {addableOthers.length > 0 && (
+                          <select data-accept-add value="" disabled={busy}
+                                  onChange={(e) => { if (e.target.value) toggleTeamMember(e.target.value); }}
+                                  className="w-full bg-white border-2 border-slate-300 rounded-xl px-3 text-[14px] font-semibold text-slate-700 outline-none focus:border-indigo-500"
+                                  style={{ minHeight: 48 }}>
+                            <option value="">+ Add another person…</option>
+                            {addableOthers.map((n) => <option key={n} value={n}>{n}</option>)}
+                          </select>
+                        )}
+                      </div>
+                    )}
+                    {/* 2026-11-02 — mandatory Digital Signature for every acceptance */}
+                    <div data-accept-signature className="accept-step rounded-xl px-3 py-3" style={{ background: "rgba(17,24,39,0.02)", border: `1px solid ${sigSvg ? "rgba(34,197,94,0.4)" : "rgba(17,24,39,0.15)"}` }}>
+                      {stepHead(acceptDeptEmps.length > 0 ? 2 : 1, "Sign here (Digital signature)", !!sigSvg)}
+                      {sigSvg ? (
+                        <div>
+                          <div className="rounded bg-white border border-emerald-200 p-1 flex items-center justify-center" style={{ height: 72 }}>
+                            <img alt="Saved signature" src={svgDataUri(sigSvg)} style={{ maxHeight: 64, maxWidth: "100%" }} />
+                          </div>
+                          <div className="flex items-center justify-between mt-1.5">
+                            <div className="accept-pop text-[13px] font-bold text-emerald-700">✓ Signature saved</div>
+                            <button type="button" disabled={busy} onClick={() => setField({ sigSvg: null })}
+                                    className="text-[10px] font-bold text-slate-500 hover:text-slate-900 underline">Re-sign</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="text-[10px] text-slate-500 mb-1.5">
+                            {acceptDeptEmps.length > 0 ? "Sign on behalf of the receiving employees selected above, then press Save Signature." : "Draw your signature, then press Save Signature."}
+                          </div>
+                          <SignaturePad onSave={(svg) => setField({ sigSvg: svg, error: "" })} />
+                        </>
+                      )}
+                    </div>
                     {/* Phase B — carry-forward: show previously unresolved items for this machine */}
                     {(pendingHandoverItems || []).filter((p) => p.machineId === handover.machineId && pendingItemIsOpen(p)).length > 0 && (
                       <div className="rounded-lg px-3 py-2" style={{ background: "rgba(217, 119, 6,0.07)", border: "1px solid rgba(217, 119, 6,0.3)" }}>
@@ -21297,7 +21377,8 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                         follow the same "unchecked needs remark" rule as
                         Finish & Transfer. */}
                     {acceptModal.checklistTemplate && (acceptModal.checklistAnswers || []).length > 0 && (
-                      <div className="rounded-lg px-3 py-2.5" style={{ background: "rgba(46, 80, 214,0.05)", border: "1px solid rgba(46, 80, 214,0.3)" }}>
+                      <div className="accept-step rounded-xl px-3 py-3" style={{ background: "rgba(46, 80, 214,0.05)", border: "1px solid rgba(46, 80, 214,0.3)" }}>
+                        {stepHead(stepBase + 1, "Check before accepting", false)}
                         <div className="text-[10px] font-bold text-blue-200 uppercase tracking-wider mb-1">
                           📋 {acceptModal.checklistTemplate.name || "After Acceptance Checklist"}
                         </div>
@@ -21334,67 +21415,18 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                     )}
 
                     {/* Phase B — raise new pending items at this transfer */}
-                    <div className="rounded-lg px-3 py-2" style={{ background: "rgba(17,24,39,0.03)", border: "1px solid rgba(17,24,39,0.10)" }}>
-                      <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1.5">Any work from {handover.fromDepartment} still pending? (optional)</div>
+                    <div className="accept-step rounded-xl px-3 py-3" style={{ background: "rgba(17,24,39,0.03)", border: "1px solid rgba(17,24,39,0.10)" }}>
+                      {stepHead(stepBase + 1 + (hasChecklist ? 1 : 0), `Did ${handover.fromDepartment} leave work undone?`, false)}
+                      <div className="text-[11px] font-bold text-slate-500 mb-1.5">Optional. Any work from {handover.fromDepartment} still pending? (optional)</div>
                       <PendingJobRows rows={acceptModal.pendingItemsToRaise || []} inventory={inventoryFlat} disabled={acceptModal.busy}
                                       accent="#dc2626" addLabel="+ Add Pending Item" mode="item"
                                       onChange={(rows) => setField({ pendingItemsToRaise: rows })} />
                       {pendingItemsProblem(acceptModal.pendingItemsToRaise) && <div data-pending-item-problem className="mt-1.5 text-[11px] font-semibold" style={{ color: "#b45309" }}>{pendingItemsProblem(acceptModal.pendingItemsToRaise)}</div>}
                       <div className="text-[10px] text-slate-500 mt-1.5">Saved against this machine and serial number in Pending Jobs until the work is completed. Nothing recorded = nothing pending.</div>
                     </div>
-                    {/* Feature 5 — team members present at acceptance */}
-                    {acceptDeptEmps.length > 0 && (
-                      <div className="rounded-lg px-3 py-2.5" style={{ background: "rgba(99,102,241,0.05)", border: "1px solid rgba(99,102,241,0.25)" }}>
-                        <div className="text-[10px] font-bold text-indigo-200 uppercase tracking-wide mb-1.5">
-                          <LeadIcon e="👥" />Receiving employees <span className="text-red-500">*</span>
-                        </div>
-                        <div className="text-[10px] text-slate-400 mb-2">
-                          Select the employees receiving this machine into {handover.toDepartment}. Recorded on the acceptance.
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          {acceptDeptEmps.map((m) => {
-                            const sel = selectedTeam.includes(m.name);
-                            return (
-                              <button key={m.id} type="button"
-                                      onClick={() => toggleTeamMember(m.name)}
-                                      className="text-[11px] font-semibold px-2.5 py-1 rounded-full transition-all"
-                                      style={{ background: sel ? "rgba(99,102,241,0.18)" : "rgba(17,24,39,0.03)",
-                                               border: `1px solid ${sel ? "rgba(99,102,241,0.5)" : "rgba(17,24,39,0.12)"}`,
-                                               color: sel ? "#a5b4fc" : "#6b7280" }}>
-                                {sel ? "✓ " : ""}{m.name}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                    {/* 2026-11-02 — mandatory Digital Signature for every acceptance */}
-                    <div data-accept-signature className="rounded-lg px-3 py-2.5" style={{ background: "rgba(17,24,39,0.02)", border: `1px solid ${sigSvg ? "rgba(34,197,94,0.4)" : "rgba(17,24,39,0.15)"}` }}>
-                      <div className="text-[10px] font-bold text-slate-600 uppercase tracking-wide mb-1.5">
-                        <LeadIcon e="✍" />Digital signature <span className="text-red-500">*</span>
-                      </div>
-                      {sigSvg ? (
-                        <div>
-                          <div className="rounded bg-white border border-emerald-200 p-1 flex items-center justify-center" style={{ height: 72 }}>
-                            <img alt="Saved signature" src={svgDataUri(sigSvg)} style={{ maxHeight: 64, maxWidth: "100%" }} />
-                          </div>
-                          <div className="flex items-center justify-between mt-1.5">
-                            <div className="text-[10px] font-bold text-emerald-700">✓ Signature saved</div>
-                            <button type="button" disabled={busy} onClick={() => setField({ sigSvg: null })}
-                                    className="text-[10px] font-bold text-slate-500 hover:text-slate-900 underline">Re-sign</button>
-                          </div>
-                        </div>
-                      ) : (
-                        <>
-                          <div className="text-[10px] text-slate-500 mb-1.5">
-                            {acceptDeptEmps.length > 0 ? "Sign on behalf of the receiving employees selected above, then press Save Signature." : "Draw your signature, then press Save Signature."}
-                          </div>
-                          <SignaturePad onSave={(svg) => setField({ sigSvg: svg, error: "" })} />
-                        </>
-                      )}
-                    </div>
                   </>
                 )}
+                {whyNot && <div data-accept-why className="text-[12px] font-semibold text-slate-500">{whyNot}</div>}
                 {error && (
                   <div className="rounded-lg px-3 py-2 text-[11px] font-semibold"
                        style={{ background: "rgba(239,68,68,0.08)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.3)" }}>
@@ -21411,8 +21443,8 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                 {(
                   <button data-accept-confirm onClick={submitAcceptHandover}
                           disabled={busy || !sigSvg || (acceptDeptEmps.length > 0 && selectedTeam.filter(Boolean).length === 0) || (workflow.require_password_at_accept && !password)}
-                          className="text-[12px] font-black text-slate-900 px-6 py-2 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                          style={{ background: "#15803d", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
+                          className={`text-[15px] font-black px-7 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed ${whyNot || busy ? "" : "accept-ready"}`}
+                          style={{ minHeight: 50, background: "#15803d", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
                     {busy ? "⏳ Accepting…" : (workflow.require_password_at_accept ? "Verify & Accept" : "Confirm Acceptance")}
                   </button>
                 )}

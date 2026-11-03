@@ -94,16 +94,14 @@ ok("Accept modal opens from the staff dashboard", await p.locator("text=Accept i
 let confirmBtn = p.getByRole("button", { name: /Confirm Acceptance|Verify & Accept/ });
 // 2026-11-02 — the signature pad is shown on EVERY acceptance; Confirm needs an employee AND a saved signature
 ok("Accept popup shows the mandatory Digital Signature pad", await p.locator("[data-accept-signature] canvas").count() === 1 && await p.getByRole("button", { name: "Save Signature" }).count() === 1);
-ok("Confirm Acceptance is disabled with no employee and no signature", await confirmBtn.isDisabled());
-await p.locator(".modal-backdrop button", { hasText: /^Ramesh Patel$/ }).first().click(); await p.waitForTimeout(200);
+ok("Confirm Acceptance is disabled with no signature", await confirmBtn.isDisabled());
+await p.locator("[data-accept-main]").selectOption("Ramesh Patel"); await p.waitForTimeout(200);
 ok("Confirm is still disabled with an employee but no signature", await confirmBtn.isDisabled());
 await p.getByRole("button", { name: "Save Signature" }).click(); await p.waitForTimeout(300);
 ok("Save Signature with an empty pad does not enable Confirm", await confirmBtn.isDisabled());
 await draw(p, p.locator("[data-accept-signature] canvas").first()); await p.getByRole("button", { name: "Save Signature" }).click(); await p.waitForTimeout(400);
 ok("signature saved: tick shown and Confirm enabled", await p.locator("text=Signature saved").count() > 0 && await confirmBtn.isEnabled());
-await p.locator(".modal-backdrop button", { hasText: /Ramesh Patel$/ }).first().click(); await p.waitForTimeout(200);
-ok("deselecting the last employee disables Confirm again", await confirmBtn.isDisabled());
-await p.locator(".modal-backdrop button", { hasText: /^Ramesh Patel$/ }).first().click(); await p.waitForTimeout(200);
+ok("main person dropdown shows Ramesh Patel and steps come in order: people, signature", await p.locator("[data-accept-main]").inputValue() === "Ramesh Patel" && await p.evaluate(() => { const a = document.querySelector("[data-accept-people]"), b = document.querySelector("[data-accept-signature]"); return !!a && !!b && !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING); }));
 await confirmBtn.click(); await p.waitForTimeout(1200);
 let hs = await ls(p, "erp_handovers"); let ms = await ls(p, "erp_machines");
 const h21 = hs.find((h) => h.id === 21), m2 = ms.find((m) => m.id === 2);
