@@ -8214,6 +8214,44 @@ const Section = ({ icon, title, children }) => (
   </div>
 );
 
+// 2026-11-03 "organise, don't change": a collapsible group with a plain-English
+// heading and a one-line helper. Children stay mounted while closed (just
+// hidden), so every control, data-* hook and string is still in the page.
+function OrgGroup({ id, icon, title, hint, badge = null, defaultOpen = true, children }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <section data-org-group={id} className="org-group" data-open={open ? "1" : "0"}>
+      <button type="button" className="org-group-head" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+        <span className="org-group-icon" aria-hidden="true">{icon}</span>
+        <span className="org-group-text">
+          <span className="org-group-title">{title}</span>
+          {hint && <span className="org-group-hint">{hint}</span>}
+        </span>
+        {badge}
+        <span className="org-group-chev" aria-hidden="true">▾</span>
+      </button>
+      <div className="org-group-body" hidden={!open}>{children}</div>
+    </section>
+  );
+}
+
+// Numbered step card used by BOM Edit (1 Details, 2 Parts, 3 Time, ...).
+function OrgStep({ n, id, title, hint, status = null, children }) {
+  return (
+    <section data-org-step={id} id={`org-step-${id}`} className="org-step">
+      <div className="org-step-head">
+        <span className="org-step-num" aria-hidden="true">{n}</span>
+        <div className="org-step-text">
+          <div className="org-step-title">{title}</div>
+          {hint && <div className="org-step-hint">{hint}</div>}
+        </div>
+        {status}
+      </div>
+      <div className="org-step-body">{children}</div>
+    </section>
+  );
+}
+
 const SETTINGS_DEFAULTS = {
   companyName:     "Shantaz Technofoods",
   gst:             "",
@@ -8896,8 +8934,8 @@ function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, onSave, i
     { id: "company",       label: "🏭 Company",        desc: "Multiple companies + active selection" },
     { id: "po",            label: "🧾 Purchase Order", desc: "Template, T&C, declaration" },
     { id: "inventory",     label: "📦 Inventory",      desc: "Currency + low-stock rules" },
-    { id: "department",    label: "🔧 Department Workflow Settings", desc: "Per-dept time limits + accept timeout" },
-    { id: "checklists",    label: "📋 Department Checklists", desc: "Admin-managed per-department checklists" },
+    { id: "department",    label: "🔧 Department Workflow Settings", desc: "Deadlines & HOLD rules · employees per department · working calendar" },
+    { id: "checklists",    label: "📋 Department Checklists", desc: "Department checklists — what each department must check" },
     { id: "employees",     label: "👥 Employees",            desc: "Manage display names for factory workers" },
     { id: "reports",       label: "📄 Report Settings",      desc: "Logo, company line, PDF language" },
     { id: "notifications", label: "🔔 Notifications",  desc: "WhatsApp / email alerts" },
@@ -9121,7 +9159,55 @@ function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, onSave, i
                   ● Unsaved changes — click <strong><LeadIcon e="💾" />Save Changes</strong> at the top to apply.
                 </div>
               )}
-              <div className="space-y-6">
+              <div className="org-groups">
+                <OrgGroup id="deadlines" icon="⏱️" title="Deadlines & HOLD rules"
+                          hint="How long each department may work, and when a machine not accepted in time goes on HOLD.">
+                  <div className="space-y-5">
+                {/* ── Per-department work-duration limits (hours/days entry) ── */}
+                <div>
+                  <SLabel text="Per-department work time limits" hint="Admin-customizable duration for each department. If a department exceeds its limit, the operator must enter an explanation on Finish & Transfer." />
+                  <div className="rounded-lg overflow-hidden" style={{ border: "1px solid rgba(17,24,39,0.10)" }}>
+                    <div className="org-dur-head grid grid-cols-5 gap-2 px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-slate-500" style={{ background: "rgba(17,24,39,0.03)" }}>
+                      <div>Department</div>
+                      <div>Days</div>
+                      <div>Hours</div>
+                      <div>Minutes</div>
+                      <div>Saved value</div>
+                    </div>
+                    {DEPTS.map((d) => {
+                      const mins = (current.dept_durations[d]?.minutes) ?? 0;
+                      const days = Math.floor(mins / (24 * 60));
+                      const hours = Math.floor((mins % (24 * 60)) / 60);
+                      const minutes = mins % 60;
+                      const setMinutes = (newMins) => commitWorkflow({ dept_durations: { [d]: { minutes: Math.max(0, newMins) } } });
+                      return (
+                        <div key={d} className="org-dur-row grid grid-cols-5 gap-2 px-3 py-2 items-center border-t border-slate-200">
+                          <div className="text-[12px] font-semibold text-slate-700">{d}</div>
+                          <input type="number" min="0" step="1" value={days} disabled={!canConfig}
+                                 onChange={(e) => {
+                                   const nd = Math.max(0, parseInt(e.target.value, 10) || 0);
+                                   setMinutes(nd * 24 * 60 + hours * 60 + minutes);
+                                 }}
+                                 className="w-20 bg-slate-50 border border-slate-200 rounded px-2 py-1 text-xs text-slate-900 outline-none focus:border-blue-500/40 disabled:opacity-60" />
+                          <input type="number" min="0" max="23" step="1" value={hours} disabled={!canConfig}
+                                 onChange={(e) => {
+                                   const nh = Math.max(0, Math.min(23, parseInt(e.target.value, 10) || 0));
+                                   setMinutes(days * 24 * 60 + nh * 60 + minutes);
+                                 }}
+                                 className="w-20 bg-slate-50 border border-slate-200 rounded px-2 py-1 text-xs text-slate-900 outline-none focus:border-blue-500/40 disabled:opacity-60" />
+                          <input type="number" min="0" max="59" step="1" value={minutes} disabled={!canConfig}
+                                 onChange={(e) => {
+                                   const nm = Math.max(0, Math.min(59, parseInt(e.target.value, 10) || 0));
+                                   setMinutes(days * 24 * 60 + hours * 60 + nm);
+                                 }}
+                                 className="w-20 bg-slate-50 border border-slate-200 rounded px-2 py-1 text-xs text-slate-900 outline-none focus:border-blue-500/40 disabled:opacity-60" />
+                          <div className="text-[11px] text-slate-400 font-mono">{mins} min · {formatDuration(mins)}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="text-[10px] text-slate-500 mt-2">Durations are stored at the time of each handover, so changing them here does NOT retroactively re-flag past transfers. Defaults: Assembly 2d · Mechanical 2d · Electrical 1d · Trial 8h.</div>
+                </div>
                 {/* ── Acceptance timeout (separate from per-dept work duration) ── */}
                 <div className="rounded-lg p-3" style={{ background: "rgba(46, 80, 214,0.04)", border: "1px solid rgba(46, 80, 214,0.2)" }}>
                   <SLabel text="Acceptance timeout (receiving dept)" hint="A handover not accepted within this window shows as OVERDUE / HOLD in Machine Tracker and reports. Separate from the department's work-duration limit." />
@@ -9149,7 +9235,61 @@ function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, onSave, i
                     <span className="text-[11px] text-slate-500 ml-2">= {current.accept_timeout_minutes} min total · default 2 hours</span>
                   </div>
                 </div>
+                  </div>
+                </OrgGroup>
 
+                {onSaveUserDepartments && (
+                <OrgGroup id="employees" icon="👥" title="Employees per department"
+                          hint="Who shows in the Finish & Transfer worker list for each department.">
+                {/* ── Migration 029 — Department-wise employee assignment ── */}
+                {onSaveUserDepartments && (() => {
+                  const active       = (allUsers || []).filter((u) => u && u.status !== "disabled");
+                  const totalAssigned = active.reduce((n, u) => n + (Array.isArray(u.departments) && u.departments.length ? 1 : 0), 0);
+                  return (
+                  <div className="pt-5 border-t border-slate-200">
+                    <SLabel text="👥 Department Employees"
+                            hint="Assign existing users to one or more departments. During Finish & Transfer, only this list shows up in the Workers / Main Employee pickers for that department. Reuses the existing user records — no new login or role is created." />
+                    {/* Prominent empty-state banner so admins immediately know
+                        this is where to set up the Finish & Transfer picker. */}
+                    {canConfig && totalAssigned === 0 && (
+                      <div className="mb-3 px-3 py-2.5 rounded-lg text-[11px] font-semibold"
+                           style={{ background: "rgba(217, 119, 6,0.1)", color: "#B45309", border: "1px solid rgba(217, 119, 6,0.4)" }}>
+                        <LeadIcon e="⚠" />No one is assigned to any department yet. Add workers below so operators see them on <strong>Machine Tracker → Finish &amp; Transfer</strong>.
+                      </div>
+                    )}
+                    {active.length === 0 && (
+                      <div className="mb-3 px-3 py-2.5 rounded-lg text-[11px] font-semibold"
+                           style={{ background: "rgba(239,68,68,0.08)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.3)" }}>
+                        <LeadIcon e="⚠" />Could not load the user roster. If you don't see users here, apply migration <code>030_dept_roster_view.sql</code> or ask a super-admin to assign departments on your behalf.
+                      </div>
+                    )}
+                    <div className="space-y-2">
+                      {["Assembly", "Mechanical", "Electrical", "Trial"].map((dept) => {
+                        const assigned   = active.filter((u) => Array.isArray(u.departments) && u.departments.includes(dept));
+                        const notAssigned = active.filter((u) => !(Array.isArray(u.departments) && u.departments.includes(dept)));
+                        return (
+                          <DeptEmployeesRow
+                            key={dept}
+                            dept={dept}
+                            assigned={assigned}
+                            notAssigned={notAssigned}
+                            canConfig={canConfig}
+                            onSaveUserDepartments={onSaveUserDepartments}
+                          />
+                        );
+                      })}
+                    </div>
+                    <div className="text-[10px] text-slate-500 mt-2">
+                      Changing an assignment affects only future Finish &amp; Transfer pickers. Historical machine records keep the people they were saved against — later changes never alter past work logs.
+                    </div>
+                  </div>
+                  );
+                })()}
+                </OrgGroup>
+                )}
+
+                <OrgGroup id="calendar" icon="📅" title="Working calendar"
+                          hint="Weekly off day and holidays. All timers pause on these days.">
                 {/* ── Working calendar (2026-10-30): weekly off + holidays ── */}
                 {(() => {
                   const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -9198,53 +9338,11 @@ function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, onSave, i
                     </div>
                   );
                 })()}
+                </OrgGroup>
 
-                {/* ── Per-department work-duration limits (hours/days entry) ── */}
-                <div>
-                  <SLabel text="Per-department work time limits" hint="Admin-customizable duration for each department. If a department exceeds its limit, the operator must enter an explanation on Finish & Transfer." />
-                  <div className="rounded-lg overflow-hidden" style={{ border: "1px solid rgba(17,24,39,0.10)" }}>
-                    <div className="grid grid-cols-5 gap-2 px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-slate-500" style={{ background: "rgba(17,24,39,0.03)" }}>
-                      <div>Department</div>
-                      <div>Days</div>
-                      <div>Hours</div>
-                      <div>Minutes</div>
-                      <div>Saved value</div>
-                    </div>
-                    {DEPTS.map((d) => {
-                      const mins = (current.dept_durations[d]?.minutes) ?? 0;
-                      const days = Math.floor(mins / (24 * 60));
-                      const hours = Math.floor((mins % (24 * 60)) / 60);
-                      const minutes = mins % 60;
-                      const setMinutes = (newMins) => commitWorkflow({ dept_durations: { [d]: { minutes: Math.max(0, newMins) } } });
-                      return (
-                        <div key={d} className="grid grid-cols-5 gap-2 px-3 py-2 items-center border-t border-slate-200">
-                          <div className="text-[12px] font-semibold text-slate-700">{d}</div>
-                          <input type="number" min="0" step="1" value={days} disabled={!canConfig}
-                                 onChange={(e) => {
-                                   const nd = Math.max(0, parseInt(e.target.value, 10) || 0);
-                                   setMinutes(nd * 24 * 60 + hours * 60 + minutes);
-                                 }}
-                                 className="w-20 bg-slate-50 border border-slate-200 rounded px-2 py-1 text-xs text-slate-900 outline-none focus:border-blue-500/40 disabled:opacity-60" />
-                          <input type="number" min="0" max="23" step="1" value={hours} disabled={!canConfig}
-                                 onChange={(e) => {
-                                   const nh = Math.max(0, Math.min(23, parseInt(e.target.value, 10) || 0));
-                                   setMinutes(days * 24 * 60 + nh * 60 + minutes);
-                                 }}
-                                 className="w-20 bg-slate-50 border border-slate-200 rounded px-2 py-1 text-xs text-slate-900 outline-none focus:border-blue-500/40 disabled:opacity-60" />
-                          <input type="number" min="0" max="59" step="1" value={minutes} disabled={!canConfig}
-                                 onChange={(e) => {
-                                   const nm = Math.max(0, Math.min(59, parseInt(e.target.value, 10) || 0));
-                                   setMinutes(days * 24 * 60 + hours * 60 + nm);
-                                 }}
-                                 className="w-20 bg-slate-50 border border-slate-200 rounded px-2 py-1 text-xs text-slate-900 outline-none focus:border-blue-500/40 disabled:opacity-60" />
-                          <div className="text-[11px] text-slate-400 font-mono">{mins} min · {formatDuration(mins)}</div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div className="text-[10px] text-slate-500 mt-2">Durations are stored at the time of each handover, so changing them here does NOT retroactively re-flag past transfers. Defaults: Assembly 2d · Mechanical 2d · Electrical 1d · Trial 8h.</div>
-                </div>
-
+                <OrgGroup id="advanced" icon="⚙️" title="Advanced" defaultOpen={false}
+                          hint="Password at Accept Machine, and your own digital signature.">
+                  <div className="space-y-5">
                 {/* ── Transfer rules — password-at-accept toggle ── */}
                 <div className="rounded-lg p-3" style={{ background: "rgba(234,179,8,0.04)", border: "1px solid rgba(234,179,8,0.2)" }}>
                   <SLabel text="Transfer rules" hint="Controls how a receiving-department operator confirms acceptance of a machine. Lower-friction default suits factory shop floors; stricter mode suits sensitive sites." />
@@ -9262,51 +9360,6 @@ function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, onSave, i
                     </div>
                   </label>
                 </div>
-                {/* ── Migration 029 — Department-wise employee assignment ── */}
-                {onSaveUserDepartments && (() => {
-                  const active       = (allUsers || []).filter((u) => u && u.status !== "disabled");
-                  const totalAssigned = active.reduce((n, u) => n + (Array.isArray(u.departments) && u.departments.length ? 1 : 0), 0);
-                  return (
-                  <div className="pt-5 border-t border-slate-200">
-                    <SLabel text="👥 Department Employees"
-                            hint="Assign existing users to one or more departments. During Finish & Transfer, only this list shows up in the Workers / Main Employee pickers for that department. Reuses the existing user records — no new login or role is created." />
-                    {/* Prominent empty-state banner so admins immediately know
-                        this is where to set up the Finish & Transfer picker. */}
-                    {canConfig && totalAssigned === 0 && (
-                      <div className="mb-3 px-3 py-2.5 rounded-lg text-[11px] font-semibold"
-                           style={{ background: "rgba(217, 119, 6,0.1)", color: "#B45309", border: "1px solid rgba(217, 119, 6,0.4)" }}>
-                        <LeadIcon e="⚠" />No one is assigned to any department yet. Add workers below so operators see them on <strong>Machine Tracker → Finish &amp; Transfer</strong>.
-                      </div>
-                    )}
-                    {active.length === 0 && (
-                      <div className="mb-3 px-3 py-2.5 rounded-lg text-[11px] font-semibold"
-                           style={{ background: "rgba(239,68,68,0.08)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.3)" }}>
-                        <LeadIcon e="⚠" />Could not load the user roster. If you don't see users here, apply migration <code>030_dept_roster_view.sql</code> or ask a super-admin to assign departments on your behalf.
-                      </div>
-                    )}
-                    <div className="space-y-2">
-                      {["Assembly", "Mechanical", "Electrical", "Trial"].map((dept) => {
-                        const assigned   = active.filter((u) => Array.isArray(u.departments) && u.departments.includes(dept));
-                        const notAssigned = active.filter((u) => !(Array.isArray(u.departments) && u.departments.includes(dept)));
-                        return (
-                          <DeptEmployeesRow
-                            key={dept}
-                            dept={dept}
-                            assigned={assigned}
-                            notAssigned={notAssigned}
-                            canConfig={canConfig}
-                            onSaveUserDepartments={onSaveUserDepartments}
-                          />
-                        );
-                      })}
-                    </div>
-                    <div className="text-[10px] text-slate-500 mt-2">
-                      Changing an assignment affects only future Finish &amp; Transfer pickers. Historical machine records keep the people they were saved against — later changes never alter past work logs.
-                    </div>
-                  </div>
-                  );
-                })()}
-
                 {onRegisterSignature && currentUser && (
                   <div className="pt-5 border-t border-slate-200">
                     <SLabel text="My digital signature" hint="A one-time signature used when you accept a department handover. The acceptance also re-verifies your password." />
@@ -9323,6 +9376,8 @@ function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, onSave, i
                     />
                   </div>
                 )}
+                  </div>
+                </OrgGroup>
               </div>
             </Section>
           );
@@ -11254,6 +11309,14 @@ function BomChecklistSlots({
   const [editErr, setEditErr] = useState("");
   const [busy,    setBusy]    = useState(false);
   const [reuseOpen, setReuseOpen] = useState(false);
+  // Enter in a step box moves to the next box (adding one at the end).
+  const [focusIdx, setFocusIdx] = useState(null);
+  const editorRef = useRef(null);
+  useEffect(() => {
+    if (focusIdx == null) return;
+    const el = editorRef.current?.querySelector(`[data-cl-step-input="${focusIdx}"]`);
+    if (el) { el.focus(); setFocusIdx(null); }
+  }, [focusIdx, editing]);
 
   const openEditor = (dept, stage) => {
     if (readOnly) return;
@@ -11358,9 +11421,17 @@ function BomChecklistSlots({
   };
 
   // ── Render ────────────────────────────────────────────────────────────────
-  const DeptRow = ({ dept }) => (
-    <div className="rounded-xl p-3" style={{ background: "rgba(17,24,39,0.03)", border: "1px solid rgba(17,24,39,0.08)" }}>
-      <div className="text-[11px] font-black text-slate-900 mb-2 uppercase tracking-wider">{dept}</div>
+  const DeptRow = ({ dept }) => {
+    const has = CHECKLIST_STAGES.some((s) => slotFor(dept, s.key));
+    return (
+    <div className="rounded-xl p-3" data-cl-dept={dept} data-has-checklist={has ? "1" : "0"}
+         style={{ background: "rgba(17,24,39,0.03)", border: `1px solid ${has ? "rgba(34,197,94,0.35)" : "rgba(17,24,39,0.08)"}` }}>
+      <div className="flex items-center gap-2 mb-2">
+        <span className="w-6 h-6 rounded-full flex items-center justify-center text-[12px] font-black flex-shrink-0" aria-hidden="true"
+              style={has ? { background: "#15803d", color: "#fff" } : { background: "rgba(17,24,39,0.08)", color: "#64748b" }}>{has ? "✓" : "–"}</span>
+        <div className="text-[12px] font-black text-slate-900 uppercase tracking-wider">{dept}</div>
+        <span className="text-[11px] font-semibold" style={{ color: has ? "#15803d" : "#64748b" }}>{has ? "Checklist ready" : "No checklist yet"}</span>
+      </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         {CHECKLIST_STAGES.map((s) => {
           const slot = slotFor(dept, s.key);
@@ -11370,7 +11441,7 @@ function BomChecklistSlots({
             <button key={s.key}
                     onClick={() => openEditor(dept, s.key)}
                     disabled={readOnly}
-                    className={`text-left px-3 py-2 rounded-lg border transition-all ${readOnly ? "cursor-default opacity-70" : "hover:bg-slate-50 cursor-pointer"}`}
+                    className={`text-left px-3 py-2 min-h-[48px] rounded-lg border transition-all ${readOnly ? "cursor-default opacity-70" : "hover:bg-slate-50 cursor-pointer"}`}
                     style={{ background: slot ? "rgba(34,197,94,0.05)" : "rgba(17,24,39,0.03)",
                              borderColor: slot ? "rgba(34,197,94,0.3)" : "rgba(17,24,39,0.10)" }}>
               <div className="text-[9px] font-bold uppercase tracking-wider" style={{ color: slot ? "#15803d" : "#64748b" }}>{s.short}</div>
@@ -11384,7 +11455,8 @@ function BomChecklistSlots({
         })}
       </div>
     </div>
-  );
+    );
+  };
 
   return (
     <div className="space-y-2">
@@ -11398,7 +11470,8 @@ function BomChecklistSlots({
         <div className="modal-backdrop fixed inset-0 z-[95] flex items-center justify-center p-4"
              style={{ background: "rgba(17,24,39,0.45)", backdropFilter: "blur(10px)" }}
              onClick={(e) => e.target === e.currentTarget && !busy && closeEditor()}>
-          <div className="w-full max-w-xl rounded-2xl overflow-hidden flex flex-col"
+          <div ref={editorRef} data-cl-editor
+               className="w-full max-w-xl rounded-2xl overflow-hidden flex flex-col"
                style={{ maxHeight: "90vh", background: "var(--surface-elevated)",
                         border: "1px solid rgba(46, 80, 214,0.5)",
                         boxShadow: "0 40px 100px rgba(17,24,39,0.22)" }}>
@@ -11410,6 +11483,7 @@ function BomChecklistSlots({
                 <div className="text-[10px] text-slate-500 mt-0.5">{CHECKLIST_STAGES.find((s) => s.key === editing.stage).hint}</div>
               </div>
               <button onClick={closeEditor} disabled={busy}
+                      aria-label="Close"
                       className="w-7 h-7 rounded-lg bg-slate-50 hover:bg-red-500/20 hover:text-red-400 text-slate-500 transition-all flex items-center justify-center text-xs font-bold disabled:opacity-40">
                 ✕
               </button>
@@ -11446,11 +11520,19 @@ function BomChecklistSlots({
             <div className="flex-1 overflow-y-auto px-5 py-3 space-y-2">
               {editing.items.map((it, idx) => (
                 <div key={it.id}
+                     data-cl-step-row
                      className="rounded-lg px-3 py-2 flex items-center gap-2"
                      style={{ background: "rgba(17,24,39,0.03)", border: "1px solid rgba(17,24,39,0.08)" }}>
                   <div className="text-[10px] font-mono text-slate-600 w-5 text-right">{idx + 1}.</div>
                   <input value={it.label}
+                         data-cl-step-input={idx}
                          onChange={(e) => patchRow(idx, { label: e.target.value })}
+                         onKeyDown={(e) => {
+                           if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
+                           e.preventDefault();
+                           if (idx === editing.items.length - 1) addRow();
+                           setFocusIdx(idx + 1);
+                         }}
                          placeholder="What should the operator check?"
                          className="flex-1 bg-slate-50 border border-slate-200 rounded-md px-2 py-1.5 text-[12px] text-slate-900 outline-none focus:border-blue-500/40 modal-input" />
                   <label className="flex items-center gap-1 cursor-pointer text-[10px] text-slate-400">
@@ -11460,17 +11542,23 @@ function BomChecklistSlots({
                     Must do
                   </label>
                   <button onClick={() => moveRow(idx, -1)} disabled={idx === 0 || busy}
+                          aria-label="Move step up"
                           className="text-[10px] font-bold w-6 h-6 rounded border border-slate-200 bg-slate-50 text-slate-600 hover:text-slate-900 disabled:opacity-30">▲</button>
                   <button onClick={() => moveRow(idx, 1)} disabled={idx === editing.items.length - 1 || busy}
+                          aria-label="Move step down"
                           className="text-[10px] font-bold w-6 h-6 rounded border border-slate-200 bg-slate-50 text-slate-600 hover:text-slate-900 disabled:opacity-30">▼</button>
                   <button onClick={() => removeRow(idx)} disabled={busy || editing.items.length === 1}
+                          aria-label="Remove step"
                           className="text-[10px] font-bold w-6 h-6 rounded border border-red-500/20 bg-red-500/10 text-red-300 hover:bg-red-500/20 disabled:opacity-30">✕</button>
                 </div>
               ))}
+              <div className="flex items-center gap-3 flex-wrap">
               <button onClick={addRow} disabled={busy}
                       className="text-[11px] font-bold px-3 py-1.5 rounded-lg border border-dashed border-blue-500/30 bg-blue-500/[0.05] text-blue-300 hover:bg-blue-500/[0.1] transition-all">
                 + Add Step
               </button>
+                <span className="text-[11px] text-slate-500">Tip: press Enter to add the next step.</span>
+              </div>
               {editErr && (
                 <div className="text-[11px] font-bold px-3 py-2 rounded-md"
                      style={{ background: "rgba(239,68,68,0.08)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.3)" }}>
@@ -12576,45 +12664,83 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
 
         {editMode ? (
           /* ── Edit Mode — full width, unchanged ── */
-          <div className="flex-1 overflow-y-auto"><div className="p-6 space-y-4 max-w-3xl">
+          <div className="flex-1 overflow-y-auto"><div className="org-bom-edit p-4 sm:p-6 space-y-4 max-w-3xl">
             <div className="text-[10px] font-bold text-amber-700 bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-3">
               ✏️ Edit Mode — Modify items, quantities, then Save BOM to apply changes permanently.
             </div>
 
-            {/* ── 2026-10-22: Clear "options" chips so operators spot both
-                   the Checklist and Critical Items reviews immediately when
-                   they open Edit on an existing BOM. Clicking opens the
-                   matching panel further down the page (expand-in-place —
-                   nothing scrolls so operators keep their context). The
-                   chips also act as a status badge: "4 configured" / etc. */}
+            {/* 2026-11-03 — Edit BOM organised into numbered steps. Same
+                state, same handlers, same Save BOM; only the order and the
+                headings changed. Counts below are read-only summaries. */}
             {(() => {
-              const scopedTemplates = (checklistTemplates || []).filter(
-                (t) => t && t.active !== false && t.bomKey === bomKey
+              const tpl = (checklistTemplates || []).filter((t) => t && t.active !== false && t.bomKey === bomKey);
+              const deptsWithList = CHECKLIST_DEPTS.filter((d) => tpl.some((t) => t.department === d));
+              const timeSet = DURATION_DEPTS.filter((d) => (Number(editDurations?.[d]?.days) || 0) + (Number(editDurations?.[d]?.hours) || 0) > 0).length;
+              const steps = [
+                ["details", "Details", !!(editKey || "").trim() && !!(editLabel || "").trim()],
+                ["parts", "Parts", editItems.length > 0],
+                ["time", "Time", timeSet === DURATION_DEPTS.length],
+                ["checklists", "Checklists", deptsWithList.length === CHECKLIST_DEPTS.length],
+                ["photo", "Photo", !!editPhoto],
+              ];
+              return (
+                <nav className="org-step-nav" aria-label="Edit BOM steps">
+                  {steps.map(([id, label, done], i) => (
+                    <button key={id} type="button" data-org-step-link={id}
+                            onClick={() => document.getElementById(`org-step-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" })}>
+                      <span className="org-step-nav-num" data-done={done ? "1" : "0"}>{done ? "✓" : i + 1}</span>
+                      <span className="org-step-nav-label">{label}</span>
+                    </button>
+                  ))}
+                </nav>
               );
-              const checklistCount = scopedTemplates.length;
-              const criticalItemsInBom = (editItems || [])
-                .map(({ code, qty }) => ({ code, qty, inv: findInv(code) }))
-                .filter((r) => r.inv && r.inv.isCritical);
-              const criticalCount = criticalItemsInBom.length;
+            })()}
+
+            {/* ── 1 Details ── */}
+            <OrgStep n={1} id="details" title="Details" hint="BOM key, machine model name and its production rack.">
+              <div className="space-y-3">
+            {/* Rename — BOM Key + Machine Model Name */}
+            <div className="rounded-xl p-4" style={{ background: "rgba(139,92,246,0.05)", border: "1px solid rgba(139,92,246,0.22)" }}>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-base">✏️</span>
+                <div className="text-[11px] font-bold text-slate-900">BOM Identity</div>
+                <span className="text-[9px] text-purple-300 px-1.5 py-0.5 rounded-full" style={{ background: "rgba(139,92,246,0.15)" }}>Rename safe</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <div className="text-[10px] font-medium text-purple-200 mb-1.5">BOM Key</div>
+                  <input value={editKey} onChange={(e) => { setEditKey(e.target.value.toUpperCase()); setRenameErr(""); }}
+                    placeholder="e.g. KM-10"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 font-mono outline-none modal-input" />
+                </div>
+                <div>
+                  <div className="text-[10px] font-medium text-purple-200 mb-1.5">Machine Model Name</div>
+                  <input value={editLabel} onChange={(e) => { setEditLabel(e.target.value); setRenameErr(""); }}
+                    placeholder="e.g. Kneading Machine 10L"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 outline-none modal-input" />
+                </div>
+              </div>
+              <div className="text-[10px] text-slate-500 mt-2">
+                Renaming updates Machine Tracker, Outward log and Pending entries to match. Existing audit history is preserved.
+              </div>
+              {renameErr && <div className="text-[10px] text-red-400 mt-2">⚠ {renameErr}</div>}
+            </div>
+
+            {/* Production rack — fixed floor racks only (2026-10-30). */}
+            <RackStatusNote bomKey={bomKey} />
+              </div>
+            </OrgStep>
+
+            {/* ── 2 Parts ── */}
+            <OrgStep n={2} id="parts" title="Parts" hint="Components and quantity for one machine. Add one by one or paste from Excel."
+                     status={<span className="org-step-pill">{editItems.length} part{editItems.length === 1 ? "" : "s"}</span>}>
+              <div className="space-y-3">
+            {(() => {
+              const bomCriticalCount = (editItems || [])
+                .map(({ code }) => findInv(code))
+                .filter((inv) => inv && inv.isCritical).length;
               return (
                 <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={() => setShowChecklistPanel((v) => !v)}
-                    className="flex items-center gap-2 text-[12px] font-bold px-4 py-2 rounded-xl border transition-all"
-                    style={{
-                      background: showChecklistPanel ? "rgba(139,92,246,0.14)" : "rgba(139,92,246,0.05)",
-                      borderColor: showChecklistPanel ? "rgba(139,92,246,0.55)" : "rgba(139,92,246,0.25)",
-                      color: "#6d28d9",
-                    }}
-                  >
-                    <span className="text-base">📋</span>
-                    <span>Checklist</span>
-                    <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full"
-                          style={{ background: "rgba(139,92,246,0.2)", color: "#6d28d9" }}>
-                      {checklistCount} {checklistCount === 1 ? "set" : "sets"}
-                    </span>
-                    <span className="text-[11px] text-slate-400">{showChecklistPanel ? "▲ Hide" : "▼ Manage"}</span>
-                  </button>
                   <button
                     onClick={() => setShowCriticalPanel((v) => !v)}
                     className="flex items-center gap-2 text-[12px] font-bold px-4 py-2 rounded-xl border transition-all"
@@ -12628,7 +12754,7 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
                     <span>Critical Items</span>
                     <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full"
                           style={{ background: "rgba(217, 119, 6,0.2)", color: "#b45309" }}>
-                      {criticalCount} in BOM
+                      {bomCriticalCount} in BOM
                     </span>
                     <span className="text-[11px] text-slate-400">{showCriticalPanel ? "▲ Hide" : "▼ View"}</span>
                   </button>
@@ -12707,53 +12833,6 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
                 </div>
               );
             })()}
-
-            {/* Rename — BOM Key + Machine Model Name */}
-            <div className="rounded-xl p-4" style={{ background: "rgba(139,92,246,0.05)", border: "1px solid rgba(139,92,246,0.22)" }}>
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-base">✏️</span>
-                <div className="text-[11px] font-bold text-slate-900">BOM Identity</div>
-                <span className="text-[9px] text-purple-300 px-1.5 py-0.5 rounded-full" style={{ background: "rgba(139,92,246,0.15)" }}>Rename safe</span>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <div className="text-[10px] font-medium text-purple-200 mb-1.5">BOM Key</div>
-                  <input value={editKey} onChange={(e) => { setEditKey(e.target.value.toUpperCase()); setRenameErr(""); }}
-                    placeholder="e.g. KM-10"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 font-mono outline-none modal-input" />
-                </div>
-                <div>
-                  <div className="text-[10px] font-medium text-purple-200 mb-1.5">Machine Model Name</div>
-                  <input value={editLabel} onChange={(e) => { setEditLabel(e.target.value); setRenameErr(""); }}
-                    placeholder="e.g. Kneading Machine 10L"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 outline-none modal-input" />
-                </div>
-              </div>
-              <div className="text-[10px] text-slate-500 mt-2">
-                Renaming updates Machine Tracker, Outward log and Pending entries to match. Existing audit history is preserved.
-              </div>
-              {renameErr && <div className="text-[10px] text-red-400 mt-2">⚠ {renameErr}</div>}
-            </div>
-
-            {/* Migration 061 — machine photo shown on machine cards. */}
-            <BomPhotoField value={editPhoto} onChange={setEditPhoto} />
-
-            {/* Production rack — fixed floor racks only (2026-10-30). */}
-            <RackStatusNote bomKey={bomKey} />
-
-            {/* Migration 041 — department durations for this model. Copied onto
-                every machine at Outward, so the operator is not asked again. */}
-            <div className="rounded-xl p-4" style={{ background: "rgba(46, 80, 214,0.05)", border: "1px solid rgba(46, 80, 214,0.2)" }}>
-              <div className="flex items-center gap-3 flex-wrap mb-3">
-                <span className="text-lg">⏱️</span>
-                <div className="flex-1 min-w-[160px]">
-                  <div className="text-[11px] font-bold text-slate-900">Department Durations</div>
-                  <div className="text-[10px] text-slate-500 mt-0.5">Deadline for each department on every machine of this model. Used at Outward without asking the store again.</div>
-                </div>
-              </div>
-              <DeptDurationFields value={editDurations} onChange={(v) => { setEditDurations(v); setEditDurErr(""); }} />
-              {editDurErr && <div className="text-[10px] text-red-500 font-bold mt-2">⚠ {editDurErr}</div>}
-            </div>
 
             <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(17,24,39,0.08)" }}>
               <div className="grid gap-0 px-4 py-2 text-[10px] font-medium text-slate-500 uppercase tracking-wide"
@@ -12835,6 +12914,62 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
               </div>
               {addErr && <div className="text-[10px] text-red-400 mt-2">⚠ {addErr}</div>}
             </div>
+              </div>
+            </OrgStep>
+
+            {/* ── 3 Time per department ── */}
+            <OrgStep n={3} id="time" title="Time per department"
+                     hint="Deadline for each department on every machine of this model. Used at Outward without asking the store again.">
+            {/* Migration 041 — department durations for this model. Copied onto
+                every machine at Outward, so the operator is not asked again. */}
+            <div data-org-durations>
+              <div className="text-[11px] font-bold text-slate-500 mb-2">Department Durations <span className="font-medium">· days + hours</span></div>
+              <DeptDurationFields value={editDurations} onChange={(v) => { setEditDurations(v); setEditDurErr(""); }} />
+              {editDurErr && <div className="text-[10px] text-red-500 font-bold mt-2">⚠ {editDurErr}</div>}
+            </div>
+            </OrgStep>
+
+            {/* ── 4 Checklists ── */}
+            {(() => {
+              const tpl = (checklistTemplates || []).filter((t) => t && t.active !== false && t.bomKey === bomKey);
+              const bomChecklistCount = tpl.length;
+              const deptsWithList = CHECKLIST_DEPTS.filter((d) => tpl.some((t) => t.department === d));
+              return (
+            <OrgStep n={4} id="checklists" title="Checklists" hint="What each department must check for this machine model. ✓ = checklist ready."
+                     status={<span className="org-step-pill" data-done={deptsWithList.length === CHECKLIST_DEPTS.length ? "1" : "0"}>{deptsWithList.length} of {CHECKLIST_DEPTS.length} ✓</span>}>
+              <div className="space-y-3">
+                <div className="org-dept-glance" data-org-checklist-glance>
+                  {CHECKLIST_DEPTS.map((d) => {
+                    const n = tpl.filter((t) => t.department === d).length;
+                    return (
+                      <button key={d} type="button" data-dept={d} data-has-checklist={n ? "1" : "0"}
+                              onClick={() => setShowChecklistPanel(true)}>
+                        <span className="org-dept-glance-mark" aria-hidden="true">{n ? "✓" : "–"}</span>
+                        <span className="org-dept-glance-name">{d}</span>
+                        <span className="org-dept-glance-note">{n ? `${n} checklist${n === 1 ? "" : "s"}` : "No checklist"}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setShowChecklistPanel((v) => !v)}
+                    className="flex items-center gap-2 text-[12px] font-bold px-4 py-2 rounded-xl border transition-all"
+                    style={{
+                      background: showChecklistPanel ? "rgba(139,92,246,0.14)" : "rgba(139,92,246,0.05)",
+                      borderColor: showChecklistPanel ? "rgba(139,92,246,0.55)" : "rgba(139,92,246,0.25)",
+                      color: "#6d28d9",
+                    }}
+                  >
+                    <span className="text-base">📋</span>
+                    <span>Checklist</span>
+                    <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full"
+                          style={{ background: "rgba(139,92,246,0.2)", color: "#6d28d9" }}>
+                      {bomChecklistCount} {bomChecklistCount === 1 ? "set" : "sets"}
+                    </span>
+                    <span className="text-[11px] text-slate-400">{showChecklistPanel ? "▲ Hide" : "▼ Manage"}</span>
+                  </button>
+                </div>
 
             {/* Migration 028 — Department Checklists for THIS BOM. Writes are
                 immediate (template rows get bomKey set) because the BOM
@@ -12865,6 +13000,17 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
                 You don't have permission to view or change checklists. Ask an admin with <code>machines.configDept</code>.
               </div>
             )}
+              </div>
+            </OrgStep>
+              );
+            })()}
+
+            {/* ── 5 Machine photo ── */}
+            <OrgStep n={5} id="photo" title="Machine photo" hint="Shown on every machine card of this model so workers recognise it."
+                     status={<span className="org-step-pill" data-done={editPhoto ? "1" : "0"}>{editPhoto ? "✓ Added" : "Not added"}</span>}>
+            {/* Migration 061 — machine photo shown on machine cards. */}
+            <BomPhotoField value={editPhoto} onChange={setEditPhoto} />
+            </OrgStep>
 
             {editValidationErr && (
               <div className="text-[11px] font-semibold rounded-xl px-4 py-2.5" style={{ background: "rgba(185,28,28,0.08)", color: "#b91c1c", border: "1px solid rgba(185,28,28,0.25)" }}>⚠ {editValidationErr}</div>
@@ -12872,7 +13018,7 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
             {(() => { const w = validateBomLines(editItems, findInv).warnings; return w.length ? (
               <div className="text-[10px] rounded-xl px-4 py-2" style={{ background: "rgba(180,83,9,0.08)", color: "#b45309", border: "1px solid rgba(180,83,9,0.25)" }}>{w.map((x, i) => <div key={i}>⚠ {x}</div>)}</div>
             ) : null; })()}
-            <div className="flex gap-3 pt-2">
+            <div className="org-edit-footer">
               <button onClick={() => { setEditMode(false); resetEditState(); }}
                       className="text-xs font-bold text-slate-400 px-5 py-2.5 rounded-xl border border-slate-200 hover:text-slate-900 hover:border-white/20 transition-all">Discard Changes</button>
               <button onClick={saveBOMEdit}
