@@ -19240,7 +19240,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                       title="Classified critical when it was raised">CRITICAL</span>
                               )}
                               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: chip.bg, color: chip.fg }}>{chip.label}</span>
-                              {onReceivePendingItem && canReceiveJob(p) && p.status === "open" && !p.receivedAt && (
+                              {onReceivePendingItem && pendingItemIsPart(p) && canReceiveJob(p) && p.status === "open" && !p.receivedAt && (
                                 <button data-needs-net type="button" onClick={() => setJobAction({ item: p, action: "receive", notes: "", busy: false, error: "" })}
                                         className="text-[10.5px] font-bold px-2.5 py-1 rounded-lg border transition-all"
                                         style={{ background: "rgba(37,99,235,0.08)", border: "1px solid rgba(37,99,235,0.35)", color: "#1d4ed8" }}>
@@ -20008,7 +20008,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                           </div>
                           {canJobs && (
                             <div className="flex flex-col sm:flex-row gap-2">
-                              {onReceivePendingItem && canReceiveJob(p) && !p.receivedAt && (
+                              {onReceivePendingItem && pendingItemIsPart(p) && canReceiveJob(p) && !p.receivedAt && (
                                 <button data-needs-net type="button" className={btn} style={{ background: "rgba(37,99,235,0.08)", border: "1px solid rgba(37,99,235,0.4)", color: "#1d4ed8" }}
                                         onClick={() => setJobAction({ item: p, action: "receive", notes: "", busy: false, error: "" })}>
                                   📦 Part received
@@ -21785,7 +21785,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                         <span className="text-[9px] font-bold" style={{ color: p.receivedAt ? "#1d4ed8" : "#b45309" }}>
                                           {p.receivedAt ? "Part received · finish work" : (Number(p.receivedQty) || 0) > 0 ? `Partly received · ${pendingItemRemaining(p)} left` : p.itemCode ? "Awaiting part" : "Awaiting work"}
                                         </span>
-                                        {onReceivePendingItem && canReceiveJob(p) && !p.receivedAt && (
+                                        {onReceivePendingItem && pendingItemIsPart(p) && canReceiveJob(p) && !p.receivedAt && (
                                           <button data-needs-net onClick={() => setJobAction({ item: p, action: "receive", notes: "", busy: false, error: "" })}
                                                   className="text-[10px] font-bold px-2 py-0.5 rounded border"
                                                   style={{ color: "#1d4ed8", borderColor: "rgba(37,99,235,0.4)", background: "rgba(37,99,235,0.08)" }}>
@@ -22319,6 +22319,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
         const blocked = !jobAction.busy && ((isReceive && !receiveReady) || remarkMissing || partNotReceived);
         // Owner's rule: no long message — the box that still needs filling turns red.
         const flagMissing = () => {
+          setJobAction((prev) => prev && !prev.tried ? { ...prev, tried: true } : prev);
           if (isReceive) flagField(qtyProblem ? "[data-receive-qty-box]" : "[data-receive-verify]");
           else if (remarkMissing) flagField("[data-job-remark]");
         };
@@ -22385,7 +22386,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                       ? <>Only this quantity is added to stock ({inv.name}). The rest stays pending and can be received later.</>
                       : <>Not in the Item Master — the receipt is recorded on the job, no stock is changed.</>}
                   </div>
-                  {qtyProblem && <div className="text-[10.5px] font-semibold mt-1" style={{ color: "#dc2626" }}>{qtyProblem}</div>}
+                  {qtyProblem && jobAction.tried && <div data-receive-qty-error className="text-[10.5px] font-semibold mt-1" style={{ color: "#dc2626" }}>{qtyProblem}</div>}
                 </div>
               )}
               {isReceive && !p.receivedAt && (
@@ -22421,8 +22422,8 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                onChange={(e) => setJobAction((prev) => prev ? { ...prev, verified: e.target.checked, error: "" } : prev)}
                                className="w-4 h-4 mt-0.5 accent-emerald-600" />
                         <span>{critical
-                          ? `I have physically verified ${recvQty > 1 ? `all ${recvQty} units of ` : ""}${(inv && inv.name) || p.itemName || p.itemCode} for this machine.`
-                          : `${p.assignedDepartment || "The department"} has physically received and checked ${inv ? inv.name : p.itemName || p.itemCode || "the part"}${recvQty > 1 ? ` (${recvQty})` : ""}.`}</span>
+                          ? `I have physically verified ${recvQty > 1 ? `all ${recvQty} units of ` : ""}${(inv && inv.name) || p.itemName || p.itemCode || p.description || "this part"} for this machine.`
+                          : `${p.assignedDepartment || "The department"} has physically received and checked ${(inv && inv.name) || p.itemName || p.itemCode || p.description || "this part"}${recvQty > 1 ? ` (${recvQty})` : ""}.`}</span>
                       </label>
                       {/* A critical item with no serial rule in the Item Master
                           (a manually named part): serials can still be typed

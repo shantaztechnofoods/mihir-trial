@@ -138,6 +138,8 @@ const openReceive = async (id) => { await p.locator(`[data-staff-job="${id}"] bu
 await openReceive(3);
 ok("Part received asks for the quantity, defaulting to what is pending", (await p.locator("[data-receive-qty]").inputValue()) === "100");
 await p.locator("[data-receive-qty]").fill("120"); await p.waitForTimeout(200);
+// 2026-11-03 — the quantity error shows once Save has been tried (tap the grey Save)
+await p.locator("[data-job-submit]").evaluate((x) => x.parentElement.click()); await p.waitForTimeout(200);
 ok("receiving more than pending is refused in the popup", await p.locator("text=/Only 100 is still pending/").count() > 0 && await p.locator("[data-job-submit]").isDisabled());
 await p.locator("[data-receive-qty]").fill("50"); await p.locator("[data-receive-check]").check(); await p.waitForTimeout(200);
 ok("popup says the other 50 stay pending", await p.locator("[data-receive-left]").innerText().then((t) => /50 will stay pending/.test(t)).catch(() => false));

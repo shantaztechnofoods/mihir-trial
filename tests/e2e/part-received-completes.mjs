@@ -16,6 +16,7 @@ await p.evaluate(() => { const pj = JSON.parse(localStorage.getItem("erp_pending
   // Owner example 2: Mechanical left a 💬 comment/work job on Finish & Transfer and SN-103 went on to
   // Electrical — the job stays owed by Mechanical (state seeded as the transfer leaves it).
   pj.push({ id: 9, machineId: 3, description: "Body sheet (patra) fitting pending", assignedDepartment: "Mechanical", raisedInDepartment: "Mechanical", kind: "owed", status: "open", raisedAt: new Date().toISOString(), receivedQty: 0, receipts: [] });
+  pj.push({ id: 11, machineId: 1, description: "Return spring", itemName: "Return spring", qty: null, assignedDepartment: "Mechanical", kind: "owed", status: "open", raisedAt: new Date().toISOString(), receivedQty: 0, receipts: [] });
   pj.push({ id: 6, machineId: 1, description: "Old bolt kit", itemName: "Bolt kit", qty: 2, assignedDepartment: "Mechanical", kind: "owed", status: "resolved", raisedAt: new Date().toISOString(), resolvedAt: new Date().toISOString(), resolvedBy: "u_mech", resolutionNotes: "done earlier", receivedQty: 0, receipts: [] });
   localStorage.setItem("erp_pending_handover_items", JSON.stringify(pj)); });
 await p.reload({ waitUntil: "networkidle" }); await p.waitForTimeout(600);
@@ -30,8 +31,16 @@ const tapSave = async () => { await p.locator("[data-job-submit]").evaluate((x) 
 // ── part job: one main action, no Work completed ──
 ok("part job (gearbox) shows 📦 Part received", await btnIn(3, /^📦 Part received$/).count() === 1);
 ok("part job has NO Work completed button", await btnIn(3, /Work completed/).count() === 0 && await btnIn(2, /Work completed/).count() === 0);
-ok("work job keeps ✓ Work completed", await btnIn(1, /Work completed/).count() === 1);
+ok("fault/work job keeps ✓ Work completed and has NO Part received", await btnIn(1, /Work completed/).count() === 1 && await btnIn(1, /Part received/).count() === 0);
 await p.screenshot({ path: `${SHOTS}/part-received-staff-390.png`, fullPage: true });
+
+// ── audit fixes: no red quantity error before a Save attempt; never "undefined" in the sheet ──
+await btnIn(11, /Part received/).click(); await p.waitForTimeout(500);
+ok("part with no recorded quantity: quantity box empty, NO red error before Save is tried", (await p.locator("[data-receive-qty]").inputValue()) === "" && await p.locator("[data-receive-qty-error]").count() === 0);
+ok("sheet never says 'undefined'", !/undefined/.test(await p.locator("[data-receive-verify]").innerText()));
+await tapSave();
+ok("after tapping grey Save: quantity error shown and box red", await p.locator("[data-receive-qty-error]").count() === 1 && await isRed("[data-receive-qty-box]"));
+await p.getByRole("button", { name: "Cancel" }).last().click(); await p.waitForTimeout(300);
 
 // ── quantity is always asked; empty / too much → grey Save + red box ──
 await btnIn(3, /Part received/).click(); await p.waitForTimeout(500);
@@ -85,7 +94,7 @@ ok("work job completed with its remark", j1.status === "resolved" && j1.resoluti
 
 // ── owner example 2: Mechanical's comment job on a machine now in Electrical ──
 ok("Mechanical login sees its owed job although SN-103 is in Electrical", await row(9).count() === 1 && /SN-103/.test(await row(9).innerText()));
-ok("it is a work job with ✓ Work completed", await btnIn(9, /Work completed/).count() === 1);
+ok("it is a work job: ✓ Work completed, no Part received", await btnIn(9, /Work completed/).count() === 1 && await btnIn(9, /Part received/).count() === 0);
 await btnIn(9, /Work completed/).click(); await p.waitForTimeout(500);
 ok("remark required for the comment job too", await p.locator("[data-job-submit]").isDisabled());
 await p.locator("[data-job-remark]").fill("Patra fitted in Electrical bay");
@@ -109,7 +118,7 @@ await login(p, "admin", "admin123"); await gotoMachineTracker(p);
 await p.locator('[data-card-jobs="1"]').first().click(); await p.waitForTimeout(700);
 const dr = (id, re) => p.locator(`[data-jobs-drawer] [data-job-row="${id}"] button`, { hasText: re });
 ok("drawer: part job 'yrtu × 5' has 📦 Part received and no Work completed", await dr(7, /Part received/).count() === 1 && await dr(7, /Work completed/).count() === 0);
-ok("drawer: work job keeps Work completed", await dr(8, /Work completed/).count() === 1);
+ok("drawer: fault job keeps Work completed, no Part received", await dr(8, /Work completed/).count() === 1 && await dr(8, /Part received/).count() === 0);
 await p.screenshot({ path: `${SHOTS}/part-received-drawer-390.png`, fullPage: true });
 await dr(7, /Part received/).click(); await p.waitForTimeout(500);
 await p.locator("[data-receive-qty]").fill("3"); await p.locator("[data-receive-check]").check(); await p.locator("[data-job-submit]").click(); await p.waitForTimeout(1000);

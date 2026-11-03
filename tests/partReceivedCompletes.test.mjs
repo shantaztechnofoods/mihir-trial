@@ -30,6 +30,14 @@ test("part jobs have no Work completed button anywhere; work jobs keep it", () =
   assert.equal(gates.length, 3, "Pending Jobs tab/drawer, staff dashboard, machine panel");
   assert.equal((app.match(/action: "complete"/g) || []).length, 3, "three Work completed buttons remain for work jobs");
   assert.equal((app.match(/📦 Part received/g) || []).length, 3);
+  // audit fix (c): Part received only on part jobs, never on fault / work / comment jobs
+  assert.equal((app.match(/onReceivePendingItem && pendingItemIsPart\(p\) && canReceiveJob\(p\)/g) || []).length, 3);
+});
+
+test("audit fixes: quantity error only after a Save attempt; no 'undefined' part name", () => {
+  assert.match(app, /\{qtyProblem && jobAction\.tried && <div data-receive-qty-error/);
+  assert.match(app, /setJobAction\(\(prev\) => prev && !prev\.tried \? \{ \.\.\.prev, tried: true \} : prev\);/);
+  assert.equal((app.match(/\(inv && inv\.name\) \|\| p\.itemName \|\| p\.itemCode \|\| p\.description \|\| "this part"/g) || []).length, 2);
 });
 
 test("Work completed requires a remark; a part job cannot be completed from the popup", () => {
