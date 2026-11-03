@@ -3346,3 +3346,65 @@ input:focus, select:focus, textarea:focus { box-shadow: 0 0 0 3px rgba(46,80,214
 [data-cl-editor] .overflow-y-auto > .flex > button { color: #1d4ed8; }
 [data-cl-editor] > div:last-child button[class*="text-red"] { color: #dc2626; }
 [data-cl-editor] > div:last-child button[class*="text-slate-400"] { color: #475569; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Four PDF reports (2026-11-03) — Customer, Company full, On hold, Pending jobs.
+   Same A4 sheet as the machine report (.mr-doc); colour for status only,
+   readable in black and white. Each report has its own named page so the
+   running footer names it, with page numbers.
+   ═══════════════════════════════════════════════════════════════════════ */
+.mr-doc .rpt-mark { width: 40px; height: 40px; border-radius: 8px; background: #14110d; color: #fff; font-weight: 800; font-size: 20px;
+  display: flex; align-items: center; justify-content: center; letter-spacing: -0.02em; flex: 0 0 auto; }
+.mr-doc .rpt-hero { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 22px; margin-top: 18px; align-items: start; }
+.mr-doc .rpt-photo { width: 180px; height: 135px; border: 1px solid var(--mr-rule); border-radius: 4px; display: flex; align-items: center; justify-content: center; overflow: hidden; background: #faf8f3; }
+.mr-doc .rpt-photo img { width: 100%; height: 100%; object-fit: contain; }
+.mr-doc .rpt-facts-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 10px; }
+.mr-doc .rpt-stamp { display: inline-block; margin-top: 12px; }
+.mr-doc .rpt-summary-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.mr-doc .rpt-two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 28px; }
+.mr-doc .rpt-sub { margin-top: 14px; }
+.mr-doc .rpt-subh { font-size: 12px; font-weight: 700; margin-bottom: 4px; }
+/* Signatures: one small box everywhere (120 × 40) */
+.mr-doc .rpt-sigbox { width: 120px; height: 40px; border-bottom: 1px solid var(--mr-mute); display: flex; align-items: flex-end; justify-content: flex-start; overflow: hidden; }
+.mr-doc .rpt-sigbox img { display: block; max-width: 120px; max-height: 38px; width: auto; height: auto; object-fit: contain; }
+.mr-doc .rpt-sigtable .mr-tr { align-items: center; }
+.mr-doc .tc-sigimg img { max-width: 120px !important; max-height: 40px !important; }
+/* The print frame is a table: the app-wide row hover tint must not paint the whole sheet. */
+.mr-doc .mr-frame > tbody > tr:hover, .mr-doc .mr-frame > thead > tr:hover { background: transparent; }
+@media (max-width: 639.98px) {
+  .mr-doc .rpt-hero { grid-template-columns: 1fr; }
+  .mr-doc .rpt-photo { width: 100%; height: 180px; }
+  .mr-doc .rpt-facts-3, .mr-doc .rpt-summary-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mr-doc .rpt-two { grid-template-columns: 1fr; }
+  .mr-doc .rpt-summary-4 .mr-sum:nth-child(odd) { padding-left: 0; border-left: 0; }
+  .mr-doc .rpt-summary-4 .mr-sum:nth-child(even) { padding-left: 12px; border-left: 1px solid var(--mr-rule); }
+  .mr-doc .rpt-summary-4 .mr-sum.is-red { padding-left: 8px; border-left: 3px solid var(--mr-red); }
+}
+@page customer-report { size: A4 portrait; margin: 14mm 12mm 16mm 12mm;
+  @bottom-left  { content: "Customer machine report"; font-size: 8pt; color: #5c5341; }
+  @bottom-right { content: "Page " counter(page) " of " counter(pages); font-size: 8pt; color: #5c5341; } }
+@page hold-report { size: A4 portrait; margin: 14mm 12mm 16mm 12mm;
+  @bottom-left  { content: "On hold report · internal"; font-size: 8pt; color: #5c5341; }
+  @bottom-right { content: "Page " counter(page) " of " counter(pages); font-size: 8pt; color: #5c5341; } }
+@page pending-report { size: A4 portrait; margin: 14mm 12mm 16mm 12mm;
+  @bottom-left  { content: "Pending jobs report · internal"; font-size: 8pt; color: #5c5341; }
+  @bottom-right { content: "Page " counter(page) " of " counter(pages); font-size: 8pt; color: #5c5341; } }
+@media print {
+  .mr-doc.rpt-customer { page: customer-report; }
+  .mr-doc.rpt-hold { page: hold-report; }
+  .mr-doc.rpt-pending { page: pending-report; }
+  .mr-doc .rpt-hero { grid-template-columns: 52mm minmax(0, 1fr); gap: 7mm; margin-top: 8pt; break-inside: avoid; }
+  .mr-doc .rpt-photo { width: 52mm; height: 39mm; }
+  .mr-doc .rpt-sigbox { width: 30mm; height: 10mm; }
+  .mr-doc .rpt-sigbox img { max-width: 30mm; max-height: 9.5mm; }
+  /* The closing line never sits alone on a last page. */
+  .mr-doc .mr-footnote { break-before: avoid; page-break-before: avoid; }
+}
+/* Reports chooser — calm list, right-sized buttons */
+.rpt-menu-item { display: flex; align-items: flex-start; gap: 14px; padding: 14px; border: 1px solid var(--border-subtle); border-radius: 12px; background: var(--surface-card); }
+.rpt-menu-open { min-height: 44px; min-width: 88px; padding: 0 18px; border-radius: 10px; font-size: 13px; font-weight: 800; color: #fff; background: #2640B0; flex: 0 0 auto; align-self: center; }
+.rpt-menu-open:hover { background: #1e3494; }
+.rpt-menu-open:disabled { opacity: 0.45; cursor: not-allowed; }
+.rpt-menu-open:focus-visible, .rpt-menu-select:focus-visible, .rpt-bar-select:focus-visible { outline: 2px solid #2640B0; outline-offset: 2px; }
+.rpt-menu-select { width: 100%; height: 40px; border-radius: 8px; border: 1px solid var(--border-rim); background: var(--surface-raised, #fff); padding: 0 10px; font-size: 13px; color: var(--text-strong); }
+.rpt-bar-select { height: 36px; border-radius: 8px; border: 1px solid var(--border-rim); background: var(--surface-raised, #fff); padding: 0 8px; font-size: 12px; font-weight: 700; color: var(--text-strong); }
