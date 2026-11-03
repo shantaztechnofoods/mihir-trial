@@ -78,6 +78,7 @@ import { parseBomPaste } from "./utils/bomPaste.js";
 import { countDelayReasons, DELAY_PERIODS, DELAY_OTHER, DELAY_TOOK_LONGER } from "./utils/delayReasons.js";
 import { useOnline } from "./components/OfflineBanner.jsx";
 import { pulseOffline } from "./utils/online.js";
+import { isReadyPopupRole, newReadySince, readyAtOf, trialSignedBy, readLastSeenReady, writeLastSeenReady, formatReadyWhen } from "./utils/readyPopup.js";
 import { receivedPoRates, bomCostLines, bomCostSummary, validateBomLines, formatINR, RATE_SOURCE_LABEL } from "./utils/bomCost.js";
 import { PHYSICAL_RACK_LAYOUT, rackOfBom, physicalRackFamily, physicalRackSlots, rackCapacityFor, buildFamilyRacks, firstFreeSlot, canAssignSlot, slotLabel, rackKeyNorm, rackViewLog, setSlotOf, setLabel, pairSlotOf, bomFillCheck, rCrateIssues, rackBoms, freeSlotsFor, tierOfSlot } from "./utils/rackSlots.js";
 import { getActiveCompany, normalizePOSettings, openPOPdf, PO_TEMPLATE_OPTIONS } from "./utils/poTemplate.js";
@@ -90,7 +91,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-03-arrival-alert";
+const APP_BUILD = "2026-11-03-ready-popup";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -18018,7 +18019,10 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
   // already recorded as a `pending_fulfilled` audit row, but nothing told the
   // department waiting on it that it had arrived — they found out by asking.
   // Read-only: the badge is derived, nothing new is stored.
-  auditLog = [] }) {
+  auditLog = [],
+  // 2026-11-03 — { filter, n }: the admin Ready popup's "View in Machine
+  // Tracker" opens this page on a given filter (n changes per request).
+  filterRequest = null }) {
   const [filter,   setFilter]   = useState("active");
   // 2026-10-30 — page layout: two tabs (Production / Transfer & Accept), the
   // Departments Called panel behind a header bell, and a collapsible BOM
@@ -18026,6 +18030,10 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
   // per-browser preference.
   const [mtTab,       setMtTab]       = useState("production");
   const [searchQ,     setSearchQ]     = useState("");
+  useEffect(() => {
+    if (!filterRequest || !filterRequest.filter) return;
+    setMtTab("production"); setSearchQ(""); setFilter(filterRequest.filter);
+  }, [filterRequest?.n]); // eslint-disable-line react-hooks/exhaustive-deps
   const [showCalled,  setShowCalled]  = useState(false);
   // Open by default on a wide screen; on a phone the six BOM cards would push
   // the machines a full screen down, so it starts folded there. An explicit
@@ -25026,6 +25034,57 @@ function GlobalSearch({ items, pos, vendorList, machineLog, onClose, onNavigate 
 
 // ─── NOTIFICATION PANEL ───────────────────────────────────────────────────────
 
+// 2026-11-03 — Admin "Ready machines" popup. Shows machines that became READY
+// since the admin last pressed OK / View (first ever open: last 24 hours).
+// Read-only; both buttons only record "seen" (and View opens the Ready list).
+function ReadyMachinesPopup({ items = [], bomDefs = {}, onOk, onView }) {
+  const okRef = useRef(null);
+  useEffect(() => {
+    try { okRef.current?.focus({ preventScroll: true }); } catch { /* ignore */ }
+    const onKey = (e) => { if (e.key === "Escape") { e.preventDefault(); onOk?.(); } };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onOk]);
+  const n = items.length;
+  const now = Date.now();
+  return (
+    <div className="rp-backdrop no-print" data-ready-popup role="dialog" aria-modal="true" aria-labelledby="rp-title">
+      <div className="rp-card">
+        <div className="rp-head">
+          <div className="rp-seal" aria-hidden="true"><CircleCheckBig size={26} strokeWidth={2.2} /></div>
+          <div className="min-w-0">
+            <h2 id="rp-title" className="rp-title" data-ready-title>🎉 {n} machine{n === 1 ? " is" : "s are"} Ready</h2>
+            <p className="rp-sub">Finished since you last looked</p>
+          </div>
+        </div>
+        <ul className="rp-list">
+          {items.map(({ machine: m, readyAt, exact }) => {
+            const signer = trialSignedBy(m);
+            return (
+              <li key={m.id} className="rp-row" data-ready-row={m.id}>
+                <BomPhotoThumb url={(bomDefs || {})[m.bomKey]?.photoUrl} size={52}
+                  fallback={<div className="rp-ph" aria-hidden="true"><Cog size={22} /></div>} />
+                <div className="min-w-0 flex-1">
+                  <div className="rp-name">{m.bomLabel || m.bomKey || "Machine"}</div>
+                  <div className="rp-meta">{m.bomKey}{m.serialNo ? <> · S/N <b>{m.serialNo}</b></> : null}</div>
+                  <div className="rp-meta">
+                    <span className="rp-when">Ready {formatReadyWhen(readyAt, now, exact)}</span>
+                    {signer ? <> · Trial signed by <b>{signer}</b></> : null}
+                  </div>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+        <div className="rp-foot">
+          <button type="button" className="rp-btn rp-btn-ghost" data-ready-view onClick={onView}>View in Machine Tracker</button>
+          <button type="button" ref={okRef} className="rp-btn rp-btn-primary" data-ready-ok onClick={onOk}>OK</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function NotificationPanel({ notifications, dismissed, onClose, onNavigate, onDismiss, onDismissAll }) {
   const TYPE_CFG = {
     critical:      { label: "Critical Stock",     icon: "🔴", color: "#b91c1c", nav: "inventory" },
@@ -25607,6 +25666,42 @@ export default function App() {
     return () => window.removeEventListener("keydown", handler);
   }, [showShortcuts, showSearch, showNotifs, canView]);
 
+  // ── 2026-11-03 — Admin "Ready machines" popup (owner-approved) ──
+  // Read-only: derived from machineLog (status + the accept-into-Ready history
+  // row). The only thing stored is a per-user "last seen" time in localStorage.
+  // Machines Ready before this session started → the popup (on Dashboard /
+  // Machine Tracker); machines turning Ready while the app is open → a toast
+  // plus the bell list. Staff never see either.
+  const readyAdmin = isReadyPopupRole(currentUser);
+  const readyUid   = currentUser ? String(currentUser.id || currentUser.username || "") : "";
+  const [readySeen, setReadySeen] = useState({ uid: "", at: null, since: 0 });
+  useEffect(() => {
+    if (!readyUid) return;
+    setReadySeen({ uid: readyUid, at: readLastSeenReady(readyUid), since: Date.now() });
+  }, [readyUid]);
+  const readyNew = useMemo(() => (
+    readyAdmin && readySeen.uid === readyUid ? newReadySince(machineLog, readySeen.at) : []
+  ), [readyAdmin, readyUid, readySeen, machineLog]);
+  const readyPopupItems = readyNew.filter((r) => r.readyAt < readySeen.since);
+  const markReadySeen = useCallback(() => {
+    const now = Date.now();
+    writeLastSeenReady(readyUid, now);
+    setReadySeen((prev) => ({ ...prev, at: now }));
+  }, [readyUid]);
+  const [mtFilterReq, setMtFilterReq] = useState(null);
+  const readyToasted = useRef(new Set());
+  useEffect(() => {
+    for (const r of readyNew) {
+      if (r.readyAt < readySeen.since) continue;
+      const key = String(r.machine.id);
+      if (readyToasted.current.has(key)) continue;
+      readyToasted.current.add(key);
+      const m = r.machine;
+      addToast("success", `🎉 Machine Ready: ${m.bomLabel || m.bomKey || ""}`,
+        `${m.bomKey || ""}${m.serialNo ? ` · S/N ${m.serialNo}` : ""}${trialSignedBy(m) ? ` · Trial signed by ${trialSignedBy(m)}` : ""}`);
+    }
+  }, [readyNew, readySeen.since, addToast]);
+
   // Auth gate — after all hooks.
   //
   // Order matters:
@@ -25709,11 +25804,23 @@ export default function App() {
       title: `${safePending.length} Pending Material${safePending.length > 1 ? "s" : ""} Awaiting`,
       desc:  `${[...new Set(safePending.map((p) => p?.bomKey).filter(Boolean))].slice(0, 3).join(", ")}${safePending.length > 3 ? "…" : ""}`,
     }] : []),
-    ...safeMachines.filter((m) => m?.status === "completed" && m?.stage === "Ready").slice(0, 3).map((m) => ({
+    // 2026-11-03 — for admins the bell lists the newest Ready machines first and
+    // every one that is new since they last looked (Ready popup); staff keep
+    // the original list.
+    ...(readyAdmin ? (() => {
+      const fresh = new Set(readyNew.map((r) => String(r.machine.id)));
+      const rows = safeMachines.filter((m) => m?.status === "completed" && m?.stage === "Ready")
+        .map((m) => ({ m, t: readyAtOf(m) ?? 0 })).sort((a, b) => b.t - a.t);
+      return rows.slice(0, Math.min(8, Math.max(3, fresh.size))).map(({ m }) => ({
+        id: `machine_ready-${m.id}`, type: "machine_ready",
+        title: `${fresh.has(String(m.id)) ? "New · " : ""}Machine Ready: ${m.bomKey || ""}`,
+        desc:  `${m.bomLabel || ""}${m.serialNo ? " · S/N: " + m.serialNo : ""} · Completed ${m.completedDate || ""}${trialSignedBy(m) ? ` · Trial signed by ${trialSignedBy(m)}` : ""}`,
+      }));
+    })() : safeMachines.filter((m) => m?.status === "completed" && m?.stage === "Ready").slice(0, 3).map((m) => ({
       id: `machine_ready-${m.id}`, type: "machine_ready",
       title: `Machine Ready: ${m.bomKey || ""}`,
       desc:  `${m.bomLabel || ""}${m.serialNo ? " · S/N: " + m.serialNo : ""} · Completed ${m.completedDate || ""}`,
-    })),
+    }))),
   ];
   const activeNotifs = notifications.filter((n) => !dismissedIds.has(n.id));
 
@@ -28750,7 +28857,7 @@ export default function App() {
                               isSuperAdmin={currentUser?.role === "super_admin"}
                               onReverseReceive={handleReverseReceive}
                               onSetItemDefaultRate={handleSetItemDefaultRate} />,
-    machines:  <MachinePage   machineLog={machineLog} checklistResponses={checklistResponses} outwardLog={outwardLog} onUpdateTrialCertificate={handleUpdateTrialCertificate} canView={canView} onUpdateStage={handleUpdateMachineStage} onNavigate={setActivePage} canDo={canDo}
+    machines:  <MachinePage   machineLog={machineLog} checklistResponses={checklistResponses} filterRequest={mtFilterReq} outwardLog={outwardLog} onUpdateTrialCertificate={handleUpdateTrialCertificate} canView={canView} onUpdateStage={handleUpdateMachineStage} onNavigate={setActivePage} canDo={canDo}
                               items={items}
                               /* 2026-10-30 — BOM Outward, embedded at the top. Shown
                                  only to roles that may issue a BOM, same as Outward. */
@@ -28896,6 +29003,20 @@ export default function App() {
           onNavigate={(page) => { setActivePage(page); setShowNotifs(false); }}
           onDismiss={dismissNotif}
           onDismissAll={dismissAllNotifs}
+        />
+      )}
+
+      {/* ── 2026-11-03 — Admin Ready popup (Dashboard / Machine Tracker) ── */}
+      {readyAdmin && readyPopupItems.length > 0 && (activePage === "dashboard" || activePage === "machines") && (
+        <ReadyMachinesPopup
+          items={readyPopupItems}
+          bomDefs={bomDefs}
+          onOk={markReadySeen}
+          onView={() => {
+            markReadySeen();
+            setActivePage("machines");
+            setMtFilterReq({ filter: "completed", n: Date.now() });
+          }}
         />
       )}
 
