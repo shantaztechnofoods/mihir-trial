@@ -3416,8 +3416,8 @@ html.erp-offline [data-needs-net]::after {
   animation: arrivalDrop 0.45s cubic-bezier(.2,.9,.25,1.2) both, arrivalGlow 1.6s ease-in-out 0.45s 3;
 }
 .arrival-banner-main {
-  flex: 1 1 auto; min-height: 64px; padding: 10px 14px; border-radius: 14px; text-align: left;
-  font-size: 18px; font-weight: 900; line-height: 1.25; color: #fff; background: rgba(255,255,255,0.10);
+  flex: 1 1 auto; min-height: 52px; padding: 8px 14px; border-radius: 14px; text-align: left;
+  font-size: 16px; font-weight: 800; line-height: 1.25; color: #fff; background: rgba(255,255,255,0.10);
   transition: transform .12s ease;
 }
 .arrival-banner-main:active { transform: scale(0.97); }
@@ -3433,6 +3433,6 @@ html.erp-offline [data-needs-net]::after {
   .arrival-banner, .arrival-flash { animation: none !important; }
 }
 @media (max-width: 767px) {
-  .arrival-banner-main { font-size: 17px; }
+  .arrival-banner-main { font-size: 15px; }
   .mt-today > span:first-child { width: 100%; }
 }

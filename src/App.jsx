@@ -90,7 +90,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-03-offline-safe";
+const APP_BUILD = "2026-11-03-arrival-alert";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -18138,6 +18138,53 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
     : [];
   const arrivalKey = arrivalWatch.map((h) => String(h.id)).sort().join("|");
   const handoversLoaded = (handovers || []).length > 0 || (Date.now() - arrivalMountRef.current) > 8000;
+  // Vibrate + two-tone chime + spoken message (Hindi voice if the phone has
+  // one, else Indian English). Used by the arrival and near-deadline alerts.
+  const ringAlert = (hiText, enText, noVibrate) => {
+    if (!noVibrate) { try { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch { /* not supported */ } }
+    // Browsers allow sound only after the user has touched the page once:
+    // until then, keep the sound for the first touch.
+    let activated = false;
+    try { activated = navigator.userActivation ? !!navigator.userActivation.hasBeenActive : true; } catch { activated = false; }
+    if (!activated) {
+      const once = () => {
+        window.removeEventListener("pointerdown", once, true); window.removeEventListener("keydown", once, true);
+        ringAlert(hiText, enText, true);
+      };
+      try { window.addEventListener("pointerdown", once, true); window.addEventListener("keydown", once, true); } catch { /* ignore */ }
+      return;
+    }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) {
+        const ctx = new AC();
+        if (ctx.state === "suspended" && ctx.resume) ctx.resume().catch(() => {});
+        [[659.25, 0], [880, 0.18]].forEach(([f, at]) => {
+          const o = ctx.createOscillator(); const g = ctx.createGain();
+          o.type = "sine"; o.frequency.value = f;
+          const t0 = ctx.currentTime + at;
+          g.gain.setValueAtTime(0.0001, t0);
+          g.gain.exponentialRampToValueAtTime(0.25, t0 + 0.02);
+          g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.32);
+          o.connect(g); g.connect(ctx.destination); o.start(t0); o.stop(t0 + 0.34);
+        });
+        setTimeout(() => { try { ctx.close && ctx.close(); } catch {} }, 900);
+      }
+    } catch { /* no audio */ }
+    setTimeout(() => {
+      try {
+        const ss = window.speechSynthesis;
+        if (!ss || typeof window.SpeechSynthesisUtterance !== "function") return;
+        const voices = (ss.getVoices && ss.getVoices()) || [];
+        const hi = voices.find((v) => /^hi[-_]IN/i.test(v.lang || "")) || voices.find((v) => /^hi\b/i.test(v.lang || ""));
+        const en = voices.find((v) => /^en[-_]IN/i.test(v.lang || ""));
+        const u = new window.SpeechSynthesisUtterance(hi ? hiText : enText);
+        u.lang = hi ? "hi-IN" : "en-IN";
+        if (hi) u.voice = hi; else if (en) u.voice = en;
+        ss.speak(u);
+      } catch { /* no speech */ }
+    }, 650);
+  };
   useEffect(() => {
     const ids = arrivalKey ? arrivalKey.split("|") : [];
     const prev = arrivalSeenRef.current;
@@ -18158,44 +18205,8 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
     const rack = isAwaitingRelease(h);
     setArrival({ id: h.id, rack, text: `📥 ${name}${serial ? ` · ${serial}` : ""} has come to ${h.toDepartment} — ${rack ? "Take from Rack" : "Accept"}` });
     if (!arrivalOn) return;
-    try { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch { /* not supported */ }
-    // Browsers allow sound only after the user has touched the page once.
-    let activated = false;
-    try { activated = navigator.userActivation ? !!navigator.userActivation.hasBeenActive : true; } catch { activated = false; }
-    if (!activated) return;
-    try {
-      const AC = window.AudioContext || window.webkitAudioContext;
-      if (AC) {
-        const ctx = new AC();
-        if (ctx.state === "suspended" && ctx.resume) ctx.resume().catch(() => {});
-        [[659.25, 0], [880, 0.18]].forEach(([f, at]) => {
-          const o = ctx.createOscillator(); const g = ctx.createGain();
-          o.type = "sine"; o.frequency.value = f;
-          const t0 = ctx.currentTime + at;
-          g.gain.setValueAtTime(0.0001, t0);
-          g.gain.exponentialRampToValueAtTime(0.25, t0 + 0.02);
-          g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.32);
-          o.connect(g); g.connect(ctx.destination); o.start(t0); o.stop(t0 + 0.34);
-        });
-        setTimeout(() => { try { ctx.close && ctx.close(); } catch {} }, 900);
-      }
-    } catch { /* no audio */ }
-    // Then speak it: Hindi when the phone has a Hindi voice, else Indian English.
-    setTimeout(() => {
-      try {
-        const ss = window.speechSynthesis;
-        if (!ss || typeof window.SpeechSynthesisUtterance !== "function") return;
-        const voices = (ss.getVoices && ss.getVoices()) || [];
-        const hi = voices.find((v) => /^hi[-_]IN/i.test(v.lang || "")) || voices.find((v) => /^hi\b/i.test(v.lang || ""));
-        const en = voices.find((v) => /^en[-_]IN/i.test(v.lang || ""));
-        const u = new window.SpeechSynthesisUtterance(hi
-          ? `आपकी मशीन आ गई है — ${name}${serial ? `, सीरियल ${serial}` : ""}`
-          : `Your machine has arrived — ${name}${serial ? `, serial ${serial}` : ""}`);
-        u.lang = hi ? "hi-IN" : "en-IN";
-        if (hi) u.voice = hi; else if (en) u.voice = en;
-        ss.speak(u);
-      } catch { /* no speech */ }
-    }, 650);
+    ringAlert(`आपकी मशीन आ गई है — ${name}${serial ? `, सीरियल ${serial}` : ""}`,
+              `Your machine has arrived — ${name}${serial ? `, serial ${serial}` : ""}`);
   }, [arrivalKey, handoversLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!arrival) return;
@@ -18206,7 +18217,8 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
     const a = arrival; setArrival(null);
     if (!a) return;
     try {
-      const el = document.querySelector(`[data-staff-accept="${a.id}"]`) || document.querySelector(`[data-staff-take="${a.id}"]`)
+      const el = (a.machineId != null && document.querySelector(`[data-staff-timer="${a.machineId}"]`))
+        || document.querySelector(`[data-staff-accept="${a.id}"]`) || document.querySelector(`[data-staff-take="${a.id}"]`)
         || document.querySelector(a.rack ? "[data-staff-section='On the rack for you']" : "[data-staff-section='To accept']");
       if (!el) return;
       el.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -18292,6 +18304,45 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
     const h = machineHandover(m);
     return h && isAwaitingRelease(h);
   });
+  // 2026-11-03 — NEAR-DEADLINE REMINDER (staff). The department timer on the
+  // staff card — same target, same computeOverrun (closed days pause it). At
+  // 80% of the target the chip turns amber with the time left; over 100% it
+  // is red. One alert per machine per threshold, remembered in localStorage
+  // so a refresh does not repeat it.
+  const deptTimerOf = (m) => {
+    const dept   = m.currentDepartment || m.stage;
+    const cfg    = (m.deptDurations && m.deptDurations[dept]) || workflow.dept_durations[dept];
+    const target = (cfg && cfg.minutes) || 0;
+    const t      = m.departmentEnteredAt ? computeOverrun(m.departmentEnteredAt, target, nowTick) : null;
+    const level  = !t || !target ? 0 : t.isOverrun ? 100 : t.actualMinutes >= target * 0.8 ? 80 : 0;
+    return { dept, target, t, level, leftMinutes: t ? Math.max(0, target - t.actualMinutes) : 0 };
+  };
+  const deadlineWatch = (staffMode && !isProdHead && hasDepartments)
+    ? myWorking.map((m) => ({ m, ...deptTimerOf(m) })).filter((x) => x.level > 0)
+    : [];
+  const deadlineKey = deadlineWatch.map((x) => `${x.m.id}|${x.dept}|${x.m.departmentEnteredAt}|${x.level}`).sort().join("~");
+  useEffect(() => {
+    if (!deadlineKey) return;
+    let fired = [];
+    try { fired = JSON.parse(localStorage.getItem("erp_deadline_alerts") || "[]"); if (!Array.isArray(fired)) fired = []; } catch { fired = []; }
+    const seen = new Set(fired);
+    const fresh = deadlineWatch.filter((x) => !seen.has(`${x.m.id}|${x.dept}|${x.m.departmentEnteredAt}|${x.level}`));
+    if (!fresh.length) return;
+    fresh.forEach((x) => fired.push(`${x.m.id}|${x.dept}|${x.m.departmentEnteredAt}|${x.level}`));
+    try { localStorage.setItem("erp_deadline_alerts", JSON.stringify(fired.slice(-300))); } catch { /* ignore */ }
+    const x = fresh.find((y) => y.level === 100) || fresh[0];
+    const name = x.m.bomKey || "Machine"; const serial = x.m.serialNo || "";
+    const late = x.level === 100;
+    setArrival({ machineId: x.m.id, deadline: true, text: late
+      ? `⏰ ${name}${serial ? ` · ${serial}` : ""} is late in ${x.dept} — by ${formatDuration(x.t.overrunMinutes)}`
+      : `⏳ ${name}${serial ? ` · ${serial}` : ""} — ${formatDuration(x.leftMinutes)} left in ${x.dept}` });
+    if (!arrivalOn) return;
+    const hrs = Math.round(x.leftMinutes / 60);
+    const hiLeft = hrs >= 1 ? `${hrs} घंटे बाकी` : `${x.leftMinutes} मिनट बाकी`;
+    const enLeft = hrs >= 1 ? `${hrs} hour${hrs === 1 ? "" : "s"} left` : `${x.leftMinutes} minutes left`;
+    if (late) ringAlert(`${name} ${serial} का समय खत्म हो गया है`, `${name} ${serial} time is over`);
+    else ringAlert(`${name} ${serial} का समय खत्म होने वाला है, ${hiLeft}`, `${name} ${serial} time is almost over, ${enLeft}`);
+  }, [deadlineKey]); // eslint-disable-line react-hooks/exhaustive-deps
   // Transfer & Accept lists every machine still moving through the line —
   // the ones to finish & transfer, release, or accept — whatever summary
   // tile was last clicked on the Production tab.
@@ -18776,9 +18827,9 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
           ].filter((x) => x.n > 0);
           return (
             <div className="mt-today flex items-center gap-2 flex-wrap" data-mt-today>
-              <span className="text-[18px] font-black mr-1" style={{ color: "var(--text-strong)" }}>Today:</span>
+              <span className="text-[16px] font-black mr-1" style={{ color: "var(--text-strong)" }}>Today:</span>
               {parts.length === 0 && (
-                <span className="text-[18px] font-black" style={{ color: "#15803d" }} data-mt-today-ok>✅ All machines on time</span>
+                <span className="text-[16px] font-black" style={{ color: "#15803d" }} data-mt-today-ok>✅ All machines on time</span>
               )}
               {parts.map((x) => {
                 const isOn = !searchText && mtTab === x.tab && filter === x.key;
@@ -18788,7 +18839,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                             setSearchQ(""); setMtTab(x.tab); setFilter(x.key);
                             setTimeout(() => { try { document.querySelector("[data-view-header]")?.scrollIntoView({ behavior: "smooth", block: "start" }); } catch { /* ignore */ } }, 80);
                           }}
-                          className="min-h-[44px] px-4 rounded-full text-[17px] font-black inline-flex items-center gap-1.5 transition-all active:scale-[0.97]"
+                          className="min-h-[44px] px-4 rounded-full text-[15px] font-bold inline-flex items-center gap-1.5 transition-all active:scale-[0.97]"
                           style={{ background: x.bg, color: x.color, border: `${isOn ? 2 : 1}px solid ${isOn ? x.color : x.bd}` }}>
                     <span aria-hidden="true">{x.icon}</span>
                     <span className="tabular-nums">{x.n}</span> {x.word}
@@ -19023,9 +19074,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                     {myWorking.map((m) => {
                       const dept   = m.currentDepartment || m.stage;
                       const next   = nextDepartment(dept);
-                      const cfg    = (m.deptDurations && m.deptDurations[dept]) || workflow.dept_durations[dept];
-                      const target = (cfg && cfg.minutes) || 0;
-                      const t      = m.departmentEnteredAt ? computeOverrun(m.departmentEnteredAt, target, nowTick) : null;
+                      const { target, t, level, leftMinutes } = deptTimerOf(m);
                       const jobs   = openJobsOf(m);
                       const during = !!onSubmitDuringWorkChecklist && !!pickTemplate(checklistTemplates, m.bomKey, dept, "during_work");
                       return (
@@ -19035,9 +19084,14 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                             <div className="text-[13px] mt-0.5" style={{ color: "var(--text-dim)" }}>{m.bomLabel || ""}{m.bomLabel ? " · " : ""}in {dept}</div>
                             <div className="flex items-center gap-2 flex-wrap mt-2">
                               {t && (
-                                <span className="text-[13px] font-bold px-2.5 py-1 rounded-full"
-                                      style={t.isOverrun ? { background: "rgba(239,68,68,0.1)", color: "#b91c1c", border: "1px solid rgba(239,68,68,0.35)" } : { background: "rgba(21,128,61,0.08)", color: "#15803d", border: "1px solid rgba(21,128,61,0.3)" }}>
-                                  ⏱ {formatDuration(t.actualMinutes)}{target ? ` / ${formatDuration(target)}` : ""}{t.isOverrun ? ` · DELAYED ${formatDuration(t.overrunMinutes)}` : ""}
+                                <span className="text-[13px] font-bold px-2.5 py-1 rounded-full" data-staff-timer={m.id} data-timer-level={level}
+                                      title={`⏱ ${formatDuration(t.actualMinutes)}${target ? ` / ${formatDuration(target)}` : ""}`}
+                                      style={t.isOverrun ? { background: "rgba(239,68,68,0.1)", color: "#b91c1c", border: "1px solid rgba(239,68,68,0.35)" }
+                                           : level === 80 ? { background: "rgba(217,119,6,0.12)", color: "#b45309", border: "1px solid rgba(217,119,6,0.45)" }
+                                           : { background: "rgba(21,128,61,0.08)", color: "#15803d", border: "1px solid rgba(21,128,61,0.3)" }}>
+                                  {t.isOverrun ? `⏰ Late by ${formatDuration(t.overrunMinutes)}`
+                                    : level === 80 ? `⏳ ${formatDuration(leftMinutes)} left`
+                                    : `⏱ ${formatDuration(t.actualMinutes)}${target ? ` / ${formatDuration(target)}` : ""}`}
                                 </span>
                               )}
                               {jobs.length > 0 && (

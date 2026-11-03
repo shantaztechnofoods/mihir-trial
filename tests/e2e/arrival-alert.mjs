@@ -60,6 +60,44 @@ ok("with the bell off: banner only, no vibration/chime/speech", await banner.cou
 ok("no page errors (staff)", errs.length === 0, errs.join(" | "));
 await b.close();
 
+// ── 1b. Near-deadline reminder (staff). Fake clock: Monday 14:00 (a working day), SN-101 entered
+// Mechanical at 04:00 with a 700-minute target → 600/700 = 86% used, 1h 40m left.
+{
+  const D = await launch(seed); const pd = D.p;
+  await pd.addInitScript(stubs); await pd.clock.setFixedTime(new Date("2026-11-02T14:00:00"));
+  await pd.evaluate(() => { const ms = JSON.parse(localStorage.getItem("erp_machines")); const m1 = ms.find((x) => x.id === 1);
+    m1.departmentEnteredAt = new Date("2026-11-02T04:00:00").toISOString(); m1.deptDurations = { Mechanical: { minutes: 700 } };
+    localStorage.setItem("erp_machines", JSON.stringify(ms)); localStorage.removeItem("erp_deadline_alerts"); });
+  const reopen = async () => { await pd.reload({ waitUntil: "networkidle" }); await pd.waitForTimeout(500); await pd.addStyleTag({ content: hide });
+    if (await pd.locator("#login-username").count()) await login(pd, "mech", "mech123");
+    await gotoMachineTracker(pd); await pd.waitForTimeout(900); };
+  await reopen();
+  const chip = pd.locator("[data-staff-timer='1']");
+  ok("at 86% the timer chip turns amber: '⏳ 1h 40m left'", (await chip.innerText()).includes("⏳ 1h 40m left") && (await chip.getAttribute("data-timer-level")) === "80", await chip.innerText());
+  const bn = pd.locator("[data-arrival-banner]");
+  ok("near-deadline banner shows", (await bn.count()) === 1 && /M-10 · SN-101 — 1h 40m left in Mechanical/.test(await bn.innerText()));
+  let a = await pd.evaluate(() => window.__alerts);
+  ok("near-deadline: vibrate + chime + Hindi speech", a.vibrate.length === 1 && a.tones === 2 && a.speak.length === 1 && a.speak[0].text === "M-10 SN-101 का समय खत्म होने वाला है, 2 घंटे बाकी", JSON.stringify(a.speak));
+  if (SHOTS) { await pd.setViewportSize({ width: 390, height: 844 }); await chip.scrollIntoViewIfNeeded(); await pd.waitForTimeout(300); await pd.screenshot({ path: `${SHOTS}/deadline-390.png` }); await pd.setViewportSize({ width: 1200, height: 1000 }); }
+  await reopen();
+  a = await pd.evaluate(() => window.__alerts);
+  ok("after a refresh the 80% alert does not repeat", a.vibrate.length === 0 && a.speak.length === 0 && (await bn.count()) === 0);
+  await pd.clock.setFixedTime(new Date("2026-11-02T16:00:00")); await reopen();
+  ok("over 100%: red chip 'Late by 20m'", (await chip.innerText()).includes("⏰ Late by 20m") && (await chip.getAttribute("data-timer-level")) === "100", await chip.innerText());
+  // The page re-opened straight on Machine Tracker with no touch yet: the browser blocks sound
+  // until the first touch, so the chime + speech wait for it.
+  a = await pd.evaluate(() => window.__alerts);
+  ok("100% alert vibrates right away; sound plays now or on the first touch", a.vibrate.length === 1 && (a.tones === 0 ? a.speak.length === 0 : a.tones === 2), JSON.stringify(a));
+  await pd.locator("[data-staff-dashboard] h2").first().click(); await pd.waitForTimeout(900);
+  a = await pd.evaluate(() => window.__alerts);
+  ok("100% alert fires once (banner + vibrate + speech)", (await bn.count()) === 1 && /is late in Mechanical/.test(await bn.innerText()) && a.vibrate.length === 1 && a.speak.length === 1 && /का समय खत्म हो गया है/.test(a.speak[0].text), JSON.stringify(a) + " " + ((await bn.count()) ? await bn.innerText() : "no banner"));
+  await reopen();
+  a = await pd.evaluate(() => window.__alerts);
+  ok("after a refresh the 100% alert does not repeat", a.vibrate.length === 0 && (await bn.count()) === 0);
+  ok("no page errors (deadline)", D.errs.length === 0, D.errs.join(" | "));
+  await D.b.close();
+}
+
 // ── 2. Admin "Today" line ──
 const A = await launch(seed); const pa = A.p;
 await loginAdmin(pa); await gotoMachineTracker(pa);
