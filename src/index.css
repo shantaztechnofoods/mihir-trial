@@ -3548,3 +3548,16 @@ html.erp-offline [data-needs-net]::after {
   .rp-btn { width: 100%; min-height: 52px; font-size: 15px; }
 }
 @media (prefers-reduced-motion: reduce) { .rp-backdrop, .rp-card, .rp-seal { animation: none; } }
+
+/* 2026-11-03 — rack alignment: a filled rack is taller than an empty one,
+   which pushed the R row of that column below the R row of its neighbours.
+   Every column now stretches to the tallest one and splits it into two equal
+   rows (label, M, R), so all M crates and all R crates sit on one line; the
+   white face fills the crate and the rack number stays at the bottom. */
+.rack-shelf { align-items: stretch; }
+.rack-set { display: grid !important; grid-template-rows: auto 1fr 1fr; }
+.rack-set > .rack-crate { display: flex; flex-direction: column; }
+.rack-set > .rack-crate > div:first-of-type { flex: 1 1 auto; display: flex; flex-direction: column; align-items: center; }
+.rack-set > .rack-crate > div:first-of-type > [data-rack-fill],
+.rack-set > .rack-crate > div:first-of-type > [data-rack-send] { margin-top: auto; }
+.rack-crate .whitespace-nowrap { white-space: normal; max-width: 100%; justify-content: center; text-align: center; line-height: 1.15; }
