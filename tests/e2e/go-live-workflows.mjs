@@ -120,8 +120,10 @@ ok("open issue on SN-101 did not block anything (still open)", (await ls(p, "erp
 // Finish & Transfer SN-101 → Electrical (no signature; Accept keeps its signature)
 await p.locator('[data-staff-finish="1"]').click(); await p.waitForTimeout(800);
 ok("Finish & Transfer modal opens from the staff dashboard", await p.locator("text=Finish & Transfer").count() > 0);
-ok("Transfer popup asks for NO employee names (no team picker, no main-employee select)", await p.locator("[data-team-picker], [data-main-select], [data-worker-chips]").count() === 0 && await p.locator("[data-transfer-sign]").count() === 0 && await p.locator("[data-transfer-by]").count() === 1);
-ok("Transfer popup has no signature box / Save Signature button", await p.locator("canvas").count() === 0 && await p.getByRole("button", { name: "Save Signature" }).count() === 0 && /Transferred by Ramesh/.test(await p.locator("[data-transfer-by]").innerText()));
+ok("Transfer popup asks for NO employee names (no team picker, no main-employee select)", await p.locator("[data-team-picker], [data-main-select], [data-worker-chips]").count() === 0 && await p.locator("[data-transfer-sign]").count() === 0);
+ok("Transfer popup has no signature box / Save Signature button", await p.locator("canvas").count() === 0 && await p.getByRole("button", { name: "Save Signature" }).count() === 0);
+// 2026-11-03 — the "Transferred by … recorded automatically" note was removed (owner: fewer words)
+ok("Transfer popup has no \"Transferred by\" note box", await p.locator("[data-transfer-by]").count() === 0 && !/recorded automatically from your login/.test(await p.locator("body").innerText()));
 await p.locator("button", { hasText: /^Finish & Transfer → Electrical/ }).click(); await p.waitForTimeout(1200);
 hs = await ls(p, "erp_handovers"); ms = await ls(p, "erp_machines");
 const hNew = hs.find((h) => h.machineId === 1 && h.status === "pending");

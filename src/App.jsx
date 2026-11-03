@@ -92,7 +92,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-03-rack-align";
+const APP_BUILD = "2026-11-03-part-or-comment";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -17795,9 +17795,17 @@ const critModeOf = (r) => (r && ["checks", "serial", "both"].includes(r.critical
 const normalizePendingJob = (r) => typeof r === "string" ? { ...emptyPendingJob(), description: r } : { ...emptyPendingJob(), ...(r || {}) };
 const pendingJobIsBlank = (r) => { const j = normalizePendingJob(r); return !j.description.trim() && !j.itemCode.trim() && !j.itemName.trim() && !j.reason.trim(); };
 // Rows worth saving, with a description guaranteed (a part alone is enough).
+// 2026-11-03 — a Finish / Accept pending row is either a 📦 Part (item name +
+// quantity) or a 💬 Comment (one line of work, e.g. "cover not painted").
+// A comment row is saved exactly like any other WORK pending job: a
+// description only — no item code, name or quantity (pendingItemIsPart → false).
+const pendingRowIsComment = (j) => !!j && j.pendingType === "comment";
 const cleanPendingJobs = (rows) => (Array.isArray(rows) ? rows : []).map(normalizePendingJob)
   .filter((j) => !pendingJobIsBlank(j))
-  .map((j) => ({
+  .map((j) => pendingRowIsComment(j) ? ({
+    description: j.description.trim(), itemCode: "", itemName: "", qty: null, reason: "",
+    critical: false, partSerialNo: "", criticalChecks: null,
+  }) : ({
     description: j.description.trim() || `Missing part: ${j.itemName.trim() || j.itemCode.trim()}${j.qty ? ` × ${j.qty}` : ""}`,
     itemCode: j.itemCode.trim(), itemName: j.itemName.trim(),
     qty: j.qty === "" || j.qty == null ? null : Number(j.qty),
@@ -17814,8 +17822,12 @@ const cleanPendingJobs = (rows) => (Array.isArray(rows) ? rows : []).map(normali
 // form as BOM Outward. A row that was started must have an item name and a
 // quantity and must be saved with its Save button, so nothing typed is lost.
 const pendingItemsProblem = (rows) => {
-  const started = (Array.isArray(rows) ? rows : []).map(normalizePendingJob)
+  const all = (Array.isArray(rows) ? rows : []).map(normalizePendingJob);
+  const comments = all.filter((j) => pendingRowIsComment(j) && (j.description.trim() || j.saved));
+  const started = all.filter((j) => !pendingRowIsComment(j))
     .filter((j) => j.itemName.trim() || j.itemCode.trim() || String(j.qty).trim() || j.partSerialNo.trim() || j.saved);
+  if (comments.some((j) => !j.description.trim())) return "Each pending comment needs text.";
+  if (comments.some((j) => !j.saved)) return "Press Save on each pending item first.";
   if (started.some((j) => !j.itemName.trim() || !(Number(j.qty) > 0))) return "Each pending item needs an item name and a quantity.";
   if (started.some((j) => !j.saved)) return "Press Save on each pending item first.";
   return "";
@@ -17850,13 +17862,16 @@ function ModalX({ onClose, disabled = false, label = "Close" }) {
   );
 }
 
-function PendingJobRows({ rows, onChange, inventory = [], accent = "#b45309", addLabel = "+ Add pending job", disabled = false, mode = "job", renderVoice = null }) {
+function PendingJobRows({ rows, onChange, inventory = [], accent = "#b45309", addLabel = "+ Add pending job", disabled = false, mode = "job", renderVoice = null, allowComment = false }) {
   // mode "item" (BOM Outward → Add Pending Item): an item with a name, a
   // pending quantity and a Critical Yes / No choice; the free-text line is a
   // note. mode "job" (Finish & Transfer, Accept, Report Issue): unchanged.
   const itemMode = mode === "item";
   const list = (Array.isArray(rows) ? rows : []).map(normalizePendingJob);
   const set = (i, patch) => onChange(list.map((r, idx) => idx === i ? { ...r, ...patch } : r));
+  // Latest rows for async callers (a voice transcript lands after a re-render).
+  const latestRows = useRef(list); latestRows.current = list;
+  const setDescLater = (i) => (fn) => onChange(latestRows.current.map((r, idx) => idx === i ? { ...r, description: fn(r.description || "") } : r));
   const codes = inventory.slice(0, 2000);
   const invHit = (code) => !!(code || "").trim() && codes.some((it) => it.code.toLowerCase() === code.trim().toLowerCase());
   const listId = "pending-job-codes";
@@ -17870,10 +17885,21 @@ function PendingJobRows({ rows, onChange, inventory = [], accent = "#b45309", ad
   if (itemMode) {
     return (
       <div className="space-y-2" data-pending-item-form>
-        {list.map((r, i) => r.saved ? (
-          <div key={i} data-pending-item-saved className="rounded-lg px-2.5 py-2 flex items-center gap-2 flex-wrap"
+        {list.map((r, i) => (r.saved && pendingRowIsComment(r)) ? (
+          <div key={i} data-pending-item-saved data-pending-saved-type="comment" className="rounded-lg px-2.5 py-2 flex items-center gap-2"
                style={{ background: `${accent}0d`, border: `1px solid ${accent}40` }}>
-            <span className="text-[12px] font-bold text-slate-800">✓ {r.itemName.trim()} × {r.qty}</span>
+            <span className="text-[12.5px] font-bold text-slate-800 min-w-0 break-words">✓ 💬 {r.description.trim()}</span>
+            <span className="ml-auto flex gap-1.5 flex-shrink-0">
+              <button type="button" disabled={disabled} data-pending-item-edit onClick={() => set(i, { saved: false })}
+                      className="text-[11px] font-bold text-slate-600 px-2 rounded-lg border border-slate-200" style={{ minHeight: 32 }}>Edit</button>
+              <button type="button" disabled={disabled} onClick={() => onChange(list.filter((_, idx) => idx !== i))}
+                      className="text-[11px] font-bold text-slate-500 hover:text-red-600 px-2 rounded-lg border border-slate-200" style={{ minHeight: 32 }}>Remove</button>
+            </span>
+          </div>
+        ) : r.saved ? (
+          <div key={i} data-pending-item-saved data-pending-saved-type="part" className="rounded-lg px-2.5 py-2 flex items-center gap-2 flex-wrap"
+               style={{ background: `${accent}0d`, border: `1px solid ${accent}40` }}>
+            <span className="text-[12px] font-bold text-slate-800">✓ {allowComment ? "📦 " : ""}{r.itemName.trim()} × {r.qty}</span>
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
                   style={r.critical ? { background: "#dc26261a", color: "#dc2626" } : { background: "#15803d1a", color: "#15803d" }}>
               {r.critical ? "Critical" : "Not critical"}
@@ -17889,7 +17915,46 @@ function PendingJobRows({ rows, onChange, inventory = [], accent = "#b45309", ad
             </span>
           </div>
         ) : (
-          <div key={i} className="rounded-lg p-2 space-y-1.5" style={{ background: `${accent}0d`, border: `1px solid ${accent}40` }}>
+          <div key={i} data-pending-row-type={pendingRowIsComment(r) ? "comment" : "part"} className="rounded-lg p-2 space-y-1.5" style={{ background: `${accent}0d`, border: `1px solid ${accent}40` }}>
+            {/* 2026-11-03 — Finish / Accept: each row is a 📦 Part or a 💬 Comment. */}
+            {allowComment && (
+              <div className="grid grid-cols-2 gap-1.5" data-pending-type-chooser role="group" aria-label="Pending type">
+                {[["part", "📦 Part"], ["comment", "💬 Comment"]].map(([k, label]) => {
+                  const on = (k === "comment") === pendingRowIsComment(r);
+                  return (
+                    <button key={k} type="button" disabled={disabled} data-pending-type={k} aria-pressed={on}
+                            onClick={() => { if (!on) set(i, k === "comment"
+                              ? { pendingType: "comment", itemName: "", itemCode: "", qty: "", critical: false, partSerialNo: "", cpList: [], cpDraft: "" }
+                              : { pendingType: "part", description: "" }); }}
+                            className="rounded-lg text-[13px] font-bold transition-all disabled:opacity-50"
+                            style={{ minHeight: 44, background: on ? accent : "var(--surface-elevated)", color: on ? "#ffffff" : "var(--text-dim)", border: `1.5px solid ${on ? accent : "var(--border-subtle)"}` }}>
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            {pendingRowIsComment(r) ? (
+              <>
+                <textarea value={r.description} disabled={disabled} data-job-comment rows={2}
+                          onChange={(e) => set(i, { description: e.target.value })}
+                          placeholder="What is pending? e.g. cover not painted" className={`${inp} text-[13px]`} style={{ ...bd, resize: "vertical" }} />
+                {renderVoice && renderVoice(i, r, setDescLater(i))}
+                <div className="flex gap-2 items-center">
+                  <button type="button" disabled={disabled} data-pending-item-save
+                          onClick={() => { if (!r.description.trim()) { flagField("[data-job-comment]"); return; } set(i, { saved: true }); }}
+                          className="text-[12px] font-black text-white px-5 rounded-lg transition-all disabled:opacity-50"
+                          style={{ minHeight: 40, background: r.description.trim() ? "#15803d" : "#94a3b8", color: "#ffffff" }}
+                          title={r.description.trim() ? "Save this pending comment" : "Write what is pending first"}>
+                    Save
+                  </button>
+                  <button type="button" disabled={disabled} onClick={() => onChange(list.filter((_, idx) => idx !== i))}
+                          className="text-[11px] font-bold text-slate-500 hover:text-red-600 px-3 rounded-lg border border-slate-200" style={{ minHeight: 40 }}>
+                    Remove
+                  </button>
+                </div>
+              </>
+            ) : (<>
             <div className="grid grid-cols-[1fr_96px] gap-1.5">
               <input value={r.itemName} disabled={disabled} data-job-name
                      onChange={(e) => set(i, { itemName: e.target.value })}
@@ -17990,11 +18055,12 @@ function PendingJobRows({ rows, onChange, inventory = [], accent = "#b45309", ad
                 Remove
               </button>
             </div>
+            </>)}
           </div>
         ))}
         <button type="button" disabled={disabled} onClick={() => onChange([...list, emptyPendingJob()])}
-                className="text-[11px] font-bold px-3 py-1.5 rounded-lg border transition-all disabled:opacity-50"
-                style={{ background: `${accent}14`, border: `1px solid ${accent}66`, color: accent }}>
+                className={`${allowComment ? "text-[13px] px-4" : "text-[11px] px-3 py-1.5"} font-bold rounded-lg border transition-all disabled:opacity-50`}
+                style={{ background: `${accent}14`, border: `1px solid ${accent}66`, color: accent, ...(allowComment ? { minHeight: 44 } : {}) }}>
           {addLabel}
         </button>
       </div>
@@ -22813,17 +22879,16 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
               <div className="p-5 space-y-4 flex-1 overflow-y-auto">
                 <div className="grid grid-cols-2 gap-3">
                   <div className="rounded-lg px-3 py-2.5 bg-slate-50 border border-slate-200">
-                    <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wide">From</div>
-                    <div className="text-[13px] font-black text-slate-900 mt-0.5">{fromDepartment}</div>
+                    <div className="text-[11px] font-semibold text-slate-500">From</div>
+                    <div className="text-[14px] font-black text-slate-900 mt-0.5">{fromDepartment}</div>
                   </div>
                   <div className="rounded-lg px-3 py-2.5 bg-emerald-50 border border-emerald-200">
-                    <div className="text-[9px] font-bold text-emerald-600 uppercase tracking-wide">{rackReturn ? "Returns to" : "To (next)"}</div>
-                    <div className="text-[13px] font-black text-emerald-700 mt-0.5">{rackReturn ? `Rack ${slotLabel(machine.rackSlot)}` : toDepartment}</div>
-                    {rackReturn && <div className="text-[9.5px] text-emerald-700 mt-0.5">Assembled · Ready — an admin sends it to {toDepartment} from the Rack View.</div>}
+                    <div className="text-[11px] font-semibold text-emerald-700">{rackReturn ? "Returns to" : "To"}</div>
+                    <div className="text-[14px] font-black text-emerald-700 mt-0.5">{rackReturn ? `Rack ${slotLabel(machine.rackSlot)}` : toDepartment}</div>
                   </div>
                 </div>
                 <div className={`rounded-lg px-3 py-2.5 border ${isOverrun ? "bg-red-50 border-red-200" : "bg-slate-50 border-slate-200"}`}>
-                  <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wide">Time in {fromDepartment}</div>
+                  <div className="text-[11px] font-semibold text-slate-500">Time</div>
                   {/* 2026-10-30 — Target is the BOM duration copied onto this
                       machine at Outward; Actual runs from when this department
                       accepted the machine (or started it) to now. */}
@@ -22835,7 +22900,6 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                       ? <span className="text-red-600 font-bold ml-2">· Delay {formatDuration(overrunMinutes)}</span>
                       : <span className="text-emerald-700 font-bold ml-2">· on time</span>}
                   </div>
-                  <div className="text-[10px] text-slate-400 mt-0.5">Actual = from acceptance into {fromDepartment} to Finish &amp; Transfer.</div>
                 </div>
                 {isOverrun && (
                   <div data-transfer-delay className="rounded-xl">
@@ -22846,7 +22910,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                     <textarea
                       value={narration}
                       onChange={(e) => setFinishModal((prev) => prev ? { ...prev, narration: e.target.value } : prev)}
-                      placeholder="Why did this department take longer than its target time? (Pending jobs are recorded separately below.)"
+                      placeholder="Reason"
                       rows={3}
                       autoFocus
                       className="w-full bg-white border border-red-300 rounded-lg px-3 py-2 text-[12px] text-slate-900 placeholder-slate-400 outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100 transition-colors"
@@ -22858,22 +22922,16 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                   </div>
                 )}
 
-                {/* ── Transferred by (2026-11-02) ──
-                    No signature and no employee names at Transfer: the
-                    logged-in user and their department are recorded
-                    automatically. (Accept keeps its mandatory signature.) */}
-                <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5" data-transfer-by>
-                  <div className="text-[10px] text-slate-500">
-                    Transferred by <span className="font-bold text-slate-900">{currentUser?.fullName || currentUser?.username || "you"}</span> · {fromDepartment} — recorded automatically from your login.
-                  </div>
-                </div>
+                {/* 2026-11-02 — no signature and no employee names at Transfer: the
+                    logged-in user and department are recorded automatically.
+                    2026-11-03 — the "Transferred by …" note box was removed
+                    (owner: fewer words); the recording itself is unchanged. */}
 
                 {/* Phase B — Department checklist (if a template exists for this dept) */}
                 {finishModal.template && Array.isArray(finishModal.answers) && finishModal.answers.length > 0 && (
                   <div data-transfer-checklist className="rounded-xl border border-slate-200 bg-white px-3 py-3">
                     <div className="text-[11px] font-black text-slate-800 mb-2">
                       Checklist · {finishModal.template.name}
-                      <span className="text-slate-400 font-normal ml-1">(an unticked item needs a reason — it is saved as a pending job)</span>
                     </div>
                     <ChecklistBulkBar
                       answers={finishModal.answers}
@@ -22891,7 +22949,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                           {!a.checked && (
                             <input type="text" value={a.remark || ""}
                                    onChange={(e) => setFinishModal((prev) => prev ? { ...prev, answers: setAnswerRemark(prev.answers, i, e.target.value) } : prev)}
-                                   placeholder="Reason not done (required — saved as a pending job)"
+                                   placeholder="Reason"
                                    className="w-full mt-2 bg-white border border-slate-300 rounded px-2 py-1.5 text-[11px] text-slate-900 placeholder-slate-400 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100 transition-colors" />
                           )}
                           {!a.checked && canVoice && (
@@ -22903,21 +22961,18 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                     </div>
                   </div>
                 )}
-                {!finishModal.template && (
-                  <div className="text-[10px] text-slate-500">No Before Transfer checklist is configured for {fromDepartment} on this BOM. Admins can add one in BOM → Edit → Department Checklists.</div>
-                )}
 
                 {/* ── Phase 1 — work this department still owes ──
                     A part on order must not hold the whole line, so the machine
                     goes on and the obligation follows it. It stays on this
                     department's list and stops the machine reaching Ready. */}
                 <div data-transfer-pending className="pt-4 mt-4 border-t border-slate-100 rounded-xl">
-                  <div className="text-[11px] font-bold text-slate-600 mb-1">
+                  <div className="text-[13px] font-bold text-slate-800 mb-2">
                     Anything still pending from {fromDepartment}?
                   </div>
                   <PendingJobRows rows={finishModal.owedItems || []} inventory={inventoryFlat} disabled={transferBusy}
-                                  addLabel="+ Add Pending Item" mode="item"
-                                  renderVoice={canVoice ? (i, r) => <VoiceNoteRecorder {...vnProps(machine.id, fromDepartment)} place="Pending item" item={r.itemName} compact disabled={transferBusy} /> : null}
+                                  addLabel="+ Add Pending Item" mode="item" allowComment
+                                  renderVoice={canVoice ? (i, r, setText) => <VoiceNoteRecorder {...vnProps(machine.id, fromDepartment)} place="Pending item" item={pendingRowIsComment(r) ? r.description : r.itemName} compact disabled={transferBusy} setText={setText || null} /> : null}
                                   onChange={(rows) => setFinishModal((prev) => prev ? { ...prev, owedItems: rows } : prev)} />
                   {pendingItemsProblem(finishModal.owedItems) && <div data-pending-item-problem className="mt-1.5 text-[11px] font-semibold" style={{ color: "#b45309" }}>{pendingItemsProblem(finishModal.owedItems)}</div>}
                 </div>
@@ -23007,8 +23062,8 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
               <div className="p-5 space-y-4 flex-1 overflow-y-auto">
                 {handover.overrunNarration && (
                   <div className="rounded-lg px-3 py-2" style={{ background: "rgba(234,179,8,0.08)", border: "1px solid rgba(234,179,8,0.3)" }}>
-                    <div className="text-[10px] font-bold text-yellow-300 uppercase tracking-wide mb-0.5">Sender's note on overrun</div>
-                    <div className="text-[11px] text-yellow-100 italic">"{handover.overrunNarration}"</div>
+                    <div className="text-[11px] font-bold text-amber-700 mb-0.5">Sender's delay note</div>
+                    <div className="text-[12px] text-amber-900 italic">"{handover.overrunNarration}"</div>
                   </div>
                 )}
                 {isHoldOverdue(handover.sentAt, handover.acceptTimeoutMinutes, nowTick) && (
@@ -23046,7 +23101,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                   <>
                     {workflow.require_password_at_accept ? (
                       <div>
-                        <label className="text-[11px] font-bold text-slate-500 block mb-1.5">Confirm your password to sign this acceptance</label>
+                        <label className="text-[12px] font-bold text-slate-600 block mb-1.5">Password</label>
                         <input type="password" value={password} autoFocus
                                onChange={(e) => setField({ password: e.target.value, error: "" })}
                                onKeyDown={(e) => { if (e.key === "Enter") submitAcceptHandover(); }}
@@ -23063,14 +23118,14 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                     {acceptDeptEmps.length > 0 && (
                       <div data-accept-people className="accept-step rounded-xl px-3 py-3" style={{ background: "rgba(99,102,241,0.05)", border: `2px solid ${selectedTeam.length ? "rgba(34,197,94,0.45)" : "rgba(99,102,241,0.3)"}` }}>
                         {stepHead(1, "Receiving employees", selectedTeam.length > 0)}
-                        <label className="text-[12px] font-bold text-slate-700 block mb-1">Main person (who is accepting)</label>
+                        <label className="text-[12px] font-bold text-slate-700 block mb-1">Main person</label>
                         <select data-accept-main value={mainName} disabled={busy}
                                 onChange={(e) => setMain(e.target.value)}
                                 className="w-full bg-white border-2 border-slate-300 rounded-xl px-3 text-[15px] font-bold text-slate-900 outline-none focus:border-indigo-500"
                                 style={{ minHeight: 50 }}>
                           {mainOptions.map((n) => <option key={n} value={n}>{n}</option>)}
                         </select>
-                        <label className="text-[12px] font-bold text-slate-700 block mt-3 mb-1">Other people working on this machine</label>
+                        <label className="text-[12px] font-bold text-slate-700 block mt-3 mb-1">Other people</label>
                         {others.length > 0 && (
                           <div className="flex flex-wrap gap-2 mb-2">
                             {others.map((n) => (
@@ -23108,18 +23163,13 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                           </div>
                         </div>
                       ) : (
-                        <>
-                          <div className="text-[10px] text-slate-500 mb-1.5">
-                            {acceptDeptEmps.length > 0 ? "Sign on behalf of the receiving employees selected above, then press Save Signature." : "Draw your signature, then press Save Signature."}
-                          </div>
-                          <SignaturePad onSave={(svg) => setField({ sigSvg: svg, error: "" })} />
-                        </>
+                        <SignaturePad onSave={(svg) => setField({ sigSvg: svg, error: "" })} />
                       )}
                     </div>
                     {/* Phase B — carry-forward: show previously unresolved items for this machine */}
                     {(pendingHandoverItems || []).filter((p) => p.machineId === handover.machineId && pendingItemIsOpen(p)).length > 0 && (
                       <div className="rounded-lg px-3 py-2" style={{ background: "rgba(217, 119, 6,0.07)", border: "1px solid rgba(217, 119, 6,0.3)" }}>
-                        <div className="text-[10px] font-bold text-amber-700 uppercase tracking-wide mb-1"><LeadIcon e="⏳" />Pending items carried forward from previous departments</div>
+                        <div className="text-[12px] font-bold text-amber-700 mb-1"><LeadIcon e="⏳" />Still pending</div>
                         <ul className="list-disc list-inside text-[11px] text-amber-800 space-y-0.5">
                           {(pendingHandoverItems || []).filter((p) => p.machineId === handover.machineId && pendingItemIsOpen(p)).map((p) => (
                             <li key={p.id}><span className="font-semibold">{p.raisedInDepartment}:</span> {p.description}</li>
@@ -23135,7 +23185,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                     {acceptModal.checklistTemplate && (acceptModal.checklistAnswers || []).length > 0 && (
                       <div data-accept-checklist className="accept-step rounded-xl px-3 py-3" style={{ background: "rgba(46, 80, 214,0.05)", border: "1px solid rgba(46, 80, 214,0.3)" }}>
                         {stepHead(stepBase + 1, "Check before accepting", false)}
-                        <div className="text-[10px] font-bold text-blue-200 uppercase tracking-wider mb-1">
+                        <div className="text-[12px] font-semibold text-slate-600 mb-1">
                           📋 {acceptModal.checklistTemplate.name || "After Acceptance Checklist"}
                         </div>
                         <ChecklistBulkBar
@@ -23158,7 +23208,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                               {!a.checked && (
                                 <input type="text" value={a.remark || ""}
                                        onChange={(e) => setField({ checklistAnswers: setAnswerRemark(acceptModal.checklistAnswers, i, e.target.value), error: "" })}
-                                       placeholder="Reason not done (required — saved as a pending job)"
+                                       placeholder="Reason"
                                        className="mt-1 w-full bg-slate-50 border border-slate-200 rounded px-2 py-1 text-[11px] text-slate-900 placeholder-slate-500 outline-none focus:border-blue-500/60" />
                               )}
                               {!a.checked && canVoice && (
@@ -23173,11 +23223,10 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
 
                     {/* Phase B — raise new pending items at this transfer */}
                     <div data-accept-pending className="accept-step rounded-xl px-3 py-3" style={{ background: "rgba(17,24,39,0.03)", border: "1px solid rgba(17,24,39,0.10)" }}>
-                      {stepHead(stepBase + 1 + (hasChecklist ? 1 : 0), `Did ${handover.fromDepartment} leave work undone?`, false)}
-                      <div className="text-[11px] font-bold text-slate-500 mb-1.5">Optional. Any work from {handover.fromDepartment} still pending? (optional)</div>
+                      {stepHead(stepBase + 1 + (hasChecklist ? 1 : 0), `Anything still pending from ${handover.fromDepartment}?`, false)}
                       <PendingJobRows rows={acceptModal.pendingItemsToRaise || []} inventory={inventoryFlat} disabled={acceptModal.busy}
-                                      accent="#dc2626" addLabel="+ Add Pending Item" mode="item"
-                                      renderVoice={canVoice ? (i, r) => <VoiceNoteRecorder {...vnProps(handover.machineId, handover.toDepartment)} place="Pending item" item={r.itemName} compact disabled={!!acceptModal.busy} /> : null}
+                                      accent="#dc2626" addLabel="+ Add Pending Item" mode="item" allowComment
+                                      renderVoice={canVoice ? (i, r, setText) => <VoiceNoteRecorder {...vnProps(handover.machineId, handover.toDepartment)} place="Pending item" item={pendingRowIsComment(r) ? r.description : r.itemName} compact disabled={!!acceptModal.busy} setText={setText || null} /> : null}
                                       onChange={(rows) => setField({ pendingItemsToRaise: rows })} />
                       {pendingItemsProblem(acceptModal.pendingItemsToRaise) && <div data-pending-item-problem className="mt-1.5 text-[11px] font-semibold" style={{ color: "#b45309" }}>{pendingItemsProblem(acceptModal.pendingItemsToRaise)}</div>}
                     </div>
