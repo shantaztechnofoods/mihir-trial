@@ -14979,6 +14979,7 @@ function AtoZMachineReport({
         </div>
         <div className="mr-docid">
           <div className="mr-doctitle">Machine production report</div>
+          <div className="mr-label" data-report-title>Company full report · internal</div>
           <div className="mr-label mr-mono">{reportRef}</div>
           <div className="mr-label">Issued {fmtDT(new Date())}</div>
         </div>
@@ -15143,6 +15144,9 @@ function AtoZMachineReport({
                     <div>{h.acceptedAt ? fmtDT(h.acceptedAt) : h.status === "pending" ? "Waiting" : "—"}</div>
                     {(h.acceptedByName || userName(h.acceptedBy)) && <div className="mr-label" data-report-accepted-by>by {h.acceptedByName || userName(h.acceptedBy)}</div>}
                     {h.acceptedAt && (h.acceptedInDepartment || h.toDepartment) && <div className="mr-label">into {h.acceptedInDepartment || h.toDepartment}</div>}
+                    {show.showEmployees !== false && Array.isArray(h.acceptedByTeamSnapshot) && h.acceptedByTeamSnapshot.length > 0 && (
+                      <div className="mr-label" data-report-accept-team>team: {h.acceptedByTeamSnapshot.map((x) => (x && (x.fullName || x.username || x.name)) || "").filter(Boolean).join(", ")}</div>
+                    )}
                     <div className="mr-label">Accept window {dur(h.acceptTimeoutMinutes)}</div>
                   </div></div>
                   <div className="mr-td" data-l="Time / target"><div>
@@ -15174,6 +15178,39 @@ function AtoZMachineReport({
           })}
         </div>
       )}
+      {/* 2026-11-03 — holds and late reasons for this machine (read-only). */}
+      {(() => {
+        const holds = collectHoldEvents({ machineLog: [machine], handovers: machineHandovers, auditLog, allUsers });
+        const late = machineHandovers.filter((h) => h.overrunNarration);
+        return (
+          <div className="rpt-sub" data-report-holds>
+            <div className="rpt-subh">Holds and late reasons <span className="mr-count">{holds.length + late.length}</span></div>
+            {holds.length + late.length === 0 ? <p className="mr-empty">No holds and no late work recorded.</p> : (
+              <div className="mr-table">
+                <div className="mr-tr mr-th" style={{ gridTemplateColumns: "1.3fr 1.3fr 0.9fr 2.4fr 1.1fr" }}><div>What</div><div>Where / when</div><div className="text-right">Length</div><div>Reason</div><div>Who</div></div>
+                {holds.map((r) => (
+                  <div key={r.key} className="mr-tr" style={{ gridTemplateColumns: "1.3fr 1.3fr 0.9fr 2.4fr 1.1fr" }}>
+                    <div className="mr-td" data-l="What"><span className={r.open ? "mr-red font-semibold" : "mr-amber font-semibold"}>{r.label}{r.open ? " · open" : ""}</span></div>
+                    <div className="mr-td" data-l="Where / when"><div><div>{r.to ? `${r.from} → ${r.to}` : r.from}</div><div className="mr-label">{fmtDT(r.startAt)}</div></div></div>
+                    <div className="mr-td md:text-right" data-l="Length">{r.minutes != null ? dur(r.minutes) : "—"}</div>
+                    <div className="mr-td" data-l="Reason">{r.reason || <span className="mr-muted">No reason given</span>}</div>
+                    <div className="mr-td" data-l="Who">{r.by || "—"}{r.releasedBy ? <div className="mr-label">released by {r.releasedBy}</div> : null}</div>
+                  </div>
+                ))}
+                {late.map((h) => (
+                  <div key={`ov-${h.id}`} className="mr-tr" style={{ gridTemplateColumns: "1.3fr 1.3fr 0.9fr 2.4fr 1.1fr" }}>
+                    <div className="mr-td" data-l="What"><span className="mr-amber font-semibold">Work over target</span></div>
+                    <div className="mr-td" data-l="Where / when"><div><div>{h.fromDepartment}</div><div className="mr-label">{fmtDT(h.sentAt)}</div></div></div>
+                    <div className="mr-td md:text-right" data-l="Length">{dur(h.overrunMinutes)}</div>
+                    <div className="mr-td" data-l="Reason">{h.overrunNarration}</div>
+                    <div className="mr-td" data-l="Who">{userName(h.sentBy) || "—"}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
     </Sec>
   );
 
@@ -15250,21 +15287,54 @@ function AtoZMachineReport({
           <div className="mr-tr mr-th" style={{ gridTemplateColumns: "3fr 1.5fr 1.2fr" }}><div>File</div><div>Department</div><div>Added</div></div>
           {machineAttach.map((a) => (
             <div key={a.id} className="mr-tr" style={{ gridTemplateColumns: "3fr 1.5fr 1.2fr" }}>
-              <div className="mr-td" data-l="File">{a.name || a.kind || "attachment"}</div>
+              <div className="mr-td" data-l="File"><div><div>{a.name || a.fileName || a.caption || a.kind || "attachment"}</div><div className="mr-label">{a.kind === "audio" ? "Voice note" : a.kind === "image" ? "Photo" : a.kind || "File"}{a.isCustomerVisible ? " · shown to customer" : " · internal"}</div></div></div>
               <div className="mr-td" data-l="Department">{a.department || "—"}</div>
-              <div className="mr-td" data-l="Added">{fmtD(a.createdAt) || "—"}</div>
+              <div className="mr-td" data-l="Added">{fmtD(a.createdAt || a.uploadedAt) || "—"}</div>
             </div>
           ))}
         </div>
       )}
-      {machineAttach.length > 0 && <p className="mr-label mt-1">Files open from the machine card in Machine Tracker.</p>}
+      {machineAttach.some((a) => a.kind === "audio") && (
+        <div className="rpt-sub" data-report-voice>
+          <div className="rpt-subh">Voice notes <span className="mr-count">{machineAttach.filter((a) => a.kind === "audio").length}</span></div>
+          {machineAttach.filter((a) => a.kind === "audio").map((a) => (
+            <div key={`v-${a.id}`} className="mr-check-row"><span className="mr-muted">♪</span><div className="min-w-0">{a.caption || a.fileName || a.name || "Voice note"}<span className="mr-label"> · {a.department || "—"} · {fmtDT(a.uploadedAt || a.createdAt)}{userName(a.uploadedBy) ? ` · ${userName(a.uploadedBy)}` : ""}</span></div></div>
+          ))}
+        </div>
+      )}
+      {machineAttach.length > 0 && <p className="mr-label mt-1">Files and voice notes open from the machine card in Machine Tracker.</p>}
     </Sec>
   );
+
+  // 2026-11-03 — every captured signature in one tidy table, each in the
+  // same small box (120 × 40), so none prints large.
+  const sigRows = [
+    ...machineHandovers.flatMap((h) => [
+      h.mainEmployeeSignatureSvg ? { k: `t-${h.id}`, role: "Transferred (sign-off)", name: nameFromSnap(h.mainEmployeeId, h.workedBySnapshot) || h.mainEmployeeName || userName(h.sentBy), dept: h.fromDepartment, when: h.sentAt, src: svgDataUri(h.mainEmployeeSignatureSvg) } : null,
+      h.acceptedSignatureSvg ? { k: `a-${h.id}`, role: "Accepted", name: h.acceptedByName || userName(h.acceptedBy), dept: h.acceptedInDepartment || h.toDepartment, when: h.acceptedAt, src: svgDataUri(h.acceptedSignatureSvg) } : null,
+    ]),
+    machine.trialCertificate && tcSigSrc(machine.trialCertificate.trialBySignature) ? { k: "tc-trial", role: "Trial certificate · set and trial by", name: machine.trialCertificate.trialByName, dept: "Trial", when: machine.trialCertificate.trialDate, src: tcSigSrc(machine.trialCertificate.trialBySignature) } : null,
+    machine.trialCertificate && tcSigSrc(machine.trialCertificate.checkBySignature) ? { k: "tc-check", role: "Trial certificate · checked by", name: machine.trialCertificate.checkByName, dept: "Service", when: machine.trialCertificate.trialDate, src: tcSigSrc(machine.trialCertificate.checkBySignature) } : null,
+  ].filter(Boolean);
 
   // D7 — the release sign-off for the paper copy.
   const SignOff = () => (
     <Sec n="07" title="Release sign-off" cls="mr-avoid">
-      <div data-report-signoff className="mr-signoff">
+      {sigRows.length > 0 && (
+        <div className="mr-table rpt-sigtable" data-report-signatures>
+          <div className="mr-tr mr-th" style={{ gridTemplateColumns: "1.6fr 1.3fr 1fr 1.2fr 136px" }}><div>Signed for</div><div>Name</div><div>Department</div><div>Date</div><div>Signature</div></div>
+          {sigRows.map((r) => (
+            <div key={r.k} className="mr-tr" style={{ gridTemplateColumns: "1.6fr 1.3fr 1fr 1.2fr 136px" }}>
+              <div className="mr-td" data-l="Signed for">{r.role}</div>
+              <div className="mr-td font-semibold" data-l="Name">{r.name || "—"}</div>
+              <div className="mr-td" data-l="Department">{r.dept || "—"}</div>
+              <div className="mr-td" data-l="Date">{fmtDT(r.when) || fmtD(r.when) || "—"}</div>
+              <div className="mr-td" data-l="Signature"><div className="rpt-sigbox" data-report-sigbox><img src={r.src} alt={`Signature: ${r.name || r.role}`} /></div></div>
+            </div>
+          ))}
+        </div>
+      )}
+      <div data-report-signoff className="mr-signoff" style={sigRows.length ? { marginTop: 18 } : undefined}>
         {[["Prepared by", "Production"], ["Checked by", "Quality / trial"], ["Approved by", "Management"]].map(([r, d]) => (
           <div key={r}><div className="mr-sign-line" /><div className="font-semibold">{r}</div><div className="mr-label">{d} · name, signature, date</div></div>
         ))}
@@ -15320,6 +15390,346 @@ function AtoZMachineReport({
         </td></tr></tbody>
       </table>
     </div>
+  );
+}
+
+// ─── FOUR PDF REPORTS (2026-11-03) ────────────────────────────────────────
+// Customer report (per machine), Company full report (the A-to-Z report
+// above), On Hold report (period) and Pending Jobs report. All four use the
+// same A4 sheet (.mr-doc): Shantaz letterhead, report title, generated
+// date / by, hairline tables, colour only for status, page numbers on paper.
+// They only READ records already loaded — nothing here writes anything.
+const rptFmtDT = (v) => { if (v == null || v === "") return ""; const d = new Date(v); return isNaN(d) ? String(v) : d.toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }); };
+const rptFmtD  = (v) => { if (v == null || v === "") return ""; const d = new Date(v); return isNaN(d) ? String(v) : d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }); };
+const rptDur = (min) => {
+  const m = Math.max(0, Math.round(Number(min) || 0));
+  if (m < 60) return `${m} min`;
+  if (m < 1440) { const h = Math.floor(m / 60), r = m % 60; return r ? `${h} h ${r} min` : `${h} h`; }
+  const d = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60);
+  return `${d} day${d === 1 ? "" : "s"}${h ? ` ${h} h` : ""}`;
+};
+const rptCompany = (settings) => { try { return getActiveCompany(settings) || {}; } catch { return {}; } };
+const rptUserName = (allUsers, id) => { if (!id) return ""; const u = (allUsers || []).find((x) => String(x.id) === String(id)); return u ? (u.fullName || u.username || "") : ""; };
+const rptMs = (v) => { if (v == null || v === "") return null; const t = typeof v === "number" ? v : Date.parse(v); return Number.isFinite(t) ? t : null; };
+// Report periods for the On Hold report (default: this month).
+const RPT_PERIODS = [["this_month", "This month"], ["last_month", "Last month"], ["last_90", "Last 90 days"], ["this_year", "This year"], ["all", "All time"]];
+function rptPeriodRange(key, now = new Date()) {
+  const y = now.getFullYear(), mo = now.getMonth();
+  if (key === "last_month") return { from: new Date(y, mo - 1, 1).getTime(), to: new Date(y, mo, 1).getTime() - 1 };
+  if (key === "last_90")    return { from: now.getTime() - 90 * 86400000, to: now.getTime() };
+  if (key === "this_year")  return { from: new Date(y, 0, 1).getTime(), to: now.getTime() };
+  if (key === "all")        return { from: -Infinity, to: Infinity };
+  return { from: new Date(y, mo, 1).getTime(), to: now.getTime() };
+}
+
+// Every hold a machine went through, read from three places:
+//   1. manual ON HOLD / release        → audit rows machine_hold_set / machine_hold_released
+//      (plus the machine's own holdAt when a hold is active with no audit row loaded)
+//   2. hand-overs accepted late         → handover sentAt + accept window vs acceptedAt,
+//      with the late reason the receiver typed (audit details.holdReason)
+//   3. hand-overs waiting past the window right now (shown as HOLD in the tracker)
+function collectHoldEvents({ machineLog = [], handovers = [], auditLog = [], allUsers = [], nowMs = Date.now() }) {
+  const byId = new Map((machineLog || []).map((m) => [String(m.id), m]));
+  const rows = [];
+  const audit = (auditLog || []).slice().sort((a, b) => String(a.ts || "").localeCompare(String(b.ts || "")));
+  const sets = audit.filter((a) => a.type === "machine_hold_set" && a.details && a.details.machineId != null);
+  const rels = audit.filter((a) => a.type === "machine_hold_released" && a.details && a.details.machineId != null);
+  const usedRel = new Set();
+  sets.forEach((s) => {
+    const mid = String(s.details.machineId); const m = byId.get(mid) || {};
+    const rel = rels.find((r) => !usedRel.has(r.id) && String(r.details.machineId) === mid && String(r.ts || "") >= String(s.ts || ""));
+    if (rel) usedRel.add(rel.id);
+    const start = rptMs(s.ts); const end = rel ? rptMs(rel.ts) : (m.holdActive ? nowMs : null);
+    rows.push({ key: `set-${s.id}`, kind: "manual", label: "Manual ON HOLD", machineId: mid, bomKey: m.bomKey || s.ref, serialNo: m.serialNo || s.serialNo,
+      from: s.details.department || m.currentDepartment || "", to: "", startAt: start, endAt: rel ? end : null, open: !rel && !!m.holdActive,
+      minutes: start != null && end != null ? Math.max(0, Math.round((end - start) / 60000)) : null,
+      reason: s.details.reason || "", by: s.user || "", releasedBy: rel ? rel.user || "" : "" });
+  });
+  (machineLog || []).forEach((m) => {
+    if (!m.holdActive) return;
+    if (rows.some((r) => r.kind === "manual" && r.machineId === String(m.id) && r.open)) return;
+    const start = rptMs(m.holdAt);
+    rows.push({ key: `active-${m.id}`, kind: "manual", label: "Manual ON HOLD", machineId: String(m.id), bomKey: m.bomKey, serialNo: m.serialNo,
+      from: m.currentDepartment || m.stage || "", to: "", startAt: start, endAt: null, open: true,
+      minutes: start != null ? Math.max(0, Math.round((nowMs - start) / 60000)) : null,
+      reason: m.holdReason || "", by: rptUserName(allUsers, m.holdBy), releasedBy: "" });
+  });
+  (handovers || []).forEach((h) => {
+    if (h.status === "cancelled") return;
+    const sent = rptMs(h.sentAt); const timeout = Math.max(0, Number(h.acceptTimeoutMinutes) || 0);
+    if (sent == null || !timeout) return;
+    const m = byId.get(String(h.machineId)) || {};
+    if (h.status === "accepted" && h.acceptedAt) {
+      const late = heldMinutes(h.sentAt, timeout, rptMs(h.acceptedAt));
+      if (late <= 0) return;
+      const a = audit.find((x) => (x.type === "handover_accepted" || x.type === "machine_completed") && x.details && String(x.details.handoverId) === String(h.id));
+      rows.push({ key: `late-${h.id}`, kind: "late", label: "Accepted late", machineId: String(h.machineId), bomKey: h.bomKey || m.bomKey, serialNo: h.serialNo || m.serialNo,
+        from: h.fromDepartment, to: h.toDepartment, startAt: sent + timeout * 60000, endAt: rptMs(h.acceptedAt), open: false, minutes: late,
+        reason: (a && a.details && a.details.holdReason) || "", by: h.acceptedByName || rptUserName(allUsers, h.acceptedBy) || (a && a.user) || "", releasedBy: "" });
+    } else if (h.status === "pending" && !(h.releaseRequired && !h.releasedAt)) {
+      const late = heldMinutes(h.sentAt, timeout, nowMs);
+      if (late <= 0) return;
+      rows.push({ key: `wait-${h.id}`, kind: "overdue", label: "Waiting to be accepted", machineId: String(h.machineId), bomKey: h.bomKey || m.bomKey, serialNo: h.serialNo || m.serialNo,
+        from: h.fromDepartment, to: h.toDepartment, startAt: sent + timeout * 60000, endAt: null, open: true, minutes: late,
+        reason: "", by: rptUserName(allUsers, h.sentBy), releasedBy: "" });
+    }
+  });
+  return rows.sort((a, b) => (a.startAt || 0) - (b.startAt || 0));
+}
+
+// The common A4 frame: running header (repeats on every printed page),
+// letterhead, title block, and the closing footnote.
+function ReportSheet({ kind, settings = {}, title, subtitle = "", refText = "", generatedBy = "", children }) {
+  const company = rptCompany(settings);
+  const issued = rptFmtDT(new Date());
+  return (
+    <div className={`mr-doc rpt-doc rpt-${kind}`} data-report-kind={kind}>
+      <table className="mr-frame">
+        <thead><tr><td><div className="mr-runhead"><span>{company.name || "Shantaz Technofoods"} · {title}</span><span className="mr-mono">{refText}</span></div></td></tr></thead>
+        <tbody><tr><td>
+          <div data-report-header className="mr-letterhead rpt-letterhead">
+            <div className="flex items-center gap-3 min-w-0">
+              {company.logo ? <img src={company.logo} alt="" className="mr-logo" /> : <div className="rpt-mark" aria-hidden="true">S</div>}
+              <div className="min-w-0">
+                <div className="mr-company">{company.name || "Shantaz Technofoods"}</div>
+                <div className="mr-label">{[company.address, company.gst ? `GSTIN ${company.gst}` : ""].filter(Boolean).join(" · ") || "Food processing machinery"}</div>
+              </div>
+            </div>
+            <div className="mr-docid">
+              <div className="mr-doctitle" data-report-title>{title}</div>
+              {subtitle && <div className="mr-label">{subtitle}</div>}
+              {refText && <div className="mr-label mr-mono">{refText}</div>}
+              <div className="mr-label" data-report-generated>Generated {issued}{generatedBy ? ` · by ${generatedBy}` : ""}</div>
+            </div>
+          </div>
+          {children}
+          <div className="mr-footnote">Generated from ERP records on {issued}{generatedBy ? ` by ${generatedBy}` : ""}{refText ? ` · ${refText}` : ""}.</div>
+        </td></tr></tbody>
+      </table>
+    </div>
+  );
+}
+const RptSec = ({ n, title, count, extra, children, cls = "", attr = {} }) => (
+  <section className={`mr-sec ${cls}`} {...attr}>
+    <h3 className="mr-h"><span className="mr-num">{n}</span>{title}{count != null && <span className="mr-count">{count}</span>}{extra}</h3>
+    {children}
+  </section>
+);
+
+// ── 1. Customer report — only what a customer should see ────────────────
+// No employee names, delays, holds, ratings, internal remarks or pending
+// jobs. Dates per stage, quality checks as passed-point summaries, the trial
+// certificate, the files marked "show customer", and a sign-off block.
+function CustomerMachineReport({ machineId, machineLog = [], bomDefs = {}, handovers = [], checklistResponses = [], attachments = [], settings = {}, generatedBy = "" }) {
+  const machine = (machineLog || []).find((m) => String(m.id) === String(machineId)) || null;
+  if (!machine) return <p className="mr-empty">Pick a machine to see its customer report.</p>;
+  const bom = bomDefs[machine.bomKey] || {};
+  const isReady = machine.status === "completed";
+  const hops = (handovers || []).filter((h) => String(h.machineId) === String(machine.id) && h.status === "accepted")
+    .slice().sort((a, b) => String(a.acceptedAt || "").localeCompare(String(b.acceptedAt || "")));
+  const STAGES = ["Assembly", "Mechanical", "Electrical", "Trial", "Ready"];
+  const cur = isReady ? "Ready" : (machine.currentDepartment || machine.stage);
+  const curIdx = STAGES.indexOf(cur);
+  const startOf = (d) => d === "Assembly" ? machine.createdDate : d === "Ready" ? machine.completedDate : (hops.find((h) => h.toDepartment === d) || {}).acceptedAt;
+  const endOf   = (d) => d === "Ready" ? machine.completedDate : (hops.find((h) => h.fromDepartment === d) || {}).acceptedAt;
+  const stateOf = (i) => isReady || i < curIdx ? "done" : i === curIdx ? "current" : "pending";
+  const checks = (checklistResponses || []).filter((cr) => String(cr.machineId) === String(machine.id));
+  const byDept = STAGES.slice(0, 4).map((d) => {
+    const list = checks.filter((cr) => cr.department === d);
+    const ans = list.flatMap((cr) => cr.answers || []);
+    return { d, n: list.length, total: ans.length, passed: ans.filter((a) => a.checked).length };
+  }).filter((r) => r.n > 0);
+  const docs = (attachments || []).filter((a) => String(a.machineId) === String(machine.id) && a.isCustomerVisible && a.kind !== "audio");
+  const cert = machine.trialCertificate || null;
+  const ref = `CR-${machine.bomKey}-${machine.serialNo || machine.id}`;
+  const buildDays = (() => { const a = rptMs(machine.createdDate); const b = machine.completedDate ? rptMs(machine.completedDate) : null; return a != null && b != null && b >= a ? Math.max(1, Math.round((b - a) / 86400000)) : null; })();
+  return (
+    <ReportSheet kind="customer" settings={settings} title="Customer machine report" refText={ref} generatedBy={generatedBy}>
+      <div className="rpt-hero" data-report-customer-hero>
+        <div className="rpt-photo">{bom.photoUrl ? <img src={bom.photoUrl} alt={`${machine.bomKey} machine`} data-report-photo /> : <span className="mr-label">Machine photo</span>}</div>
+        <div className="min-w-0">
+          <div className="mr-label">Machine</div>
+          <div className="mr-machine">{machine.bomLabel || bom.label || machine.bomKey}</div>
+          <div className="mr-facts rpt-facts-3">
+            {[["Model", machine.bomKey], ["Serial no.", machine.serialNo || "—", true], ["Build started", rptFmtD(machine.createdDate) || "—"],
+              ["Ready on", rptFmtD(machine.completedDate) || "In production"], ["Build time", buildDays ? `${buildDays} day${buildDays === 1 ? "" : "s"}` : "—"],
+              ["Trial", cert ? `Passed · ${rptFmtD(cert.trialDate) || "certified"}` : "Scheduled"]].map(([k, v, mono]) => (
+              <div key={k} className="min-w-0"><div className="mr-label">{k}</div><div className={`mr-fact ${mono ? "mr-mono" : ""}`}>{v}</div></div>
+            ))}
+          </div>
+          <div className={`mr-stamp rpt-stamp ${isReady ? "is-done" : "is-progress"}`} data-report-status>{isReady ? "Ready for dispatch" : `In production · ${cur}`}</div>
+        </div>
+      </div>
+      <RptSec n="01" title="Build journey" attr={{ "data-report-journey": "" }}>
+        <div className="mr-strip">
+          {STAGES.map((d, i) => <div key={d} className={`mr-step is-${stateOf(i)}`}><div className="mr-step-name">{d}</div><div className="mr-label">{stateOf(i) === "done" ? (rptFmtD(endOf(d) || startOf(d)) || "Done") : stateOf(i) === "current" ? "In progress" : "Upcoming"}</div></div>)}
+        </div>
+        <div className="mr-table">
+          <div className="mr-tr mr-th" style={{ gridTemplateColumns: "1.4fr 1.2fr 1.2fr 1fr" }}><div>Stage</div><div>Started</div><div>Completed</div><div>Status</div></div>
+          {STAGES.map((d, i) => { const st = stateOf(i); return (
+            <div key={d} className="mr-tr" style={{ gridTemplateColumns: "1.4fr 1.2fr 1.2fr 1fr" }}>
+              <div className="mr-td font-semibold" data-l="Stage">{d === "Ready" ? "Final inspection · Ready" : d}</div>
+              <div className="mr-td" data-l="Started">{st === "pending" ? "—" : rptFmtD(startOf(d)) || "—"}</div>
+              <div className="mr-td" data-l="Completed">{st === "done" ? rptFmtD(endOf(d)) || "✓" : "—"}</div>
+              <div className="mr-td" data-l="Status"><span className={st === "done" ? "mr-green" : st === "current" ? "mr-amber" : "mr-muted"}>{st === "done" ? "✓ Completed" : st === "current" ? "In progress" : "Upcoming"}</span></div>
+            </div>); })}
+        </div>
+      </RptSec>
+      <RptSec n="02" title="Quality checks" attr={{ "data-report-quality": "" }}>
+        {byDept.length === 0 ? <p className="mr-empty">Quality checks are recorded at every stage as the machine moves forward.</p> : (
+          <div className="mr-table">
+            <div className="mr-tr mr-th" style={{ gridTemplateColumns: "1.4fr 1fr 2fr" }}><div>Stage</div><div>Inspections</div><div>Result</div></div>
+            {byDept.map((r) => (
+              <div key={r.d} className="mr-tr" style={{ gridTemplateColumns: "1.4fr 1fr 2fr" }}>
+                <div className="mr-td font-semibold" data-l="Stage">{r.d}</div>
+                <div className="mr-td" data-l="Inspections">{r.n}</div>
+                <div className="mr-td" data-l="Result"><span className={r.passed === r.total ? "mr-green" : ""}>{r.passed === r.total ? `✓ All ${r.total} check points passed` : `${r.passed} of ${r.total} check points verified`}</span></div>
+              </div>
+            ))}
+          </div>
+        )}
+      </RptSec>
+      <RptSec n="03" title="Trial certificate" cls={cert ? "mr-cert-sec" : ""} attr={{ "data-report-trial": "" }}>
+        {cert ? <div className="mr-cert"><style>{TC_SHEET_CSS}</style><TrialCertificateSheet machine={machine} cert={cert} /></div>
+              : <p className="mr-empty">The machine is run under load at Trial; its certificate is added here when the trial is complete.</p>}
+      </RptSec>
+      <RptSec n="04" title="Documents for you" count={docs.length} attr={{ "data-report-docs": "" }}>
+        {docs.length === 0 ? <p className="mr-empty">No documents shared yet.</p> : (
+          <div className="mr-table">
+            <div className="mr-tr mr-th" style={{ gridTemplateColumns: "3fr 1fr 1.2fr" }}><div>Document</div><div>Type</div><div>Date</div></div>
+            {docs.map((a) => (
+              <div key={a.id} className="mr-tr" style={{ gridTemplateColumns: "3fr 1fr 1.2fr" }}>
+                <div className="mr-td" data-l="Document">{a.caption || a.fileName || a.name || "Document"}</div>
+                <div className="mr-td" data-l="Type">{a.kind === "image" ? "Photo" : a.kind === "video" ? "Video" : "Document"}</div>
+                <div className="mr-td" data-l="Date">{rptFmtD(a.uploadedAt || a.createdAt) || "—"}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </RptSec>
+      <RptSec n="05" title="Final sign-off" cls="mr-avoid" attr={{ "data-report-customer-signoff": "" }}>
+        <p className="mr-small" style={{ marginBottom: 14 }}>We certify that the machine described above, serial no. <b className="mr-mono">{machine.serialNo || "—"}</b>, was built to its approved bill of materials, inspected at every stage and {cert ? "run on trial before release" : "will be run on trial before release"}.</p>
+        <div className="mr-signoff">
+          {[["Quality & trial", "name, signature, date"], ["Authorised signatory", "for Shantaz Technofoods"], ["Received by customer", "name, signature, date"]].map(([r, d]) => (
+            <div key={r}><div className="mr-sign-line" /><div className="font-semibold">{r}</div><div className="mr-label">{d}</div></div>
+          ))}
+        </div>
+      </RptSec>
+    </ReportSheet>
+  );
+}
+
+// ── 3. On Hold report — period, totals by department and by reason ───────
+function OnHoldReport({ period = "this_month", machineLog = [], handovers = [], auditLog = [], allUsers = [], settings = {}, generatedBy = "" }) {
+  const now = Date.now();
+  const { from, to } = rptPeriodRange(period, new Date(now));
+  const all = collectHoldEvents({ machineLog, handovers, auditLog, allUsers, nowMs: now });
+  // In the period = the hold started in it, or is still running.
+  const rows = all.filter((r) => (r.startAt != null && r.startAt >= from && r.startAt <= to) || (r.open && period !== "last_month"));
+  const machines = new Set(rows.map((r) => r.machineId));
+  const totalMin = rows.reduce((s, r) => s + (r.minutes || 0), 0);
+  const group = (keyOf) => {
+    const g = {};
+    rows.forEach((r) => { const k = keyOf(r) || "—"; g[k] = g[k] || { k, n: 0, min: 0, machines: new Set() }; g[k].n++; g[k].min += r.minutes || 0; g[k].machines.add(r.machineId); });
+    return Object.values(g).sort((a, b) => b.n - a.n || b.min - a.min);
+  };
+  const byDept = group((r) => r.kind === "manual" ? r.from : r.to);
+  const byReason = group((r) => (r.reason || (r.kind === "overdue" ? "Not yet accepted" : "No reason given")).trim());
+  const label = (RPT_PERIODS.find(([k]) => k === period) || [null, "This month"])[1];
+  const periodText = from === -Infinity ? "All time" : `${label} · ${rptFmtD(from)} to ${rptFmtD(Math.min(to, now))}`;
+  return (
+    <ReportSheet kind="hold" settings={settings} title="On hold report" subtitle={periodText} refText={`HOLD-${new Date(now).toISOString().slice(0, 7)}`} generatedBy={generatedBy}>
+      <div className="mr-summary rpt-summary-4" data-report-glance>
+        {[{ k: "Machines held", v: machines.size }, { k: "Hold events", v: rows.length }, { k: "Still on hold", v: rows.filter((r) => r.open).length, red: rows.some((r) => r.open) }, { k: "Total time held", v: rows.length ? rptDur(totalMin) : "—" }]
+          .map((g) => <div key={g.k} className={`mr-sum ${g.red ? "is-red" : ""}`}><div className="mr-sum-v">{g.v}</div><div className="mr-label">{g.k}</div></div>)}
+      </div>
+      <RptSec n="01" title="Holds in this period" count={rows.length} attr={{ "data-report-hold-list": "" }}>
+        {rows.length === 0 ? <p className="mr-empty">No machine went on hold in this period.</p> : (
+          <div className="mr-table">
+            <div className="mr-tr mr-th" style={{ gridTemplateColumns: "1.5fr 1.3fr 1.2fr 0.9fr 2fr 1.1fr" }}><div>Machine</div><div>Where</div><div>Since</div><div className="text-right">How long</div><div>Reason</div><div>Who</div></div>
+            {rows.map((r) => (
+              <div key={r.key} className="mr-tr" data-report-hold-row={r.kind} style={{ gridTemplateColumns: "1.5fr 1.3fr 1.2fr 0.9fr 2fr 1.1fr" }}>
+                <div className="mr-td" data-l="Machine"><div><div className="font-semibold">{r.bomKey}</div><div className="mr-label mr-mono">{r.serialNo || "—"}</div></div></div>
+                <div className="mr-td" data-l="Where"><div><div>{r.to ? `${r.from} → ${r.to}` : r.from || "—"}</div><div className={`mr-label ${r.open ? "mr-red" : ""}`}>{r.label}{r.open ? " · open" : ""}</div></div></div>
+                <div className="mr-td" data-l="Since"><div><div>{rptFmtDT(r.startAt) || "—"}</div>{r.endAt ? <div className="mr-label">to {rptFmtDT(r.endAt)}</div> : null}</div></div>
+                <div className={`mr-td md:text-right ${r.open ? "mr-red font-semibold" : ""}`} data-l="How long">{r.minutes != null ? rptDur(r.minutes) : "—"}</div>
+                <div className="mr-td" data-l="Reason">{r.reason || <span className="mr-muted">{r.kind === "overdue" ? "Waiting for the next department" : "No reason given"}</span>}</div>
+                <div className="mr-td" data-l="Who"><div><div>{r.by || "—"}</div>{r.releasedBy ? <div className="mr-label">released by {r.releasedBy}</div> : null}</div></div>
+              </div>
+            ))}
+          </div>
+        )}
+      </RptSec>
+      <div className="rpt-two">
+        {[["02", "Totals by department", byDept, "data-report-hold-by-dept", "Department"], ["03", "Totals by reason", byReason, "data-report-hold-by-reason", "Reason"]].map(([n, t, list, attr, col]) => (
+          <RptSec key={n} n={n} title={t} attr={{ [attr]: "" }}>
+            {list.length === 0 ? <p className="mr-empty">Nothing to total.</p> : (
+              <div className="mr-table">
+                <div className="mr-tr mr-th" style={{ gridTemplateColumns: "2fr 0.7fr 0.8fr 1.1fr" }}><div>{col}</div><div className="text-right">Holds</div><div className="text-right">Machines</div><div className="text-right">Time held</div></div>
+                {list.map((g) => (
+                  <div key={g.k} className="mr-tr" style={{ gridTemplateColumns: "2fr 0.7fr 0.8fr 1.1fr" }}>
+                    <div className="mr-td" data-l={col}>{g.k}</div><div className="mr-td md:text-right mr-mono" data-l="Holds">{g.n}</div>
+                    <div className="mr-td md:text-right mr-mono" data-l="Machines">{g.machines.size}</div><div className="mr-td md:text-right" data-l="Time held">{rptDur(g.min)}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </RptSec>
+        ))}
+      </div>
+      <p className="mr-label" style={{ marginTop: 10 }}>Holds counted: a manual ON HOLD from the machine card, a hand-over accepted after its accept window (time over the window), and a hand-over still waiting past its window today.</p>
+    </ReportSheet>
+  );
+}
+
+// ── 4. Pending Jobs report — parts and work per machine and department ──
+function PendingJobsReport({ includeDone = false, dept = "", machineLog = [], pendingHandoverItems = [], allUsers = [], settings = {}, generatedBy = "" }) {
+  const now = Date.now();
+  const byId = new Map((machineLog || []).map((m) => [String(m.id), m]));
+  const list = (pendingHandoverItems || [])
+    .filter((p) => includeDone || pendingItemIsOpen(p))
+    .filter((p) => !dept || (p.assignedDepartment || "Unassigned") === dept)
+    .slice().sort((a, b) => String(a.raisedAt || "").localeCompare(String(b.raisedAt || "")));
+  const STAGE = { awaiting: ["Awaiting", "mr-red"], partial: ["Part received", "mr-amber"], received: ["Received · work to do", "mr-amber"], completed: ["Work done", "mr-green"] };
+  const order = (d) => { const i = DEPARTMENT_SEQUENCE.indexOf(d); return i < 0 ? 99 : i; };
+  const depts = [...new Set(list.map((p) => p.assignedDepartment || "Unassigned"))].sort((a, b) => order(a) - order(b) || a.localeCompare(b));
+  const counts = list.reduce((c, p) => { const s = pendingItemStage(p); c[s] = (c[s] || 0) + 1; return c; }, {});
+  const age = (p) => { const t = rptMs(p.raisedAt); if (t == null) return "—"; const end = p.status === "resolved" ? (rptMs(p.resolvedAt) || now) : now; return rptDur(Math.max(0, (end - t) / 60000)); };
+  const critOpen = list.filter((p) => p.critical && pendingItemIsOpen(p)).length;
+  return (
+    <ReportSheet kind="pending" settings={settings} title="Pending jobs report" subtitle={`${includeDone ? "Open and completed" : "Open"} jobs${dept ? ` · ${dept}` : " · all departments"}`} refText={`PJ-${new Date(now).toISOString().slice(0, 10)}`} generatedBy={generatedBy}>
+      <div className="mr-summary rpt-summary-4" data-report-glance>
+        {[{ k: "Jobs listed", v: list.length }, { k: "Awaiting part / work", v: counts.awaiting || 0, red: (counts.awaiting || 0) > 0 }, { k: "Received, work to do", v: (counts.partial || 0) + (counts.received || 0) }, { k: "Critical open", v: critOpen, red: critOpen > 0 }]
+          .map((g) => <div key={g.k} className={`mr-sum ${g.red ? "is-red" : ""}`}><div className="mr-sum-v">{g.v}</div><div className="mr-label">{g.k}</div></div>)}
+      </div>
+      {list.length === 0 && <p className="mr-empty" style={{ marginTop: 18 }}>No {includeDone ? "" : "open "}pending jobs.</p>}
+      {depts.map((d, i) => {
+        const rows = list.filter((p) => (p.assignedDepartment || "Unassigned") === d);
+        return (
+          <RptSec key={d} n={String(i + 1).padStart(2, "0")} title={d} count={`${rows.length} job${rows.length === 1 ? "" : "s"}`} attr={{ "data-report-pending-dept": d }}>
+            <div className="mr-table">
+              <div className="mr-tr mr-th" style={{ gridTemplateColumns: "1.3fr 2.4fr 0.8fr 1.4fr 0.9fr" }}><div>Machine</div><div>Part / work</div><div className="text-right">Qty</div><div>Status</div><div className="text-right">Age</div></div>
+              {rows.map((p) => {
+                const m = byId.get(String(p.machineId)) || {}; const st = pendingItemStage(p); const [lbl, cls] = STAGE[st] || STAGE.awaiting;
+                const isPart = !!(p.itemCode || p.itemName || p.qty != null);
+                return (
+                  <div key={p.id} className="mr-tr" data-report-pending-row={st} style={{ gridTemplateColumns: "1.3fr 2.4fr 0.8fr 1.4fr 0.9fr" }}>
+                    <div className="mr-td" data-l="Machine"><div><div className="font-semibold">{m.bomKey || p.bomKey || "—"}</div><div className="mr-label mr-mono">{m.serialNo || p.serialNo || ""}</div></div></div>
+                    <div className="mr-td" data-l="Part / work"><div>
+                      <div>{p.critical ? <span className="mr-tag">Critical</span> : null}{p.itemName || p.description}</div>
+                      <div className="mr-label">{isPart ? "Part" : "Work"}{p.itemCode ? <> · <span className="mr-mono">{p.itemCode}</span></> : null}{p.itemName && p.description && p.description !== p.itemName ? ` · ${p.description}` : ""} · raised in {p.raisedInDepartment || "—"}, {rptFmtD(p.raisedAt)}</div>
+                    </div></div>
+                    <div className="mr-td md:text-right mr-mono" data-l="Qty">{p.qty != null ? <div><div>{p.qty}</div>{(Number(p.receivedQty) || 0) > 0 && <div className="mr-label">{p.receivedQty} recd</div>}</div> : "—"}</div>
+                    <div className="mr-td" data-l="Status"><div><div className={`${cls} font-semibold`}>{lbl}</div>{st === "completed" && <div className="mr-label">{rptFmtD(p.resolvedAt)}{rptUserName(allUsers, p.resolvedBy) ? ` · ${rptUserName(allUsers, p.resolvedBy)}` : ""}</div>}</div></div>
+                    <div className="mr-td md:text-right" data-l="Age">{age(p)}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </RptSec>
+        );
+      })}
+    </ReportSheet>
   );
 }
 
@@ -17641,6 +18051,26 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
     const m = machineLog.find((x) => String(x.id) === String(reportMachineId));
     printWithTitle(machineReportRef(m), { bodyClass: "print-machine-report" });
   };
+  // 2026-11-03 — the four PDF reports. reportsMenu = the "Reports" chooser is
+  // open; reportDoc = { kind: "customer"|"company"|"hold"|"pending", machineId }
+  // is the report on screen (the Company report also opens via reportMachineId).
+  const [reportsMenu, setReportsMenu] = useState(false);
+  const [reportDoc, setReportDoc] = useState(null);
+  const [reportPick, setReportPick] = useState("");
+  const [holdPeriod, setHoldPeriod] = useState("this_month");
+  const [pendIncludeDone, setPendIncludeDone] = useState(false);
+  const [pendDept, setPendDept] = useState("");
+  const openReport = (kind, machineId = null) => { setReportsMenu(false); setReportMachineId(null); setReportDoc({ kind, machineId }); };
+  const closeReports = () => { setReportDoc(null); setReportMachineId(null); };
+  const printReportDoc = () => {
+    if (!reportDoc) return;
+    const m = machineLog.find((x) => String(x.id) === String(reportDoc.machineId));
+    const day = new Date().toISOString().slice(0, 10);
+    const title = reportDoc.kind === "customer" ? `CR-${m ? `${m.bomKey}-${m.serialNo || m.id}` : day}`
+      : reportDoc.kind === "company" ? machineReportRef(m)
+      : reportDoc.kind === "hold" ? `On-hold-report-${holdPeriod}-${day}` : `Pending-jobs-report-${day}`;
+    printWithTitle(title, { bodyClass: "print-machine-report" });
+  };
   // 2026-10-30 — pending jobs: part lookup + receive/complete actions.
   // Item Master by code — the rack crate face and the rack details panel both
   // ask it for stock when they run bomFillCheck. It used to live inside the
@@ -18592,7 +19022,9 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
       const steps = [
         [jobAction,          () => !jobAction?.busy && setJobAction(null)],
         [reportMachineId,    () => setReportMachineId(null)],
-        [trialCertModal,     () => setTrialCertModal(null)],
+        [reportDoc,          () => setReportDoc(null)],
+        [reportsMenu,        () => setReportsMenu(false)],
+        [trialCertModal,    () => setTrialCertModal(null)],
         [trialCertViewModal, () => setTrialCertViewModal(null)],
         [finishModal,        () => !transferBusy && setFinishModal(null)],
         [acceptModal,        () => !acceptModal?.busy && setAcceptModal(null)],
@@ -18611,7 +19043,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [jobAction, reportMachineId, trialCertModal, trialCertViewModal, finishModal, transferBusy, acceptModal, duringWorkModal,
+  }, [jobAction, reportMachineId, reportDoc, reportsMenu, trialCertModal, trialCertViewModal, finishModal, transferBusy, acceptModal, duringWorkModal,
       removeRackConfirm, pullBack, undoAsk, raiseModal, raiseBusy, jobsDrawer, rackPanel, issuePopup, showCalled]);
   // Pending part awaiting "Confirm issue" in the rack panel, and the one in flight.
   const [pendIssueAsk, setPendIssueAsk] = useState(null);
@@ -18754,11 +19186,13 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
 
       <Topbar title="Machine Tracker" subtitle="Mechanical → Electrical → Trial → Ready">
         {/* 2026-10-31 — the Report Center opens from here (no sidebar entry). */}
+        {/* 2026-11-03 — one Reports menu: the four PDF reports, plus the full
+            Report Center link inside it. */}
         {canView("reports") && (
-          <button type="button" data-open-reports onClick={() => onNavigate("reports")}
+          <button type="button" data-reports-menu onClick={() => { setReportsMenu(true); setReportPick((prev) => prev || String(((machineLog || []).slice().reverse()[0] || {}).id || "")); }}
                   className="h-9 px-3 rounded-lg text-[12px] font-black flex items-center gap-1.5"
                   style={{ background: "rgba(46, 80, 214,0.10)", color: "#2640B0", border: "1px solid rgba(46, 80, 214,0.35)" }}
-                  title="Open the Report Center">
+                  title="Customer, company, on hold and pending jobs reports">
             📄 Reports
           </button>
         )}
@@ -20662,8 +21096,16 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                         <button type="button" data-card-report={machine.id} onClick={() => setReportMachineId(machine.id)}
                                 className="text-[11px] font-black px-3 py-1.5 rounded-lg border transition-all"
                                 style={{ background: "rgba(21,128,61,0.08)", border: "1px solid rgba(21,128,61,0.35)", color: "#15803d" }}
-                                title="Complete production report — BOM to Ready">
-                          📄 Report
+                                title="Company full report — BOM to Ready, internal">
+                          Company report
+                        </button>
+                      )}
+                      {isAdminUser && (
+                        <button type="button" data-card-customer-report={machine.id} onClick={() => openReport("customer", machine.id)}
+                                className="text-[11px] font-black px-3 py-1.5 rounded-lg border transition-all"
+                                style={{ background: "var(--surface-card)", border: "1px solid var(--border-rim)", color: "var(--text-strong)" }}
+                                title="Customer report — clean PDF to send to the customer">
+                          Customer report
                         </button>
                       )}
                       <button onClick={() => setExpanded(isExpanded ? null : machine.id)}
@@ -20697,7 +21139,12 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                           {isAdminUser && <button type="button" data-history-report={machine.id} onClick={() => setReportMachineId(machine.id)}
                                   className="text-[11px] font-bold px-2.5 py-1 rounded-lg border ml-auto"
                                   style={{ borderColor: "var(--border-rim)", color: "var(--text-strong)", background: "var(--surface-card)" }}>
-                            📄 Open full machine report
+                            Company full report
+                          </button>}
+                          {isAdminUser && <button type="button" data-history-customer-report={machine.id} onClick={() => openReport("customer", machine.id)}
+                                  className="text-[11px] font-bold px-2.5 py-1 rounded-lg border"
+                                  style={{ borderColor: "var(--border-rim)", color: "var(--text-strong)", background: "var(--surface-card)" }}>
+                            Customer report
                           </button>}
                           {ratingSummary.average != null && (
                             <span className="text-[12px] font-black" style={{ color: ratingSummary.average >= 4.5 ? "#15803d" : ratingSummary.average >= 3.5 ? "#b45309" : "#dc2626" }}>
@@ -21119,6 +21566,119 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
           </div>
         </div>
       )}
+
+      {/* ── Reports chooser (2026-11-03) — the four PDF reports ── */}
+      {reportsMenu && (() => {
+        const sorted = (machineLog || []).slice().sort((a, b) => String(a.bomKey || "").localeCompare(String(b.bomKey || "")) || String(a.serialNo || "").localeCompare(String(b.serialNo || "")));
+        const pickOk = sorted.some((m) => String(m.id) === String(reportPick));
+        const machineSelect = (
+          <select data-report-machine-pick value={pickOk ? reportPick : ""} onChange={(e) => setReportPick(e.target.value)} onClick={(e) => e.stopPropagation()}
+                  className="rpt-menu-select" aria-label="Machine">
+            {!pickOk && <option value="">Choose a machine…</option>}
+            {sorted.map((m) => <option key={m.id} value={m.id}>{m.bomKey}{m.serialNo ? ` · ${m.serialNo}` : ""} — {m.status === "completed" ? "Ready" : (m.currentDepartment || m.stage)}</option>)}
+          </select>
+        );
+        const items = [
+          { kind: "customer", title: "Customer report", sub: "Clean report for the customer: photo, build dates, quality checks, trial certificate, sign-off.", machine: true },
+          { kind: "company",  title: "Company full report", sub: "Internal: route with times vs target, who transferred and accepted, every checklist, holds, pending jobs, signatures.", machine: true, admin: true },
+          { kind: "hold",     title: "On hold report", sub: "Machines that went on hold in a period, how long, why and who — totals by department and reason." },
+          { kind: "pending",  title: "Pending jobs report", sub: "Open parts and work per machine and department: quantity, critical flag, status and age." },
+        ].filter((x) => !x.admin || isAdminUser);
+        return (
+          <div data-reports-chooser className="modal-backdrop fixed inset-0 z-[90] flex items-center justify-center p-4"
+               style={{ background: "rgba(17,24,39,0.45)", backdropFilter: "blur(6px)" }}
+               onClick={(e) => e.target === e.currentTarget && setReportsMenu(false)}>
+            <div className="w-full max-w-xl rounded-2xl p-5 rpt-menu" style={{ background: "var(--surface-elevated)", border: "1px solid var(--border-subtle)", boxShadow: "0 24px 60px rgba(17,24,39,0.22)" }}>
+              <div className="flex items-start gap-3 mb-4">
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-[17px] font-black" style={{ color: "var(--text-strong)" }}>Reports</h3>
+                  <p className="text-[12px]" style={{ color: "var(--text-dim)" }}>A4 reports — open one, then Print or save as PDF.</p>
+                </div>
+                <ModalX onClose={() => setReportsMenu(false)} />
+              </div>
+              <div className="space-y-2.5">
+                {items.map((x) => (
+                  <div key={x.kind} className="rpt-menu-item" data-report-option={x.kind}>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[14px] font-black" style={{ color: "var(--text-strong)" }}>{x.title}</div>
+                      <div className="text-[12px] leading-snug" style={{ color: "var(--text-dim)" }}>{x.sub}</div>
+                      {x.machine && <div className="mt-2">{machineSelect}</div>}
+                    </div>
+                    <button type="button" data-report-open={x.kind} disabled={x.machine && !pickOk}
+                            onClick={() => openReport(x.kind, x.machine ? reportPick : null)}
+                            className="rpt-menu-open">Open</button>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 pt-3 flex items-center justify-between gap-3" style={{ borderTop: "1px solid var(--border-subtle)" }}>
+                <span className="text-[12px]" style={{ color: "var(--text-dim)" }}>Production, department-wise and monthly tables</span>
+                <button type="button" data-open-reports onClick={() => onNavigate("reports")}
+                        className="h-9 px-3 rounded-lg text-[12px] font-bold"
+                        style={{ border: "1px solid var(--border-rim)", color: "var(--text-strong)", background: "var(--surface-card)" }}>
+                  Report Center →
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ── Report viewer for the four reports (2026-11-03) — same full-screen
+          sheet and print rules as the machine report above. ── */}
+      {reportDoc && (() => {
+        const m = machineLog.find((x) => String(x.id) === String(reportDoc.machineId));
+        const by = currentUser?.fullName || currentUser?.name || currentUser?.username || "";
+        const heading = { customer: "Customer report", company: "Company full report", hold: "On hold report", pending: "Pending jobs report" }[reportDoc.kind];
+        const deptOptions = [...new Set((pendingHandoverItems || []).map((p) => p.assignedDepartment || "Unassigned"))].sort();
+        return (
+          <div className="mt-report-modal fixed inset-0 z-[95] flex flex-col" role="dialog" aria-label={heading} data-report-viewer={reportDoc.kind}
+               style={{ background: "rgba(17,24,39,0.55)", backdropFilter: "blur(6px)" }}>
+            <div className="mt-report-bar flex items-center gap-2 px-3 sm:px-5 py-2.5 flex-shrink-0 flex-wrap"
+                 style={{ background: "var(--surface-card)", borderBottom: "1px solid var(--border-subtle)" }}>
+              <button type="button" data-report-doc-back onClick={() => { setReportDoc(null); setReportsMenu(true); }}
+                      className="h-9 px-3 rounded-lg text-[12px] font-black flex items-center gap-1.5"
+                      style={{ border: "1px solid var(--border-rim)", color: "var(--text-strong)" }}>← Reports</button>
+              <div className={`text-[13px] font-black truncate flex-1 min-w-0 ${reportDoc.kind === "hold" || reportDoc.kind === "pending" ? "max-sm:invisible" : ""}`} style={{ color: "var(--text-strong)" }}>
+                {heading}{m && (reportDoc.kind === "customer" || reportDoc.kind === "company") ? ` · ${m.bomKey}${m.serialNo ? ` · ${m.serialNo}` : ""}` : ""}
+              </div>
+              {reportDoc.kind === "hold" && (
+                <select data-report-period value={holdPeriod} onChange={(e) => setHoldPeriod(e.target.value)} className="rpt-bar-select" aria-label="Period">
+                  {RPT_PERIODS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+                </select>
+              )}
+              {reportDoc.kind === "pending" && (
+                <>
+                  <select data-report-dept value={pendDept} onChange={(e) => setPendDept(e.target.value)} className="rpt-bar-select" aria-label="Department">
+                    <option value="">All departments</option>
+                    {deptOptions.map((d) => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                  <label className="text-[12px] font-bold flex items-center gap-1.5 px-1" style={{ color: "var(--text-strong)" }}>
+                    <input type="checkbox" data-report-include-done checked={pendIncludeDone} onChange={(e) => setPendIncludeDone(e.target.checked)} /> Include completed
+                  </label>
+                </>
+              )}
+              <button type="button" data-report-doc-print onClick={printReportDoc}
+                      className="h-9 px-3 rounded-lg text-[12px] font-black text-white flex items-center gap-1.5"
+                      style={{ background: "#2640B0" }}>Print / PDF</button>
+              <button type="button" aria-label="Close report" onClick={closeReports}
+                      className="w-9 h-9 rounded-full flex items-center justify-center text-[15px] font-black"
+                      style={{ background: "rgba(17,24,39,0.07)", color: "var(--text-dim)" }}>✕</button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-2 sm:p-6" onClick={(e) => e.target === e.currentTarget && closeReports()}>
+              <div className="mt-report-sheet mx-auto w-full max-w-4xl rounded-xl p-4 sm:p-8" style={{ background: "#fff", boxShadow: "0 24px 60px rgba(17,24,39,0.25)" }}>
+                {reportDoc.kind === "customer" && <CustomerMachineReport machineId={reportDoc.machineId} machineLog={machineLog} bomDefs={bomDefs} handovers={handovers}
+                                                     checklistResponses={checklistResponses} attachments={attachments} settings={settings} generatedBy={by} />}
+                {reportDoc.kind === "company" && <AtoZMachineReport machineId={reportDoc.machineId} machineLog={machineLog} bomDefs={bomDefs} handovers={handovers}
+                                                     pendingHandoverItems={pendingHandoverItems} deptRatings={deptRatings} checklistResponses={checklistResponses}
+                                                     outwardLog={outwardLog} items={items} attachments={attachments} settings={settings}
+                                                     auditLog={auditLog} allUsers={allUsers} />}
+                {reportDoc.kind === "hold" && <OnHoldReport period={holdPeriod} machineLog={machineLog} handovers={handovers} auditLog={auditLog} allUsers={allUsers} settings={settings} generatedBy={by} />}
+                {reportDoc.kind === "pending" && <PendingJobsReport includeDone={pendIncludeDone} dept={pendDept} machineLog={machineLog} pendingHandoverItems={pendingHandoverItems} allUsers={allUsers} settings={settings} generatedBy={by} />}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {deleteModal && (() => {
         const m = deleteModal.machine;
