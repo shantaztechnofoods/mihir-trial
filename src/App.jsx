@@ -16711,7 +16711,7 @@ function transcribeVoice(blob) {
 // empty after saving, the audio is sent for server transcription and the words
 // are put in the box; if that fails the worker is asked to type them (the
 // box stays required — 2026-11-03 owner: reports need TEXT).
-function VoiceNoteRecorder({ machineId, department, place, item = "", onUpload, onDelete = null, canRemove = false, setText = null, disabled = false, compact = false, langs = true }) {
+function VoiceNoteRecorder({ machineId, department, place, item = "", onUpload, onDelete = null, canRemove = false, setText = null, disabled = false, compact = false, langs = true, mini = false }) {
   const [phase, setPhase] = useState("idle"); // idle | starting | recording | saving | saved | error
   const [secs, setSecs]   = useState(0);
   const [err, setErr]     = useState("");
@@ -16890,14 +16890,23 @@ function VoiceNoteRecorder({ machineId, department, place, item = "", onUpload, 
   ));
 
   return (
-    <div className="vn-box mt-2" data-voice-recorder={place}>
+    <div className={mini ? "vn-box" : "vn-box mt-2"} data-voice-recorder={place}>
       {(phase === "idle" || phase === "starting" || phase === "error") && !att && (
         <div className="flex items-center gap-2 flex-wrap">
+          {mini ? (
+            /* 2026-11-03 — icon-only mic that sits inside a reason box. */
+            <button type="button" data-voice-record aria-label="Record" disabled={disabled || phase === "starting"} onClick={start}
+                    className="vn-rec rounded-lg flex items-center justify-center transition-transform active:scale-[0.97] disabled:opacity-60"
+                    style={{ width: 40, height: 40, background: "transparent", color: "#dc2626", border: "none", fontSize: 18 }}>
+              {phase === "starting" ? "…" : "🎤"}
+            </button>
+          ) : (
           <button type="button" data-voice-record disabled={disabled || phase === "starting"} onClick={start}
                   className="vn-rec rounded-xl font-bold flex items-center justify-center gap-1.5 transition-transform active:scale-[0.97] disabled:opacity-60"
                   style={{ minHeight: compact ? 44 : 48, padding: "0 16px", background: "#fff", color: "#dc2626", border: "1.5px solid #dc2626", fontSize: compact ? 15 : 16 }}>
             <span style={{ fontSize: 18 }}>🎤</span>{phase === "starting" ? "Please wait…" : "Record"}
           </button>
+          )}
           {chips}
         </div>
       )}
@@ -18610,6 +18619,9 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
   const [trialCertViewModal, setTrialCertViewModal] = useState(null); // machine object
   // Migration 028 — During-Work checklist runtime modal.
   const [duringWorkModal, setDuringWorkModal] = useState(null); // { machine, template, answers, busy, error }
+  // 2026-11-03 — Assembly "Before Starting Work" checklist, asked when a rack
+  // machine's Assemble is pressed. { queue: [machine], idx, ids, template, answers, marks, busy, error, after }
+  const [startChk, setStartChk] = useState(null);
   const [acceptModal, setAcceptModal] = useState(null); // { handover, password, sigSvg, busy, error }
   // 2026-11-03 — offline: Confirm Acceptance is disabled (popup keeps the
   // signature / team / ticks) and a tap pulses the "No internet" banner.
@@ -18739,6 +18751,41 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
     }
     setDuringWorkModal(null);
     showToast("During-Work checks saved", `${machine.bomKey}${machine.serialNo ? ` · S/N ${machine.serialNo}` : ""} · ${machine.currentDepartment || machine.stage}`);
+  };
+
+  // 2026-11-03 — Assemble on a rack machine first asks the Assembly
+  // "Before Starting Work" checklist (template stage before_receive) for every
+  // selected machine whose BOM has one; only then is onStartProduction called,
+  // unchanged. No template → starts exactly as before.
+  const startChkTemplate = (m) => pickTemplate(checklistTemplates, m.bomKey, "Assembly", "before_receive");
+  const startWithChecklist = (ids, after) => {
+    const queue = machineLog.filter((m) => ids.includes(m.id) && m.stage === "BOM Issued" && startChkTemplate(m));
+    if (!queue.length || !onSubmitDuringWorkChecklist) { after(onStartProduction ? onStartProduction(ids) : { success: false }); return; }
+    const t = startChkTemplate(queue[0]);
+    setStartChk({ queue, idx: 0, ids, template: t, answers: startChecklistResponse(t), marks: {}, busy: false, error: "", after });
+  };
+  const submitStartChk = async () => {
+    if (!startChk || startChk.busy) return;
+    const { queue, idx, ids, template, answers, marks, after } = startChk;
+    const undecided = answers.map((a, i) => (marks[i] ? -1 : i)).filter((i) => i >= 0);
+    const chk = validateChecklistAnswers(answers);
+    const bad = [...new Set([...undecided, ...chk.missing])];
+    if (bad.length) {
+      setStartChk((prev) => prev ? { ...prev, error: undecided.length ? `Tick ✓ or ✗ for ${undecided.length} point${undecided.length === 1 ? "" : "s"}` : checklistProblemText(chk), bad } : prev);
+      flagField(`[data-start-chk-row="${bad[0]}"]`);
+      return;
+    }
+    setStartChk((prev) => prev ? { ...prev, busy: true, error: "" } : prev);
+    const machine = queue[idx];
+    const r = await onSubmitDuringWorkChecklist({ machine, template, answers, stage: "before_receive", department: "Assembly" });
+    if (r && r.success === false) { setStartChk((prev) => prev ? { ...prev, busy: false, error: r.error || "NOT SAVED" } : prev); return; }
+    if (idx + 1 < queue.length) {
+      const t = startChkTemplate(queue[idx + 1]);
+      setStartChk({ ...startChk, idx: idx + 1, template: t, answers: startChecklistResponse(t), marks: {}, busy: false, error: "", bad: [] });
+      return;
+    }
+    setStartChk(null);
+    after(onStartProduction ? onStartProduction(ids) : { success: false });
   };
 
   // 2026-10-31 — complete / correct an already-saved certificate (no transfer).
@@ -19471,6 +19518,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
     const onKey = (e) => {
       if (e.key !== "Escape") return;
       const steps = [
+        [startChk,           () => !startChk?.busy && setStartChk(null)],
         [jobAction,          () => !jobAction?.busy && setJobAction(null)],
         [reportMachineId,    () => setReportMachineId(null)],
         [reportDoc,          () => setReportDoc(null)],
@@ -19494,7 +19542,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [jobAction, reportMachineId, reportDoc, reportsMenu, trialCertModal, trialCertViewModal, finishModal, transferBusy, acceptModal, duringWorkModal,
+  }, [jobAction, reportMachineId, reportDoc, reportsMenu, trialCertModal, trialCertViewModal, finishModal, transferBusy, acceptModal, duringWorkModal, startChk,
       removeRackConfirm, pullBack, undoAsk, raiseModal, raiseBusy, jobsDrawer, rackPanel, issuePopup, showCalled]);
   // Pending part awaiting "Confirm issue" in the rack panel, and the one in flight.
   const [pendIssueAsk, setPendIssueAsk] = useState(null);
@@ -19585,10 +19633,12 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
     // 2026-10-31 — no assembly while BOM components are still pending.
     const shortSel = machineLog.filter((m) => ids.includes(m.id) && pendingForMachine(m).length > 0);
     if (shortSel.length) { setStartErr(`Cannot start — still waiting for components: ${shortSel.map((m) => m.serialNo || m.bomKey).join(", ")}. Receive the pending stock first.`); return; }
-    const res = onStartProduction(ids);
-    if (res?.success === false) { setStartErr(res.error || "Failed to start production"); return; }
-    showToast(`${startProd.key} — ${res.count} machine(s) into production`, (res.serials || []).join(", ") || "Assembly stage active");
-    setStartProd(null); setStartErr("");
+    const key = startProd.key;
+    startWithChecklist(ids, (res) => {
+      if (res?.success === false) { setStartErr(res.error || "Failed to start production"); return; }
+      showToast(`${key} — ${res.count} machine(s) into production`, (res.serials || []).join(", ") || "Assembly stage active");
+      setStartProd(null); setStartErr("");
+    });
   };
 
   const handleStageUpdate = async (machine) => {
@@ -20826,9 +20876,10 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
               if (sl.status === "set") {
                 if (pend.length) { showToast("Waiting for material", `${pend.length} component(s) still to collect`, "urgent"); return; }
                 if (crate.state === "pending") { showToast("Fill the R crate first", `${slotLabel(pairSlotOf(sl.setId))} — ${rKey} for ${m.serialNo}`, "urgent"); return; }
-                const res = onStartProduction ? onStartProduction([m.id]) : { success: false };
-                if (res && res.success === false) { showToast("Could not start assembly", res.error || "", "urgent"); return; }
-                showToast(`${slotLabel(sl.id)} — ${m.serialNo || m.bomKey}`, "Assembly started. The machine keeps this rack until it is sent to Mechanical.");
+                startWithChecklist([m.id], (res) => {
+                  if (res && res.success === false) { showToast("Could not start assembly", res.error || "", "urgent"); return; }
+                  showToast(`${slotLabel(sl.id)} — ${m.serialNo || m.bomKey}`, "Assembly started. The machine keeps this rack until it is sent to Mechanical.");
+                });
               } else if (sl.status === "assembling") {
                 setRackPanel(null);
                 openFinishModal(m);
@@ -23473,6 +23524,91 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                         className="text-xs font-black text-white px-4 py-1.5 rounded-lg transition-all disabled:opacity-50"
                         style={{ background: "#2640B0", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
                   {busy ? "Saving…" : "✓ Save Checks"}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ── 2026-11-03 — Assembly "Before Starting Work" checklist ──────────
+          Opened by Assemble on a rack machine when its BOM has an Assembly
+          before_receive template. Each point: ✓, or ✗ with a reason (the
+          reason becomes a pending job; it does not block). */}
+      {startChk && (() => {
+        const { queue, idx, template, answers, marks, busy, error } = startChk;
+        const machine = queue[idx];
+        const bad = new Set(startChk.bad || []);
+        const setMark = (i, v) => setStartChk((prev) => prev ? { ...prev, marks: { ...prev.marks, [i]: v }, answers: toggleAnswer(prev.answers, i, v === "ok"), error: "", bad: (prev.bad || []).filter((x) => x !== i) } : prev);
+        const setRemark = (i, fn) => setStartChk((prev) => prev ? { ...prev, error: "", answers: setAnswerRemark(prev.answers, i, typeof fn === "function" ? fn((prev.answers[i] || {}).remark || "") : fn) } : prev);
+        const ready = answers.every((a, i) => marks[i] === "ok" || (marks[i] === "x" && String(a.remark || "").trim()));
+        const doneCount = answers.filter((a, i) => marks[i] === "ok" || (marks[i] === "x" && String(a.remark || "").trim())).length;
+        return (
+          <div data-start-checklist className="modal-backdrop fixed inset-0 z-[97] flex items-center justify-center p-3"
+               style={{ background: "rgba(17,24,39,0.45)", backdropFilter: "blur(10px)", zIndex: 97 }}
+               onClick={(e) => e.target === e.currentTarget && !busy && setStartChk(null)}>
+            <div className="relative w-full max-w-md rounded-2xl overflow-hidden flex flex-col"
+                 style={{ background: "var(--surface-elevated)", border: "1px solid rgba(217,119,6,0.4)", boxShadow: "0 40px 80px rgba(17,24,39,0.22)", maxHeight: "90dvh" }}>
+              <ModalX onClose={() => setStartChk(null)} disabled={!!busy} />
+              <div className="px-5 py-3 border-b border-slate-200 flex-shrink-0 pr-14"
+                   style={{ background: "linear-gradient(90deg,rgba(217,119,6,0.12),rgba(217,119,6,0.03))" }}>
+                <div className="text-[15px] font-black text-slate-900"><LeadIcon e="🔧" />Before Starting Work</div>
+                <div className="text-[12px] text-slate-500 mt-0.5">{machine.bomKey}{machine.serialNo ? ` · S/N ${machine.serialNo}` : ""}{queue.length > 1 ? ` · ${idx + 1} of ${queue.length}` : ""}</div>
+                <div className="mt-2 h-1.5 rounded-full bg-slate-200 overflow-hidden">
+                  <div className="h-full rounded-full transition-all" style={{ width: `${answers.length ? (doneCount / answers.length) * 100 : 0}%`, background: ready ? "#16a34a" : "#d97706" }} />
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+                {answers.map((a, i) => {
+                  const mk = marks[i];
+                  return (
+                    <div key={a.id || i} data-start-chk-row={i} data-mark={mk || ""}
+                         className="rounded-xl px-3 py-2"
+                         style={{ background: mk === "ok" ? "rgba(22,163,74,0.06)" : mk === "x" ? "rgba(220,38,38,0.05)" : "rgba(17,24,39,0.03)",
+                                  border: `1px solid ${bad.has(i) ? "rgba(220,38,38,0.7)" : mk === "ok" ? "rgba(22,163,74,0.35)" : mk === "x" ? "rgba(220,38,38,0.35)" : "rgba(17,24,39,0.10)"}` }}>
+                      <div className="flex items-center gap-2">
+                        <span className="flex-1 text-[14px] text-slate-800 leading-snug">{a.label}</span>
+                        <button type="button" data-start-chk-ok={i} aria-label="OK" aria-pressed={mk === "ok"} disabled={busy}
+                                onClick={() => setMark(i, "ok")}
+                                className="w-11 h-11 rounded-lg text-[18px] font-black flex-shrink-0 transition-transform active:scale-95"
+                                style={mk === "ok" ? { background: "#16a34a", color: "#fff", border: "1px solid #16a34a" } : { background: "#fff", color: "#16a34a", border: "1px solid rgba(22,163,74,0.45)" }}>✓</button>
+                        <button type="button" data-start-chk-x={i} aria-label="Not OK" aria-pressed={mk === "x"} disabled={busy}
+                                onClick={() => setMark(i, "x")}
+                                className="w-11 h-11 rounded-lg text-[18px] font-black flex-shrink-0 transition-transform active:scale-95"
+                                style={mk === "x" ? { background: "#dc2626", color: "#fff", border: "1px solid #dc2626" } : { background: "#fff", color: "#dc2626", border: "1px solid rgba(220,38,38,0.45)" }}>✗</button>
+                      </div>
+                      {mk === "x" && (
+                        <div className="mt-2 flex flex-wrap items-center gap-1 bg-white border border-slate-300 rounded-lg pl-2 pr-1 focus-within:border-blue-500/60">
+                          <input type="text" data-start-chk-reason={i} value={a.remark || ""} disabled={busy}
+                                 onChange={(e) => setRemark(i, e.target.value)}
+                                 placeholder="Reason"
+                                 className="flex-1 min-w-0 bg-transparent py-2 text-[14px] text-slate-900 placeholder-slate-400 outline-none" />
+                          {canVoice && (
+                            <VoiceNoteRecorder {...vnProps(machine.id, "Assembly")} place="Assembly start checklist" item={a.label} compact mini langs={false} disabled={!!busy}
+                                               setText={(fn) => setRemark(i, fn)} />
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                {error && (
+                  <div data-start-chk-error className="rounded-lg px-3 py-2 text-[12px] font-semibold"
+                       style={{ background: "rgba(239,68,68,0.08)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.3)" }}>
+                    ⚠ {error}
+                  </div>
+                )}
+              </div>
+              <div className="px-4 py-3 border-t border-slate-200 flex items-center gap-2 flex-shrink-0"
+                   style={{ background: "#f8f9fb", paddingBottom: "max(12px, env(safe-area-inset-bottom))" }}>
+                <button onClick={() => !busy && setStartChk(null)} disabled={busy}
+                        className="mt-cancel text-[13px] font-bold px-4 h-11 rounded-lg text-slate-500 border border-slate-200 bg-white hover:bg-slate-100 transition-all disabled:opacity-50">
+                  Cancel
+                </button>
+                <button data-start-chk-submit data-ready={ready ? "1" : "0"} onClick={submitStartChk} disabled={busy}
+                        className="flex-1 text-[14px] font-black h-12 rounded-lg transition-all active:scale-[.98] disabled:opacity-60"
+                        style={ready ? { background: "#d97706", color: "#ffffff", boxShadow: "0 1px 2px rgba(17,24,39,0.14)" } : { background: "#e2e8f0", color: "#64748b" }}>
+                  {busy ? "Please wait…" : idx + 1 < queue.length ? "Save · Next machine" : "🔧 Start Assembly"}
                 </button>
               </div>
             </div>
@@ -28755,13 +28891,20 @@ export default function App() {
 
   // Migration 028 — During-Work checklist submission. Optional; no stage
   // transition, no machine state change. Pure snapshot + audit.
-  const handleSubmitDuringWorkChecklist = async ({ machine, template, answers }) => {
+  // 2026-11-03 — also saves the Assembly "Before Starting Work" checklist
+  // (stage "before_receive", department "Assembly") answered when a rack
+  // machine's Assemble is pressed. Same snapshot; a ✗ item (reason required)
+  // becomes a pending job owed by that department, exactly like an unticked
+  // Before Transfer item. During-Work behaviour is unchanged.
+  const handleSubmitDuringWorkChecklist = async ({ machine, template, answers, stage = "during_work", department = null }) => {
     if (!currentUser?.id) return { success: false, error: "Not authenticated" };
     if (!machine || !template) return { success: false, error: "Missing machine or template" };
+    const isStart = stage !== "during_work";
+    const dept = department || machine.currentDepartment || machine.stage;
     const snap = snapshotResponse({
       machineId: machine.id, handoverId: null,
-      department: machine.currentDepartment || machine.stage,
-      stage: "during_work",
+      department: dept,
+      stage,
       bomKey: machine.bomKey || null,
       template, answers,
       submittedBy: currentUser.id,
@@ -28770,11 +28913,32 @@ export default function App() {
     if (!cr.success) return cr;
     setChecklistResponses((prev) => [cr.response, ...prev]);
     logAudit({
-      type: "checklist_submitted_during_work", module: "Machine",
-      action: `Checklist submitted (During Work): ${template.name || ""} for ${machine.bomKey}${machine.serialNo ? ` [${machine.serialNo}]` : ""} (${machine.currentDepartment || machine.stage})`,
+      type: isStart ? "checklist_submitted_assembly_start" : "checklist_submitted_during_work", module: "Machine",
+      action: `Checklist submitted (${isStart ? "Before Starting Work" : "During Work"}): ${template.name || ""} for ${machine.bomKey}${machine.serialNo ? ` [${machine.serialNo}]` : ""} (${dept})`,
       ref: machine.bomKey, serialNo: machine.serialNo || "",
-      details: { templateId: template.id, items: answers.length, unchecked: answers.filter((a) => !a.checked).length, stage: "during_work" },
+      details: { templateId: template.id, items: answers.length, unchecked: answers.filter((a) => !a.checked).length, stage },
     });
+    if (isStart) {
+      for (const job of incompleteChecklistJobs(answers, "Before Starting Work")) {
+        const pi = await createPendingItem({
+          machineId: machine.id, raisedInHandoverId: null,
+          raisedInDepartment: dept, assignedDepartment: dept,
+          kind: "owed", raisedBy: currentUser.id, description: job.description, reason: job.reason,
+        });
+        if (pi.success) {
+          setPendingHandoverItems((prev) => [pi.item, ...prev]);
+          logAudit({
+            type: "pending_item_raised", module: "Machine",
+            action: `${job.description} — ${machine.bomKey}${machine.serialNo ? ` [${machine.serialNo}]` : ""}`,
+            ref: machine.bomKey, serialNo: machine.serialNo || "",
+            details: { machineId: machine.id, itemId: pi.item?.id, kind: "owed", assignedDepartment: dept, reason: job.reason, source: "checklist_assembly_start" },
+          });
+        } else {
+          saveFailed("Pending job", pi.error);
+          flashSaveError("Pending job not saved", `${machine.bomKey}${machine.serialNo ? ` · ${machine.serialNo}` : ""}: "${job.description}" — ${pi.error || "unknown error"}. Raise it again from the machine card.`);
+        }
+      }
+    }
     return { success: true };
   };
 
