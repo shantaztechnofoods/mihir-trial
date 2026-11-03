@@ -86,7 +86,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-03-late-reason-buttons";
+const APP_BUILD = "2026-11-03-red-box-only";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -16896,6 +16896,18 @@ const pendingItemsProblem = (rows) => {
 // its top-right corner. Several closed only by tapping outside or by a Cancel
 // at the very bottom, which on a phone sat below the screen and left people
 // stuck. Disabled while the popup is saving, exactly like its Cancel.
+// Form mistake: no long message — the box that needs work turns red, shakes,
+// and the screen scrolls to it (owner's rule: "only the red box").
+const flagField = (selector) => {
+  setTimeout(() => {
+    try {
+      const el = document.querySelector(selector); if (!el) return;
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.remove("field-bad"); void el.offsetWidth; el.classList.add("field-bad");
+      setTimeout(() => el.classList.remove("field-bad"), 2600);
+    } catch { /* ignore */ }
+  }, 30);
+};
 // A save that did not reach the server: log it AND tell the user in plain words.
 const saveFailed = (where, err) => {
   console.warn(`[App] ${where} failed`, err);
@@ -17487,18 +17499,18 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
       machine.departmentEnteredAt, expectedDurationMinutes, nowTick
     );
     if (isOverrun && !narration.trim()) {
-      showToast("Narration required", "This department exceeded its configured duration. Please add an explanation.");
+      flagField("[data-transfer-delay]");
       return;
     }
     // Phase B — enforce "every unchecked item has a remark" before submit.
     if (template && Array.isArray(answers) && answers.length) {
       const chk = validateChecklistAnswers(answers);
       if (!chk.ok) {
-        showToast("Checklist incomplete", checklistProblemText(chk), "urgent");
+        flagField("[data-transfer-checklist]");
         return;
       }
     }
-    { const pp = pendingItemsProblem(owedItems); if (pp) { showToast("Pending item not saved", pp, "warning"); return; } }
+    { const pp = pendingItemsProblem(owedItems); if (pp) { flagField("[data-transfer-pending]"); return; } }
     // 2026-11-02 — no signature and no worker / main-employee names are
     // collected at Transfer; the signed-in user is recorded as the transferer.
     if (!currentUser?.id) { showToast("Not signed in", "Sign in again to transfer.", "warning"); return; }
@@ -17583,19 +17595,19 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
     // permanent history and the audit trail.
     const acceptingLate = isHoldOverdue(handover.sentAt, handover.acceptTimeoutMinutes, nowTick);
     if (acceptingLate && !holdReason.trim()) {
-      setAcceptModal((prev) => prev ? { ...prev, error: "This machine is ON HOLD — write why it is being accepted late." } : prev);
+      setAcceptModal((prev) => prev ? { ...prev, error: "This machine is ON HOLD — write why it is being accepted late.", errorField: "This machine is ON HOLD — write why it is being accepted late." } : prev); flagField("[data-late-reasons]");
       return;
     }
     // 2026-10-30 — the receiving employees must be named when the department
     // has employees configured. Acceptance is a record of who took the machine.
     const deptHasEmps = (settings?.employeeMembers || []).some((m) => m && m.active && Array.isArray(m.departments) && m.departments.includes(handover.toDepartment));
     if (deptHasEmps && acceptTeamMembers.filter(Boolean).length === 0) {
-      setAcceptModal((prev) => prev ? { ...prev, error: "Select the employees receiving this machine." } : prev);
+      setAcceptModal((prev) => prev ? { ...prev, error: "Select the employees receiving this machine.", errorField: "Select the employees receiving this machine." } : prev); flagField("[data-accept-people]");
       return;
     }
     // 2026-11-02 — the digital signature is mandatory on every acceptance.
     if (!sigSvg) {
-      setAcceptModal((prev) => prev ? { ...prev, error: "Draw your signature and press Save Signature before confirming." } : prev);
+      setAcceptModal((prev) => prev ? { ...prev, error: "Draw your signature and press Save Signature before confirming.", errorField: "Draw your signature and press Save Signature before confirming." } : prev); flagField("[data-accept-signature]");
       return;
     }
     // Password is only required when the admin has opted into
@@ -17610,11 +17622,11 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
     if (checklistTemplate && Array.isArray(checklistAnswers) && checklistAnswers.length) {
       const chk = validateChecklistAnswers(checklistAnswers);
       if (!chk.ok) {
-        setAcceptModal((prev) => prev ? { ...prev, error: `Checklist incomplete — ${checklistProblemText(chk)}` } : prev);
+        { const m = `Checklist incomplete — ${checklistProblemText(chk)}`; setAcceptModal((prev) => prev ? { ...prev, error: m, errorField: m } : prev); flagField("[data-accept-checklist]"); }
         return;
       }
     }
-    { const pp = pendingItemsProblem(acceptModal.pendingItemsToRaise); if (pp) { setAcceptModal((prev) => prev ? { ...prev, error: pp } : prev); return; } }
+    { const pp = pendingItemsProblem(acceptModal.pendingItemsToRaise); if (pp) { setAcceptModal((prev) => prev ? { ...prev, error: pp, errorField: pp } : prev); flagField("[data-accept-pending]"); return; } }
     setAcceptModal((prev) => prev ? { ...prev, busy: true, error: "" } : prev);
     const pendingItemsToRaise = cleanPendingJobs(acceptModal.pendingItemsToRaise);
     const res = await onAcceptHandover({ handoverId: handover.id, password, pendingItemsToRaise, holdReason: holdReason.trim(),
@@ -21167,7 +21179,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                   <div className="text-[10px] text-slate-400 mt-0.5">Actual = from acceptance into {fromDepartment} to Finish &amp; Transfer.</div>
                 </div>
                 {isOverrun && (
-                  <div>
+                  <div data-transfer-delay className="rounded-xl">
                     <label className="text-[11px] font-bold text-red-600 block mb-1.5">
                       Delay reason (required)
                       <span className="text-red-500 ml-0.5">*</span>
@@ -21195,7 +21207,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
 
                 {/* Phase B — Department checklist (if a template exists for this dept) */}
                 {finishModal.template && Array.isArray(finishModal.answers) && finishModal.answers.length > 0 && (
-                  <div className="rounded-xl border border-slate-200 bg-white px-3 py-3">
+                  <div data-transfer-checklist className="rounded-xl border border-slate-200 bg-white px-3 py-3">
                     <div className="text-[11px] font-black text-slate-800 mb-2">
                       Checklist · {finishModal.template.name}
                       <span className="text-slate-400 font-normal ml-1">(an unticked item needs a reason — it is saved as a pending job)</span>
@@ -21232,7 +21244,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                     A part on order must not hold the whole line, so the machine
                     goes on and the obligation follows it. It stays on this
                     department's list and stops the machine reaching Ready. */}
-                <div className="pt-4 mt-4 border-t border-slate-100">
+                <div data-transfer-pending className="pt-4 mt-4 border-t border-slate-100 rounded-xl">
                   <div className="text-[11px] font-bold text-slate-600 mb-1">
                     Anything still pending from {fromDepartment}?
                   </div>
@@ -21247,10 +21259,12 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                         className="text-[12px] font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                   Cancel
                 </button>
+                <span onClick={() => { if ((!transferBusy && isOverrun && !narration.trim())) flagField("[data-transfer-delay]"); }}>
                 <button onClick={submitFinishTransfer} disabled={transferBusy || (isOverrun && !narration.trim())}
-                        className="text-[12px] font-bold text-slate-900 bg-amber-600 hover:bg-amber-700 px-5 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed" style={{ color: "#fff" }}>
+                        className="text-[12px] font-bold text-slate-900 bg-amber-600 hover:bg-amber-700 px-5 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed" style={{ color: "#fff", pointerEvents: (!transferBusy && isOverrun && !narration.trim()) ? "none" : undefined }}>
                   {transferBusy ? "⏳ Please wait…" : rackReturn ? `✓ Assembled · Return to ${slotLabel(machine.rackSlot)}` : `Finish & Transfer → ${toDepartment}`}
                 </button>
+                </span>
               </div>
             </div>
           </div>
@@ -21447,7 +21461,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                         follow the same "unchecked needs remark" rule as
                         Finish & Transfer. */}
                     {acceptModal.checklistTemplate && (acceptModal.checklistAnswers || []).length > 0 && (
-                      <div className="accept-step rounded-xl px-3 py-3" style={{ background: "rgba(46, 80, 214,0.05)", border: "1px solid rgba(46, 80, 214,0.3)" }}>
+                      <div data-accept-checklist className="accept-step rounded-xl px-3 py-3" style={{ background: "rgba(46, 80, 214,0.05)", border: "1px solid rgba(46, 80, 214,0.3)" }}>
                         {stepHead(stepBase + 1, "Check before accepting", false)}
                         <div className="text-[10px] font-bold text-blue-200 uppercase tracking-wider mb-1">
                           📋 {acceptModal.checklistTemplate.name || "After Acceptance Checklist"}
@@ -21482,7 +21496,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                     )}
 
                     {/* Phase B — raise new pending items at this transfer */}
-                    <div className="accept-step rounded-xl px-3 py-3" style={{ background: "rgba(17,24,39,0.03)", border: "1px solid rgba(17,24,39,0.10)" }}>
+                    <div data-accept-pending className="accept-step rounded-xl px-3 py-3" style={{ background: "rgba(17,24,39,0.03)", border: "1px solid rgba(17,24,39,0.10)" }}>
                       {stepHead(stepBase + 1 + (hasChecklist ? 1 : 0), `Did ${handover.fromDepartment} leave work undone?`, false)}
                       <div className="text-[11px] font-bold text-slate-500 mb-1.5">Optional. Any work from {handover.fromDepartment} still pending? (optional)</div>
                       <PendingJobRows rows={acceptModal.pendingItemsToRaise || []} inventory={inventoryFlat} disabled={acceptModal.busy}
@@ -21492,8 +21506,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                     </div>
                   </>
                 )}
-                {whyNot && <div data-accept-why className="text-[12px] font-semibold text-slate-500">{whyNot}</div>}
-                {error && (
+                {error && error !== acceptModal.errorField && (
                   <div className="rounded-lg px-3 py-2 text-[11px] font-semibold"
                        style={{ background: "rgba(239,68,68,0.08)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.3)" }}>
                     ⚠ {error}
@@ -21506,14 +21519,20 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                         className="text-[11px] font-bold px-3 py-1.5 rounded-lg text-slate-400 border border-slate-200 bg-slate-50 hover:bg-slate-100 hover:text-slate-900 transition-all disabled:opacity-50">
                   Cancel
                 </button>
+                <span onClick={() => {
+                        if (busy || !whyNot) return;
+                        flagField(acceptDeptEmps.length > 0 && selectedTeam.filter(Boolean).length === 0 ? "[data-accept-people]"
+                          : !sigSvg ? "[data-accept-signature]" : "[data-accept-confirm]");
+                      }}>
                 {(
                   <button data-accept-confirm onClick={submitAcceptHandover}
                           disabled={busy || !sigSvg || (acceptDeptEmps.length > 0 && selectedTeam.filter(Boolean).length === 0) || (workflow.require_password_at_accept && !password)}
                           className={`text-[15px] font-black px-7 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed ${whyNot || busy ? "" : "accept-ready"}`}
-                          style={{ minHeight: 50, background: "#15803d", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
+                          style={{ pointerEvents: (busy || !whyNot) ? undefined : "none", minHeight: 50, background: "#15803d", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
                     {busy ? "⏳ Please wait…" : (workflow.require_password_at_accept ? "Verify & Accept" : "Confirm Acceptance")}
                   </button>
                 )}
+                </span>
               </div>
             </div>
           </div>

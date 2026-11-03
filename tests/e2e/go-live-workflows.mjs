@@ -95,6 +95,8 @@ let confirmBtn = p.getByRole("button", { name: /Confirm Acceptance|Verify & Acce
 // 2026-11-02 — the signature pad is shown on EVERY acceptance; Confirm needs an employee AND a saved signature
 ok("Accept popup shows the mandatory Digital Signature pad", await p.locator("[data-accept-signature] canvas").count() === 1 && await p.getByRole("button", { name: "Save Signature" }).count() === 1);
 ok("Confirm Acceptance is disabled with no signature", await confirmBtn.isDisabled());
+await confirmBtn.click({ force: true }).catch(() => {}); await p.locator("[data-accept-confirm]").evaluate((b) => b.parentElement.click()); await p.waitForTimeout(150);
+ok("tapping the grey Accept button turns the signature box red (no long message)", await p.locator("[data-accept-signature].field-bad").count() === 1 && await p.locator("[data-accept-why]").count() === 0);
 await p.locator("[data-accept-main]").selectOption("Ramesh Patel"); await p.waitForTimeout(200);
 ok("Confirm is still disabled with an employee but no signature", await confirmBtn.isDisabled());
 await p.getByRole("button", { name: "Save Signature" }).click(); await p.waitForTimeout(300);
