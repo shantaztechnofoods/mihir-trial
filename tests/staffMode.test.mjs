@@ -82,3 +82,19 @@ test("rack release stays gated by canDo('machines','release') || isAdminUser", (
   assert.match(mp, /\{\(staffMode \? isProdHead : mtTab === "production"\) && \(/);
   assert.match(mp, /\{isAdminUser && onPullBackHandover && \(/);
 });
+
+test("staff My Dashboard (2026-11-03): button in the staff layout, read-only panel scoped to my departments", () => {
+  const sd = mp.slice(mp.indexOf("{staffMode && (() => {"), mp.indexOf("data-staff-dashboard") + 20000);
+  assert.match(sd, /\{!isProdHead && hasDepartments && \(\s*<button type="button" data-my-dashboard-open onClick=\{\(\) => setMyDashOpen\(true\)\}/);
+  assert.match(mp, /\{staffMode && !isProdHead && hasDepartments && myDashOpen && \(\s*<StaffMyDashboard departments=\{myDepartments\}/);
+  const dash = app.slice(app.indexOf("function StaffMyDashboard("), app.indexOf("function MachinePage("));
+  assert.ok(dash.length > 0, "StaffMyDashboard is defined");
+  assert.match(dash, /mine\.has\(r\.department\)/, "stars: my departments only");
+  assert.match(dash, /mine\.has\(h\.fromDepartment\)/, "finished machines: my departments only");
+  assert.match(dash, /h\.status !== "cancelled"/, "a pulled-back hand-over is not a finish");
+  // read-only: no handler, store call or audit write in the panel
+  for (const s of ["onAcceptHandover", "onFinishTransfer", "logAudit(", "createRating(", "overrideRating(", "setDeptRatings", "localStorage"]) {
+    assert.ok(!dash.includes(s), `${s} must not be in My Dashboard`);
+  }
+  assert.match(dash, /data-my-dashboard-close[\s\S]{0,200}min-w-\[52px\] min-h-\[52px\]/, "big close button");
+});
