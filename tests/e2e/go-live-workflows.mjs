@@ -134,10 +134,12 @@ ok("open pending jobs did not block the transfer", (await ls(p, "erp_pending_han
 
 // ── 1b. Part received: partial quantity, stock inward, remaining stays pending ──
 const stockOf = async () => (await ls(p, "erp_items")).Mechanical.find((i) => i.code === "GBX").stock;
-const openReceive = async (id) => { await p.locator(`[data-staff-job="${id}"] button`, { hasText: /^Part received$/ }).click(); await p.waitForTimeout(500); };
+const openReceive = async (id) => { await p.locator(`[data-staff-job="${id}"] button`, { hasText: /^📦 Part received$/ }).click(); await p.waitForTimeout(500); };
 await openReceive(3);
 ok("Part received asks for the quantity, defaulting to what is pending", (await p.locator("[data-receive-qty]").inputValue()) === "100");
 await p.locator("[data-receive-qty]").fill("120"); await p.waitForTimeout(200);
+// 2026-11-03 — the quantity error shows once Save has been tried (tap the grey Save)
+await p.locator("[data-job-submit]").evaluate((x) => x.parentElement.click()); await p.waitForTimeout(200);
 ok("receiving more than pending is refused in the popup", await p.locator("text=/Only 100 is still pending/").count() > 0 && await p.locator("[data-job-submit]").isDisabled());
 await p.locator("[data-receive-qty]").fill("50"); await p.locator("[data-receive-check]").check(); await p.waitForTimeout(200);
 ok("popup says the other 50 stay pending", await p.locator("[data-receive-left]").innerText().then((t) => /50 will stay pending/.test(t)).catch(() => false));
@@ -150,7 +152,7 @@ ok("second receipt defaults to the 50 still pending", (await p.locator("[data-re
 await p.locator("[data-receive-check]").check(); await p.locator("[data-job-submit]").click(); await p.waitForTimeout(1000);
 job3 = (await ls(p, "erp_pending_handover_items")).find((i) => i.id === 3);
 ok("final 50 received → stock 110, both receipts kept, receive step closed", (await stockOf()) === 110 && job3.receipts.length === 2 && !!job3.receivedAt && job3.receipts[0].qtyReceived === 50, `stock ${await stockOf()}`);
-ok("no double inward: no Part received button left on the fully received job", await p.locator('[data-staff-job="3"] button', { hasText: /^Part received$/ }).count() === 0);
+ok("no double inward: no Part received button left on the fully received job", await p.locator('[data-staff-job="3"] button', { hasText: /^📦 Part received$/ }).count() === 0);
 // critical manual item: verification required, serials optional, stock untouched
 await openReceive(2);
 ok("critical manual item shows the critical verification block", await p.locator('[data-receive-verify="checkbox"]').count() === 1 && await p.locator("text=/CRITICAL ITEM/").count() > 0);
@@ -197,6 +199,8 @@ const sec = await p.evaluate(() => { const d = document.querySelector("[data-job
 ok("Pending Parts shows only parts (item jobs), Pending Work only work", sec.partsRows.length >= 1 && sec.partsRows.every((x) => x.startsWith("part:")) && sec.workRows.length >= 2 && sec.workRows.every((x) => x.startsWith("work:")) && sec.workRows.includes("work:4"));
 ok("separate pending counts match the rows; Completed is a collapsed section below", Number(sec.cParts) === sec.partsRows.length && Number(sec.cWork) === sec.workRows.length && sec.hasDetails);
 await p.locator('[data-jobs-drawer] [data-job-row="4"] button', { hasText: /^Work completed$/ }).click(); await p.waitForTimeout(500);
+// 2026-11-03 — Work completed now needs a remark
+await p.locator("[data-job-remark]").fill("Lamp wired and tested");
 await p.locator("[data-job-submit]").click(); await p.waitForTimeout(900);
 const job4 = (await ls(p, "erp_pending_handover_items")).find((i) => i.id === 4);
 ok("Work completed records who and when; other departments' jobs stay pending", job4.status === "resolved" && !!job4.resolvedBy && !!job4.resolvedAt && (await ls(p, "erp_pending_handover_items")).find((i) => i.id === 1).status === "open");

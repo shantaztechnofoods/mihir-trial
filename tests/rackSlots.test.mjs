@@ -366,8 +366,9 @@ test("App: Part received asks for the item's configured verification and gates t
   // a pending item the operator classified Critical is critical even when it is not in the Item Master
   assert.match(app, /const critical = !!\(inv && inv\.isCritical\) \|\| !!p\.critical;/);
   assert.match(app, /const receiveReady = !isReceive \|\| p\.receivedAt \|\| \(!qtyProblem && !serialProblem && \(critical && inputType === "serial" \? true : !!jobAction\.verified\)\);/);
-  assert.match(app, /if \(isReceive && !receiveReady\) \{ setJobAction\(\(prev\) => prev \? \{ \.\.\.prev, error: receiveWhy \} : prev\); return; \}/);
-  assert.match(app, /data-job-submit onClick=\{submit\} disabled=\{jobAction\.busy \|\| \(isReceive && !receiveReady\)\}/);
+  // 2026-11-03 — the refused save also turns the missing box red (flagMissing)
+  assert.match(app, /if \(isReceive && !receiveReady\) \{ setJobAction\(\(prev\) => prev \? \{ \.\.\.prev, error: receiveWhy \} : prev\); flagMissing\(\); return; \}/);
+  assert.match(app, /data-job-submit onClick=\{submit\} disabled=\{jobAction\.busy \|\| \(isReceive && !receiveReady\) \|\| remarkMissing \|\| partNotReceived\}/);
   assert.match(app, /await onReceivePendingItem\(p\.id, \{ qty: recvQty, notes: jobAction\.notes\.trim\(\), verification \}\)/);
   assert.match(app, /const handleReceivePendingItem = async \(id, \{ qty, notes, verification = null \}\) => \{/);
   // popup above the Pending Jobs drawer (z-66) and the rack panel (z-65)
