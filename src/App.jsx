@@ -86,7 +86,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-03-save-failed-alert";
+const APP_BUILD = "2026-11-03-photo-button-wait";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -17211,6 +17211,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
     return by;
   }, [items]);
   const inventoryFlat = useMemo(() => Object.entries(items || {}).flatMap(([cat, list]) => (list || []).map((i) => ({ code: i.code, name: i.name, unit: i.unit, category: cat }))), [items]);
+  const [attachAsk, setAttachAsk] = useState(null); // { kind: "upload"|"delete", machine, file, a, busy }
   const [jobAction, setJobAction] = useState(null); // { item, action: "receive"|"complete", notes, busy, error }
   // 2026-10-31 — machine whose pending jobs are open in the card drawer.
   const [jobsDrawer, setJobsDrawer] = useState(null); // machine id
@@ -20238,21 +20239,17 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                           <div className="flex items-center justify-between mb-2">
                             <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Attachments ({machineAttachments.length})</div>
                             {onUploadAttachment && canFinishTransfer(canDo) && (
-                              <label className="text-[10px] font-bold text-blue-300 hover:text-blue-200 cursor-pointer px-2 py-0.5 rounded border border-blue-500/30 bg-blue-500/10">
-                                + Upload
-                                <input type="file" className="hidden"
-                                       accept="image/*,video/*,application/pdf"
-                                       onChange={async (e) => {
-                                         const file = e.target.files?.[0];
-                                         if (!file) return;
-                                         const dept = machine.currentDepartment || machine.stage;
-                                         const customer = window.confirm("Make this attachment visible on the Customer Progress Report? Click OK for YES, Cancel for internal-only.");
-                                         const r = await onUploadAttachment({ machineId: machine.id, department: dept, stage: dept, file, caption: "", isCustomerVisible: customer });
-                                         e.target.value = "";
-                                         if (r && r.success === false) showToast("Upload failed", r.error || "", "urgent");
-                                         else showToast("Attachment uploaded", file.name);
-                                       }} />
-                              </label>
+                              <div className="flex gap-2">
+                                {[{ k: "photo", icon: "📷", text: "Take photo", cap: "environment", acc: "image/*" },
+                                  { k: "file", icon: "📎", text: "Add file", cap: undefined, acc: "image/*,video/*,application/pdf" }].map((b) => (
+                                  <label key={b.k} data-attach-btn={b.k} className="text-[13px] font-black cursor-pointer rounded-xl flex items-center gap-1.5 px-4"
+                                         style={{ minHeight: 46, background: "#1d4ed8", color: "#fff" }}>
+                                    <span style={{ fontSize: 18 }}>{b.icon}</span>{b.text}
+                                    <input type="file" className="hidden" accept={b.acc} capture={b.cap}
+                                           onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ""; if (file) setAttachAsk({ kind: "upload", machine, file, busy: false }); }} />
+                                  </label>
+                                ))}
+                              </div>
                             )}
                           </div>
                           {machineAttachments.length === 0 && (
@@ -20271,13 +20268,8 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                     <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full text-emerald-300 bg-emerald-500/10 border border-emerald-500/30">customer-visible</span>
                                   )}
                                   {canConfigureDept(canDo) && onDeleteAttachment && (
-                                    <button onClick={async () => {
-                                              if (!window.confirm("Delete this attachment?")) return;
-                                              const r = await onDeleteAttachment(a.id);
-                                              if (r && r.success === false) showToast("Delete failed", r.error || "", "urgent");
-                                              else showToast("Attachment deleted", "");
-                                            }}
-                                            className="text-[10px] text-slate-500 hover:text-red-400">×</button>
+                                    <button onClick={() => setAttachAsk({ kind: "delete", a, busy: false })}
+                                            className="text-[16px] font-black text-slate-500 hover:text-red-500 px-2" aria-label="Delete file">×</button>
                                   )}
                                 </li>
                               ))}
@@ -20296,6 +20288,52 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
         )}
 
       </div>
+
+      {attachAsk && (() => {
+        const close = () => !attachAsk.busy && setAttachAsk(null);
+        const doUpload = async (customer) => {
+          const { machine, file } = attachAsk;
+          setAttachAsk((prev) => prev ? { ...prev, busy: true } : prev);
+          const dept = machine.currentDepartment || machine.stage;
+          const r = await onUploadAttachment({ machineId: machine.id, department: dept, stage: dept, file, caption: "", isCustomerVisible: customer });
+          setAttachAsk(null);
+          if (r && r.success === false) showToast("Upload failed", r.error || "", "urgent");
+          else showToast("Attachment uploaded", file.name);
+        };
+        const doDelete = async () => {
+          const { a } = attachAsk;
+          setAttachAsk((prev) => prev ? { ...prev, busy: true } : prev);
+          const r = await onDeleteAttachment(a.id);
+          setAttachAsk(null);
+          if (r && r.success === false) showToast("Delete failed", r.error || "", "urgent");
+          else showToast("Attachment deleted", "");
+        };
+        const big = { minHeight: 52, fontSize: 15 };
+        return (
+          <div data-attach-ask className="modal-backdrop fixed inset-0 z-[90] flex items-center justify-center p-4"
+               style={{ background: "rgba(17,24,39,0.45)", backdropFilter: "blur(10px)" }}
+               onClick={(e) => e.target === e.currentTarget && close()}>
+            <div className="w-full max-w-sm rounded-2xl p-5 space-y-3" style={{ background: "var(--surface-elevated)", border: "1px solid rgba(17,24,39,0.15)" }}>
+              {attachAsk.kind === "upload" ? (
+                <>
+                  <div className="text-[16px] font-black text-slate-900">Show this on the Customer Progress Report?</div>
+                  <div className="text-[12px] text-slate-500 break-all">{attachAsk.file?.name}</div>
+                  <button disabled={attachAsk.busy} onClick={() => doUpload(true)} className="w-full rounded-xl font-black text-white disabled:opacity-60" style={{ ...big, background: "#15803d" }}>{attachAsk.busy ? "⏳ Please wait…" : "Yes, show customer"}</button>
+                  <button disabled={attachAsk.busy} onClick={() => doUpload(false)} className="w-full rounded-xl font-black text-slate-800 bg-white border-2 border-slate-300 disabled:opacity-60" style={big}>No, internal only</button>
+                  <button disabled={attachAsk.busy} onClick={close} className="w-full text-[13px] font-bold text-slate-500 py-2">Cancel</button>
+                </>
+              ) : (
+                <>
+                  <div className="text-[16px] font-black text-slate-900">Are you sure you want to delete this file?</div>
+                  <div className="text-[13px] font-bold text-slate-700 break-all">{attachAsk.a?.fileName || attachAsk.a?.name || attachAsk.a?.caption || "This attachment"}</div>
+                  <button disabled={attachAsk.busy} onClick={doDelete} className="w-full rounded-xl font-black text-white disabled:opacity-60" style={{ ...big, background: "#dc2626" }}>{attachAsk.busy ? "⏳ Please wait…" : "Yes, delete"}</button>
+                  <button disabled={attachAsk.busy} onClick={close} className="w-full rounded-xl font-black text-slate-800 bg-white border-2 border-slate-300" style={big}>No, keep it</button>
+                </>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Admin Pull Back (2026-10-30) ── */}
       {/* ── Full machine report (2026-11-01) ──
@@ -20668,7 +20706,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                         title={isReceive && !receiveReady ? receiveWhy : ""}
                         className="flex-[2] h-11 rounded-lg text-[13px] font-black text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                         style={{ background: isReceive ? "#1d4ed8" : "linear-gradient(135deg,#16a34a,#15803d)", color: "#ffffff" }}>
-                  {jobAction.busy ? "Saving…" : isReceive ? (remaining != null && recvQty > 0 && recvQty < remaining ? `✓ Receive ${recvQty} · ${remaining - recvQty} stays pending` : "✓ Part received") : "✓ Work completed"}
+                  {jobAction.busy ? "⏳ Please wait…" : isReceive ? (remaining != null && recvQty > 0 && recvQty < remaining ? `✓ Receive ${recvQty} · ${remaining - recvQty} stays pending` : "✓ Part received") : "✓ Work completed"}
                 </button>
               </div>
             </div>
@@ -21199,7 +21237,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                 </button>
                 <button onClick={submitFinishTransfer} disabled={transferBusy || (isOverrun && !narration.trim())}
                         className="text-[12px] font-bold text-slate-900 bg-amber-600 hover:bg-amber-700 px-5 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed" style={{ color: "#fff" }}>
-                  {transferBusy ? "⏳ Saving…" : rackReturn ? `✓ Assembled · Return to ${slotLabel(machine.rackSlot)}` : `Finish & Transfer → ${toDepartment}`}
+                  {transferBusy ? "⏳ Please wait…" : rackReturn ? `✓ Assembled · Return to ${slotLabel(machine.rackSlot)}` : `Finish & Transfer → ${toDepartment}`}
                 </button>
               </div>
             </div>
@@ -21457,7 +21495,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                           disabled={busy || !sigSvg || (acceptDeptEmps.length > 0 && selectedTeam.filter(Boolean).length === 0) || (workflow.require_password_at_accept && !password)}
                           className={`text-[15px] font-black px-7 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed ${whyNot || busy ? "" : "accept-ready"}`}
                           style={{ minHeight: 50, background: "#15803d", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
-                    {busy ? "⏳ Accepting…" : (workflow.require_password_at_accept ? "Verify & Accept" : "Confirm Acceptance")}
+                    {busy ? "⏳ Please wait…" : (workflow.require_password_at_accept ? "Verify & Accept" : "Confirm Acceptance")}
                   </button>
                 )}
               </div>
