@@ -261,7 +261,11 @@ test("App: finish Assembly returns a rack machine to its rack; admin transfers f
   // Two release calls, both in the Rack View: the details panel's Transfer
   // and the same transfer offered on the assembled crate's own face.
   const releaseCalls = app.match(/await onReleaseHandover\(/g) || [];
-  assert.equal(releaseCalls.length, 2, "release only from the Rack View (panel + crate face)");
+  // 2026-11-03 (owner-approved) — a third, deliberate path: the receiving
+  // department head takes the machine off the rack ("Take from Rack" on the
+  // staff dashboard), which releases and opens Accept in one go.
+  assert.equal(releaseCalls.length, 3, "release from the Rack View (panel + crate face) + department Take from Rack");
+  assert.match(app, /const r = await onReleaseHandover\(h\.id\);\s*setRackTakeBusy\(null\);/);
   assert.match(app, /const r = await onReleaseHandover\(ho\.id\);/);
   assert.match(app, /const r = await onReleaseHandover\(faceHo\.id\);/);
   // signature, checklist and pending-work sections stay in the popup; the

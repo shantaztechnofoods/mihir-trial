@@ -86,7 +86,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-03-my-dashboard";
+const APP_BUILD = "2026-11-03-take-from-rack";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -17798,6 +17798,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
   // 2026-11-03 — staff "My Dashboard" panel (read-only; see StaffMyDashboard).
   const [myDashOpen, setMyDashOpen] = useState(false);
   const canReleaseFromRack = canDo("machines", "release") || isAdminUser;
+  const [rackTakeBusy, setRackTakeBusy] = useState(null);
   // The first department that actually does work — machines are started onto
   // it from the rack. Derived, so adding a stage ahead of Assembly keeps this
   // correct.
@@ -18373,6 +18374,10 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
           const titleOf    = (m, h) => `${(m && m.bomKey) || (h && h.bomKey) || "Machine"}${(m && m.serialNo) || (h && h.serialNo) ? ` · S/N ${(m && m.serialNo) || h.serialNo}` : ""}`;
           const openJobsOf = (m) => (pendingHandoverItems || []).filter((p) => String(p.machineId) === String(m.id) && pendingItemIsOpen(p));
           const toAccept   = askableHandovers.filter((h) => myDepartments.includes(h.toDepartment));
+          // 2026-11-03 — the receiving department takes the machine off the
+          // rack itself: release + Accept (people, signature, checklist) in one go.
+          const rackForMe  = (handovers || []).filter((h) => h.status === "pending" && isAwaitingRelease(h) && myDepartments.includes(h.toDepartment));
+          const canTakeFromRack = canReleaseFromRack && !!onReleaseHandover;
           const sentOn     = startedAll.filter((m) => { if (m.status === "completed") return false; const h = machineHandover(m); return h && myDepartments.includes(h.fromDepartment) && !myDepartments.includes(h.toDepartment); });
           const myJobs     = (pendingHandoverItems || []).filter((p) => pendingItemIsOpen(p) && myDepartments.includes(p.assignedDepartment));
           const awaitingRelease = startedAll.filter((m) => { const h = machineHandover(m); return !!(h && isAwaitingRelease(h)); });
@@ -18450,6 +18455,43 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                     }}>
                               → Send to {h.toDepartment}
                             </button>
+                          )}
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </Section>
+              )}
+
+              {/* On the rack for my department: take it myself */}
+              {!isProdHead && rackForMe.length > 0 && (
+                <Section title="On the rack for you" count={rackForMe.length}>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                    {rackForMe.map((h) => {
+                      const m = machineOf(h);
+                      return (
+                        <Card key={h.id} tone="rgba(67,56,202,0.45)">
+                          <div>
+                            <div className="text-[17px] font-black" style={{ color: "var(--text-strong)" }}>{titleOf(m, h)}</div>
+                            <div className="text-[13px] mt-0.5" style={{ color: "var(--text-dim)" }}>
+                              {m?.bomLabel ? `${m.bomLabel} · ` : ""}{m?.rackSlot ? slotLabel(m.rackSlot) : "on the rack"} → {h.toDepartment}
+                            </div>
+                          </div>
+                          {canTakeFromRack && canAccept ? (
+                            <button type="button" data-staff-take={h.id} className={btn} style={{ background: "#4338ca", color: "#fff" }}
+                                    disabled={!!acceptModal || rackTakeBusy === h.id}
+                                    onClick={async () => {
+                                      if (acceptModal || rackTakeBusy) return;
+                                      setRackTakeBusy(h.id);
+                                      const r = await onReleaseHandover(h.id);
+                                      setRackTakeBusy(null);
+                                      if (!r || r.success === false) { showToast("Could not take", r?.error || "", "urgent"); return; }
+                                      openAcceptModal({ ...h, ...(r.handover || {}), releasedAt: (r.handover && r.handover.releasedAt) || new Date().toISOString() });
+                                    }}>
+                              {rackTakeBusy === h.id ? "⏳ Please wait…" : "📥 Take from Rack"}
+                            </button>
+                          ) : (
+                            <div className="text-[13px] font-bold" style={{ color: "#4338ca" }}>Waiting for your head to take it</div>
                           )}
                         </Card>
                       );
