@@ -29,6 +29,45 @@ function isMissingDurationsColumn(error) {
   const msg = `${error?.message || ""} ${error?.details || ""} ${error?.hint || ""}`.toLowerCase();
   return error?.code === "42703" || error?.code === "PGRST204" || msg.includes("dept_durations") || msg.includes("schema cache");
 }
+// Migration 061 — one machine photo per BOM (public URL in the item-media
+// bucket, or a small data: URL in local mode). Same idea as dept_durations:
+// on a pre-061 schema the write is retried without it, so this client can
+// ship before the column exists.
+function photoRow(b) {
+  const u = b && b.photoUrl;
+  return typeof u === "string" && u.trim() ? u.trim() : null;
+}
+function isMissingPhotoColumn(error) {
+  const msg = `${error?.message || ""} ${error?.details || ""} ${error?.hint || ""}`.toLowerCase();
+  return msg.includes("photo_url") || ((error?.code === "42703" || error?.code === "PGRST204") && !msg.includes("dept_durations"));
+}
+// Full row for insert/update. photo_url is only sent when the def carries a
+// photoUrl key, so a partial def never wipes a stored photo.
+function writeRow(key, b) {
+  const row = { ...toRow(key, b), dept_durations: durationsRow(b) };
+  if (b && Object.prototype.hasOwnProperty.call(b, "photoUrl")) row.photo_url = photoRow(b);
+  return row;
+}
+// Runs op(row); on a missing-column error drops photo_url (061) first, then
+// dept_durations (041), retrying after each drop.
+async function writeWithRetry(tag, row, op) {
+  let res = await op(row);
+  if (res.error && "photo_url" in row && isMissingPhotoColumn(res.error)) {
+    console.warn(`[boms:${tag}] 061 photo_url not in schema yet — retrying without it`);
+    const { photo_url: _p, ...rest } = row; row = rest;
+    res = await op(row);
+  }
+  if (res.error && "dept_durations" in row && isMissingDurationsColumn(res.error)) {
+    console.warn(`[boms:${tag}] 041 dept_durations not in schema yet — retrying without it`);
+    const { dept_durations: _d, ...legacy } = row; row = legacy;
+    res = await op(row);
+  }
+  return res;
+}
+// Pure row <-> def mappers, exported for unit tests only.
+export function bomRowFromDef(key, def) { return writeRow(key, def); }
+export function bomDefFromRow(row) { return fromRow(row); }
+
 function fromRow(r) {
   return {
     label:        r.label,
@@ -36,6 +75,7 @@ function fromRow(r) {
     rackCapacity: Number(r.rack_capacity) || 0,
     items:        Array.isArray(r.items) ? r.items : [],
     deptDurations: r.dept_durations && typeof r.dept_durations === "object" ? r.dept_durations : null,
+    photoUrl:     typeof r.photo_url === "string" && r.photo_url ? r.photo_url : null,
     // Migration 046 — a retired BOM (KM10/KM15/KM20 → M-10/M-15/M-20) stays
     // for history and labels but is hidden from issuing.
     retiredAt:    r.retired_at || null,
@@ -66,13 +106,8 @@ export async function createBOM(key, def) {
   if (!isSupabaseEnabled()) { const g = getLocal(); g[key] = def; setLocal(g); return { success: true }; }
   const c = getSupabase();
   if (!c) return { success: false, error: "no client" };
-  const row = { ...toRow(key, def), dept_durations: durationsRow(def) };
-  let { error } = await c.from("bom_definitions").insert(row);
-  if (error && isMissingDurationsColumn(error)) {
-    console.warn("[boms:create] 041 dept_durations not in schema yet — retrying without it");
-    const { dept_durations: _d, ...legacy } = row;
-    ({ error } = await c.from("bom_definitions").insert(legacy));
-  }
+  const row = writeRow(key, def);
+  const { error } = await writeWithRetry("create", row, (r) => c.from("bom_definitions").insert(r));
   if (error) { console.error("[boms:create] failed", error); return { success: false, error: error.message }; }
   console.info("[boms:create] ok");
   return { success: true };
@@ -83,19 +118,14 @@ export async function updateBOM(key, def) {
   if (!isSupabaseEnabled()) { const g = getLocal(); g[key] = def; setLocal(g); return { success: true }; }
   const c = getSupabase();
   if (!c) return { success: false, error: "no client" };
-  const row = { ...toRow(key, def), dept_durations: durationsRow(def) }; delete row.key;
+  const row = writeRow(key, def); delete row.key;
   // `.select("key")` is load-bearing: without it PostgREST answers an UPDATE
   // that matched ZERO rows with no error and no data, and this function
   // reported success for a write that never happened. `key` is the primary
   // key of bom_definitions (migration 002), so zero rows means either no such
   // BOM or an RLS policy hiding it from this user. Same trap as
   // machinesStore.updateMachine. Note the table has no `id` column.
-  let { data, error } = await c.from("bom_definitions").update(row).eq("key", key).select("key");
-  if (error && isMissingDurationsColumn(error)) {
-    console.warn("[boms:update] 041 dept_durations not in schema yet — retrying without it");
-    const { dept_durations: _d, ...legacy } = row;
-    ({ data, error } = await c.from("bom_definitions").update(legacy).eq("key", key).select("key"));
-  }
+  const { data, error } = await writeWithRetry("update", row, (r) => c.from("bom_definitions").update(r).eq("key", key).select("key"));
   if (error) { console.error("[boms:update] failed", error); return { success: false, error: error.message }; }
   if (!Array.isArray(data) || data.length === 0) {
     const msg = `BOM ${key} was not updated — no such row, or it is not visible to this user`;
