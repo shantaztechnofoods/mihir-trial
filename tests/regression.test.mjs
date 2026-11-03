@@ -245,6 +245,8 @@ const AUDIT_EVENT_TYPES = [
   // Replaces the generic "checklist_submitted" string with three stage-specific
   // event types so Reports can filter the Checklist History tab precisely.
   "checklist_submitted_finish", "checklist_submitted_accept", "checklist_submitted_during_work",
+  // 2026-11-03 — Assembly "Before Starting Work" checklist at rack Assemble.
+  "checklist_submitted_assembly_start",
   // Migration 029 — department-employees admin audit.
   "user_departments_updated",
 ];
