@@ -3630,3 +3630,9 @@ button.rack-btn:disabled { background: #e5e7eb !important; color: #6b7280 !impor
 }
 .rack-crate:hover { box-shadow: 0 1px 0 rgba(15,23,42,0.06), 0 8px 18px rgba(17,24,39,0.12); }
 .rack-crate-handle { top: 8px; background: rgba(71,85,105,0.45); }
+
+/* 2026-11-03 — machine photo shows the WHOLE machine (contain, white), and the
+   card action row wraps instead of cutting off its last chip/button. */
+.mt-card-actions { flex-wrap: wrap !important; }
+.mt-card-actions > span { white-space: nowrap; }
+.rpt-photo img { object-fit: contain; background: #fff; }
