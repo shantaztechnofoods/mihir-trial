@@ -215,6 +215,43 @@ export function heldMinutes(sentAtIso, acceptTimeoutMinutes, nowMs = Date.now(),
   return Math.max(0, diffMinutes - timeout);
 }
 
+// 2026-11-03 (owner-approved) — SENDER UNDO. The worker who did Finish &
+// Transfer may take the machine back himself for 5 minutes (wall clock), but
+// only while the next department has NOT accepted it. Admins keep their own
+// Pull back (no time limit). The database (053/058 handover_events_accept,
+// cancel branch: sent_by = auth.uid(), finishTransfer, from-department) is the
+// authority; this is the client gate and the countdown source.
+export const SENDER_UNDO_WINDOW_MS = 5 * 60 * 1000;
+
+// → { allowed, remainingMs, reason }   reason ∈ "", "no-user", "not-pending",
+//   "accepted", "other-sender", "no-time", "expired"
+export function senderUndoState(h, user, nowMs = Date.now()) {
+  const no = (reason) => ({ allowed: false, remainingMs: 0, reason });
+  if (!user || !user.id) return no("no-user");
+  if (!h || h.status !== "pending") return no(h && h.status === "accepted" ? "accepted" : "not-pending");
+  if (h.acceptedAt || h.acceptedBy) return no("accepted");
+  if (!h.sentBy || String(h.sentBy) !== String(user.id)) return no("other-sender");
+  const t = typeof h.sentAt === "number" ? h.sentAt : Date.parse(h.sentAt || "");
+  if (!Number.isFinite(t)) return no("no-time");
+  const remainingMs = SENDER_UNDO_WINDOW_MS - (nowMs - t);
+  if (remainingMs <= 0) return no("expired");
+  return { allowed: true, remainingMs: Math.min(SENDER_UNDO_WINDOW_MS, remainingMs), reason: "" };
+}
+
+// Admin (super_admin / Admin) may always pull a pending hand-over back; anyone
+// else only as the sender inside the undo window.
+export function canTakeBackHandover(h, user, nowMs = Date.now()) {
+  const isAdmin = !!user && (user.role === "super_admin" || user.role === "Admin");
+  if (isAdmin) return !!h && h.status === "pending";
+  return senderUndoState(h, user, nowMs).allowed;
+}
+
+// "4:32" for the countdown on the Undo button.
+export function formatUndoCountdown(ms) {
+  const s = Math.max(0, Math.ceil((Number(ms) || 0) / 1000));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
 // "90 min" → "1h 30m". "2880 min" → "2d". Format matches the Settings UI
 // rendering of per-department durations.
 export function formatDuration(minutes) {
