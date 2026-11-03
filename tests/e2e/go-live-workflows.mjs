@@ -79,12 +79,16 @@ const staff = await p.evaluate(() => ({
   dash: !!document.querySelector("[data-staff-dashboard]"), nav: !!document.querySelector("[data-mt-nav]"),
   report: !!document.querySelector("[data-card-report]"), rack: !!document.querySelector(".rack-shelf"),
   sn101: document.body.innerText.includes("SN-101"), sn102: document.body.innerText.includes("SN-102"),
-  sn103: document.body.innerText.includes("SN-103"), sn104: document.body.innerText.includes("SN-104"),
+  sn103: document.body.innerText.includes("SN-103"),
+  // 2026-11-03 (owner-approved) — a machine still on the rack for Mechanical shows ONLY in "On the rack for you".
+  sn104: document.body.innerText.includes("SN-104"),
+  sn104RackOnly: (document.querySelector("[data-staff-section='On the rack for you']")?.innerText || "").includes("SN-104")
+    && !(document.querySelector("[data-staff-section='To accept']")?.innerText || "").includes("SN-104"),
   smallButtons: [...document.querySelectorAll("[data-staff-dashboard] button")].filter((b) => b.getBoundingClientRect().height < 44).length,
   hscroll: document.documentElement.scrollWidth > innerWidth + 2,
 }));
 ok("staff sees the department dashboard, not the admin tracker", staff.dash && !staff.nav && !staff.rack);
-ok("staff sees only Mechanical machines + the released hand-over", staff.sn101 && staff.sn102 && !staff.sn103 && !staff.sn104);
+ok("staff sees only Mechanical machines + the released hand-over (+ its rack machine, only under On the rack)", staff.sn101 && staff.sn102 && !staff.sn103 && staff.sn104 && staff.sn104RackOnly);
 ok("staff has no machine report button", !staff.report);
 ok("all staff buttons are touch-sized (≥44px), no horizontal scroll", staff.smallButtons === 0 && !staff.hscroll);
 
