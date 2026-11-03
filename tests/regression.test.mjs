@@ -453,6 +453,11 @@ const USER_FACING_STRINGS = [
   "VoiceNoteRecorder",
   "VoicePlayButton",
   "data-staff-voice",
+  // 2026-11-03 — voice notes always become text (server transcription)
+  "transcribeVoice(",
+  "VOICE_WRITING_TEXT",
+  "VOICE_WRITE_PROMPT",
+  "data-voice-writing",
 ];
 
 for (const s of USER_FACING_STRINGS) {
