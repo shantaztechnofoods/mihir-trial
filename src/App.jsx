@@ -11469,8 +11469,9 @@ function BomChecklistSlots({
         <div className="modal-backdrop fixed inset-0 z-[95] flex items-center justify-center p-4"
              style={{ background: "rgba(17,24,39,0.45)", backdropFilter: "blur(10px)" }}
              onClick={(e) => e.target === e.currentTarget && !busy && closeEditor()}>
-          <div ref={editorRef} data-cl-editor className="w-full max-w-xl rounded-2xl overflow-hidden flex flex-col"
-               style={{ maxHeight: "90dvh", background: "var(--surface-elevated)",
+          <div ref={editorRef} data-cl-editor
+               className="w-full max-w-xl rounded-2xl overflow-hidden flex flex-col"
+               style={{ maxHeight: "90vh", background: "var(--surface-elevated)",
                         border: "1px solid rgba(46, 80, 214,0.5)",
                         boxShadow: "0 40px 100px rgba(17,24,39,0.22)" }}>
             <div className="px-5 py-3 border-b border-slate-200 flex items-start justify-between flex-shrink-0"
@@ -11480,8 +11481,9 @@ function BomChecklistSlots({
                 <div className="text-[11px] text-slate-400 mt-0.5">{CHECKLIST_STAGES.find((s) => s.key === editing.stage).long}</div>
                 <div className="text-[10px] text-slate-500 mt-0.5">{CHECKLIST_STAGES.find((s) => s.key === editing.stage).hint}</div>
               </div>
-              <button onClick={closeEditor} disabled={busy} aria-label="Close"
-                      className="w-11 h-11 flex-shrink-0 rounded-xl bg-slate-50 hover:bg-red-500/20 hover:text-red-400 text-slate-500 transition-all flex items-center justify-center text-sm font-bold disabled:opacity-40">
+              <button onClick={closeEditor} disabled={busy}
+                      aria-label="Close"
+                      className="w-7 h-7 rounded-lg bg-slate-50 hover:bg-red-500/20 hover:text-red-400 text-slate-500 transition-all flex items-center justify-center text-xs font-bold disabled:opacity-40">
                 ✕
               </button>
             </div>
@@ -11516,11 +11518,13 @@ function BomChecklistSlots({
 
             <div className="flex-1 overflow-y-auto px-5 py-3 space-y-2">
               {editing.items.map((it, idx) => (
-                <div key={it.id} data-cl-step-row
-                     className="rounded-lg px-3 py-2 flex flex-wrap items-center gap-2"
+                <div key={it.id}
+                     data-cl-step-row
+                     className="rounded-lg px-3 py-2 flex items-center gap-2"
                      style={{ background: "rgba(17,24,39,0.03)", border: "1px solid rgba(17,24,39,0.08)" }}>
-                  <div className="text-[12px] font-mono font-bold text-slate-600 w-6 text-right">{idx + 1}.</div>
-                  <input value={it.label} data-cl-step-input={idx}
+                  <div className="text-[10px] font-mono text-slate-600 w-5 text-right">{idx + 1}.</div>
+                  <input value={it.label}
+                         data-cl-step-input={idx}
                          onChange={(e) => patchRow(idx, { label: e.target.value })}
                          onKeyDown={(e) => {
                            if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
@@ -11529,30 +11533,29 @@ function BomChecklistSlots({
                            setFocusIdx(idx + 1);
                          }}
                          placeholder="What should the operator check?"
-                         className="flex-1 min-w-[180px] min-h-[44px] bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-[14px] text-slate-900 outline-none focus:border-blue-500/40 modal-input" />
-                  <div className="flex items-center gap-1.5 ml-auto">
-                    <label className="min-h-[44px] flex items-center gap-1.5 cursor-pointer text-[12px] font-bold px-2.5 rounded-lg border transition-all"
-                           style={it.required ? { background: "rgba(21,128,61,0.10)", color: "#15803d", borderColor: "rgba(21,128,61,0.45)" }
-                                              : { background: "#fff", color: "#64748b", borderColor: "rgba(17,24,39,0.15)" }}>
-                      <input type="checkbox" checked={!!it.required}
-                             onChange={(e) => patchRow(idx, { required: e.target.checked })}
-                             className="accent-emerald-500 w-5 h-5" />
-                      Must do
-                    </label>
-                    <button onClick={() => moveRow(idx, -1)} disabled={idx === 0 || busy} aria-label="Move step up"
-                            className="text-[13px] font-bold w-11 h-11 rounded-lg border border-slate-200 bg-slate-50 text-slate-600 hover:text-slate-900 disabled:opacity-30">▲</button>
-                    <button onClick={() => moveRow(idx, 1)} disabled={idx === editing.items.length - 1 || busy} aria-label="Move step down"
-                            className="text-[13px] font-bold w-11 h-11 rounded-lg border border-slate-200 bg-slate-50 text-slate-600 hover:text-slate-900 disabled:opacity-30">▼</button>
-                    <button onClick={() => removeRow(idx)} disabled={busy || editing.items.length === 1} aria-label="Remove step"
-                            className="text-[13px] font-bold w-11 h-11 rounded-lg border border-red-500/20 bg-red-500/10 text-red-600 hover:bg-red-500/20 disabled:opacity-30">✕</button>
-                  </div>
+                         className="flex-1 bg-slate-50 border border-slate-200 rounded-md px-2 py-1.5 text-[12px] text-slate-900 outline-none focus:border-blue-500/40 modal-input" />
+                  <label className="flex items-center gap-1 cursor-pointer text-[10px] text-slate-400">
+                    <input type="checkbox" checked={!!it.required}
+                           onChange={(e) => patchRow(idx, { required: e.target.checked })}
+                           className="accent-emerald-500 w-3.5 h-3.5" />
+                    Must do
+                  </label>
+                  <button onClick={() => moveRow(idx, -1)} disabled={idx === 0 || busy}
+                          aria-label="Move step up"
+                          className="text-[10px] font-bold w-6 h-6 rounded border border-slate-200 bg-slate-50 text-slate-600 hover:text-slate-900 disabled:opacity-30">▲</button>
+                  <button onClick={() => moveRow(idx, 1)} disabled={idx === editing.items.length - 1 || busy}
+                          aria-label="Move step down"
+                          className="text-[10px] font-bold w-6 h-6 rounded border border-slate-200 bg-slate-50 text-slate-600 hover:text-slate-900 disabled:opacity-30">▼</button>
+                  <button onClick={() => removeRow(idx)} disabled={busy || editing.items.length === 1}
+                          aria-label="Remove step"
+                          className="text-[10px] font-bold w-6 h-6 rounded border border-red-500/20 bg-red-500/10 text-red-300 hover:bg-red-500/20 disabled:opacity-30">✕</button>
                 </div>
               ))}
               <div className="flex items-center gap-3 flex-wrap">
-                <button onClick={() => { addRow(); setFocusIdx(editing.items.length); }} disabled={busy}
-                        className="min-h-[44px] text-[13px] font-bold px-4 rounded-lg border border-dashed border-blue-500/40 bg-blue-500/[0.05] text-blue-700 hover:bg-blue-500/[0.1] transition-all">
-                  + Add Step
-                </button>
+              <button onClick={addRow} disabled={busy}
+                      className="text-[11px] font-bold px-3 py-1.5 rounded-lg border border-dashed border-blue-500/30 bg-blue-500/[0.05] text-blue-300 hover:bg-blue-500/[0.1] transition-all">
+                + Add Step
+              </button>
                 <span className="text-[11px] text-slate-500">Tip: press Enter to add the next step.</span>
               </div>
               {editErr && (
@@ -11569,18 +11572,18 @@ function BomChecklistSlots({
                 {(editing._id || editing._localId) && (
                   <button onClick={async () => { await removeSlot(editing.dept, editing.stage); closeEditor(); }}
                           disabled={busy}
-                          className="min-h-[44px] text-[12px] font-bold px-3 rounded-lg text-red-600 border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 transition-all">
+                          className="text-[11px] font-bold px-3 py-1.5 rounded-lg text-red-300 border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 transition-all">
                     Remove Checklist
                   </button>
                 )}
               </div>
               <div className="flex gap-2">
                 <button onClick={closeEditor} disabled={busy}
-                        className="min-h-[44px] text-[12px] font-bold px-4 rounded-lg text-slate-600 border border-slate-200 bg-slate-50 hover:bg-slate-100 hover:text-slate-900 transition-all">
+                        className="text-[11px] font-bold px-3 py-1.5 rounded-lg text-slate-400 border border-slate-200 bg-slate-50 hover:bg-slate-100 hover:text-slate-900 transition-all">
                   Cancel
                 </button>
                 <button onClick={saveSlot} disabled={busy}
-                        className="min-h-[44px] text-[13px] font-black text-slate-900 px-5 rounded-lg transition-all disabled:opacity-50"
+                        className="text-xs font-black text-slate-900 px-4 py-1.5 rounded-lg transition-all disabled:opacity-50"
                         style={{ background: "#15803d", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
                   {busy ? "Saving…" : "✓ Save Checklist"}
                 </button>

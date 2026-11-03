@@ -3339,3 +3339,19 @@ input:focus, select:focus, textarea:focus { box-shadow: 0 0 0 3px rgba(46,80,214
   /* Settings: the outer section card adds a second 24px gutter around the groups. */
   div.px-6:has(> .org-groups) { padding: 12px 10px; }
 }
+/* Checklist step editor (BOM Create + Edit): big targets, visible "Must do",
+   Enter-to-add. Styling here keeps the JSX unchanged. */
+[data-cl-editor] { max-height: 90dvh !important; }
+[data-cl-editor] button[aria-label="Close"] { width: 44px; height: 44px; border-radius: 12px; font-size: 14px; flex-shrink: 0; }
+[data-cl-step-row] { flex-wrap: wrap; }
+[data-cl-step-row] > div:first-child { font-size: 12px; font-weight: 700; width: 24px; }
+[data-cl-step-input] { min-width: 180px; min-height: 44px; font-size: 14px !important; padding: 8px 12px !important; border-radius: 10px !important; }
+[data-cl-step-row] > label { min-height: 44px; margin-left: auto; padding: 0 10px; gap: 6px; border-radius: 10px; border: 1px solid rgba(17,24,39,0.15); background: #fff; color: #64748b !important; font-size: 12px !important; font-weight: 700; }
+[data-cl-step-row] > label:has(input:checked) { background: rgba(21,128,61,0.10); color: #15803d !important; border-color: rgba(21,128,61,0.45); }
+[data-cl-step-row] > label input { width: 20px !important; height: 20px !important; }
+[data-cl-step-row] > button { width: 44px !important; height: 44px !important; border-radius: 10px !important; font-size: 13px !important; }
+[data-cl-step-row] > button[aria-label="Remove step"] { color: #dc2626 !important; }
+[data-cl-editor] .overflow-y-auto > .flex > button, [data-cl-editor] > div:last-child button { min-height: 44px; font-size: 13px !important; padding-left: 16px !important; padding-right: 16px !important; }
+[data-cl-editor] .overflow-y-auto > .flex > button { color: #1d4ed8; }
+[data-cl-editor] > div:last-child button[class*="text-red"] { color: #dc2626; }
+[data-cl-editor] > div:last-child button[class*="text-slate-400"] { color: #475569; }
