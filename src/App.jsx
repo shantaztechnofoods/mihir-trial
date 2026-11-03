@@ -86,7 +86,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-03-ignore-worktrees";
+const APP_BUILD = "2026-11-03-phone-polish";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -19008,7 +19008,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                 <div className="text-[13px] font-bold" style={{ color: "var(--text-strong)" }}>Production Rack View</div>
               </div>
             </div>
-            <div className="flex items-center gap-2.5 flex-wrap text-[10px] font-semibold" style={{ color: "var(--text-dim)" }}>
+            <div className="mt-rack-legend flex items-center gap-2.5 flex-wrap text-[10px] font-semibold" style={{ color: "var(--text-dim)" }}>
               {RACK_UNIT_STATUS_ORDER.map((k) => (
                 <span key={k} className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ background: RACK_UNIT_STATUS[k].dot }} />{RACK_UNIT_STATUS[k].short}</span>
               ))}
@@ -19722,7 +19722,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
 
                     {/* Actions — max-w-full so the row wraps on a phone instead
                         of being clipped by the card's overflow-hidden. */}
-                    <div className="flex items-center gap-2 flex-wrap max-w-full">
+                    <div className="mt-card-actions flex items-center gap-2 flex-wrap max-w-full">
                       {/* Phase 1 — admin-only, and only while the card is open
                           (History). Update Stage bypasses the entire handover
                           chain; operators must use Finish & Transfer so the
