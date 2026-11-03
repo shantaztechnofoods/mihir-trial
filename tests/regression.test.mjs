@@ -480,7 +480,7 @@ const STORE_SURFACE = [
   // settingsStore
   { file: "settingsStore.js", exports: ["loadSettings", "saveSettings"] },
   // Phase A stores
-  { file: "handoverStore.js",   exports: ["fetchHandovers", "fetchPendingHandovers", "createHandover", "acceptHandover", "cancelHandover"] },
+  { file: "handoverStore.js",   exports: ["fetchHandovers", "fetchPendingHandovers", "createHandover", "acceptHandover", "cancelHandover", "adminCancelHandover", "fetchHandoverById"] },
   { file: "signaturesStore.js", exports: ["getMySignature", "saveMySignature", "reauthenticateByPassword"] },
   // Phase B stores
   { file: "checklistsStore.js",   exports: ["fetchTemplates", "createTemplate", "updateTemplate", "deleteTemplate", "fetchResponses", "createResponse"] },

@@ -44,13 +44,14 @@ import { fetchOutward, createOutward, updateOutwardRef, deleteOutwardByIssueId }
 import { fetchPending, bulkCreatePending, updatePending as pendingUpdate, deletePending as pendingDelete, clearAllPending, updatePendingBomKey } from "./stores/pendingStore.js";
 import { fetchFollowUps, createFollowUp as followupCreate, updateFollowUp as followupUpdate, deleteFollowUpsByPO } from "./stores/followupsStore.js";
 import { fetchMachines, createMachine as machineCreate, updateMachine as machineUpdate, updateMachineBomKey, deleteMachine as machineDelete, fetchMachineLockState } from "./stores/machinesStore.js";
-import { fetchHandovers, createHandover as handoverCreate, acceptHandover as handoverAccept, releaseHandover, adminCancelHandover } from "./stores/handoverStore.js";
+import { fetchHandovers, createHandover as handoverCreate, acceptHandover as handoverAccept, releaseHandover, adminCancelHandover, fetchHandoverById } from "./stores/handoverStore.js";
 import { getMySignature, saveMySignature, reauthenticateByPassword } from "./stores/signaturesStore.js";
 import {
   DEPARTMENT_SEQUENCE, DEFAULT_DEPT_DURATIONS, DEFAULT_ACCEPT_TIMEOUT_MINUTES,
   readDeptWorkflowSettings, writeDeptWorkflowSettings, setWorkCalendar, isClosedDay, localDateKey,
   nextDepartment, computeElapsedMinutes, computeOverrun, isHoldOverdue, heldMinutes, RACK_RELEASE_HOPS, isRackReleaseHop,
   formatDuration, canAcceptHandover, canFinishTransfer, canConfigureDept, workerIdsOf,
+  senderUndoState, formatUndoCountdown,
 } from "./utils/handoverLogic.js";
 // Phase B
 import { fetchTemplates, createTemplate, updateTemplate, deleteTemplate, fetchResponses, createResponse } from "./stores/checklistsStore.js";
@@ -11208,6 +11209,27 @@ function BomPhotoField({ value, onChange }) {
   );
 }
 
+// 2026-11-03 (owner-approved) — SENDER UNDO button with a live countdown.
+// Ticks every second on its own (the tracker's nowTick is 60 s) and hides
+// itself the moment the window closes or the hand-over is accepted.
+function SenderUndoButton({ handover, user, onUndo }) {
+  const [now, setNow] = useState(Date.now());
+  const st = senderUndoState(handover, user, now);
+  useEffect(() => {
+    if (!st.allowed) return undefined;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [st.allowed]);
+  if (!st.allowed) return null;
+  return (
+    <button type="button" data-sender-undo={handover.id} onClick={() => onUndo(handover)}
+            className="min-h-[48px] self-start sm:self-auto px-4 rounded-xl text-[15px] font-black transition-all active:scale-[0.97] inline-flex items-center justify-center gap-1.5 shrink-0"
+            style={{ background: "#f59e0b", color: "#1f1300" }}>
+      ↩ Undo <span className="tabular-nums" data-sender-undo-clock>({formatUndoCountdown(st.remainingMs)})</span>
+    </button>
+  );
+}
+
 // Small rounded machine photo; falls back to `fallback` when the BOM has none.
 function BomPhotoThumb({ url, size = 64, fallback = null, className = "" }) {
   const [broken, setBroken] = useState(false);
@@ -17854,6 +17876,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
   const [jobsDrawer, setJobsDrawer] = useState(null); // machine id
   const [jobsView,  setJobsView]  = useState("open"); // Pending Jobs tab: open | done | all
   const [pullBack,  setPullBack]  = useState(null);   // { handover, reason, busy, error } — admin pull back
+  const [undoAsk,   setUndoAsk]   = useState(null);   // { handover, busy } — 2026-11-03 sender Undo (5 min)
   const [deleteModal, setDeleteModal] = useState(null); // { machine, reason, busy, error } — Super Admin machine deletion (2026-11-03)
   const [holdModal, setHoldModal]  = useState(null);   // { machine, release, reason, busy, error } — manual ON HOLD / release (2026-11-02)
   const [raiseText,  setRaiseText]  = useState("");
@@ -18660,7 +18683,8 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
         [duringWorkModal,    () => !duringWorkModal?.busy && setDuringWorkModal(null)],
         [removeRackConfirm,  () => setRemoveRackConfirm(null)],
         [pullBack,           () => !pullBack?.busy && setPullBack(null)],
-        [raiseModal,         () => !raiseBusy && setRaiseModal(null)],
+        [undoAsk,            () => !undoAsk?.busy && setUndoAsk(null)],
+        [raiseModal,        () => !raiseBusy && setRaiseModal(null)],
         [jobsDrawer,         () => setJobsDrawer(null)],
         [rackPanel,          () => setRackPanel(null)],
         [issuePopup,         () => setIssuePopup(null)],
@@ -18672,7 +18696,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [jobAction, reportMachineId, trialCertModal, trialCertViewModal, finishModal, transferBusy, acceptModal, duringWorkModal,
-      removeRackConfirm, pullBack, raiseModal, raiseBusy, jobsDrawer, rackPanel, issuePopup, showCalled]);
+      removeRackConfirm, pullBack, undoAsk, raiseModal, raiseBusy, jobsDrawer, rackPanel, issuePopup, showCalled]);
   // Pending part awaiting "Confirm issue" in the rack panel, and the one in flight.
   const [pendIssueAsk, setPendIssueAsk] = useState(null);
   const [pendIssueBusy, setPendIssueBusy] = useState(null);
@@ -19150,9 +19174,18 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
               {!isProdHead && sentOn.length > 0 && (
                 <Section title="Sent on" count={sentOn.length} hint="waiting for the next department to accept">
                   <div className="flex flex-col gap-2">
-                    {sentOn.map((m) => { const h = machineHandover(m); return (
-                      <div key={m.id} className="text-[14px] px-3 py-2 rounded-xl" style={{ background: "rgba(17,24,39,0.03)", color: "var(--text-strong)" }}>
-                        <span className="font-black">{titleOf(m, h)}</span> <span style={{ color: "var(--text-dim)" }}>→ {h.toDepartment} · awaiting accept</span>
+                    {sentOn.map((m) => { const h = machineHandover(m);
+                      // 2026-11-03 — Sender Undo: the button shows itself only for the
+                      // sender, within 5 min, while not yet accepted (senderUndoState).
+                      return (
+                      <div key={m.id} data-sent-on={m.id} className="text-[14px] px-3 py-2 rounded-xl flex flex-col sm:flex-row sm:items-center gap-2"
+                           style={{ background: "rgba(17,24,39,0.03)", color: "var(--text-strong)" }}>
+                        <div className="flex-1 min-w-0">
+                          <span className="font-black">{titleOf(m, h)}</span> <span style={{ color: "var(--text-dim)" }}>→ {h.toDepartment} · awaiting accept</span>
+                        </div>
+                        {canFinish && onPullBackHandover && (
+                          <SenderUndoButton handover={h} user={currentUser} onUndo={(ho) => setUndoAsk({ handover: ho, busy: false })} />
+                        )}
                       </div>
                     ); })}
                   </div>
@@ -21236,6 +21269,43 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                 <button type="button" onClick={() => setPullBack(null)} disabled={pullBack.busy} className="flex-1 h-11 rounded-lg text-[13px] font-bold text-slate-600 border transition-all disabled:opacity-40" style={{ borderColor: "rgba(17,24,39,0.12)" }}>Cancel</button>
                 <button type="button" onClick={submit} disabled={pullBack.busy} className="flex-[2] h-11 rounded-lg text-[13px] font-black text-white transition-all disabled:opacity-50" style={{ background: "#dc2626", color: "#ffffff" }}>
                   {pullBack.busy ? "Pulling back…" : "↩ Pull back machine"}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ── Sender Undo (2026-11-03, owner-approved) ── the worker who sent the
+          machine takes it back within 5 minutes, before it is accepted. Same
+          path as the admin Pull back (onPullBackHandover), re-checked on a
+          fresh read inside the handler. */}
+      {undoAsk && (() => {
+        const h = undoAsk.handover;
+        const name = `${h.bomKey || "Machine"}${h.serialNo ? ` · ${h.serialNo}` : ""}`;
+        const yes = async () => {
+          if (undoAsk.busy) return;
+          setUndoAsk((prev) => prev ? { ...prev, busy: true } : prev);
+          const r = await onPullBackHandover({ handoverId: h.id, bySender: true });
+          setUndoAsk(null);
+          if (r && r.success === false) { showToast("Cannot undo", r.error || "Could not take it back.", "urgent"); return; }
+          showToast("Taken back", `${name} is back in ${h.fromDepartment}`);
+        };
+        return (
+          <div className="modal-backdrop fixed inset-0 z-[72] flex items-end sm:items-center justify-center p-3 sm:p-4" data-sender-undo-ask
+               style={{ background: "rgba(17,24,39,0.45)", backdropFilter: "blur(12px)" }}
+               onClick={(e) => e.target === e.currentTarget && !undoAsk.busy && setUndoAsk(null)}>
+            <div className="w-full max-w-md rounded-2xl p-5" style={{ background: "var(--surface-raised)", border: "1px solid rgba(245,158,11,0.5)", boxShadow: "0 24px 70px rgba(17,24,39,0.2)", paddingBottom: "max(20px, env(safe-area-inset-bottom))" }}>
+              <h3 className="text-[17px] font-black" style={{ color: "var(--text-strong)" }}>Are you sure?</h3>
+              <p className="text-[15px] font-semibold mt-1" style={{ color: "var(--text-strong)" }}>Take {name} back from {h.toDepartment}?</p>
+              <div className="flex gap-2 mt-4">
+                <button type="button" onClick={() => setUndoAsk(null)} disabled={undoAsk.busy}
+                        className="flex-1 min-h-[48px] rounded-xl text-[15px] font-bold border transition-all active:scale-[0.97] disabled:opacity-40"
+                        style={{ borderColor: "rgba(17,24,39,0.15)", color: "#334155" }}>No</button>
+                <button type="button" data-sender-undo-yes onClick={yes} disabled={undoAsk.busy}
+                        className="flex-[2] min-h-[48px] rounded-xl text-[15px] font-black transition-all active:scale-[0.97] disabled:opacity-80"
+                        style={{ background: "#f59e0b", color: "#1f1300" }}>
+                  {undoAsk.busy ? "⏳ Please wait…" : "Yes, take it back"}
                 </button>
               </div>
             </div>
@@ -27610,20 +27680,39 @@ export default function App() {
   // machine to the sending department. The hand-over row stays (status
   // cancelled, with the reason), the machine keeps its department clock,
   // and both the history and the audit trail record it.
-  const handlePullBackHandover = async ({ handoverId, reason }) => {
+  // 2026-11-03 (owner-approved) — SENDER UNDO uses this same path: the worker
+  // who sent the machine may take it back within 5 minutes while it is not yet
+  // accepted (senderUndoState). Re-checked on a fresh read right before the
+  // write; the database cancel policy (053/058) is the authority.
+  const handlePullBackHandover = async ({ handoverId, reason, bySender = false }) => {
     if (!currentUser?.id) return { success: false, error: "Not authenticated" };
     const isAdmin = currentUser?.role === "super_admin" || currentUser?.role === "Admin";
-    if (!isAdmin) return { success: false, error: "Only an admin can pull a hand-over back." };
-    const why = String(reason || "").trim();
+    const senderUndo = !!bySender;
+    if (!isAdmin && !senderUndo) return { success: false, error: "Only an admin can pull a hand-over back." };
+    const why = String(reason || "").trim() || (senderUndo ? "Sent by mistake — taken back by the sender" : "");
     if (!why) return { success: false, error: "Write the reason for pulling this machine back." };
-    const h = (handovers || []).find((x) => x.id === handoverId);
+    let h = (handovers || []).find((x) => x.id === handoverId);
     if (!h) return { success: false, error: "Hand-over not found" };
+    if (senderUndo) {
+      const fresh = await fetchHandoverById(handoverId);
+      if (fresh) h = { ...h, ...fresh };
+      const st = senderUndoState(h, currentUser, Date.now());
+      if (!st.allowed) {
+        const msg = st.reason === "accepted" || st.reason === "not-pending" ? `${h.toDepartment} has already accepted it — Undo is no longer possible.`
+                  : st.reason === "expired" ? "The 5 minutes for Undo are over — ask your admin to pull it back."
+                  : st.reason === "other-sender" ? "Only the person who sent this machine can undo it."
+                  : "Undo is not possible for this hand-over.";
+        return { success: false, error: msg, reason: st.reason };
+      }
+    }
     if (h.status !== "pending") return { success: false, error: "This hand-over is no longer pending." };
     const machine = machineLog.find((m) => String(m.id) === String(h.machineId));
     const res = await adminCancelHandover(handoverId, why);
     if (!res.success) return res;
     const dateStr = fmtDate(new Date());
-    const note = `Pulled back by admin — ${h.fromDepartment} → ${h.toDepartment} cancelled: ${why}`;
+    const note = senderUndo && !isAdmin
+      ? `Taken back by sender — ${h.fromDepartment} → ${h.toDepartment} cancelled (sent by mistake)`
+      : `Pulled back by admin — ${h.fromDepartment} → ${h.toDepartment} cancelled: ${why}`;
     setHandovers((prev) => prev.map((x) => x.id === handoverId ? { ...x, status: "cancelled", cancelledAt: new Date().toISOString(), cancellationReason: why } : x));
     setMachineLog((prev) => prev.map((m) => String(m.id) === String(h.machineId)
       ? { ...m, pendingHandoverId: null, history: [...(m.history || []), { stage: m.stage, date: dateStr, note }] }
@@ -27634,9 +27723,10 @@ export default function App() {
     }
     logAudit({
       type: "handover_pulled_back", module: "Machine",
-      action: `Pulled back by admin: ${machine?.bomKey || h.bomKey || ""}${(machine?.serialNo || h.serialNo) ? ` [${machine?.serialNo || h.serialNo}]` : ""} — ${h.fromDepartment} → ${h.toDepartment} cancelled`,
+      action: `${senderUndo && !isAdmin ? "Taken back by sender (Undo)" : "Pulled back by admin"}: ${machine?.bomKey || h.bomKey || ""}${(machine?.serialNo || h.serialNo) ? ` [${machine?.serialNo || h.serialNo}]` : ""} — ${h.fromDepartment} → ${h.toDepartment} cancelled`,
       ref: machine?.bomKey || h.bomKey || "", serialNo: machine?.serialNo || h.serialNo || "",
-      details: { handoverId, machineId: h.machineId, from: h.fromDepartment, to: h.toDepartment, reason: why, wasOnHold: isHoldOverdue(h.sentAt, h.acceptTimeoutMinutes, Date.now()) },
+      details: { handoverId, machineId: h.machineId, from: h.fromDepartment, to: h.toDepartment, reason: why, wasOnHold: isHoldOverdue(h.sentAt, h.acceptTimeoutMinutes, Date.now()),
+                 ...(senderUndo ? { senderUndo: true, sentAt: h.sentAt || null } : {}) },
     });
     return res;
   };

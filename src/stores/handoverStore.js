@@ -157,6 +157,18 @@ export async function fetchPendingHandovers() {
   return all.filter((h) => h.status === "pending");
 }
 
+// 2026-11-03 — Sender Undo: one fresh hand-over row, read right before the
+// take-back so an accept on another device is seen. null = could not read
+// (the caller then falls back to its in-memory copy; the cancel itself still
+// only matches status 'pending').
+export async function fetchHandoverById(id) {
+  if (!isSupabaseEnabled()) return getLocal().find((h) => String(h.id) === String(id)) || null;
+  const c = getSupabase(); if (!c) return null;
+  const { data, error } = await c.from("handover_events").select("*").eq("id", id).maybeSingle();
+  if (error || !data) { if (error) console.warn("[handover:fetchOne] failed", error); return null; }
+  return fromRow(data);
+}
+
 export async function createHandover(h) {
   console.info("[handovers:create] start", { machineId: h.machineId, from: h.fromDepartment, to: h.toDepartment, overrun: h.overrunNarration ? "yes" : "no" });
   if (!isSupabaseEnabled()) {
