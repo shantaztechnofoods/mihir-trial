@@ -3199,3 +3199,14 @@ input:focus, select:focus, textarea:focus { box-shadow: 0 0 0 3px rgba(46,80,214
 .accept-ready{animation:acceptReady 1.6s ease-in-out infinite}
 .accept-step{animation:acceptIn .25s ease-out}
 @media (prefers-reduced-motion:reduce){.accept-pop,.accept-ready,.accept-step{animation:none}}
+
+/* Machine Tracker count boxes: phone = 3 small boxes per row (desktop unchanged) */
+@media (max-width: 767px){
+  .mt-kpis{gap:8px!important}
+  .mt-kpis .kpi-tile{padding:10px 8px!important;min-height:0!important}
+  .mt-kpis .kpi-tile > div:first-child{margin-bottom:4px}
+  .mt-kpis .kpi-tile > div:first-child > span{display:none}
+  .mt-kpis .mt-kpi-label{font-size:9px;letter-spacing:0;line-height:1.15;min-height:2.3em}
+  .mt-kpis .mt-kpi-value{font-size:22px}
+  .mt-kpis .mt-kpi-sub{display:none}
+}
