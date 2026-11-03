@@ -86,7 +86,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-03-photo-button-wait";
+const APP_BUILD = "2026-11-03-mt-search";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -17176,6 +17176,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
   // section. Each remembers nothing it shouldn't: the BOM fold is the only
   // per-browser preference.
   const [mtTab,       setMtTab]       = useState("production");
+  const [searchQ,     setSearchQ]     = useState("");
   const [showCalled,  setShowCalled]  = useState(false);
   // Open by default on a wide screen; on a phone the six BOM cards would push
   // the machines a full screen down, so it starts folded there. An explicit
@@ -17901,7 +17902,11 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
       </div>
     );
   };
-  const listForTab = () => (mtTab === "pending" ? []
+  const searchText = searchQ.trim().toLowerCase();
+  const searchHit = (m) => [m.bomKey, m.label, m.bomLabel, m.serialNo, m.currentDepartment, m.stage, m.id]
+    .some((v) => String(v ?? "").toLowerCase().includes(searchText));
+  const listForTab = () => (searchText ? started.filter(searchHit)
+    : mtTab === "pending" ? []
     : mtTab === "transfer" ? (filter === "hold" ? onHold : filter === "pendingAccept" ? pendingAccept : active)
     : filtered);
   // 2026-10-30 — Pending Jobs: every open job in the factory (a floor login
@@ -18191,6 +18196,25 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
       </Topbar>
 
       <div className="p-4 sm:p-6 space-y-5">
+
+        {/* Search: type a machine name or serial number, the list shows it. */}
+        {!staffMode && (
+          <div className="relative" data-mt-search>
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[18px] pointer-events-none">🔍</span>
+            <input type="search" value={searchQ} data-mt-search-input
+                   onChange={(e) => {
+                     const v = e.target.value; setSearchQ(v); if (v.trim()) setMtTab("production");
+                     if (v.trim()) setTimeout(() => { try { document.querySelector("[data-view-header]")?.scrollIntoView({ behavior: "smooth", block: "start" }); } catch { /* ignore */ } }, 80);
+                   }}
+                   placeholder="Search machine or serial no."
+                   className="w-full rounded-2xl bg-white border-2 border-slate-300 focus:border-blue-600 outline-none pl-12 pr-12 text-[16px] font-semibold text-slate-900"
+                   style={{ minHeight: 52 }} />
+            {searchQ && (
+              <button type="button" aria-label="Clear search" onClick={() => setSearchQ("")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-slate-100 text-slate-600 font-black">✕</button>
+            )}
+          </div>
+        )}
 
         {/* ── BOM Outward (2026-10-30) ──
             The Outward page's own BOM section, embedded: issuing here and
@@ -18483,7 +18507,6 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                 <span data-jobs-head-parts className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(217,119,6,0.12)", color: "#b45309" }}>Parts {partsOpenN} pending</span>
                 <span data-jobs-head-work className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(37,99,235,0.1)", color: "#1d4ed8" }}>Work {workOpenN} pending</span>
                 <span data-jobs-head-done className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(22,163,74,0.1)", color: "#15803d" }}>{doneN} completed</span>
-                <span className="text-[10px]" style={{ color: "var(--text-dim)" }}>tracked until completed — an open job never stops a machine moving on</span>
               </div>
               {renderJobBoard(allJobsScoped, { detailsKey: "completed" })}
             </div>
@@ -18809,9 +18832,6 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                   Departments Called
                 </span>
                 <span className="sp-pill sp-pill-red">{openAssigned.length} open</span>
-                <span className="text-[10px]" style={{ color: "var(--text-dim)" }}>
-                  each machine stays put until its issues are resolved
-                </span>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2">
                 {Object.entries(byDept).map(([dept, list]) => (
@@ -18974,7 +18994,6 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
               </div>
               <div>
                 <div className="text-[13px] font-bold" style={{ color: "var(--text-strong)" }}>Production Rack View</div>
-                <div className="text-[10px] mt-0.5" style={{ color: "var(--text-dim)" }}>Tap a rack to see its BOM and stock, fill it, assemble and send to Mechanical</div>
               </div>
             </div>
             <div className="flex items-center gap-2.5 flex-wrap text-[10px] font-semibold" style={{ color: "var(--text-dim)" }}>
@@ -19512,6 +19531,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                    : filter === "completed" ? "finished — Ready is the final stage"
                    : filter === "onRack"    ? "assembled, waiting for a production head to transfer them"
                    : "every machine that has started production" };
+          if (searchText) { view.title = `Search: "${searchQ.trim()}"`; view.sub = `${started.filter(searchHit).length} found`; }
           return (
             <div className="flex items-baseline gap-2 flex-wrap" data-view-header>
               <h2 className="text-[14px] font-black" style={{ color: "var(--text-strong)" }}>{view.title}</h2>
@@ -20043,9 +20063,6 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                     ))}
                                   </tbody>
                                 </table>
-                              </div>
-                              <div className="text-[10px] text-slate-500 mt-2">
-                                A star is lost for finishing late, for the next department accepting late, and for leaving an issue unresolved.
                               </div>
                               {(() => {
                                 // Every pending job on this machine with its full history.
@@ -20687,7 +20704,6 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                 <p className="text-[11px] font-bold mb-2" style={{ color: "#b45309" }}>This part has not been recorded as received. Mark it completed only if the work is actually done.</p>
               )}
               <label className="block text-[11px] font-bold text-slate-600 mb-1">{isReceive ? "Receive remark / reason (optional)" : "Completion note (optional)"}</label>
-              <div className="text-[10px] text-slate-500 mb-1.5">Saved as a separate history entry with your name, department and time. The original reason above is never changed.</div>
               <input value={jobAction.notes} disabled={jobAction.busy} autoFocus
                      onChange={(e) => setJobAction((prev) => prev ? { ...prev, notes: e.target.value, error: "" } : prev)}
                      onKeyDown={(e) => e.key === "Enter" && submit()}
@@ -21164,7 +21180,6 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                       autoFocus
                       className="w-full bg-white border border-red-300 rounded-lg px-3 py-2 text-[12px] text-slate-900 placeholder-slate-400 outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100 transition-colors"
                     />
-                    <div className="text-[10px] text-slate-400 mt-1">This explanation is saved to the handover audit record and shown on reports.</div>
                   </div>
                 )}
 
@@ -21220,9 +21235,6 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                 <div className="pt-4 mt-4 border-t border-slate-100">
                   <div className="text-[11px] font-bold text-slate-600 mb-1">
                     Anything still pending from {fromDepartment}?
-                  </div>
-                  <div className="text-[10px] text-slate-500 mb-2.5">
-                    Leave empty if the work is complete. Anything listed here stays on {fromDepartment}&apos;s list until it is done — it is tracked, and it does not stop the machine moving on.
                   </div>
                   <PendingJobRows rows={finishModal.owedItems || []} inventory={inventoryFlat} disabled={transferBusy}
                                   addLabel="+ Add Pending Item" mode="item"
@@ -21327,7 +21339,6 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                               onChange={(e) => setField({ holdReason: e.target.value, error: "" })}
                               placeholder="e.g. machine was on the rack behind two others; operator on leave"
                               className="w-full bg-white border border-red-200 rounded-lg px-3 py-2 text-[12px] text-slate-900 outline-none focus:border-red-400" />
-                    <div className="text-[10px] text-slate-500 mt-1">Saved permanently in the machine's history and the audit trail.</div>
                   </div>
                 )}
                 {(
@@ -21340,15 +21351,11 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                onKeyDown={(e) => { if (e.key === "Enter") submitAcceptHandover(); }}
                                placeholder="Password"
                                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-[12px] text-slate-900 placeholder-slate-500 outline-none focus:border-green-500/60" />
-                        <div className="text-[10px] text-slate-500 mt-1">Your signature below is attached to this acceptance record.</div>
                       </div>
                     ) : (
                       <div className="rounded-lg px-3 py-2.5" style={{ background: "rgba(34,197,94,0.07)", border: "1px solid rgba(34,197,94,0.3)" }}>
                         <div className="text-[11px] font-bold text-emerald-200">
                           Accepting as <span className="text-slate-900">{currentUser?.fullName || currentUser?.username || "you"}</span>
-                        </div>
-                        <div className="text-[10px] text-slate-400 mt-0.5">
-                          Sign below to confirm. No password required for routine acceptance.
                         </div>
                       </div>
                     )}
@@ -21362,7 +21369,6 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                 style={{ minHeight: 50 }}>
                           {mainOptions.map((n) => <option key={n} value={n}>{n}</option>)}
                         </select>
-                        <div className="text-[11px] text-slate-500 mt-1">Your name is here. If you are not there, pick the person who is accepting.</div>
                         <label className="text-[12px] font-bold text-slate-700 block mt-3 mb-1">Other people working on this machine</label>
                         {others.length > 0 && (
                           <div className="flex flex-wrap gap-2 mb-2">
@@ -21418,7 +21424,6 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                             <li key={p.id}><span className="font-semibold">{p.raisedInDepartment}:</span> {p.description}</li>
                           ))}
                         </ul>
-                        <div className="text-[10px] text-slate-500 mt-1.5">These stay open on this machine. Record the part received and the work completed in the Pending Jobs tab, or on the machine card, after you accept.</div>
                       </div>
                     )}
                     {/* Migration 028 — Before-Receive checklist. Appears only
@@ -21431,9 +21436,6 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                         {stepHead(stepBase + 1, "Check before accepting", false)}
                         <div className="text-[10px] font-bold text-blue-200 uppercase tracking-wider mb-1">
                           📋 {acceptModal.checklistTemplate.name || "After Acceptance Checklist"}
-                        </div>
-                        <div className="text-[10px] text-slate-400 mb-2">
-                          Tick each step after you check it. Any step you can't tick needs a short reason.
                         </div>
                         <ChecklistBulkBar
                           answers={acceptModal.checklistAnswers}
@@ -21472,7 +21474,6 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                       accent="#dc2626" addLabel="+ Add Pending Item" mode="item"
                                       onChange={(rows) => setField({ pendingItemsToRaise: rows })} />
                       {pendingItemsProblem(acceptModal.pendingItemsToRaise) && <div data-pending-item-problem className="mt-1.5 text-[11px] font-semibold" style={{ color: "#b45309" }}>{pendingItemsProblem(acceptModal.pendingItemsToRaise)}</div>}
-                      <div className="text-[10px] text-slate-500 mt-1.5">Saved against this machine and serial number in Pending Jobs until the work is completed. Nothing recorded = nothing pending.</div>
                     </div>
                   </>
                 )}
@@ -21522,9 +21523,6 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                 <div className="text-[10px] text-slate-500 mt-0.5">{template?.name || "Checks"}</div>
               </div>
               <div className="flex-1 overflow-y-auto p-5 space-y-2">
-                <div className="text-[10px] text-slate-400 mb-1">
-                  Tick each step after you check it. Any step you can't tick needs a short reason.
-                </div>
                 <ChecklistBulkBar
                   answers={answers}
                   onSetAll={(v) => setField({ answers: setAllAnswers(answers, v), error: "" })}

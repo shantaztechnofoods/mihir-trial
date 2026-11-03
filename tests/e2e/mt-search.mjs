@@ -1,0 +1,21 @@
+// Machine Tracker search box + cleaned helper lines. LOCAL TEST DATA ONLY.
+import fs from "fs";
+import { launch, loginAdmin, gotoMachineTracker, makeOk } from "./lib/helpers.mjs";
+const src = fs.readFileSync(new URL("./go-live-workflows.mjs", import.meta.url), "utf8");
+const m = src.match(/const seed = \(\) => \{[\s\S]*?\n\};\n/); const seed = eval("(" + m[0].replace("const seed = ", "").replace(/;\s*$/, "") + ")");
+const { ok, done } = makeOk();
+const { b, p, errs } = await launch(seed);
+await loginAdmin(p); await gotoMachineTracker(p);
+const box = p.locator("[data-mt-search-input]");
+ok("search box is at the top of Machine Tracker", await box.count() === 1);
+const total = await p.locator("[data-card-report]").count();
+await box.fill("SN-10"); await p.waitForTimeout(400);
+const hdr = await p.locator("[data-view-header]").innerText();
+ok("typing shows a Search header with a count", /Search:/.test(hdr) && /found/.test(hdr), hdr.replace(/\n/g, " "));
+await box.fill("zzz-nothing"); await p.waitForTimeout(300);
+ok("no match shows 0 found", /0 found/.test(await p.locator("[data-view-header]").innerText()));
+await p.getByRole("button", { name: "Clear search" }).click(); await p.waitForTimeout(300);
+ok("clear button empties the search", (await box.inputValue()) === "" && !/Search:/.test(await p.locator("[data-view-header]").innerText()));
+ok("small helper lines removed", await p.locator("text=Tap a rack to see its BOM").count() === 0);
+ok("no page errors", errs.length === 0, errs.join(" | "));
+await done(b);
