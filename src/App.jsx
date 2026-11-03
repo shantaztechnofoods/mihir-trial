@@ -12695,31 +12695,7 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
 
             {/* 2026-11-03 — Edit BOM organised into numbered steps. Same
                 state, same handlers, same Save BOM; only the order and the
-                headings changed. Counts below are read-only summaries. */}
-            {(() => {
-              const tpl = (checklistTemplates || []).filter((t) => t && t.active !== false && t.bomKey === bomKey);
-              const deptsWithList = CHECKLIST_DEPTS.filter((d) => tpl.some((t) => t.department === d));
-              const timeSet = DURATION_DEPTS.filter((d) => (Number(editDurations?.[d]?.days) || 0) + (Number(editDurations?.[d]?.hours) || 0) > 0).length;
-              const steps = [
-                ["details", "Details", !!(editKey || "").trim() && !!(editLabel || "").trim()],
-                ["parts", "Parts", editItems.length > 0],
-                ["time", "Time", timeSet === DURATION_DEPTS.length],
-                ["checklists", "Checklists", deptsWithList.length === CHECKLIST_DEPTS.length],
-                ["photo", "Photo", !!editPhoto],
-              ];
-              return (
-                <nav className="org-step-nav" aria-label="Edit BOM steps">
-                  {steps.map(([id, label, done], i) => (
-                    <button key={id} type="button" data-org-step-link={id}
-                            onClick={() => document.getElementById(`org-step-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" })}>
-                      <span className="org-step-nav-num" data-done={done ? "1" : "0"}>{done ? "✓" : i + 1}</span>
-                      <span className="org-step-nav-label">{label}</span>
-                    </button>
-                  ))}
-                </nav>
-              );
-            })()}
-
+                headings changed. */}
             {/* ── 1 Details ── */}
             <OrgStep n={1} id="details" title="Details" hint="BOM key, machine model name and its production rack.">
               <div className="space-y-3">
