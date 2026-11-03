@@ -16105,7 +16105,7 @@ function VoicePlayButton({ attachment, big = false, label = "" }) {
       setState("playing");
     } catch { setState("error"); }
   };
-  const size = big ? 48 : 40;
+  const size = 44; // min touch target; `big` only enlarges the icon
   return (
     <button type="button" data-voice-play={attachment.id} onClick={toggle} aria-label={state === "playing" ? "Pause voice note" : "Play voice note"}
             className="vn-play rounded-full flex items-center justify-center gap-1 font-black flex-shrink-0 transition-transform active:scale-[0.97]"
@@ -16294,29 +16294,29 @@ function VoiceNoteRecorder({ machineId, department, place, item = "", onUpload, 
       {(phase === "idle" || phase === "starting" || phase === "error") && !att && (
         <div className="flex items-center gap-2 flex-wrap">
           <button type="button" data-voice-record disabled={disabled || phase === "starting"} onClick={start}
-                  className="vn-rec rounded-2xl font-black flex items-center justify-center gap-2 transition-transform active:scale-[0.97] disabled:opacity-60"
-                  style={{ minHeight: compact ? 48 : 56, padding: "0 18px", background: "#fff", color: "#dc2626", border: "2px solid #dc2626", fontSize: compact ? 15 : 17 }}>
-            <span style={{ fontSize: compact ? 20 : 24 }}>🎤</span>{phase === "starting" ? "Please wait…" : "Record"}
+                  className="vn-rec rounded-xl font-bold flex items-center justify-center gap-1.5 transition-transform active:scale-[0.97] disabled:opacity-60"
+                  style={{ minHeight: compact ? 44 : 48, padding: "0 16px", background: "#fff", color: "#dc2626", border: "1.5px solid #dc2626", fontSize: compact ? 15 : 16 }}>
+            <span style={{ fontSize: 18 }}>🎤</span>{phase === "starting" ? "Please wait…" : "Record"}
           </button>
           {chips}
         </div>
       )}
       {phase === "recording" && (
         <div className="flex items-center gap-2 flex-wrap">
-          <div data-voice-live className="vn-live flex-1 min-w-[180px] rounded-2xl flex items-center gap-2 px-4 font-black text-white"
-               style={{ minHeight: 56, background: "#dc2626", fontSize: 17 }}>
+          <div data-voice-live className="vn-live flex-1 min-w-[180px] rounded-xl flex items-center gap-2 px-4 font-bold text-white"
+               style={{ minHeight: 48, background: "#dc2626", fontSize: 16 }}>
             <span className="vn-dot" aria-hidden="true" />
             Recording… <span className="tabular-nums" data-voice-clock>{formatClock(secs)}</span>
             <span className="text-[12px] font-bold opacity-80 ml-auto tabular-nums">/ {formatClock(VOICE_MAX_SECONDS)}</span>
           </div>
           <button type="button" data-voice-stop onClick={stopAll}
-                  className="rounded-2xl font-black text-white flex items-center justify-center gap-2 px-5 active:scale-[0.97]"
-                  style={{ minHeight: 56, background: "#111827", fontSize: 17 }}>⏹ Stop</button>
+                  className="rounded-xl font-bold text-white flex items-center justify-center gap-1.5 px-4 active:scale-[0.97]"
+                  style={{ minHeight: 48, background: "#111827", fontSize: 15 }}>⏹ Stop</button>
           {SRCls && textRef.current && <div className="w-full text-[12px] font-bold" style={{ color: "#b91c1c" }}>Speak in {langLabel} — words appear in the box</div>}
         </div>
       )}
       {phase === "saving" && (
-        <div className="rounded-2xl flex items-center gap-2 px-4 font-black" style={{ minHeight: 52, background: "rgba(38,64,176,0.08)", color: "#2640B0", fontSize: 15 }}>⏳ Saving voice note…</div>
+        <div className="rounded-xl flex items-center gap-2 px-4 font-bold" style={{ minHeight: 48, background: "rgba(38,64,176,0.08)", color: "#2640B0", fontSize: 15 }}>⏳ Saving voice note…</div>
       )}
       {att && (phase === "saved" || phase === "error") && (
         <div data-voice-player className="rounded-2xl flex items-center gap-2 px-2 py-1.5 flex-wrap" style={{ background: "rgba(21,128,61,0.07)", border: "1px solid rgba(21,128,61,0.35)" }}>
@@ -16325,7 +16325,7 @@ function VoiceNoteRecorder({ machineId, department, place, item = "", onUpload, 
               <audio ref={audioRef} src={localUrl} preload="metadata" onEnded={() => setPlaying(false)} />
               <button type="button" data-voice-local-play onClick={togglePlay} aria-label={playing ? "Pause" : "Play"}
                       className="rounded-full flex items-center justify-center font-black text-white active:scale-[0.97]"
-                      style={{ width: 48, height: 48, background: "#2640B0", fontSize: 18 }}>{playing ? "⏸" : "▶"}</button>
+                      style={{ width: 44, height: 44, background: "#2640B0", fontSize: 16 }}>{playing ? "⏸" : "▶"}</button>
             </>
           ) : <VoicePlayButton attachment={att} big />}
           <span className="text-[14px] font-black" style={{ color: "#15803d" }} data-voice-saved>✓ Saved</span>
