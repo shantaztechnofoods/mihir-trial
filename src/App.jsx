@@ -86,7 +86,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-03-take-from-rack";
+const APP_BUILD = "2026-11-03-bom-photo";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -11103,6 +11103,66 @@ const validateDurationsForm = (form) => {
   return "";
 };
 
+// Migration 061 — one machine photo per BOM. Same uploader as the Item Master
+// photo (uploadItemMedia → item-media bucket in Supabase mode, small data: URL
+// offline). Used on BOM Create and BOM Edit; value is the URL or "".
+function BomPhotoField({ value, onChange }) {
+  const inputRef = useRef(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const onPick = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!/^image\/(png|jpe?g)$/i.test(file.type || "")) { setErr("Please choose a PNG or JPG photo."); return; }
+    setErr(""); setBusy(true);
+    try {
+      const res = await uploadItemMedia("bom-photos", file);
+      if (!res.ok) { setErr("Photo upload failed: " + res.error); return; }
+      onChange(res.url);
+    } finally { setBusy(false); }
+  };
+  return (
+    <div data-bom-photo-field className="rounded-xl p-4" style={{ background: "rgba(17,24,39,0.03)", border: "1px solid rgba(17,24,39,0.08)" }}>
+      <div className="text-[11px] font-bold text-slate-900">📷 Machine photo</div>
+      <div className="text-[10px] text-slate-500 mt-0.5 mb-3">Shown on every machine card of this model so workers recognise it. PNG or JPG.</div>
+      <div className="flex items-center gap-4 flex-wrap">
+        <div className="w-32 h-32 sm:w-40 sm:h-40 rounded-xl overflow-hidden flex items-center justify-center flex-shrink-0"
+             style={{ background: "rgba(17,24,39,0.04)", border: "1px solid var(--border-rim)" }}>
+          {value ? <img data-bom-photo-preview src={value} alt="Machine photo" className="w-full h-full object-cover" />
+                 : <span className="text-[11px] text-slate-400 text-center px-2">No photo yet</span>}
+        </div>
+        <div className="flex flex-col gap-2 min-w-[140px]">
+          <input ref={inputRef} type="file" accept="image/png,image/jpeg" className="hidden" onChange={onPick} />
+          <button type="button" onClick={() => inputRef.current?.click()} disabled={busy}
+                  className="min-h-[44px] px-4 rounded-xl text-[13px] font-bold transition-all disabled:opacity-50"
+                  style={{ background: "#2E50D6", color: "#fff" }}>
+            {busy ? "Uploading…" : "📷 Upload photo"}
+          </button>
+          {value && !busy && (
+            <button type="button" onClick={() => onChange("")}
+                    className="min-h-[44px] px-4 rounded-xl text-[13px] font-bold border border-red-500/30 text-red-600 hover:bg-red-500/10 transition-all">
+              Remove
+            </button>
+          )}
+        </div>
+      </div>
+      {err && <div className="text-[10px] text-red-500 font-bold mt-2">⚠ {err}</div>}
+    </div>
+  );
+}
+
+// Small rounded machine photo; falls back to `fallback` when the BOM has none.
+function BomPhotoThumb({ url, size = 64, fallback = null, className = "" }) {
+  const [broken, setBroken] = useState(false);
+  if (!url || broken) return fallback;
+  return (
+    <img data-bom-photo src={url} alt="" loading="lazy" onError={() => setBroken(true)}
+         className={`rounded-xl object-cover flex-shrink-0 ${className}`}
+         style={{ width: size, height: size, border: "1px solid var(--border-rim)", background: "rgba(17,24,39,0.04)" }} />
+  );
+}
+
 // Days/hours per department. Used on BOM Create, BOM Edit and (unchanged in
 // look) the Outward durations popup.
 function DeptDurationFields({ value, onChange, disabled = false }) {
@@ -11758,6 +11818,7 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
   const [checked,      setChecked]      = useState({});
   const [editMode,     setEditMode]     = useState(false);
   const [editItems,    setEditItems]    = useState(() => bom.items.map((i) => ({ ...i })));
+  const [editPhoto,    setEditPhoto]    = useState(() => bom.photoUrl || "");
   const [editRackCap,  setEditRackCap]  = useState(() => bom.rackCapacity ?? 0);
   // Migration 041 — department durations live on the BOM.
   const [editDurations, setEditDurations] = useState(() => durationsFormFrom(bom.deptDurations, settings));
@@ -12401,6 +12462,7 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
       items: editItems.filter((i) => i.qty > 0),
       rackCapacity: Math.max(0, parseInt(editRackCap, 10) || 0),
       deptDurations: durationsStoreFrom(editDurations),
+      photoUrl: editPhoto || null,
     });
     // Then rename if key or label changed
     if ((newKey !== bomKey || newLabel !== bom.label) && onRenameBOM) {
@@ -12415,6 +12477,7 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
     setEditItems(bom.items.map((i) => ({ ...i })));
     setEditRackCap(bom.rackCapacity ?? 0);
     setEditDurations(durationsFormFrom(bom.deptDurations, settings));
+    setEditPhoto(bom.photoUrl || "");
     setEditDurErr("");
     setEditKey(bomKey);
     setEditLabel(bom.label || "");
@@ -12670,6 +12733,9 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
               </div>
               {renameErr && <div className="text-[10px] text-red-400 mt-2">⚠ {renameErr}</div>}
             </div>
+
+            {/* Migration 061 — machine photo shown on machine cards. */}
+            <BomPhotoField value={editPhoto} onChange={setEditPhoto} />
 
             {/* Production rack — fixed floor racks only (2026-10-30). */}
             <RackStatusNote bomKey={bomKey} />
@@ -13534,6 +13600,7 @@ function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, onCreateB
   const [createForm,    setCreateForm]    = useState({ key: "", label: "", rackCapacity: "0" });
   // Migration 041 — durations for the new model, pre-filled from settings.
   const [createDurations, setCreateDurations] = useState(() => durationsFormFrom(null, settings));
+  const [createPhoto,     setCreatePhoto]     = useState("");
   const [createItems,   setCreateItems]   = useState([]); // [{ code, qty, checkPoints }]
   // Which create-BOM line has its per-BOM check points open (migration 037).
   const [cpEditCode,    setCpEditCode]    = useState(null);
@@ -13708,6 +13775,7 @@ function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, onCreateB
   const openCreateBOM = () => {
     setCreateForm({ key: "", label: "", rackCapacity: "0" });
     setCreateDurations(durationsFormFrom(null, settings));
+    setCreatePhoto("");
     setCreateItems([]);
     setCreateAddCode("");
     setCreateAddQty("1");
@@ -13765,6 +13833,7 @@ function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, onCreateB
       items: createItems,
       rackCapacity: createForm.rackCapacity,
       deptDurations: durationsStoreFrom(createDurations),
+      photoUrl: createPhoto || null,
     });
     if (res?.success === false) { setCreateErr(res.error); return; }
     // Migration 028 — flush buffered checklists after BOM row exists. Each
@@ -14097,6 +14166,9 @@ function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, onCreateB
                   <RackStatusNote bomKey={createForm.key} />
                 </div>
               </div>
+
+              {/* Migration 061 — machine photo shown on machine cards. */}
+              <BomPhotoField value={createPhoto} onChange={setCreatePhoto} />
 
               {/* Migration 041 — department durations for this model */}
               <div className="rounded-xl p-4" style={{ background: "rgba(17,24,39,0.03)", border: "1px solid rgba(17,24,39,0.08)" }}>
@@ -18395,6 +18467,18 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
           const Card  = ({ children, tone }) => (
             <div className="mt-card no-lift p-4 flex flex-col gap-3" style={tone ? { borderColor: tone } : undefined}>{children}</div>
           );
+          // Migration 061 — the BOM's machine photo (64px) at the left of the
+          // card's title block, so workers recognise the machine at a glance.
+          const withPhoto  = (m, h, body) => {
+            const url = (bomDefs || {})[(m && m.bomKey) || (h && h.bomKey)]?.photoUrl;
+            if (!url) return body;
+            return (
+              <div className="flex items-start gap-3">
+                <BomPhotoThumb url={url} size={64} />
+                <div className="min-w-0 flex-1">{body}</div>
+              </div>
+            );
+          };
           // No department: say so and show nothing else. A Store Manager still
           // keeps the BOM section above when the role may issue a BOM.
           if (!isProdHead && !hasDepartments) {
@@ -18438,12 +18522,12 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                       const h = machineHandover(m);
                       return (
                         <Card key={m.id}>
-                          <div>
+                          {withPhoto(m, h, <div>
                             <div className="text-[17px] font-black" style={{ color: "var(--text-strong)" }}>{titleOf(m, h)}</div>
                             <div className="text-[13px] mt-0.5" style={{ color: "var(--text-dim)" }}>
                               {m.bomLabel || ""}{m.rackSlot ? ` · ${slotLabel(m.rackSlot)}` : " · on the rack"} · to {h.toDepartment}
                             </div>
-                          </div>
+                          </div>)}
                           {/* The release itself happens only in the Rack View
                               (details panel / crate face — same handler, same
                               gate). This opens that machine's rack panel. */}
@@ -18471,12 +18555,12 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                       const m = machineOf(h);
                       return (
                         <Card key={h.id} tone="rgba(67,56,202,0.45)">
-                          <div>
+                          {withPhoto(m, h, <div>
                             <div className="text-[17px] font-black" style={{ color: "var(--text-strong)" }}>{titleOf(m, h)}</div>
                             <div className="text-[13px] mt-0.5" style={{ color: "var(--text-dim)" }}>
                               {m?.bomLabel ? `${m.bomLabel} · ` : ""}{m?.rackSlot ? slotLabel(m.rackSlot) : "on the rack"} → {h.toDepartment}
                             </div>
-                          </div>
+                          </div>)}
                           {canTakeFromRack && canAccept ? (
                             <button type="button" data-staff-take={h.id} className={btn} style={{ background: "#4338ca", color: "#fff" }}
                                     disabled={!!acceptModal || rackTakeBusy === h.id}
@@ -18511,13 +18595,13 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                       const waited = h.sentAt ? formatDuration(Math.max(0, Math.floor((nowTick - Date.parse(h.sentAt)) / 60000))) : "";
                       return (
                         <Card key={h.id} tone={late ? "rgba(239,68,68,0.5)" : "rgba(217,119,6,0.45)"}>
-                          <div>
+                          {withPhoto(m, h, <div>
                             <div className="text-[17px] font-black" style={{ color: "var(--text-strong)" }}>{titleOf(m, h)}</div>
                             <div className="text-[13px] mt-0.5" style={{ color: "var(--text-dim)" }}>
                               {m?.bomLabel ? `${m.bomLabel} · ` : ""}from {h.fromDepartment} → {h.toDepartment}{waited ? ` · waiting ${waited}` : ""}
                             </div>
                             {late && <div className="text-[13px] font-black mt-1" style={{ color: "#dc2626" }}><LeadIcon e="🚦" />ON HOLD — accept deadline passed</div>}
-                          </div>
+                          </div>)}
                           {canAccept && (
                             <button type="button" data-staff-accept={h.id} className={btn} style={{ background: "#15803d", color: "#fff" }}
                                     disabled={!!acceptModal} onClick={() => { if (!acceptModal) openAcceptModal(h); }}>
@@ -18546,7 +18630,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                       const during = !!onSubmitDuringWorkChecklist && !!pickTemplate(checklistTemplates, m.bomKey, dept, "during_work");
                       return (
                         <Card key={m.id}>
-                          <div>
+                          {withPhoto(m, null, <div>
                             <div className="text-[17px] font-black" style={{ color: "var(--text-strong)" }}>{titleOf(m)}</div>
                             <div className="text-[13px] mt-0.5" style={{ color: "var(--text-dim)" }}>{m.bomLabel || ""}{m.bomLabel ? " · " : ""}in {dept}</div>
                             <div className="flex items-center gap-2 flex-wrap mt-2">
@@ -18564,7 +18648,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                 </button>
                               )}
                             </div>
-                          </div>
+                          </div>)}
                           <div className="flex flex-col sm:flex-row gap-2 sm:flex-wrap">
                             {during && (
                               <button type="button" data-staff-during={m.id} className={btn} style={{ background: "#2640B0", color: "#fff" }} onClick={() => openDuringWorkModal(m)}>
@@ -19781,10 +19865,15 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                     {/* Machine identity — may shrink and wrap so a 360px phone
                         never pushes the stage pills past the screen edge. */}
                     <div className="flex items-center gap-3 min-w-0 max-w-full">
-                      <div className="w-11 h-11 rounded-xl flex items-center justify-center text-[11px] font-black text-slate-900 flex-shrink-0"
-                           style={{ background: stageColor + "1a", border: `1px solid ${stageColor}45` }}>
-                        {machine.bomKey}
-                      </div>
+                      {/* Migration 061 — the BOM's machine photo replaces the
+                          key tile when one is set; the tile is the fallback. */}
+                      <BomPhotoThumb url={(bomDefs || {})[machine.bomKey]?.photoUrl} size={56}
+                                     fallback={(
+                        <div className="w-11 h-11 rounded-xl flex items-center justify-center text-[11px] font-black text-slate-900 flex-shrink-0"
+                             style={{ background: stageColor + "1a", border: `1px solid ${stageColor}45` }}>
+                          {machine.bomKey}
+                        </div>
+                      )} />
                       <div className="min-w-0">
                         <div className="text-sm font-bold text-slate-900">{machine.bomLabel}</div>
                         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
@@ -25454,6 +25543,8 @@ export default function App() {
       rackCapacity: Math.max(0, parseInt(def.rackCapacity, 10) || 0),
       // Migration 041 — department durations set on the BOM.
       deptDurations: def.deptDurations && typeof def.deptDurations === "object" ? def.deptDurations : null,
+      // Migration 061 — machine photo (URL) or null.
+      photoUrl: typeof def.photoUrl === "string" && def.photoUrl ? def.photoUrl : null,
     };
     setBomDefs((prev) => ({ ...prev, [k]: newBom }));
     if (isSupabaseEnabled()) bomCreate(k, newBom).then((r) => { if (!r.success) console.warn("[App] BOM create Supabase failed:", r.error); });
@@ -25483,6 +25574,7 @@ export default function App() {
       items:        (src.items || []).map((i) => ({ code: i.code, qty: Number(i.qty) || 0 })),
       rackCapacity: Number(src.rackCapacity) || 0,
       deptDurations: src.deptDurations || null,
+      photoUrl: src.photoUrl || null,
     };
     setBomDefs((prev) => ({ ...prev, [newKey]: newBom }));
     if (isSupabaseEnabled()) bomCreate(newKey, newBom).then((r) => { if (!r.success) console.warn("[App] BOM duplicate Supabase failed:", r.error); });
