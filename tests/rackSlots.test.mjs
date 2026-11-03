@@ -273,7 +273,9 @@ test("App: finish Assembly returns a rack machine to its rack; admin transfers f
   assert.match(app, /Anything still pending from \{fromDepartment\}\?/);
   // 2026-11-02 — Transfer has NO signature; the transferer is recorded from the login
   assert.doesNotMatch(app, /data-transfer-sign|Sign to confirm this department's work|Signature required/);
-  assert.match(app, /data-transfer-by/);
+  // 2026-11-03 — the "Transferred by … recorded automatically" note box was removed
+  // (owner: fewer words); the transferer is still recorded from the login (below).
+  assert.doesNotMatch(app, /recorded automatically from your login/);
   assert.match(app, /mainEmployeeSignatureSvg: null,   \/\/ Transfer needs no signature/);
   assert.match(app, /mainEmployeeName: transferrerName,/);
   // Accept keeps its mandatory signature
