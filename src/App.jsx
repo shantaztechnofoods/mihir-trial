@@ -92,7 +92,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-03-mt-polish-1";
+const APP_BUILD = "2026-11-03-mt-polish";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -15549,8 +15549,9 @@ function CustomerMachineReport({ machineId, machineLog = [], bomDefs = {}, hando
   const buildDays = (() => { const a = rptMs(machine.createdDate); const b = machine.completedDate ? rptMs(machine.completedDate) : null; return a != null && b != null && b >= a ? Math.max(1, Math.round((b - a) / 86400000)) : null; })();
   return (
     <ReportSheet kind="customer" settings={settings} title="Customer machine report" refText={ref} generatedBy={generatedBy}>
-      <div className="rpt-hero" data-report-customer-hero>
-        <div className="rpt-photo">{bom.photoUrl ? <img src={bom.photoUrl} alt={`${machine.bomKey} machine`} data-report-photo /> : <span className="mr-label">Machine photo</span>}</div>
+      {/* 2026-11-03 — no photo set: no empty grey box, the facts take the width. */}
+      <div className={`rpt-hero${bom.photoUrl ? "" : " no-photo"}`} data-report-customer-hero>
+        {bom.photoUrl && <div className="rpt-photo"><img src={bom.photoUrl} alt={`${machine.bomKey} machine`} data-report-photo /></div>}
         <div className="min-w-0">
           <div className="mr-label">Machine</div>
           <div className="mr-machine">{machine.bomLabel || bom.label || machine.bomKey}</div>
@@ -18185,7 +18186,20 @@ function PendingJobRows({ rows, onChange, inventory = [], accent = "#b45309", ad
 // reasons already saved on late acceptance, manual ON HOLD and Finish &
 // Transfer delay notes — by REASON and by DEPARTMENT, never by person. The
 // aim is to see where work gets stuck so the process can be fixed.
-function DelayReasonsCard({ machines = [], handovers = [], pendingItems = [] }) {
+// 2026-11-03 — a short, visible reason a Fill Rack button is off, from the
+// same bomFillCheck result the button already uses (display only).
+function rackFillShortWhy(chk, canIssue = true) {
+  if (!chk) return "";
+  if (!chk.ok) {
+    const n = (chk.short || []).length;
+    if (n) return `${n} part${n === 1 ? "" : "s"} short in store`;
+    if (chk.empty) return "BOM has no parts yet";
+    return chk.why || "Cannot fill yet";
+  }
+  return canIssue ? "" : "No permission to issue";
+}
+
+function DelayReasonsCard({ machines = [], handovers = [], pendingItems = [], lateNow = 0 }) {
   const [open, setOpen] = useState(() => {
     try { const v = localStorage.getItem("erp_mt_delay_open"); if (v !== null) return v === "1"; } catch {}
     return typeof window === "undefined" || window.innerWidth >= 768;
@@ -18204,7 +18218,11 @@ function DelayReasonsCard({ machines = [], handovers = [], pendingItems = [] }) 
         <div className="sec-icon" style={{ background: "rgba(100,116,139,0.10)", color: "#475569" }}><Hourglass size={16} /></div>
         <div className="flex-1 min-w-0">
           <div className="text-[15px] font-bold" style={{ color: "var(--text-strong)" }}>Why machines got delayed</div>
-          <div className="text-[12px]" style={{ color: "var(--text-dim)" }}>Where work gets stuck — to fix the process</div>
+          {/* 2026-11-03 — the number on the right counts delay REASONS
+              recorded in the period; "late right now" is the live count the
+              Today line uses (On HOLD list), so the two never contradict. */}
+          <div className="text-[12px]" style={{ color: "var(--text-dim)" }} data-delay-subtitle>Reasons recorded {periodLabel.toLowerCase()}</div>
+          <div className="text-[12px] font-semibold" data-delay-late-now style={{ color: lateNow > 0 ? "#b91c1c" : "var(--text-dim)" }}>Late right now: <span className="tabular-nums">{lateNow}</span></div>
         </div>
         <span data-delay-total className="text-[22px] font-black tabular-nums" style={{ color: "var(--text-strong)" }}>{data.total}</span>
         <span className="text-[14px] transition-transform" style={{ color: "var(--text-dim)", transform: open ? "rotate(180deg)" : "none" }}>▾</span>
@@ -18224,7 +18242,7 @@ function DelayReasonsCard({ machines = [], handovers = [], pendingItems = [] }) 
           </div>
           {data.total === 0 ? (
             <div data-delay-empty className="rounded-xl py-5 text-center text-[15px] font-semibold" style={{ background: "rgba(21,128,61,0.06)", color: "#15803d" }}>
-              No delays {periodLabel.toLowerCase()} 🎉
+              No delay reasons recorded {periodLabel.toLowerCase()}
             </div>
           ) : (
             <>
@@ -19443,6 +19461,8 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
   // for actions that cannot be undone). { name, to, run, busy } — run is the
   // unchanged send handler, called only after Yes.
   const [rackSendAsk, setRackSendAsk] = useState(null);
+  // 2026-11-03 — the admin "Update Stage" correction sits behind a small toggle in History.
+  const [stageEditFor, setStageEditFor] = useState(null);
   const [rackPanelTab, setRackPanelTab] = useState("bom");
   // 2026-11-01 — Escape closes the top-most popup, in the same order they
   // stack on screen; a popup that is saving ignores it, like its Cancel.
@@ -19695,6 +19715,12 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
               <span className="text-[16px] font-black mr-1" style={{ color: "var(--text-strong)" }}>Today:</span>
               {parts.length === 0 && (
                 <span className="text-[16px] font-black" style={{ color: "#15803d" }} data-mt-today-ok>✅ All machines on time</span>
+              )}
+              {isClosedDay(nowTick) && (
+                <span data-mt-closed-day className="min-h-[36px] px-3 rounded-full text-[13px] font-bold inline-flex items-center gap-1.5"
+                      style={{ background: "rgba(99,102,241,0.08)", color: "#4338ca", border: "1px solid rgba(99,102,241,0.30)" }}>
+                  ⏸ Closed day — all timers paused
+                </span>
               )}
               {parts.map((x) => {
                 const isOn = !searchText && mtTab === x.tab && filter === x.key;
@@ -20574,7 +20600,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
 
         {/* 2026-11-03 — admin-only, read-only: why machines got delayed. */}
         {isAdminUser && !staffMode && (
-          <DelayReasonsCard machines={machineLog} handovers={handovers} pendingItems={pendingHandoverItems} />
+          <DelayReasonsCard machines={machineLog} handovers={handovers} pendingItems={pendingHandoverItems} lateNow={onHold.length} />
         )}
 
         {/* ── Production Rack View ──
@@ -20634,6 +20660,9 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                       const faceFillChk  = sl.status === "empty" ? bomFillCheck(rack.bom.primary, bomDefs, (c) => itemByCode[c]) : null;
                       const faceCanFill  = !!faceFillChk && faceFillChk.ok && canDo("outward", "bom") && !!onFillRack;
                       const faceFillWhy  = !faceFillChk ? "" : !faceFillChk.ok ? faceFillChk.why : !canDo("outward", "bom") ? "You do not have permission to issue a BOM" : "";
+                      // 2026-11-03 — the same reason, short enough to print
+                      // under the disabled button (no hover on a tablet).
+                      const faceFillShort = !faceFillChk || faceCanFill ? "" : rackFillShortWhy(faceFillChk, canDo("outward", "bom"));
                       const faceHo       = sl.status === "assembled" && m ? (handovers || []).find((h) => h && h.status === "pending" && String(h.machineId) === String(m.id)) : null;
                       const faceCanSend  = !!faceHo && (canDo("machines", "release") || isAdminUser) && !!onReleaseHandover;
                       // How long this machine has been in assembly, from the
@@ -20732,12 +20761,15 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                 )}
                               </>
                             ) : (
+                              <>
                               <button type="button" data-rack-fill={sl.id} onClick={faceFill} disabled={!faceCanFill}
-                                      className="mt-2 w-full rounded-lg px-2 py-1.5 text-[10.5px] font-black text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                                      className="rack-btn mt-2 w-full rounded-lg px-2 py-1.5 text-[10.5px] font-black text-white disabled:cursor-not-allowed"
                                       style={{ background: "#1d4ed8" }}
                                       title={faceCanFill ? `Issue ${rack.bom.primary} into this rack` : faceFillWhy}>
                                 ＋ Fill Rack
                               </button>
+                              {faceFillShort && <div data-rack-fill-why={sl.id} className="rack-why mt-1 text-[10px] font-semibold leading-tight text-center" style={{ color: "#64748b" }}>{faceFillShort}</div>}
+                              </>
                             )}
                           </div>
                           <div className="mt-1.5 mx-auto w-fit text-[10px] font-black px-2 py-0.5 rounded bg-white/90" style={{ color: "#111827" }}>{rack.tier}-{f.label} ({sl.position})</div>
@@ -20974,17 +21006,17 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                     )}
                     <div className="grid grid-cols-3 gap-2">
                       {[
-                        { key: "fill", label: "＋ Fill Rack", sub: `Issues ${rack.bom.primary} · own serial`, ok: canFill, bg: "#1d4ed8", fn: doFill, why: fillWhy },
+                        { key: "fill", label: "＋ Fill Rack", sub: `Issues ${rack.bom.primary} · own serial`, ok: canFill, bg: "#1d4ed8", fn: doFill, why: sl.status === "empty" && !canFill ? rackFillShortWhy(ownChk, perm) : fillWhy },
                         { key: "assemble", label: `🔧 ${assembleLabel}`, sub: sl.status === "assembling" ? "Back on this rack" : "Start assembly work", ok: assembleOk, bg: "#d97706", fn: doAssemble, why: assembleWhy },
                         { key: "send", label: "→ Transfer to Mechanical", sub: "Rack becomes empty", ok: sendOk, bg: "#15803d", fn: doSend, why: sl.status !== "assembled" ? "Assemble first" : !canSendFromRack ? "Admin / production head only" : "" },
                       ].map((b) => (
                         <div key={b.key} className="flex flex-col items-center gap-1">
                           <button type="button" data-action={b.key} disabled={!b.ok} onClick={b.fn} title={b.ok ? "" : b.why}
-                                  className="w-full rounded-xl px-2 py-3 text-[12.5px] font-black text-white disabled:opacity-35 disabled:cursor-not-allowed"
+                                  className="rack-btn w-full rounded-xl px-2 py-3 text-[12.5px] font-black text-white disabled:cursor-not-allowed"
                                   style={{ background: b.bg, minHeight: 48 }}>{b.label}</button>
                           {/* 2026-11-02 — the reason a floor button is off is
                               readable on a tablet (no hover), not only in title. */}
-                          <span className="text-[10px] text-center leading-tight" style={{ color: !b.ok && b.why ? "#b91c1c" : "var(--text-dim)" }}>{!b.ok && b.why ? b.why : b.sub}</span>
+                          <span data-rack-action-why={b.key} className="text-[10.5px] font-semibold text-center leading-tight break-words max-w-full" style={{ color: !b.ok && b.why ? "#64748b" : "var(--text-dim)" }}>{!b.ok && b.why ? b.why : b.sub}</span>
                         </div>
                       ))}
                     </div>
@@ -21205,17 +21237,18 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
 
                 {/* ── Card header ── */}
                 <div className="px-5 py-4">
-                  <div className="flex items-start gap-4 flex-wrap">
+                  <div className="mt-card-head flex items-start gap-4 flex-wrap">
 
                     {/* Machine identity — may shrink and wrap so a 360px phone
                         never pushes the stage pills past the screen edge. */}
-                    <div className="flex items-center gap-3 min-w-0 max-w-full">
+                    <div className="mt-card-id flex items-center gap-3 min-w-0 max-w-full">
                       {/* Migration 061 — the BOM's machine photo replaces the
                           key tile when one is set; the tile is the fallback. */}
                       <BomPhotoThumb url={(bomDefs || {})[machine.bomKey]?.photoUrl} size={56}
                                      fallback={(
-                        <div className="w-11 h-11 rounded-xl flex items-center justify-center text-[11px] font-black text-slate-900 flex-shrink-0"
-                             style={{ background: stageColor + "1a", border: `1px solid ${stageColor}45` }}>
+                        <div className={`mt-card-key w-11 h-11 rounded-xl flex items-center justify-center ${String(machine.bomKey || "").length > 5 ? "text-[8.5px]" : "text-[11px]"} font-black text-slate-900 flex-shrink-0 overflow-hidden whitespace-nowrap px-0.5`}
+                             title={machine.bomKey}
+                             style={{ background: stageColor + "1a", border: `1px solid ${stageColor}45`, textOverflow: "ellipsis" }}>
                           {machine.bomKey}
                         </div>
                       )} />
@@ -21260,7 +21293,8 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                 ⏱ {formatDuration(t.actualMinutes)} / {formatDuration(target)}
                                 {t.isOverrun ? ` · DELAYED ${formatDuration(t.overrunMinutes)}` : ""}
                               </span>
-                              {closedToday && <span className="font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(99,102,241,0.1)", color: "#4338ca" }}>⏸ paused — closed day</span>}
+                              {/* 2026-11-03 — said once, next to the Today line; kept here (hidden) as the per-card hook. */}
+                              {closedToday && <span data-card-closed-day className="mt-closed-chip font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(99,102,241,0.1)", color: "#4338ca" }}>⏸ paused — closed day</span>}
                             </div>
                           );
                         })()}
@@ -21274,7 +21308,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                         are unchanged. Hidden for a floor login, who only acts on
                         their own stage. */}
                     {!isFloorLogin && (
-                    <div className="flex-1 min-w-[260px]">
+                    <div className="mt-card-stages flex-1 min-w-[260px]">
                       <div className="flex items-center">
                         {DISPLAY_STAGES.map((stage, idx) => {
                           const done    = idx <= dispIdx;
@@ -21324,8 +21358,16 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                           off every card without removing the escape hatch. */}
                       {isExpanded && !isComplete && futureStages.length > 0 && isAdminUser && canDo("machines","updateStage") && !machine.pendingHandoverId
                         && !(handovers || []).some((h) => h && h.status === "pending" && String(h.machineId) === String(machine.id)) && (
+                        String(stageEditFor) !== String(machine.id) ? (
+                          <button type="button" data-stage-edit-toggle={machine.id} onClick={() => setStageEditFor(machine.id)}
+                                  className="text-[11px] font-bold px-3 py-1.5 rounded-lg border transition-all"
+                                  style={{ borderColor: "rgba(17,24,39,0.12)", color: "#475569", background: "var(--surface-card)" }}
+                                  title="Admin correction — moves the stage without the hand-over">
+                            Change stage (admin)
+                          </button>
+                        ) : (
                         <>
-                          <select value={selStage}
+                          <select value={selStage} data-stage-edit-select={machine.id}
                                   onChange={(e) => setStageMap((p) => ({ ...p, [machine.id]: e.target.value }))}
                                   className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-[11px] text-slate-500 outline-none"
                                   style={{ background: "var(--surface-elevated)" }}>
@@ -21338,7 +21380,11 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                   style={{ background: selStage ? "#2640B0" : "transparent", borderColor: selStage ? "rgba(46, 80, 214,0.4)" : "rgba(17,24,39,0.10)", color: selStage ? "white" : "#6b7280" }}>
                             Update
                           </button>
+                          <button type="button" onClick={() => setStageEditFor(null)} aria-label="Close stage change"
+                                  className="text-[11px] font-bold px-2 py-1.5 rounded-lg border transition-all"
+                                  style={{ borderColor: "rgba(17,24,39,0.10)", color: "#6b7280" }}>✕</button>
                         </>
+                        )
                       )}
                       {/* Phase A — Finish & Transfer (handover flow). Shown only when:
                           (a) the machine isn't complete, (b) a next department exists,
@@ -21584,11 +21630,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                   style={{ borderColor: "var(--border-rim)", color: "var(--text-strong)", background: "var(--surface-card)" }}>
                             Company full report
                           </button>}
-                          {isAdminUser && <button type="button" data-history-customer-report={machine.id} onClick={() => openReport("customer", machine.id)}
-                                  className="text-[11px] font-bold px-2.5 py-1 rounded-lg border"
-                                  style={{ borderColor: "var(--border-rim)", color: "var(--text-strong)", background: "var(--surface-card)" }}>
-                            Customer report
-                          </button>}
+                          {/* Customer report: one button, on the card row above (2026-11-03). */}
                           {ratingSummary.average != null && (
                             <span className="text-[12px] font-black" style={{ color: ratingSummary.average >= 4.5 ? "#15803d" : ratingSummary.average >= 3.5 ? "#b45309" : "#dc2626" }}>
                               {formatRatingBadge(Math.round(ratingSummary.average))} {ratingSummary.average} / 5
@@ -21715,7 +21757,10 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                         <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-3">Stage History</div>
                         <div className="relative pl-5">
                           <div className="absolute left-2 top-0 bottom-0 w-px" style={{ background: "rgba(17,24,39,0.06)" }} />
-                          {[...machine.history].reverse().map((h, i) => {
+                          {!(machine.history || []).length && (
+                            <div data-stage-history-empty className="text-[11px] text-slate-500">No stage moves yet</div>
+                          )}
+                          {[...(machine.history || [])].reverse().map((h, i) => {
                             const sc = STAGE_COLORS[h.stage] || "#2E50D6";
                             return (
                               <div key={i} className="relative mb-3 last:mb-0">
@@ -22567,7 +22612,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
       {/* ── Phase 1 — Report Issue Modal ──
           Raises a pending item against the department that must come and fix
           it. The machine does not move; the responsible department is called
-          to it. Blocks Finish & Transfer until resolved. */}
+          to it. Tracking only — it never blocks Finish & Transfer. */}
       {raiseModal && (() => {
         const m = raiseModal.machine;
         const here = m.currentDepartment || m.stage;
@@ -22591,7 +22636,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
           if (r && r.success === false) { setRaiseErr(r.error || "Could not save the issue."); return; }
           if (voiceRecRef.current) { voiceRecRef.current.stop(); voiceRecRef.current = null; setVoiceActive(false); }
           setRaiseModal(null);
-          showToast(`${m.bomKey}${m.serialNo ? ` — ${m.serialNo}` : ""}`, `${raiseDept} called · machine is now blocked`, "urgent");
+          showToast(`${m.bomKey}${m.serialNo ? ` — ${m.serialNo}` : ""}`, `${raiseDept} called · issue is tracked in Pending Jobs`, "urgent");
         };
         return (
         <div className="modal-backdrop fixed inset-0 z-[70] flex items-center justify-center p-4"
@@ -22614,7 +22659,10 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                         placeholder={voiceActive ? "🎙 Listening…" : "e.g. noise coming from the gearbox · or tap 🎤 and speak"}
                         className="w-full rounded-lg px-3 py-2.5 pr-12 text-[13px] text-slate-800 outline-none resize-y"
                         style={{ background: "var(--surface-elevated)", border: voiceActive ? "2px solid #ef4444" : "1px solid rgba(17,24,39,0.12)" }} />
-              {(window.SpeechRecognition || window.webkitSpeechRecognition) && (
+              {/* 2026-11-03 — one recorder: the 🎤 Record below also types what is
+                  said, so this small dictation button is only the fallback for
+                  a login that cannot save voice notes. */}
+              {!canVoice && (window.SpeechRecognition || window.webkitSpeechRecognition) && (
                 <button type="button" disabled={raiseBusy}
                         onClick={() => toggleVoice(setRaiseText)}
                         className="absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center transition-all"
@@ -22624,12 +22672,12 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                 </button>
               )}
             </div>
-            {(window.SpeechRecognition || window.webkitSpeechRecognition) && (
-              <div className="flex items-center gap-1.5 mt-1.5" role="group" aria-label="Voice language">
-                <span className="text-[10px] text-slate-500">Speak in:</span>
+            {!canVoice && (window.SpeechRecognition || window.webkitSpeechRecognition) && (
+              <div className="flex items-center gap-1.5 mt-1.5 flex-wrap" role="group" aria-label="Voice language">
+                <span className="text-[12px] text-slate-500">Speak in:</span>
                 {VOICE_LANGS.map(([code, label]) => (
                   <button key={code} type="button" disabled={raiseBusy || voiceActive} onClick={() => pickVoiceLang(code)} aria-pressed={voiceLang === code}
-                          className="text-[10.5px] font-bold px-2 py-0.5 rounded-md border transition-all disabled:opacity-60"
+                          className="min-h-[44px] text-[14px] font-bold px-3 rounded-xl border-2 transition-all disabled:opacity-60"
                           style={voiceLang === code ? { background: "#ef4444", color: "#fff", borderColor: "#ef4444" } : { background: "#fff", color: "#475569", borderColor: "rgba(17,24,39,0.15)" }}>
                     {label}
                   </button>
@@ -22637,7 +22685,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
               </div>
             )}
             {canVoice && (
-              <VoiceNoteRecorder {...vnProps(m.id, here)} place="Report Issue" setText={setRaiseText} disabled={raiseBusy || voiceActive} langs={false} />
+              <VoiceNoteRecorder {...vnProps(m.id, here)} place="Report Issue" setText={setRaiseText} disabled={raiseBusy || voiceActive} />
             )}
 
             {/* 2026-10-30 — optional missing part, so the job is traceable. */}
@@ -22676,7 +22724,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
             </select>
 
             <p className="text-[11px] text-slate-500 mt-3">
-              The machine stays in {here}. Finish &amp; Transfer stays blocked until this is resolved.
+              The machine stays in {here}. The issue is tracked until it is fixed — it never blocks Finish &amp; Transfer.
             </p>
 
             {raiseErr && (

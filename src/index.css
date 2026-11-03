@@ -3595,3 +3595,24 @@ body:has(.mt-report-modal) #erp-build-badge { display: none !important; }
     background: linear-gradient(to bottom, rgba(255,255,255,0), #fff);
   }
 }
+
+/* 2026-11-03 — Machine Tracker polish (part 2). */
+/* A rack button that cannot be used is plain grey, its reason printed below. */
+button.rack-btn:disabled { background: #e5e7eb !important; color: #6b7280 !important; opacity: 1 !important; box-shadow: none !important; }
+/* Desktop machine cards: identity in a fixed column, so every stage line
+   (1-2-3-4) starts at the same x; the actions row spans the card. */
+@media (min-width: 1024px) {
+  .mt-card-head { display: grid !important; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); column-gap: 24px; row-gap: 12px; }
+  .mt-card-head > .mt-card-id { max-width: none; }
+  .mt-card-head > .mt-card-stages { min-width: 0; }
+  .mt-card-head > .mt-card-actions { grid-column: 1 / -1; }
+}
+/* "paused — closed day" is said once, next to the Today line. */
+.mt-closed-chip { display: none !important; }
+/* Count boxes: the label always takes two lines, so the numbers line up. */
+@media (max-width: 767px) {
+  .mt-kpis .mt-kpi-label { line-height: 1.15; height: 2.3em; min-height: 2.3em; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .mt-kpis .kpi-tile > div:first-child { align-items: flex-start; }
+}
+/* Customer report without a photo: no empty box. */
+.mr-doc .rpt-hero.no-photo { grid-template-columns: minmax(0, 1fr); }

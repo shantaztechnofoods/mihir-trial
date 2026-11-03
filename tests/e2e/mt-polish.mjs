@@ -1,6 +1,8 @@
 // Machine Tracker polish (2026-11-03). LOCAL TEST DATA ONLY.
 // Rack crates never overlap with a long serial, the build tag hides while a
 // dialog is open, and sending a machine from the rack asks "Are you sure?".
+// Part 2: Fill Rack reasons, delay card vs Today, History panel, Report Issue
+// copy + one recorder, and the ⚙️ Settings target.
 import fs from "fs";
 import { launch, login, makeOk, ls } from "./lib/helpers.mjs";
 const src = fs.readFileSync(new URL("./go-live-workflows.mjs", import.meta.url), "utf8");
@@ -43,6 +45,41 @@ const tops = await p.evaluate(() => [...document.querySelectorAll(".rack-shelf >
 ok("rack rows stay aligned (M with M, R with R)", tops.length === 2 && tops[0][0] === tops[1][0] && tops[0][1] === tops[1][1], JSON.stringify(tops));
 await p.setViewportSize({ width: 1280, height: 800 }); await p.waitForTimeout(300);
 
+// ── 3. A Fill Rack that is off says why, in plain sight, and is grey ──
+const fills = await p.evaluate(() => [...document.querySelectorAll("[data-rack-fill]")].map((b) => ({ id: b.dataset.rackFill, off: b.disabled, bg: getComputedStyle(b).backgroundColor,
+  why: (document.querySelector(`[data-rack-fill-why="${CSS.escape(b.dataset.rackFill)}"]`) || {}).textContent || "" })));
+const off = fills.filter((f) => f.off);
+ok("every disabled Fill Rack has a visible reason under it", off.length > 0 && off.every((f) => f.why.trim().length > 0), JSON.stringify(off.map((f) => f.why)));
+ok("disabled Fill Rack is plain grey (not faded blue)", off.every((f) => f.bg === "rgb(229, 231, 235)"), off[0] && off[0].bg);
+ok("an enabled Fill Rack shows no reason line", fills.filter((f) => !f.off).every((f) => !f.why));
+if (off.length) {
+  await p.locator(`[data-slot="${off[0].id}"]`).click(); await p.waitForTimeout(400);
+  const pw = p.locator('.rack-panel [data-rack-action-why="fill"]');
+  ok("rack panel: the same short reason is printed under its disabled Fill Rack", await p.locator('.rack-panel [data-action="fill"]').isDisabled() && (await pw.innerText()).trim() === off[0].why.trim(), await pw.innerText());
+  ok("build tag hidden while the rack panel is open", await p.evaluate(() => getComputedStyle(document.getElementById("erp-build-badge")).display === "none"));
+  await p.locator('.rack-panel button[aria-label="Close"]').click(); await p.waitForTimeout(300);
+}
+
+// ── 2. The copy matches the real rule and the delay card agrees with Today ──
+const lateChip = p.locator('[data-mt-today-chip="hold"]');
+const lateN = (await lateChip.count()) ? Number((await lateChip.innerText()).match(/\d+/)[0]) : 0;
+const lateNow = await p.locator("[data-delay-late-now]").innerText().catch(() => "");
+ok("delay card shows 'Late right now: N' from the same list as the Today line", lateNow.includes(`Late right now: ${lateN}`), `${lateNow} vs ${lateN}`);
+ok("delay card says it counts recorded reasons", /Reasons recorded this month/.test(await p.locator("[data-delay-subtitle]").innerText()));
+ok("no 'No delays … 🎉' while a machine is late", !(await p.locator("[data-delay-card]").innerText()).includes("🎉"));
+
+// ── 7. History: empty stage history, one Customer report, Update Stage behind a toggle ──
+const histBtn = p.locator("button", { hasText: /^History$/ }).first();
+await histBtn.scrollIntoViewIfNeeded(); await histBtn.click(); await p.waitForTimeout(400);
+ok("empty stage history says 'No stage moves yet'", await p.locator("[data-stage-history-empty]").first().innerText().then((t) => t.trim() === "No stage moves yet").catch(() => false));
+ok("History panel has no second Customer report button", await p.locator("[data-history-customer-report]").count() === 0 && await p.locator("[data-card-customer-report]").count() > 0);
+const tg = p.locator("[data-stage-edit-toggle]").first();
+ok("Update Stage is hidden behind 'Change stage (admin)'", await tg.count() === 1 && await p.locator("[data-stage-edit-select]").count() === 0);
+await tg.click(); await p.waitForTimeout(200);
+ok("the toggle shows the same Update Stage select", await p.locator("[data-stage-edit-select]").count() === 1 && /Update Stage/.test(await p.locator("[data-stage-edit-select]").innerText()));
+await p.locator('button[aria-label="Close stage change"]').click(); await p.waitForTimeout(200);
+await p.locator("button", { hasText: /^Hide$/ }).first().click(); await p.waitForTimeout(300);
+
 // ── 8. Send to Mechanical asks first; No keeps it; Yes runs the same handler ──
 const badge = () => p.evaluate(() => { const e = document.getElementById("erp-build-badge"); return !!e && getComputedStyle(e).display !== "none"; });
 ok("build tag shows while no dialog is open", await badge());
@@ -72,7 +109,18 @@ const cancel = p.locator(".modal-backdrop button.mt-cancel").first();
 const cb = await cancel.boundingBox();
 ok("phone Report Issue: Cancel is at least 48px and inside the screen", cb && cb.height >= 47.5 && cb.y + cb.height <= 844, JSON.stringify(cb));
 ok("phone: build tag hidden while Report Issue is open", !(await badge()));
+// 2. + 11. Report Issue copy and one recorder with big language chips
+const rtext = await p.locator(".modal-backdrop").last().innerText();
+ok("Report Issue says it never blocks Finish & Transfer", /never blocks Finish & Transfer/.test(rtext) && !/stays blocked/.test(rtext));
+ok("Report Issue has one recorder (🎤 Record), no second small 🎤", await p.locator(".modal-backdrop [data-voice-record]").count() === 1 && await p.locator('.modal-backdrop button[title^="Voice input"]').count() === 0);
+const chipH = await p.locator(".modal-backdrop [data-voice-lang]").evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height));
+ok("language chips are at least 44px", chipH.length === 3 && chipH.every((h) => h >= 43.5), JSON.stringify(chipH));
 await cancel.click(); await p.waitForTimeout(300);
+
+// ── 9. Machine Tracker ⚙️ Settings opens the Machine Tracker settings ──
+await p.setViewportSize({ width: 1280, height: 800 }); await p.waitForTimeout(300);
+await p.locator("button", { hasText: "⚙️ Settings" }).first().click(); await p.waitForTimeout(700);
+ok("⚙️ Settings opens Machine Tracker Settings (not Company)", /Machine Tracker Settings/.test(await p.locator("body").innerText()) && await p.locator("button", { hasText: /^Company$/ }).count() === 0);
 
 ok("no page errors", errs.length === 0, errs.join(" | "));
 await done(b);
