@@ -86,7 +86,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-03-mt-search";
+const APP_BUILD = "2026-11-03-phone-count-boxes";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -18956,7 +18956,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
             { key: "jobs",          tab: "pending",    label: "Pending Jobs",       value: openJobsScoped.length,  sub: "parts & work still open", color: "#b91c1c", strip: "status-strip-red" },
           ];
           return (
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3" data-mt-nav>
+            <div className="mt-kpis grid grid-cols-3 xl:grid-cols-6 gap-3" data-mt-nav>
               {cards.map((c) => {
                 const isOn = mtTab === c.tab && (c.tab === "pending" || filter === c.key);
                 return (
@@ -18969,11 +18969,11 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                           className={`kpi-tile status-strip ${c.strip} text-left`}
                           style={isOn ? { borderColor: c.color, boxShadow: `0 0 0 1px ${c.color}, 0 4px 16px -4px ${c.color}55` } : {}}>
                     <div className="flex items-center justify-between mb-2">
-                      <div className="text-[9.5px] font-bold uppercase tracking-[0.08em]" style={{ color: c.color }}>{c.label}</div>
+                      <div className="mt-kpi-label text-[9.5px] font-bold uppercase tracking-[0.08em]" style={{ color: c.color }}>{c.label}</div>
                       <span className="w-2 h-2 rounded-full" style={{ background: c.color }} />
                     </div>
-                    <div className="text-[26px] font-extrabold leading-none tabular-nums tracking-[-0.02em]" style={{ color: c.color }}>{c.value}</div>
-                    <div className="text-[10px] mt-2" style={{ color: "var(--text-dim)" }}>{c.sub}</div>
+                    <div className="mt-kpi-value text-[26px] font-extrabold leading-none tabular-nums tracking-[-0.02em]" style={{ color: c.color }}>{c.value}</div>
+                    <div className="mt-kpi-sub text-[10px] mt-2" style={{ color: "var(--text-dim)" }}>{c.sub}</div>
                   </button>
                 );
               })}
