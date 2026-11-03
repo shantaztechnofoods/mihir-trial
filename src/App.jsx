@@ -92,7 +92,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-03-part-or-comment";
+const APP_BUILD = "2026-11-03-voice-text";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -16737,7 +16737,16 @@ function VoiceNoteRecorder({ machineId, department, place, item = "", onUpload, 
     r.current.file = null;
     setAtt(res.attachment || null);
     setPhase("saved");
-    if (textRef.current) textRef.current((prev) => fillVoiceText(prev));
+    // 2026-11-03 (owner) — reports and screens read TEXT, not audio: the box is
+    // never auto-filled with a placeholder. If dictation produced no words, the
+    // worker is asked to type them; the field's own "required" check stays.
+    if (textRef.current) textRef.current((prev) => {
+      if (!String(prev || "").trim() || String(prev).trim() === "🎤 Voice note") {
+        setTimeout(() => setErr("Audio saved — now write the same in words in the box"), 0);
+        return "";
+      }
+      return prev;
+    });
   };
 
   const finish = () => {
