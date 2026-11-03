@@ -63,12 +63,13 @@ await b.close();
 // ── 1b. Near-deadline reminder (staff). Fake clock: Monday 14:00 (a working day), SN-101 entered
 // Mechanical at 04:00 with a 700-minute target → 600/700 = 86% used, 1h 40m left.
 {
-  const D = await launch(seed); const pd = D.p;
-  await pd.addInitScript(stubs); await pd.clock.setFixedTime(new Date("2026-11-02T14:00:00"));
-  await pd.evaluate(() => { const ms = JSON.parse(localStorage.getItem("erp_machines")); const m1 = ms.find((x) => x.id === 1);
+  // Seed SN-101's timer in the same step as the base seed (before the app first loads it).
+  const seedD = eval(`() => { (${seed.toString()})(); const ms = JSON.parse(localStorage.getItem("erp_machines")); const m1 = ms.find((x) => x.id === 1);
     m1.departmentEnteredAt = new Date("2026-11-02T04:00:00").toISOString(); m1.deptDurations = { Mechanical: { minutes: 700 } };
-    localStorage.setItem("erp_machines", JSON.stringify(ms)); localStorage.removeItem("erp_deadline_alerts"); });
-  const reopen = async () => { await pd.reload({ waitUntil: "networkidle" }); await pd.waitForTimeout(500); await pd.addStyleTag({ content: hide });
+    localStorage.setItem("erp_machines", JSON.stringify(ms)); localStorage.removeItem("erp_deadline_alerts"); }`);
+  const D = await launch(seedD); const pd = D.p;
+  await pd.addInitScript(stubs); await pd.clock.setFixedTime(new Date("2026-11-02T14:00:00"));
+  const reopen = async () => { await pd.reload({ waitUntil: "load" }); await pd.waitForTimeout(1200); await pd.addStyleTag({ content: hide });
     if (await pd.locator("#login-username").count()) await login(pd, "mech", "mech123");
     await gotoMachineTracker(pd); await pd.waitForTimeout(900); };
   await reopen();
