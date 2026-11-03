@@ -86,7 +86,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-03-delete-machine";
+const APP_BUILD = "2026-11-03-transfer-pending-item";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -16881,6 +16881,17 @@ const cleanPendingJobs = (rows) => (Array.isArray(rows) ? rows : []).map(normali
       : null,
   }));
 
+// 2026-11-03 — Finish & Transfer and Accept use the same small Add Pending Item
+// form as BOM Outward. A row that was started must have an item name and a
+// quantity and must be saved with its Save button, so nothing typed is lost.
+const pendingItemsProblem = (rows) => {
+  const started = (Array.isArray(rows) ? rows : []).map(normalizePendingJob)
+    .filter((j) => j.itemName.trim() || j.itemCode.trim() || String(j.qty).trim() || j.partSerialNo.trim() || j.saved);
+  if (started.some((j) => !j.itemName.trim() || !(Number(j.qty) > 0))) return "Each pending item needs an item name and a quantity.";
+  if (started.some((j) => !j.saved)) return "Press Save on each pending item first.";
+  return "";
+};
+
 // 2026-11-01 — every Machine Tracker popup gets a visible close control in
 // its top-right corner. Several closed only by tapping outside or by a Cancel
 // at the very bottom, which on a phone sat below the screen and left people
@@ -17473,6 +17484,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
         return;
       }
     }
+    { const pp = pendingItemsProblem(owedItems); if (pp) { showToast("Pending item not saved", pp, "warning"); return; } }
     // 2026-11-02 — no signature and no worker / main-employee names are
     // collected at Transfer; the signed-in user is recorded as the transferer.
     if (!currentUser?.id) { showToast("Not signed in", "Sign in again to transfer.", "warning"); return; }
@@ -17584,6 +17596,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
         return;
       }
     }
+    { const pp = pendingItemsProblem(acceptModal.pendingItemsToRaise); if (pp) { setAcceptModal((prev) => prev ? { ...prev, error: pp } : prev); return; } }
     setAcceptModal((prev) => prev ? { ...prev, busy: true, error: "" } : prev);
     const pendingItemsToRaise = cleanPendingJobs(acceptModal.pendingItemsToRaise);
     const res = await onAcceptHandover({ handoverId: handover.id, password, pendingItemsToRaise, holdReason: holdReason.trim(),
@@ -21158,7 +21171,9 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                     Leave empty if the work is complete. Anything listed here stays on {fromDepartment}&apos;s list until it is done — it is tracked, and it does not stop the machine moving on.
                   </div>
                   <PendingJobRows rows={finishModal.owedItems || []} inventory={inventoryFlat} disabled={transferBusy}
+                                  addLabel="+ Add Pending Item" mode="item"
                                   onChange={(rows) => setFinishModal((prev) => prev ? { ...prev, owedItems: rows } : prev)} />
+                  {pendingItemsProblem(finishModal.owedItems) && <div data-pending-item-problem className="mt-1.5 text-[11px] font-semibold" style={{ color: "#b45309" }}>{pendingItemsProblem(finishModal.owedItems)}</div>}
                 </div>
               </div>
               <div className="px-5 py-3 border-t border-slate-100 flex items-center justify-between flex-shrink-0 bg-white">
@@ -21322,8 +21337,9 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                     <div className="rounded-lg px-3 py-2" style={{ background: "rgba(17,24,39,0.03)", border: "1px solid rgba(17,24,39,0.10)" }}>
                       <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1.5">Any work from {handover.fromDepartment} still pending? (optional)</div>
                       <PendingJobRows rows={acceptModal.pendingItemsToRaise || []} inventory={inventoryFlat} disabled={acceptModal.busy}
-                                      accent="#dc2626" addLabel="+ Add pending job / missing part"
+                                      accent="#dc2626" addLabel="+ Add Pending Item" mode="item"
                                       onChange={(rows) => setField({ pendingItemsToRaise: rows })} />
+                      {pendingItemsProblem(acceptModal.pendingItemsToRaise) && <div data-pending-item-problem className="mt-1.5 text-[11px] font-semibold" style={{ color: "#b45309" }}>{pendingItemsProblem(acceptModal.pendingItemsToRaise)}</div>}
                       <div className="text-[10px] text-slate-500 mt-1.5">Saved against this machine and serial number in Pending Jobs until the work is completed. Nothing recorded = nothing pending.</div>
                     </div>
                     {/* Feature 5 — team members present at acceptance */}
@@ -26278,6 +26294,7 @@ export default function App() {
         description: text,
         kind: "owed",
         itemCode: job.itemCode, itemName: job.itemName, qty: job.qty, reason: job.reason,
+        critical: !!job.critical, partSerialNo: job.partSerialNo || "", criticalChecks: job.criticalChecks || null,
       });
       if (pr.success) {
         setPendingHandoverItems((prev) => [pr.item, ...prev]);
@@ -26464,6 +26481,7 @@ export default function App() {
         raisedBy: currentUser.id,
         description: desc,
         itemCode: job.itemCode, itemName: job.itemName, qty: job.qty, reason: job.reason,
+        critical: !!job.critical, partSerialNo: job.partSerialNo || "", criticalChecks: job.criticalChecks || null,
       });
       if (pi.success) {
         setPendingHandoverItems((prev) => [pi.item, ...prev]);
