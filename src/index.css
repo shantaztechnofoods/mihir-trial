@@ -3268,6 +3268,74 @@ input:focus, select:focus, textarea:focus { box-shadow: 0 0 0 3px rgba(46,80,214
 .vn-dot{width:12px;height:12px;border-radius:999px;background:#fff;flex-shrink:0;animation:pulseDot 1s ease-in-out infinite}
 @media (prefers-reduced-motion:reduce){.vn-live,.vn-dot{animation:none}}
 
+/* 2026-11-03 — compact voice: a small mic INSIDE the text box (right end),
+   a one-line recording bar over the box, a one-line saved player under it.
+   No language picker, no big Record button. */
+.vn-field{position:relative}
+.vn-field > input, .vn-field > textarea{padding-right:44px!important}
+.vn-field-bare{min-height:40px}
+.vn-field-plain > input{padding-right:10px!important}
+.vn-mic{position:absolute;right:3px;top:50%;transform:translateY(-50%);width:36px;height:36px;min-height:36px!important;min-width:36px;padding:0;display:inline-flex;align-items:center;justify-content:center;
+  border-radius:8px;border:1px solid transparent;background:transparent;color:#475569;font-size:16px;line-height:1;cursor:pointer;transition:background-color .15s,color .15s,transform .1s}
+.vn-field > textarea ~ .vn-mic{top:4px;transform:none}
+.vn-mic:hover{background:rgba(38,64,176,.07);color:#2640B0}
+.vn-mic:active{background:rgba(38,64,176,.14)}
+.vn-mic:disabled{opacity:.45;cursor:default}
+.vn-mic-busy{cursor:default;color:#2640B0}
+.vn-spin{width:14px;height:14px;border-radius:999px;border:2px solid rgba(38,64,176,.25);border-top-color:#2640B0;animation:vnSpin .8s linear infinite}
+@keyframes vnSpin{to{transform:rotate(360deg)}}
+.vn-bar{position:absolute;inset:0;display:flex;align-items:center;gap:8px;padding:0 4px 0 12px;border-radius:9px;background:#fff5f5;border:1px solid rgba(220,38,38,.55);color:#b91c1c;font-size:13px;font-weight:700;z-index:1;min-height:40px}
+.vn-bar .vn-dot{width:9px;height:9px;background:#dc2626}
+.vn-bar-text{white-space:nowrap}
+.vn-bar-max{font-size:11px;font-weight:600;color:#ef4444;opacity:.75;margin-left:auto;white-space:nowrap}
+@media (max-width:400px){.vn-bar-max{display:none}.vn-bar-text{margin-right:auto}}
+.vn-stop{display:inline-flex;align-items:center;gap:6px;height:34px;min-height:34px!important;padding:0 12px;border-radius:7px;background:#111827;color:#fff;font-size:12.5px;font-weight:700;border:0;cursor:pointer}
+.vn-stop-sq{width:8px;height:8px;border-radius:1.5px;background:#fff}
+.vn-saved{margin-top:6px;display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:3px 4px 3px 3px;border-radius:9px;background:rgba(21,128,61,.05);border:1px solid rgba(21,128,61,.22)}
+.vn-play-sm{width:32px;height:32px;min-height:32px!important;border-radius:999px;background:#2640B0;color:#fff;font-size:11px;font-weight:900;display:inline-flex;align-items:center;justify-content:center;border:0;cursor:pointer}
+.vn-saved .vn-play{min-width:32px!important;height:32px!important;min-height:32px!important;font-size:12px!important}
+.vn-saved-text{font-size:12.5px;font-weight:700;color:#15803d}
+.vn-saved-time{font-size:11.5px;color:#64748b}
+.vn-del{margin-left:auto;height:32px;min-height:32px!important;padding:0 10px;border-radius:7px;background:#fff;border:1px solid rgba(17,24,39,.14);color:#64748b;font-size:12px;font-weight:600;cursor:pointer}
+.vn-del:hover{color:#b91c1c;border-color:rgba(220,38,38,.4)}
+.vn-yes{height:36px;min-height:36px!important;padding:0 12px;border-radius:8px;background:#dc2626;color:#fff;font-size:12.5px;font-weight:700;border:0}
+.vn-no{height:36px;min-height:36px!important;padding:0 12px;border-radius:8px;background:#fff;color:#334155;font-size:12.5px;font-weight:700;border:1px solid rgba(17,24,39,.18)}
+.vn-retry{margin-top:6px;height:36px;min-height:36px!important;padding:0 12px;border-radius:8px;background:#2640B0;color:#fff;font-size:12.5px;font-weight:700;border:0}
+.vn-note{margin-top:4px;font-size:12px;font-weight:600;line-height:1.35}
+@media (prefers-reduced-motion:reduce){.vn-spin{animation-duration:2s}}
+
+/* 2026-11-03 — compact checklist rows: ✓ box + label + small ✕ "Not done".
+   The reason box opens only under a point marked ✕. */
+.ck-list{display:flex;flex-direction:column;gap:4px}
+.ck-row{border:1px solid rgba(17,24,39,.10);border-radius:10px;background:#fff;transition:border-color .15s,background-color .15s}
+.ck-row[data-check-state="ok"]{border-color:rgba(21,128,61,.30);background:rgba(21,128,61,.035)}
+.ck-row[data-check-state="no"]{border-color:rgba(220,38,38,.35);background:rgba(220,38,38,.025)}
+.ck-line{display:flex;align-items:center;min-height:46px}
+.ck-hit{flex:1;min-width:0;display:flex;align-items:center;gap:10px;padding:5px 6px 5px 10px;min-height:46px;cursor:pointer}
+.ck-row input.ck-box{width:22px!important;height:22px!important;min-height:0!important;flex-shrink:0;margin:0;accent-color:#15803d;cursor:pointer}
+.ck-label{font-size:15px;line-height:1.35;color:#111827;font-weight:400;min-width:0;overflow-wrap:anywhere}
+.ck-row[data-check-state="ok"] .ck-label{color:#1f2937}
+.ck-must{display:inline-block;margin-left:6px;padding:0 7px;border-radius:999px;font-size:11px;font-weight:700;line-height:16px;color:#92400e;background:rgba(180,83,9,.09);white-space:nowrap;vertical-align:1px}
+.ck-no{flex-shrink:0;width:38px;height:38px;min-height:38px!important;margin-right:4px;border-radius:8px;border:1px solid rgba(17,24,39,.12);background:#fff;color:#94a3b8;font-size:13px;font-weight:800;line-height:1;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:background-color .15s,color .15s,border-color .15s}
+.ck-no:hover{color:#dc2626;border-color:rgba(220,38,38,.35)}
+.ck-no[aria-pressed="true"]{background:#fee2e2;color:#dc2626;border-color:rgba(220,38,38,.5)}
+.ck-reason{padding:0 6px 6px 42px;animation:ckOpen .16s ease-out}
+@keyframes ckOpen{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}
+.ck-input{width:100%;height:42px;min-height:42px!important;border-radius:8px;border:1px solid rgba(17,24,39,.18);padding:0 10px;font-size:15px;color:#0f172a;background:#fff;outline:none}
+.ck-input:focus{border-color:#2640B0!important;box-shadow:0 0 0 3px rgba(38,64,176,.12)}
+.ck-row.field-bad{outline-offset:1px}
+@media (prefers-reduced-motion:reduce){.ck-reason{animation:none}}
+@media (max-width:767px){
+  .ck-label{font-size:16px}
+  .ck-input{font-size:16px} /* no iOS zoom on focus */
+}
+
+/* 2026-11-03 — calm two-way segmented control (Pending: Part | Comment). */
+.seg2{display:grid;grid-template-columns:1fr 1fr;gap:3px;padding:3px;border-radius:11px;background:rgba(17,24,39,.05);border:1px solid rgba(17,24,39,.08)}
+.seg2-btn{min-height:44px;border-radius:8px;border:1px solid transparent;background:transparent;color:#64748b;font-size:13px;font-weight:600;transition:background-color .15s,color .15s,box-shadow .15s}
+.seg2-btn[aria-pressed="true"]{background:#fff;color:#0f172a;font-weight:700;border-color:rgba(17,24,39,.10);box-shadow:0 1px 2px rgba(17,24,39,.10)}
+.seg2-btn:disabled{opacity:.5}
+
 /* ── 2026-11-03 Organise: Machine Tracker settings groups + BOM Edit steps ──
    Layout only, inside the existing card look. Right-sized controls:
    min touch 44px, primary 48px, control text 15px, nothing stretched. */

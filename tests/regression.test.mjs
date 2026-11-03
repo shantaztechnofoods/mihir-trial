@@ -300,7 +300,9 @@ const USER_FACING_STRINGS = [
   "Pending Acceptance",
   "Acting Main Employee", "Delay reason (required)",
   // 2026-10-30 — calendar, pull back, on-hold reason, voice languages, report settings
-  "Working calendar", "+ Add holiday", "Pull back", "Reason for late acceptance", "Speak in:",
+  "Working calendar", "+ Add holiday", "Pull back", "Reason for late acceptance",
+  // 2026-11-03 (owner) — "Speak in:" language chips removed on purpose: no
+  // language picker anywhere; server transcription detects the language.
   "Report Settings", "PDF / print language", "Receive remark / reason",
   "Customer Progress Report",
   // Machine Tracker UX pass
@@ -449,7 +451,8 @@ const USER_FACING_STRINGS = [
   "🎤 Voice note",
   "Recording… ",
   "Are you sure? Remove this voice note?",
-  "Typing by voice not supported on this phone — audio saved",
+  // 2026-11-03 — browser live dictation inside the recorder was dropped (it
+  // needed a language choice); "Typing by voice not supported…" went with it.
   "VoiceNoteRecorder",
   "VoicePlayButton",
   "data-staff-voice",
@@ -458,6 +461,15 @@ const USER_FACING_STRINGS = [
   "VOICE_WRITING_TEXT",
   "VOICE_WRITE_PROMPT",
   "data-voice-writing",
+  // 2026-11-03 — compact checklists (✕ Not done → reason box) + small in-box mic
+  "ChecklistRows",
+  "flagChecklist(",
+  "data-check-no",
+  "data-check-reason",
+  "Why not done?",
+  "Must do",
+  "data-voice-record",
+  "data-voice-stop",
 ];
 
 for (const s of USER_FACING_STRINGS) {
