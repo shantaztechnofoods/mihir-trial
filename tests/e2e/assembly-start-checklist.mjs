@@ -30,7 +30,7 @@ await p.locator('[data-slot="R-10-1#1"]').first().click(); await p.waitForTimeou
 await p.locator('.rack-panel [data-action="assemble"]').click(); await p.waitForTimeout(400);
 const sheet = p.locator("[data-start-checklist]");
 ok("Assemble opens the Before Starting Work checklist", await sheet.count() === 1 && /Before Starting Work/.test(await sheet.innerText()));
-ok("the checklist shows the 4 template points", await p.locator("[data-start-chk-row]").count() === 4);
+ok("the checklist shows the 4 template points", await p.locator("[data-start-checklist] [data-check-row]").count() === 4);
 ok("machine is NOT started while the checklist is open", (await mach(71)).stage === "BOM Issued");
 
 // Start with nothing answered → blocked, first row flagged
@@ -38,21 +38,21 @@ await p.locator("[data-start-chk-submit]").click(); await p.waitForTimeout(300);
 ok("Start with no answers is blocked", (await mach(71)).stage === "BOM Issued" && await sheet.count() === 1 && await p.locator("[data-start-chk-error]").count() === 1);
 
 // ✓ three, ✗ one without reason → still blocked
-for (const i of [0, 1, 2]) await p.locator(`[data-start-chk-ok="${i}"]`).click();
-await p.locator('[data-start-chk-x="3"]').click(); await p.waitForTimeout(200);
-ok("✗ opens a Reason box for that point only", await p.locator("[data-start-chk-reason]").count() === 1 && await p.locator('[data-start-chk-reason="3"]').count() === 1);
+for (const i of [0, 1, 2]) await p.locator(`[data-start-checklist] [data-check-row="${i}"] [data-check-ok]`).check();
+await p.locator('[data-start-checklist] [data-check-row="3"] [data-check-no]').click(); await p.waitForTimeout(200);
+ok("✗ opens a Reason box for that point only", await p.locator("[data-start-checklist] [data-check-reason-input]").count() === 1 && await p.locator('[data-start-checklist] [data-check-row="3"] [data-check-reason-input]').count() === 1);
 await p.locator("[data-start-chk-submit]").click(); await p.waitForTimeout(300);
 ok("✗ without a reason is blocked", (await mach(71)).stage === "BOM Issued" && await sheet.count() === 1);
 
 // Screenshot at phone size with the reason box open
-await p.locator('[data-start-chk-reason="3"]').fill("Heater wire loose, sent to store");
+await p.locator('[data-start-checklist] [data-check-row="3"] [data-check-reason-input]').fill("Heater wire loose, sent to store");
 await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(2800);
 const shot = process.env.SHOT || "/tmp/assembly-start-checklist-390.png";
 await p.screenshot({ path: shot });
 const fit = await p.evaluate(() => { const btn = document.querySelector("[data-start-chk-submit]"); const r = btn.getBoundingClientRect(); const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
   return { inView: r.bottom <= innerHeight && r.top >= 0, hit: btn.contains(top), hscroll: document.documentElement.scrollWidth > innerWidth + 1,
-    small: [...document.querySelectorAll("[data-start-checklist] [data-start-chk-ok],[data-start-checklist] [data-start-chk-x]")].filter((x) => x.getBoundingClientRect().height < 44).length }; });
-ok("390px: Start button visible and tappable, ✓/✗ ≥44px, no sideways scroll", fit.inView && fit.hit && fit.small === 0 && !fit.hscroll, JSON.stringify(fit));
+    small: [...document.querySelectorAll("[data-start-checklist] .ck-hit,[data-start-checklist] [data-check-no]")].filter((x) => x.getBoundingClientRect().height < (x.matches("[data-check-no]") ? 38 : 44)).length }; });
+ok("390px: Start button visible and tappable, ✓ row ≥44px, ✗ ≥38px (shared checklist size), no sideways scroll", fit.inView && fit.hit && fit.small === 0 && !fit.hscroll, JSON.stringify(fit));
 await p.setViewportSize({ width: 1200, height: 1000 }); await p.waitForTimeout(300);
 
 await p.locator("[data-start-chk-submit]").click(); await p.waitForTimeout(900);

@@ -1,6 +1,7 @@
-// Voice notes (2026-11-03): 🎤 Record next to Machine Tracker text boxes.
-// Fake mic (getUserMedia + MediaRecorder) and fake speech-to-text
-// (SpeechRecognition) via an init script. LOCAL TEST DATA ONLY.
+// Voice notes (2026-11-03): a small 🎤 icon inside Machine Tracker text boxes
+// (no big Record button, no language picker). Fake mic (getUserMedia +
+// MediaRecorder) and a stubbed voice-transcribe server call (auto language)
+// via an init script. LOCAL TEST DATA ONLY.
 import fs from "fs";
 import pw from "/usr/local/lib/node_modules_global/playwright/index.js";
 import { BASE, makeOk, login, ls } from "./lib/helpers.mjs";
@@ -10,7 +11,7 @@ const SHOTS = process.env.SHOT_DIR || "";
 const { ok, done } = makeOk();
 
 const fakeMedia = () => {
-  window.__played = 0; window.__micBlocked = false; window.__srLangs = [];
+  window.__played = 0; window.__micBlocked = false; window.__srLangs = []; window.__say = "बेल्ट ढीला है";
   const SPOKEN = { "hi-IN": "बेल्ट ढीला है", "gu-IN": "પટ્ટો ઢીલો છે", "en-IN": "belt is loose" };
   navigator.mediaDevices = navigator.mediaDevices || {};
   navigator.mediaDevices.getUserMedia = async () => {
@@ -35,6 +36,8 @@ const fakeMedia = () => {
     stop() { clearTimeout(this._t); }
   }
   window.SpeechRecognition = FakeSR; window.webkitSpeechRecognition = FakeSR;
+  // Server transcription (Edge Function voice-transcribe) writes the words as spoken.
+  window.__erpVoiceTranscribe = async () => ({ data: { text: window.__say }, error: null });
   HTMLMediaElement.prototype.play = function () { window.__played++; return Promise.resolve(); };
   HTMLMediaElement.prototype.pause = function () {};
 };
@@ -59,13 +62,16 @@ await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(400
 const openIssue = async () => { await p.locator("[data-staff-issue='1']").click(); await p.waitForTimeout(500); };
 await openIssue();
 const rec = p.locator("[data-voice-recorder='Report Issue']");
-ok("Report Issue shows a big 🎤 Record button", await rec.locator("[data-voice-record]").count() === 1 && (await rec.locator("[data-voice-record]").boundingBox()).height >= 48);
+const micB = await rec.locator("[data-voice-record]").boundingBox(); const boxB = await p.locator("#raise-desc").boundingBox();
+ok("Report Issue shows a small 🎤 icon inside the text box (no big Record button)", await rec.locator("[data-voice-record]").count() === 1 && micB.height <= 40.5 && micB.width <= 40.5 && micB.x + micB.width <= boxB.x + boxB.width + 0.5 && micB.y >= boxB.y - 1 && micB.y + micB.height <= boxB.y + boxB.height + 1, JSON.stringify({ micB, boxB }));
+ok("no language chips", await p.locator("[data-voice-lang], [data-voice-lang-cycle], [data-voice-langs]").count() === 0);
 await rec.locator("[data-voice-record]").click(); await p.waitForTimeout(1300);
 const live = await rec.locator("[data-voice-live]").innerText().catch(() => "");
 ok("tapping shows a red 'Recording… 0:0x' with Stop", /Recording…\s*0:0[1-9]/.test(live) && await rec.locator("[data-voice-stop]").count() === 1, live.replace(/\s+/g, " "));
 await shot("voice-recording-390x844");
-ok("spoken Hindi is typed into the box in Devanagari (no translation)", (await p.locator("#raise-desc").inputValue()).includes("बेल्ट ढीला है"));
 await rec.locator("[data-voice-stop]").click(); await p.waitForTimeout(900);
+ok("spoken Hindi is written into the box in Devanagari (no translation)", (await p.locator("#raise-desc").inputValue()).includes("बेल्ट ढीला है"));
+ok("browser dictation no longer runs (no language needed)", (await p.evaluate(() => window.__srLangs)).length === 0);
 ok("after Stop: player with ▶ and a Saved tick", await rec.locator("[data-voice-player]").count() === 1 && await rec.locator("[data-voice-saved]").count() === 1 && await rec.locator("[data-voice-local-play]").count() === 1);
 let va = await voiceAtts();
 ok("saved as an attachment of the machine (audio/webm, caption = place, who = me)", va.length === 1 && va[0].machineId === 1 && va[0].caption === "Report Issue" && va[0].mimeType === "audio/webm" && va[0].uploadedBy === "u_mech" && va[0].kind === "document");
@@ -93,18 +99,20 @@ await p.evaluate(() => { window.__micBlocked = false; });
 await p.locator("[data-staff-finish='1']").click(); await p.waitForTimeout(700);
 const delay = p.locator("[data-voice-recorder='Delay reason']");
 if (await delay.count()) {
-  await delay.locator("[data-voice-lang='gu-IN']").click();
-  ok("language chips: Gujarati picked and remembered", await p.evaluate(() => localStorage.getItem("erp_voice_lang")) === "gu-IN");
+  await p.evaluate(() => { window.__say = "પટ્ટો ઢીલો છે"; });
+  ok("delay reason: small 🎤 inside the box, no language chips", await delay.locator("[data-voice-record].vn-mic").count() === 1 && await delay.locator("textarea").count() === 1 && await p.locator("[data-voice-lang], [data-voice-lang-cycle]").count() === 0);
   await delay.locator("[data-voice-record]").click(); await p.waitForTimeout(700);
   await delay.locator("[data-voice-stop]").click(); await p.waitForTimeout(900);
   const narr = await p.locator("[data-transfer-delay] textarea").inputValue();
   ok("delay reason box gets the Gujarati words", narr.includes("પટ્ટો ઢીલો છે"), narr);
-  ok("speech recogniser ran in gu-IN", (await p.evaluate(() => window.__srLangs)).includes("gu-IN"));
+  ok("Gujarati written as spoken without picking a language", (await p.evaluate(() => window.__srLangs)).length === 0);
   await shot("voice-delay-gujarati-390x844");
 } else ok("delay reason recorder present (machine 1 is overrun)", false);
-// Pending item: optional voice note next to the item row
+// Pending item: no voice on a 📦 Part row (owner), small 🎤 inside the 💬 Comment box
 await p.locator("[data-transfer-pending] button", { hasText: /Add Pending Item/ }).first().click(); await p.waitForTimeout(300);
-ok("pending item row has a 🎤 Record button", await p.locator("[data-voice-recorder='Pending item'] [data-voice-record]").count() === 1);
+ok("📦 Part row has no voice recorder", await p.locator("[data-voice-recorder='Pending item']").count() === 0);
+await p.locator("[data-transfer-pending] [data-pending-type='comment']").click(); await p.waitForTimeout(200);
+ok("💬 Comment row has the small 🎤 inside its box", await p.locator("[data-voice-recorder='Pending item'] [data-job-comment]").count() === 1 && await p.locator("[data-voice-recorder='Pending item'] [data-voice-record]").count() === 1);
 await p.locator("[data-modal-close]").first().click().catch(() => {}); await p.waitForTimeout(300);
 if (await p.locator("[data-transfer-delay]").count()) { await p.getByRole("button", { name: /^Cancel$/ }).first().click(); await p.waitForTimeout(300); }
 va = await voiceAtts();

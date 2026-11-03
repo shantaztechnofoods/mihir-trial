@@ -80,7 +80,7 @@ import { useOnline } from "./components/OfflineBanner.jsx";
 import { pulseOffline } from "./utils/online.js";
 import { isReadyPopupRole, newReadySince, readyAtOf, trialSignedBy, readLastSeenReady, writeLastSeenReady, formatReadyWhen } from "./utils/readyPopup.js";
 import { receivedPoRates, bomCostLines, bomCostSummary, validateBomLines, formatINR, RATE_SOURCE_LABEL } from "./utils/bomCost.js";
-import { VOICE_MAX_SECONDS, VOICE_LANGS as VN_LANGS, VOICE_LANG_KEY, pickVoiceMime, baseMime, voiceFileName, voiceCaption, isVoiceAttachment, voiceNotesFor, formatClock, micErrorMessage, clearVoiceText, appendTranscript, readVoiceLang, transcribeVoiceBlob, fillTranscript, VOICE_WRITING_TEXT, VOICE_WRITE_PROMPT } from "./utils/voiceNote.js";
+import { VOICE_MAX_SECONDS, pickVoiceMime, baseMime, voiceFileName, voiceCaption, isVoiceAttachment, voiceNotesFor, formatClock, micErrorMessage, clearVoiceText, transcribeVoiceBlob, fillTranscript, VOICE_WRITING_TEXT, VOICE_WRITE_PROMPT } from "./utils/voiceNote.js";
 import { PHYSICAL_RACK_LAYOUT, rackOfBom, physicalRackFamily, physicalRackSlots, rackCapacityFor, buildFamilyRacks, firstFreeSlot, canAssignSlot, slotLabel, rackKeyNorm, rackViewLog, setSlotOf, setLabel, pairSlotOf, bomFillCheck, rCrateIssues, rackBoms, freeSlotsFor, tierOfSlot } from "./utils/rackSlots.js";
 import { getActiveCompany, normalizePOSettings, openPOPdf, PO_TEMPLATE_OPTIONS } from "./utils/poTemplate.js";
 import {
@@ -16623,27 +16623,12 @@ function AttachmentLink({ attachment }) {
 
 // ── Voice notes (2026-11-03) ──────────────────────────────────────────────
 // A voice note is an ordinary machine attachment (audio/*), uploaded through
-// the same onUploadAttachment path as photos. The recorder also types what
-// the worker says into the text box (Web Speech API, in the language picked:
-// Gujarati / Hindi / English — no translation). Text fields save exactly as
-// before; the transcript is just text the worker can edit.
+// the same onUploadAttachment path as photos. The words are written into the
+// text box by the voice-transcribe Edge Function (auto language, no
+// translation). Text fields save exactly as before; the words stay editable.
 
-// Shared language choice (same localStorage key as Report Issue dictation).
+// Report Issue dictation fallback still listens for this event (no picker any more).
 const VN_LANG_EVENT = "erp-voice-lang";
-function useVoiceLang() {
-  const [lang, setLang] = useState(() => { try { return readVoiceLang(window.localStorage); } catch { return "hi-IN"; } });
-  useEffect(() => {
-    const on = (e) => setLang(e.detail);
-    window.addEventListener(VN_LANG_EVENT, on);
-    return () => window.removeEventListener(VN_LANG_EVENT, on);
-  }, []);
-  const pick = (l) => {
-    try { window.localStorage.setItem(VOICE_LANG_KEY, l); } catch {}
-    setLang(l);
-    try { window.dispatchEvent(new CustomEvent(VN_LANG_EVENT, { detail: l })); } catch {}
-  };
-  return [lang, pick];
-}
 
 // Plays one saved voice note (signed URL in Supabase mode, data: URL locally).
 function VoicePlayButton({ attachment, big = false, label = "" }) {
@@ -16706,35 +16691,30 @@ function transcribeVoice(blob) {
   return transcribeVoiceBlob(blob, invoke);
 }
 
-// Big 🎤 Record button + live recording + player. `setText(updater)` gets the
-// spoken words (live dictation where the browser has it). If the box is still
-// empty after saving, the audio is sent for server transcription and the words
-// are put in the box; if that fails the worker is asked to type them (the
-// box stays required — 2026-11-03 owner: reports need TEXT).
-function VoiceNoteRecorder({ machineId, department, place, item = "", onUpload, onDelete = null, canRemove = false, setText = null, disabled = false, compact = false, langs = true, mini = false }) {
+// Small 🎤 icon INSIDE the text box (pass the box as `children`) + a one-line
+// recording bar + a one-line saved player. 2026-11-03 (owner): no language
+// picker and no big Record button — after Stop the saved audio is sent to the
+// voice-transcribe Edge Function (auto language: writes Gujarati / Hindi /
+// English as spoken) and the words fill a still-empty box (editable). If that
+// fails (or local/offline mode) the worker is asked to type them; the box
+// stays required — reports need TEXT.
+function VoiceNoteRecorder({ machineId, department, place, item = "", onUpload, onDelete = null, canRemove = false, setText = null, disabled = false, children = null }) {
   const [phase, setPhase] = useState("idle"); // idle | starting | recording | saving | saved | error
   const [secs, setSecs]   = useState(0);
   const [err, setErr]     = useState("");
-  const [srNote, setSrNote] = useState("");
   const [writing, setWriting] = useState(false);
   const [att, setAtt]     = useState(null);
   const [localUrl, setLocalUrl] = useState("");
   const [playing, setPlaying]   = useState(false);
   const [askRemove, setAskRemove] = useState(false);
   const [removing, setRemoving]   = useState(false);
-  const [lang, pickLang] = useVoiceLang();
-  const r = useRef({ rec: null, sr: null, stream: null, timer: null, t0: 0, chunks: [], discard: false, live: false, file: null, tx: 0, heard: false });
+  const r = useRef({ rec: null, stream: null, timer: null, t0: 0, chunks: [], discard: false, file: null, tx: 0 });
   const audioRef = useRef(null);
   const textRef = useRef(setText); textRef.current = setText;
-  const SRCls = typeof window !== "undefined" ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null;
-  const langLabel = (VN_LANGS.find(([c]) => c === lang) || [null, lang])[1];
 
   const stopAll = () => {
     const s = r.current;
-    s.live = false;
     if (s.timer) { clearInterval(s.timer); s.timer = null; }
-    try { s.sr && s.sr.stop(); } catch {}
-    s.sr = null;
     try { if (s.rec && s.rec.state !== "inactive") s.rec.stop(); } catch {}
   };
   useEffect(() => () => {
@@ -16755,13 +16735,7 @@ function VoiceNoteRecorder({ machineId, department, place, item = "", onUpload, 
     r.current.file = null;
     setAtt(res.attachment || null);
     setPhase("saved");
-    // 2026-11-03 (owner) — reports and screens read TEXT, not audio: the box is
-    // never auto-filled with a placeholder. Live dictation already put words in
-    // the box → done. Otherwise the saved audio goes to the voice-transcribe
-    // Edge Function and its words fill a still-empty box (editable). If that
-    // fails (or local/offline mode), the worker is asked to type them; the
-    // field's own "required" check stays.
-    if (!textRef.current || r.current.heard) return;
+    if (!textRef.current) return;
     const tx = ++r.current.tx;
     setWriting(true); setErr("");
     const out = await transcribeVoice(file);
@@ -16795,33 +16769,9 @@ function VoiceNoteRecorder({ machineId, department, place, item = "", onUpload, 
     upload(file);
   };
 
-  const startSR = () => {
-    if (!SRCls || !textRef.current) return;
-    try {
-      const sr = new SRCls();
-      // Read fresh: the Report Issue chips write the same key.
-      let useLang = lang; try { useLang = readVoiceLang(window.localStorage); } catch {}
-      if (useLang !== lang) pickLang(useLang);
-      sr.lang = useLang; sr.continuous = true; sr.interimResults = false;
-      sr.onresult = (e) => {
-        let txt = "";
-        for (let i = e.resultIndex; i < e.results.length; i++) if (e.results[i].isFinal) txt += e.results[i][0].transcript;
-        if (txt.trim() && textRef.current) { r.current.heard = true; textRef.current((prev) => appendTranscript(prev, txt)); }
-      };
-      sr.onerror = (e) => {
-        if (e && (e.error === "aborted" || e.error === "no-speech")) return;
-        setSrNote("Typing by voice stopped — audio is still recording");
-      };
-      // Chrome ends recognition after a pause; keep it going while recording.
-      sr.onend = () => { if (r.current.live && r.current.sr === sr) { try { sr.start(); } catch {} } };
-      sr.start();
-      r.current.sr = sr;
-    } catch { setSrNote("Typing by voice did not start — audio is still recording"); }
-  };
-
   const start = async () => {
     if (disabled || phase === "recording" || phase === "starting" || phase === "saving") return;
-    setErr(""); setSrNote(""); setAskRemove(false);
+    setErr(""); setAskRemove(false);
     const md = typeof navigator !== "undefined" ? navigator.mediaDevices : null;
     if (!md || !md.getUserMedia || typeof window.MediaRecorder === "undefined") { setPhase("error"); setErr(micErrorMessage({ name: "unsupported" })); return; }
     setPhase("starting");
@@ -16834,7 +16784,7 @@ function VoiceNoteRecorder({ machineId, department, place, item = "", onUpload, 
     let rec;
     try { rec = new window.MediaRecorder(stream, mime ? { mimeType: mime } : undefined); }
     catch { try { rec = new window.MediaRecorder(stream); } catch (e2) { stream.getTracks().forEach((t) => t.stop()); setPhase("error"); setErr(micErrorMessage(e2)); return; } }
-    s.stream = stream; s.rec = rec; s.chunks = []; s.live = true; s.t0 = Date.now(); s.heard = false;
+    s.stream = stream; s.rec = rec; s.chunks = []; s.t0 = Date.now();
     rec.ondataavailable = (ev) => { if (ev.data && ev.data.size) s.chunks.push(ev.data); };
     rec.onstop = finish;
     rec.start(1000);
@@ -16844,8 +16794,6 @@ function VoiceNoteRecorder({ machineId, department, place, item = "", onUpload, 
       setSecs(el);
       if (el >= VOICE_MAX_SECONDS) stopAll();
     }, 200);
-    if (SRCls) startSR();
-    else if (textRef.current) setSrNote("Typing by voice not supported on this phone — audio saved");
   };
 
   const togglePlay = () => {
@@ -16868,100 +16816,61 @@ function VoiceNoteRecorder({ machineId, department, place, item = "", onUpload, 
     if (textRef.current) textRef.current((prev) => clearVoiceText(prev));
   };
 
-  const chips = langs && SRCls && textRef.current && (phase === "idle" || phase === "error") && (compact ? (
-    <button type="button" data-voice-lang-cycle disabled={disabled}
-            onClick={() => { const i = VN_LANGS.findIndex(([c]) => c === lang); pickLang(VN_LANGS[(i + 1) % VN_LANGS.length][0]); }}
-            className="vn-lang rounded-xl text-[13px] font-bold px-3 border-2"
-            style={{ minHeight: 44, borderColor: "rgba(17,24,39,0.15)", background: "#fff", color: "#334155" }}
-            aria-label="Speak in (tap to change)">
-      {langLabel} ⇆
-    </button>
-  ) : (
-    <div className="flex gap-1.5 flex-wrap" role="group" aria-label="Speak in" data-voice-langs>
-      {VN_LANGS.map(([code, label]) => (
-        <button key={code} type="button" disabled={disabled} aria-pressed={lang === code} data-voice-lang={code}
-                onClick={() => pickLang(code)}
-                className="vn-lang rounded-xl text-[14px] font-bold px-3 border-2 transition-all"
-                style={lang === code ? { minHeight: 44, background: "#dc2626", borderColor: "#dc2626", color: "#fff" } : { minHeight: 44, background: "#fff", borderColor: "rgba(17,24,39,0.15)", color: "#334155" }}>
-          {label}
-        </button>
-      ))}
-    </div>
-  ));
-
+  const canRecord = (phase === "idle" || phase === "starting" || phase === "error") && !att;
   return (
-    <div className={mini ? "vn-box" : "vn-box mt-2"} data-voice-recorder={place}>
-      {(phase === "idle" || phase === "starting" || phase === "error") && !att && (
-        <div className="flex items-center gap-2 flex-wrap">
-          {mini ? (
-            /* 2026-11-03 — icon-only mic that sits inside a reason box. */
-            <button type="button" data-voice-record aria-label="Record" disabled={disabled || phase === "starting"} onClick={start}
-                    className="vn-rec rounded-lg flex items-center justify-center transition-transform active:scale-[0.97] disabled:opacity-60"
-                    style={{ width: 40, height: 40, background: "transparent", color: "#dc2626", border: "none", fontSize: 18 }}>
-              {phase === "starting" ? "…" : "🎤"}
-            </button>
-          ) : (
+    <div className="vn-box" data-voice-recorder={place}>
+      <div className={`vn-field${children ? "" : " vn-field-bare"}`}>
+        {children}
+        {canRecord && (
           <button type="button" data-voice-record disabled={disabled || phase === "starting"} onClick={start}
-                  className="vn-rec rounded-xl font-bold flex items-center justify-center gap-1.5 transition-transform active:scale-[0.97] disabled:opacity-60"
-                  style={{ minHeight: compact ? 44 : 48, padding: "0 16px", background: "#fff", color: "#dc2626", border: "1.5px solid #dc2626", fontSize: compact ? 15 : 16 }}>
-            <span style={{ fontSize: 18 }}>🎤</span>{phase === "starting" ? "Please wait…" : "Record"}
+                  aria-label="Speak (voice note)" title="Speak"
+                  className="vn-mic">
+            {phase === "starting" ? <span className="vn-spin" aria-hidden="true" /> : (
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0" /><path d="M12 18v3" />
+              </svg>
+            )}
           </button>
-          )}
-          {chips}
-        </div>
-      )}
-      {phase === "recording" && (
-        <div className="flex items-center gap-2 flex-wrap">
-          <div data-voice-live className="vn-live flex-1 min-w-[180px] rounded-xl flex items-center gap-2 px-4 font-bold text-white"
-               style={{ minHeight: 48, background: "#dc2626", fontSize: 16 }}>
+        )}
+        {phase === "saving" && <span className="vn-mic vn-mic-busy" aria-label="Saving voice note"><span className="vn-spin" aria-hidden="true" /></span>}
+        {phase === "recording" && (
+          <div data-voice-live className="vn-bar" role="status">
             <span className="vn-dot" aria-hidden="true" />
-            Recording… <span className="tabular-nums" data-voice-clock>{formatClock(secs)}</span>
-            <span className="text-[12px] font-bold opacity-80 ml-auto tabular-nums">/ {formatClock(VOICE_MAX_SECONDS)}</span>
+            <span className="vn-bar-text">Recording… <span className="tabular-nums" data-voice-clock>{formatClock(secs)}</span></span>
+            <span className="vn-bar-max tabular-nums">/ {formatClock(VOICE_MAX_SECONDS)}</span>
+            <button type="button" data-voice-stop onClick={stopAll} aria-label="Stop recording" className="vn-stop">
+              <span aria-hidden="true" className="vn-stop-sq" />Stop
+            </button>
           </div>
-          <button type="button" data-voice-stop onClick={stopAll}
-                  className="rounded-xl font-bold text-white flex items-center justify-center gap-1.5 px-4 active:scale-[0.97]"
-                  style={{ minHeight: 48, background: "#111827", fontSize: 15 }}>⏹ Stop</button>
-          {SRCls && textRef.current && <div className="w-full text-[12px] font-bold" style={{ color: "#b91c1c" }}>Speak in {langLabel} — words appear in the box</div>}
-        </div>
-      )}
-      {phase === "saving" && (
-        <div className="rounded-xl flex items-center gap-2 px-4 font-bold" style={{ minHeight: 48, background: "rgba(38,64,176,0.08)", color: "#2640B0", fontSize: 15 }}>⏳ Saving voice note…</div>
-      )}
+        )}
+      </div>
       {att && (phase === "saved" || phase === "error") && (
-        <div data-voice-player className="rounded-2xl flex items-center gap-2 px-2 py-1.5 flex-wrap" style={{ background: "rgba(21,128,61,0.07)", border: "1px solid rgba(21,128,61,0.35)" }}>
+        <div data-voice-player className="vn-saved">
           {localUrl ? (
             <>
               <audio ref={audioRef} src={localUrl} preload="metadata" onEnded={() => setPlaying(false)} />
-              <button type="button" data-voice-local-play onClick={togglePlay} aria-label={playing ? "Pause" : "Play"}
-                      className="rounded-full flex items-center justify-center font-black text-white active:scale-[0.97]"
-                      style={{ width: 44, height: 44, background: "#2640B0", fontSize: 16 }}>{playing ? "⏸" : "▶"}</button>
+              <button type="button" data-voice-local-play onClick={togglePlay} aria-label={playing ? "Pause" : "Play"} className="vn-play-sm">{playing ? "❚❚" : "▶"}</button>
             </>
-          ) : <VoicePlayButton attachment={att} big />}
-          <span className="text-[14px] font-black" style={{ color: "#15803d" }} data-voice-saved>✓ Saved</span>
-          <span className="text-[12px] tabular-nums" style={{ color: "#475569" }}>{formatClock(secs)}</span>
+          ) : <VoicePlayButton attachment={att} />}
+          <span className="vn-saved-text" data-voice-saved>✓ Saved</span>
+          <span className="vn-saved-time tabular-nums">{formatClock(secs)}</span>
           {canRemove && onDelete && !askRemove && (
-            <button type="button" data-voice-remove onClick={() => setAskRemove(true)} aria-label="Remove voice note"
-                    className="ml-auto rounded-full flex items-center justify-center"
-                    style={{ width: 44, height: 44, background: "#fff", border: "1px solid rgba(220,38,38,0.4)", fontSize: 18 }}>🗑</button>
+            <button type="button" data-voice-remove onClick={() => setAskRemove(true)} aria-label="Remove voice note" className="vn-del">Remove</button>
           )}
           {askRemove && (
             <div className="w-full flex items-center gap-2 flex-wrap pt-1" data-voice-remove-ask>
-              <span className="text-[13px] font-black text-slate-900">Are you sure? Remove this voice note?</span>
-              <button type="button" data-voice-remove-yes disabled={removing} onClick={doRemove}
-                      className="rounded-xl font-black text-white px-4" style={{ minHeight: 44, background: "#dc2626" }}>{removing ? "⏳ Please wait…" : "Yes, remove"}</button>
-              <button type="button" disabled={removing} onClick={() => setAskRemove(false)}
-                      className="rounded-xl font-black text-slate-800 px-4 bg-white border-2 border-slate-300" style={{ minHeight: 44 }}>No, keep</button>
+              <span className="text-[12.5px] font-bold text-slate-900">Are you sure? Remove this voice note?</span>
+              <button type="button" data-voice-remove-yes disabled={removing} onClick={doRemove} className="vn-yes">{removing ? "Please wait…" : "Yes, remove"}</button>
+              <button type="button" disabled={removing} onClick={() => setAskRemove(false)} className="vn-no">No, keep</button>
             </div>
           )}
         </div>
       )}
       {phase === "error" && !att && r.current.file && (
-        <button type="button" data-voice-retry onClick={() => upload(r.current.file)}
-                className="mt-2 rounded-xl font-black text-white px-4" style={{ minHeight: 44, background: "#2640B0" }}>↻ Try saving again</button>
+        <button type="button" data-voice-retry onClick={() => upload(r.current.file)} className="vn-retry">↻ Try saving again</button>
       )}
-      {writing && <div data-voice-writing className="mt-1.5 text-[13px] font-bold" style={{ color: "#2640B0" }}>{VOICE_WRITING_TEXT}</div>}
-      {err && <div data-voice-error className="mt-1.5 text-[13px] font-bold" style={{ color: "#b91c1c" }}>{err}</div>}
-      {srNote && (phase === "saved" || (phase === "recording" && SRCls)) && <div data-voice-sr-note className="mt-1 text-[12px] font-semibold" style={{ color: "#92400e" }}>{srNote}</div>}
+      {writing && <div data-voice-writing className="vn-note" style={{ color: "#2640B0" }}>{VOICE_WRITING_TEXT}</div>}
+      {err && <div data-voice-error className="vn-note" style={{ color: "#b91c1c" }}>{err}</div>}
     </div>
   );
 }
@@ -17785,6 +17694,93 @@ function ChecklistBulkBar({ answers, onSetAll }) {
   );
 }
 
+// 2026-11-03 (owner: "UI इतना मत बिगाड़ो") — one compact row per checklist
+// point: ✓ checkbox + label (+ small "Must do") + a small ✗ "Not done"
+// button. The Reason box (with the 🎤 icon inside) opens only under a point
+// marked ✗, or one that already has a reason. Data and validation are
+// unchanged: answers stay { checked, remark } and every unticked point still
+// needs a reason (validateChecklistAnswers). A Confirm / Save tap on an
+// incomplete list calls flagChecklist(root): the first unticked point without
+// a reason opens its box, turns red and gets the cursor.
+const CHECKLIST_FLAG_EVENT = "erp-checklist-flag";
+const flagChecklist = (root) => {
+  try { window.dispatchEvent(new CustomEvent(CHECKLIST_FLAG_EVENT, { detail: { root } })); } catch { flagField(root); }
+};
+function ChecklistRows({ answers, onToggle, onRemark, voice = null, placeholder = "Why not done?" }) {
+  const [open, setOpen] = useState(() => new Set());
+  const listRef = useRef(null);
+  const ansRef = useRef(answers); ansRef.current = answers;
+  const focusReason = (i) => setTimeout(() => {
+    try { const el = listRef.current && listRef.current.querySelector(`[data-check-row="${i}"] [data-check-reason] input`); el && el.focus({ preventScroll: true }); } catch {}
+  }, 60);
+  useEffect(() => {
+    const on = (e) => {
+      const root = e && e.detail && e.detail.root;
+      const host = root ? document.querySelector(root) : null;
+      if (!host || !listRef.current || !host.contains(listRef.current)) return;
+      const miss = validateChecklistAnswers(ansRef.current).missing;
+      if (!miss.length) { flagField(root); return; }
+      const i = miss[0];
+      setOpen((prev) => { const n = new Set(prev); n.add(i); return n; });
+      flagField(`${root} [data-check-row="${i}"]`);
+      focusReason(i);
+    };
+    window.addEventListener(CHECKLIST_FLAG_EVENT, on);
+    return () => window.removeEventListener(CHECKLIST_FLAG_EVENT, on);
+  }, []);
+  const list = Array.isArray(answers) ? answers : [];
+  return (
+    <div className="ck-list" ref={listRef} data-checklist-rows>
+      {list.map((a, i) => {
+        const hasWhy = !!String(a.remark || "").trim();
+        const showWhy = !a.checked && (open.has(i) || hasWhy);
+        const state = a.checked ? "ok" : showWhy ? "no" : "todo";
+        const field = (
+          <input type="text" value={a.remark || ""} data-check-reason-input
+                 onChange={(e) => onRemark(i, e.target.value)}
+                 placeholder={placeholder} aria-label={`Reason: ${a.label}`} className="ck-input" />
+        );
+        return (
+          <div key={a.id || i} className="ck-row" data-check-row={i} data-check-state={state}>
+            <div className="ck-line">
+              <label className="ck-hit">
+                <input type="checkbox" checked={!!a.checked} data-check-ok
+                       onChange={(e) => {
+                         const v = e.target.checked;
+                         onToggle(i, v);
+                         if (v) setOpen((prev) => { if (!prev.has(i)) return prev; const n = new Set(prev); n.delete(i); return n; });
+                       }}
+                       className="ck-box" />
+                <span className="ck-label">
+                  {a.label}
+                  {a.required && <span className="ck-must">Must do</span>}
+                </span>
+              </label>
+              <button type="button" className="ck-no" data-check-no aria-pressed={state === "no"}
+                      aria-label={state === "no" ? "Undo not done" : "Not done"} title="Not done"
+                      onClick={() => {
+                        if (state === "no") {
+                          setOpen((prev) => { const n = new Set(prev); n.delete(i); return n; });
+                          if (hasWhy) onRemark(i, "");
+                          return;
+                        }
+                        if (a.checked) onToggle(i, false);
+                        setOpen((prev) => { const n = new Set(prev); n.add(i); return n; });
+                        focusReason(i);
+                      }}>✕</button>
+            </div>
+            {showWhy && (
+              <div className="ck-reason" data-check-reason>
+                {voice ? voice(i, a, field) : <div className="vn-field vn-field-plain">{field}</div>}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── Pending job history (2026-10-30) ─────────────────────────────────────────
 // The three permanent entries of a job — Reported (the original reason),
 // Part received (the receive remark), Work completed — each with who, which
@@ -17968,7 +17964,7 @@ function PendingJobRows({ rows, onChange, inventory = [], accent = "#b45309", ad
           <div key={i} data-pending-row-type={pendingRowIsComment(r) ? "comment" : "part"} className="rounded-lg p-2 space-y-1.5" style={{ background: `${accent}0d`, border: `1px solid ${accent}40` }}>
             {/* 2026-11-03 — Finish / Accept: each row is a 📦 Part or a 💬 Comment. */}
             {allowComment && (
-              <div className="grid grid-cols-2 gap-1.5" data-pending-type-chooser role="group" aria-label="Pending type">
+              <div className="seg2" data-pending-type-chooser role="group" aria-label="Pending type">
                 {[["part", "📦 Part"], ["comment", "💬 Comment"]].map(([k, label]) => {
                   const on = (k === "comment") === pendingRowIsComment(r);
                   return (
@@ -17976,8 +17972,7 @@ function PendingJobRows({ rows, onChange, inventory = [], accent = "#b45309", ad
                             onClick={() => { if (!on) set(i, k === "comment"
                               ? { pendingType: "comment", itemName: "", itemCode: "", qty: "", critical: false, partSerialNo: "", cpList: [], cpDraft: "" }
                               : { pendingType: "part", description: "" }); }}
-                            className="rounded-lg text-[13px] font-bold transition-all disabled:opacity-50"
-                            style={{ minHeight: 44, background: on ? accent : "var(--surface-elevated)", color: on ? "#ffffff" : "var(--text-dim)", border: `1.5px solid ${on ? accent : "var(--border-subtle)"}` }}>
+                            className="seg2-btn">
                       {label}
                     </button>
                   );
@@ -17986,10 +17981,14 @@ function PendingJobRows({ rows, onChange, inventory = [], accent = "#b45309", ad
             )}
             {pendingRowIsComment(r) ? (
               <>
-                <textarea value={r.description} disabled={disabled} data-job-comment rows={2}
-                          onChange={(e) => set(i, { description: e.target.value })}
-                          placeholder="What is pending? e.g. cover not painted" className={`${inp} text-[13px]`} style={{ ...bd, resize: "vertical" }} />
-                {renderVoice && renderVoice(i, r, setDescLater(i))}
+                {(() => {
+                  const commentBox = (
+                    <textarea value={r.description} disabled={disabled} data-job-comment rows={2}
+                              onChange={(e) => set(i, { description: e.target.value })}
+                              placeholder="What is pending? e.g. cover not painted" className={`${inp} text-[13px]`} style={{ ...bd, resize: "vertical" }} />
+                  );
+                  return renderVoice ? renderVoice(i, r, setDescLater(i), commentBox) : commentBox;
+                })()}
                 <div className="flex gap-2 items-center">
                   <button type="button" disabled={disabled} data-pending-item-save
                           onClick={() => { if (!r.description.trim()) { flagField("[data-job-comment]"); return; } set(i, { saved: true }); }}
@@ -18013,8 +18012,7 @@ function PendingJobRows({ rows, onChange, inventory = [], accent = "#b45309", ad
                      onChange={(e) => set(i, { qty: e.target.value })}
                      placeholder="Quantity *" className={`${inp} text-right`} style={bd} />
             </div>
-            {/* 2026-11-03 — optional 🎤 voice note explaining this item (name + qty stay required). */}
-            {renderVoice && renderVoice(i, r)}
+            {/* 2026-11-03 (owner) — no voice on a 📦 Part row: name + qty say it all. */}
             <div className="flex items-center gap-1.5 flex-wrap" data-job-class>
               <span className="text-[10.5px] font-bold text-slate-600 mr-0.5">Critical item?</span>
               {[["normal", "No"], ["critical", "Yes"]].map(([k, label]) => {
@@ -18551,12 +18549,10 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
   };
 
   // Voice input helper — Web Speech API (Hindi + English fallback)
-  // 2026-10-30 — voice-to-text language: Gujarati, Hindi or English (Indian).
-  // Remembered on this device; the mic button uses whichever is selected.
-  const VOICE_LANGS = [["gu-IN", "ગુજરાતી"], ["hi-IN", "हिंदी"], ["en-IN", "English"]];
+  // 2026-11-03 (owner) — no language picker any more: this fallback dictation
+  // (only for a login that cannot save voice notes) uses the language last
+  // remembered on this phone, else Hindi.
   const [voiceLang, setVoiceLang] = useState(() => { try { return localStorage.getItem("erp_voice_lang") || "hi-IN"; } catch { return "hi-IN"; } });
-  const pickVoiceLang = (l) => { setVoiceLang(l); try { localStorage.setItem("erp_voice_lang", l); } catch {} };
-  // Keep in step with the 🎤 Record chips elsewhere (same key).
   useEffect(() => { const on = (e) => setVoiceLang(e.detail); window.addEventListener(VN_LANG_EVENT, on); return () => window.removeEventListener(VN_LANG_EVENT, on); }, []);
   const voiceLangRef = React.useRef(voiceLang); voiceLangRef.current = voiceLang;
   const toggleVoice = React.useCallback((targetSetter) => {
@@ -18741,6 +18737,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
     const chk = validateChecklistAnswers(answers);
     if (!chk.ok) {
       setDuringWorkModal((prev) => prev ? { ...prev, error: checklistProblemText(chk) } : prev);
+      flagChecklist("[data-during-checklist]");
       return;
     }
     setDuringWorkModal((prev) => prev ? { ...prev, busy: true, error: "" } : prev);
@@ -18762,17 +18759,15 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
     const queue = machineLog.filter((m) => ids.includes(m.id) && m.stage === "BOM Issued" && startChkTemplate(m));
     if (!queue.length || !onSubmitDuringWorkChecklist) { after(onStartProduction ? onStartProduction(ids) : { success: false }); return; }
     const t = startChkTemplate(queue[0]);
-    setStartChk({ queue, idx: 0, ids, template: t, answers: startChecklistResponse(t), marks: {}, busy: false, error: "", after });
+    setStartChk({ queue, idx: 0, ids, template: t, answers: startChecklistResponse(t), busy: false, error: "", after });
   };
   const submitStartChk = async () => {
     if (!startChk || startChk.busy) return;
-    const { queue, idx, ids, template, answers, marks, after } = startChk;
-    const undecided = answers.map((a, i) => (marks[i] ? -1 : i)).filter((i) => i >= 0);
+    const { queue, idx, ids, template, answers, after } = startChk;
     const chk = validateChecklistAnswers(answers);
-    const bad = [...new Set([...undecided, ...chk.missing])];
-    if (bad.length) {
-      setStartChk((prev) => prev ? { ...prev, error: undecided.length ? `Tick ✓ or ✗ for ${undecided.length} point${undecided.length === 1 ? "" : "s"}` : checklistProblemText(chk), bad } : prev);
-      flagField(`[data-start-chk-row="${bad[0]}"]`);
+    if (!chk.ok) {
+      setStartChk((prev) => prev ? { ...prev, error: checklistProblemText(chk) } : prev);
+      flagChecklist("[data-start-checklist]");
       return;
     }
     setStartChk((prev) => prev ? { ...prev, busy: true, error: "" } : prev);
@@ -18781,7 +18776,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
     if (r && r.success === false) { setStartChk((prev) => prev ? { ...prev, busy: false, error: r.error || "NOT SAVED" } : prev); return; }
     if (idx + 1 < queue.length) {
       const t = startChkTemplate(queue[idx + 1]);
-      setStartChk({ ...startChk, idx: idx + 1, template: t, answers: startChecklistResponse(t), marks: {}, busy: false, error: "", bad: [] });
+      setStartChk({ ...startChk, idx: idx + 1, template: t, answers: startChecklistResponse(t), busy: false, error: "" });
       return;
     }
     setStartChk(null);
@@ -18859,7 +18854,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
     if (template && Array.isArray(answers) && answers.length) {
       const chk = validateChecklistAnswers(answers);
       if (!chk.ok) {
-        flagField("[data-transfer-checklist]");
+        flagChecklist("[data-transfer-checklist]");
         return;
       }
     }
@@ -18975,7 +18970,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
     if (checklistTemplate && Array.isArray(checklistAnswers) && checklistAnswers.length) {
       const chk = validateChecklistAnswers(checklistAnswers);
       if (!chk.ok) {
-        { const m = `Checklist incomplete — ${checklistProblemText(chk)}`; setAcceptModal((prev) => prev ? { ...prev, error: m, errorField: m } : prev); flagField("[data-accept-checklist]"); }
+        { const m = `Checklist incomplete — ${checklistProblemText(chk)}`; setAcceptModal((prev) => prev ? { ...prev, error: m, errorField: m } : prev); flagChecklist("[data-accept-checklist]"); }
         return;
       }
     }
@@ -22626,18 +22621,23 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                 <p className="text-[11px] font-bold mb-2" style={{ color: "#b45309" }}>This part has not been recorded as received. Mark it completed only if the work is actually done.</p>
               )}
               <label className="block text-[11px] font-bold text-slate-600 mb-1">{isReceive ? "Receive remark / reason (optional)" : <>Completion remark <span className="text-red-500">*</span></>}</label>
-              <input value={jobAction.notes} disabled={jobAction.busy} autoFocus data-job-remark={isReceive ? undefined : ""}
-                     onChange={(e) => setJobAction((prev) => prev ? { ...prev, notes: e.target.value, error: "" } : prev)}
-                     onKeyDown={(e) => e.key === "Enter" && submit()}
-                     placeholder={isReceive ? "e.g. received from Stores, 2 pcs — replacement for the damaged cover" : "e.g. fitted and tested"}
-                     className="w-full rounded-lg px-3 py-2.5 text-[13px] text-slate-800 outline-none"
-                     style={{ background: "var(--surface-elevated)", border: "1px solid rgba(17,24,39,0.12)" }} />
-              {!isReceive && canVoice && (
-                <div className="mt-2" data-job-remark-voice>
-                  <VoiceNoteRecorder {...vnProps(p.machineId, p.assignedDepartment || m?.currentDepartment || "")} place="Work completed" item={p.description || ""} compact
-                                     disabled={!!jobAction.busy} setText={(fn) => setJobAction((prev) => prev ? { ...prev, notes: fn(prev.notes || ""), error: "" } : prev)} />
-                </div>
-              )}
+              {(() => {
+                const remarkBox = (
+                  <input value={jobAction.notes} disabled={jobAction.busy} autoFocus data-job-remark={isReceive ? undefined : ""}
+                         onChange={(e) => setJobAction((prev) => prev ? { ...prev, notes: e.target.value, error: "" } : prev)}
+                         onKeyDown={(e) => e.key === "Enter" && submit()}
+                         placeholder={isReceive ? "e.g. received from Stores, 2 pcs — replacement for the damaged cover" : "e.g. fitted and tested"}
+                         className="w-full rounded-lg px-3 py-2.5 text-[13px] text-slate-800 outline-none"
+                         style={{ background: "var(--surface-elevated)", border: "1px solid rgba(17,24,39,0.12)" }} />
+                );
+                // 2026-11-03 — the 🎤 is a small icon inside the remark box.
+                return !isReceive && canVoice ? (
+                  <div data-job-remark-voice>
+                    <VoiceNoteRecorder {...vnProps(p.machineId, p.assignedDepartment || m?.currentDepartment || "")} place="Work completed" item={p.description || ""}
+                                       disabled={!!jobAction.busy} setText={(fn) => setJobAction((prev) => prev ? { ...prev, notes: fn(prev.notes || ""), error: "" } : prev)}>{remarkBox}</VoiceNoteRecorder>
+                  </div>
+                ) : remarkBox;
+              })()}
               {jobAction.error && (
                 <div className="mt-3 text-[11px] font-bold px-3 py-2 rounded-lg" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.4)", color: "#dc2626" }}>{jobAction.error}</div>
               )}
@@ -22704,40 +22704,34 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
             <label htmlFor="raise-desc" className="block text-[11px] font-bold text-slate-600 mb-1.5">
               What is wrong
             </label>
-            <div className="relative">
-              <textarea id="raise-desc" rows={3} value={raiseText} disabled={raiseBusy}
-                        onChange={(e) => setRaiseText(e.target.value)}
-                        placeholder={voiceActive ? "🎙 Listening…" : "e.g. noise coming from the gearbox · or tap 🎤 and speak"}
-                        className="w-full rounded-lg px-3 py-2.5 pr-12 text-[13px] text-slate-800 outline-none resize-y"
-                        style={{ background: "var(--surface-elevated)", border: voiceActive ? "2px solid #ef4444" : "1px solid rgba(17,24,39,0.12)" }} />
-              {/* 2026-11-03 — one recorder: the 🎤 Record below also types what is
-                  said, so this small dictation button is only the fallback for
-                  a login that cannot save voice notes. */}
-              {!canVoice && (window.SpeechRecognition || window.webkitSpeechRecognition) && (
-                <button type="button" disabled={raiseBusy}
-                        onClick={() => toggleVoice(setRaiseText)}
-                        className="absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center transition-all"
-                        style={{ background: voiceActive ? "#ef4444" : "rgba(239,68,68,0.1)", color: voiceActive ? "#fff" : "#ef4444" }}
-                        title={voiceActive ? "Stop voice" : `Voice input (${(VOICE_LANGS.find((x) => x[0] === voiceLang) || [])[1] || voiceLang})`}>
-                  {voiceActive ? "⏹" : "🎤"}
-                </button>
-              )}
-            </div>
-            {!canVoice && (window.SpeechRecognition || window.webkitSpeechRecognition) && (
-              <div className="flex items-center gap-1.5 mt-1.5 flex-wrap" role="group" aria-label="Voice language">
-                <span className="text-[12px] text-slate-500">Speak in:</span>
-                {VOICE_LANGS.map(([code, label]) => (
-                  <button key={code} type="button" disabled={raiseBusy || voiceActive} onClick={() => pickVoiceLang(code)} aria-pressed={voiceLang === code}
-                          className="min-h-[44px] text-[14px] font-bold px-3 rounded-xl border-2 transition-all disabled:opacity-60"
-                          style={voiceLang === code ? { background: "#ef4444", color: "#fff", borderColor: "#ef4444" } : { background: "#fff", color: "#475569", borderColor: "rgba(17,24,39,0.15)" }}>
-                    {label}
-                  </button>
-                ))}
-              </div>
-            )}
-            {canVoice && (
-              <VoiceNoteRecorder {...vnProps(m.id, here)} place="Report Issue" setText={setRaiseText} disabled={raiseBusy || voiceActive} />
-            )}
+            {(() => {
+              const issueBox = (
+                <textarea id="raise-desc" rows={3} value={raiseText} disabled={raiseBusy}
+                          onChange={(e) => setRaiseText(e.target.value)}
+                          placeholder={voiceActive ? "🎙 Listening…" : "e.g. noise coming from the gearbox"}
+                          className="w-full rounded-lg px-3 py-2.5 pr-12 text-[13px] text-slate-800 outline-none resize-y"
+                          style={{ background: "var(--surface-elevated)", border: voiceActive ? "2px solid #ef4444" : "1px solid rgba(17,24,39,0.12)" }} />
+              );
+              // 2026-11-03 — one small 🎤 inside the box, no language picker. A
+              // login that cannot save voice notes keeps browser dictation (in
+              // the phone's remembered / default language).
+              return canVoice ? (
+                <VoiceNoteRecorder {...vnProps(m.id, here)} place="Report Issue" setText={setRaiseText} disabled={raiseBusy || voiceActive}>{issueBox}</VoiceNoteRecorder>
+              ) : (
+                <div className="vn-field">
+                  {issueBox}
+                  {(window.SpeechRecognition || window.webkitSpeechRecognition) && (
+                    <button type="button" disabled={raiseBusy}
+                            onClick={() => toggleVoice(setRaiseText)}
+                            className="vn-mic" aria-label={voiceActive ? "Stop voice" : "Voice input"}
+                            title={voiceActive ? "Stop voice" : "Voice input"}
+                            style={voiceActive ? { background: "#dc2626", color: "#fff", borderColor: "#dc2626" } : undefined}>
+                      {voiceActive ? "■" : "🎤"}
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* 2026-10-30 — optional missing part, so the job is traceable. */}
             <div className="block text-[11px] font-bold text-slate-600 mt-4 mb-1.5">Missing part (optional)</div>
@@ -23106,18 +23100,22 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                       Delay reason (required)
                       <span className="text-red-500 ml-0.5">*</span>
                     </label>
-                    <textarea
-                      value={narration}
-                      onChange={(e) => setFinishModal((prev) => prev ? { ...prev, narration: e.target.value } : prev)}
-                      placeholder="Reason"
-                      rows={3}
-                      autoFocus
-                      className="w-full bg-white border border-red-300 rounded-lg px-3 py-2 text-[12px] text-slate-900 placeholder-slate-400 outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100 transition-colors"
-                    />
-                    {canVoice && (
-                      <VoiceNoteRecorder {...vnProps(machine.id, fromDepartment)} place="Delay reason" disabled={transferBusy}
-                                         setText={(fn) => setFinishModal((prev) => prev ? { ...prev, narration: fn(prev.narration || "") } : prev)} />
-                    )}
+                    {(() => {
+                      const delayBox = (
+                        <textarea
+                          value={narration}
+                          onChange={(e) => setFinishModal((prev) => prev ? { ...prev, narration: e.target.value } : prev)}
+                          placeholder="Reason"
+                          rows={3}
+                          autoFocus
+                          className="w-full bg-white border border-red-300 rounded-lg px-3 py-2 text-[12px] text-slate-900 placeholder-slate-400 outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100 transition-colors"
+                        />
+                      );
+                      return canVoice ? (
+                        <VoiceNoteRecorder {...vnProps(machine.id, fromDepartment)} place="Delay reason" disabled={transferBusy}
+                                           setText={(fn) => setFinishModal((prev) => prev ? { ...prev, narration: fn(prev.narration || "") } : prev)}>{delayBox}</VoiceNoteRecorder>
+                      ) : delayBox;
+                    })()}
                   </div>
                 )}
 
@@ -23136,28 +23134,13 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                       answers={finishModal.answers}
                       onSetAll={(v) => setFinishModal((prev) => prev ? { ...prev, answers: setAllAnswers(prev.answers, v) } : prev)}
                     />
-                    <div className="space-y-2 max-h-56 overflow-y-auto">
-                      {finishModal.answers.map((a, i) => (
-                        <div key={i} className={`rounded-md px-2 py-2 border ${a.checked ? "bg-emerald-50 border-emerald-200" : "bg-slate-50 border-slate-200"}`}>
-                          <label className="flex items-start gap-2 cursor-pointer">
-                            <input type="checkbox" checked={!!a.checked}
-                                   onChange={(e) => setFinishModal((prev) => prev ? { ...prev, answers: toggleAnswer(prev.answers, i, e.target.checked) } : prev)}
-                                   className="mt-0.5 accent-slate-900" />
-                            <span className="text-[12px] text-slate-700 flex-1">{a.label}{a.required && <span className="text-red-500 ml-0.5">*</span>}</span>
-                          </label>
-                          {!a.checked && (
-                            <input type="text" value={a.remark || ""}
-                                   onChange={(e) => setFinishModal((prev) => prev ? { ...prev, answers: setAnswerRemark(prev.answers, i, e.target.value) } : prev)}
-                                   placeholder="Reason"
-                                   className="w-full mt-2 bg-white border border-slate-300 rounded px-2 py-1.5 text-[11px] text-slate-900 placeholder-slate-400 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100 transition-colors" />
-                          )}
-                          {!a.checked && canVoice && (
-                            <VoiceNoteRecorder {...vnProps(machine.id, fromDepartment)} place="Transfer checklist" item={a.label} compact disabled={transferBusy}
-                                               setText={(fn) => setFinishModal((prev) => prev ? { ...prev, answers: setAnswerRemark(prev.answers, i, fn((prev.answers[i] || {}).remark || "")) } : prev)} />
-                          )}
-                        </div>
-                      ))}
-                    </div>
+                    <ChecklistRows answers={finishModal.answers}
+                      onToggle={(i, v) => setFinishModal((prev) => prev ? { ...prev, answers: toggleAnswer(prev.answers, i, v) } : prev)}
+                      onRemark={(i, t) => setFinishModal((prev) => prev ? { ...prev, answers: setAnswerRemark(prev.answers, i, t) } : prev)}
+                      voice={canVoice ? (i, a, field) => (
+                        <VoiceNoteRecorder {...vnProps(machine.id, fromDepartment)} place="Transfer checklist" item={a.label} disabled={transferBusy}
+                                           setText={(fn) => setFinishModal((prev) => prev ? { ...prev, answers: setAnswerRemark(prev.answers, i, fn((prev.answers[i] || {}).remark || "")) } : prev)}>{field}</VoiceNoteRecorder>
+                      ) : null} />
                   </div>
                 )}
 
@@ -23171,7 +23154,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                   </div>
                   <PendingJobRows rows={finishModal.owedItems || []} inventory={inventoryFlat} disabled={transferBusy}
                                   addLabel="+ Add Pending Item" mode="item" allowComment
-                                  renderVoice={canVoice ? (i, r, setText) => <VoiceNoteRecorder {...vnProps(machine.id, fromDepartment)} place="Pending item" item={pendingRowIsComment(r) ? r.description : r.itemName} compact disabled={transferBusy} setText={setText || null} /> : null}
+                                  renderVoice={canVoice ? (i, r, setText, field) => <VoiceNoteRecorder {...vnProps(machine.id, fromDepartment)} place="Pending item" item={r.description} disabled={transferBusy} setText={setText || null}>{field}</VoiceNoteRecorder> : null}
                                   onChange={(rows) => setFinishModal((prev) => prev ? { ...prev, owedItems: rows } : prev)} />
                   {pendingItemsProblem(finishModal.owedItems) && <div data-pending-item-problem className="mt-1.5 text-[11px] font-semibold" style={{ color: "#b45309" }}>{pendingItemsProblem(finishModal.owedItems)}</div>}
                 </div>
@@ -23284,16 +23267,18 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                         );
                       })}
                     </div>
-                    {(acceptModal.holdPick === "Other" || (!acceptModal.holdPick && (acceptModal.holdReason || ""))) && (
-                      <textarea rows={2} value={acceptModal.holdReason || ""} disabled={acceptModal.busy} autoFocus
-                                onChange={(e) => setField({ holdReason: e.target.value, error: "" })}
-                                placeholder="Write the reason"
-                                className="w-full bg-white border-2 border-red-200 rounded-lg px-3 py-2 text-[14px] text-slate-900 outline-none focus:border-red-400" />
-                    )}
-                    {acceptModal.holdPick === "Other" && canVoice && (
-                      <VoiceNoteRecorder {...vnProps(handover.machineId, handover.toDepartment)} place="Late reason" disabled={!!acceptModal.busy}
-                                         setText={(fn) => setAcceptModal((prev) => prev ? { ...prev, holdReason: fn(prev.holdReason || ""), error: "" } : prev)} />
-                    )}
+                    {(acceptModal.holdPick === "Other" || (!acceptModal.holdPick && (acceptModal.holdReason || ""))) && (() => {
+                      const lateBox = (
+                        <textarea rows={2} value={acceptModal.holdReason || ""} disabled={acceptModal.busy} autoFocus
+                                  onChange={(e) => setField({ holdReason: e.target.value, error: "" })}
+                                  placeholder="Write the reason"
+                                  className="w-full bg-white border-2 border-red-200 rounded-lg px-3 py-2 text-[14px] text-slate-900 outline-none focus:border-red-400" />
+                      );
+                      return acceptModal.holdPick === "Other" && canVoice ? (
+                        <VoiceNoteRecorder {...vnProps(handover.machineId, handover.toDepartment)} place="Late reason" disabled={!!acceptModal.busy}
+                                           setText={(fn) => setAcceptModal((prev) => prev ? { ...prev, holdReason: fn(prev.holdReason || ""), error: "" } : prev)}>{lateBox}</VoiceNoteRecorder>
+                      ) : lateBox;
+                    })()}
                   </div>
                 )}
                 {(
@@ -23391,32 +23376,13 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                           answers={acceptModal.checklistAnswers}
                           onSetAll={(v) => setField({ checklistAnswers: setAllAnswers(acceptModal.checklistAnswers, v), error: "" })}
                         />
-                        <div className="space-y-1.5">
-                          {acceptModal.checklistAnswers.map((a, i) => (
-                            <div key={a.id || i} className="rounded-md px-2 py-1.5"
-                                 style={{ background: "rgba(17,24,39,0.03)", border: `1px solid ${a.checked ? "rgba(34,197,94,0.3)" : "rgba(17,24,39,0.10)"}` }}>
-                              <label className="flex items-start gap-2 cursor-pointer">
-                                <input type="checkbox" checked={!!a.checked}
-                                       onChange={(e) => setField({ checklistAnswers: toggleAnswer(acceptModal.checklistAnswers, i, e.target.checked), error: "" })}
-                                       className="accent-emerald-500 w-4 h-4 mt-0.5" />
-                                <span className="flex-1 text-[11px] text-slate-700 leading-relaxed">
-                                  {a.label}
-                                  {a.required && <span className="ml-1 text-[9px] font-bold text-amber-700">• Must do</span>}
-                                </span>
-                              </label>
-                              {!a.checked && (
-                                <input type="text" value={a.remark || ""}
-                                       onChange={(e) => setField({ checklistAnswers: setAnswerRemark(acceptModal.checklistAnswers, i, e.target.value), error: "" })}
-                                       placeholder="Reason"
-                                       className="mt-1 w-full bg-slate-50 border border-slate-200 rounded px-2 py-1 text-[11px] text-slate-900 placeholder-slate-500 outline-none focus:border-blue-500/60" />
-                              )}
-                              {!a.checked && canVoice && (
-                                <VoiceNoteRecorder {...vnProps(handover.machineId, handover.toDepartment)} place="Accept checklist" item={a.label} compact disabled={!!busy}
-                                                   setText={(fn) => setAcceptModal((prev) => prev ? { ...prev, error: "", checklistAnswers: setAnswerRemark(prev.checklistAnswers, i, fn(((prev.checklistAnswers || [])[i] || {}).remark || "")) } : prev)} />
-                              )}
-                            </div>
-                          ))}
-                        </div>
+                        <ChecklistRows answers={acceptModal.checklistAnswers}
+                          onToggle={(i, v) => setAcceptModal((prev) => prev ? { ...prev, error: "", checklistAnswers: toggleAnswer(prev.checklistAnswers, i, v) } : prev)}
+                          onRemark={(i, t) => setAcceptModal((prev) => prev ? { ...prev, error: "", checklistAnswers: setAnswerRemark(prev.checklistAnswers, i, t) } : prev)}
+                          voice={canVoice ? (i, a, field) => (
+                            <VoiceNoteRecorder {...vnProps(handover.machineId, handover.toDepartment)} place="Accept checklist" item={a.label} disabled={!!busy}
+                                               setText={(fn) => setAcceptModal((prev) => prev ? { ...prev, error: "", checklistAnswers: setAnswerRemark(prev.checklistAnswers, i, fn(((prev.checklistAnswers || [])[i] || {}).remark || "")) } : prev)}>{field}</VoiceNoteRecorder>
+                          ) : null} />
                       </div>
                     )}
 
@@ -23425,7 +23391,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                       {stepHead(stepBase + 1 + (hasChecklist ? 1 : 0), `Anything still pending from ${handover.fromDepartment}?`, false)}
                       <PendingJobRows rows={acceptModal.pendingItemsToRaise || []} inventory={inventoryFlat} disabled={acceptModal.busy}
                                       accent="#dc2626" addLabel="+ Add Pending Item" mode="item" allowComment
-                                      renderVoice={canVoice ? (i, r, setText) => <VoiceNoteRecorder {...vnProps(handover.machineId, handover.toDepartment)} place="Pending item" item={pendingRowIsComment(r) ? r.description : r.itemName} compact disabled={!!acceptModal.busy} setText={setText || null} /> : null}
+                                      renderVoice={canVoice ? (i, r, setText, field) => <VoiceNoteRecorder {...vnProps(handover.machineId, handover.toDepartment)} place="Pending item" item={r.description} disabled={!!acceptModal.busy} setText={setText || null}>{field}</VoiceNoteRecorder> : null}
                                       onChange={(rows) => setField({ pendingItemsToRaise: rows })} />
                       {pendingItemsProblem(acceptModal.pendingItemsToRaise) && <div data-pending-item-problem className="mt-1.5 text-[11px] font-semibold" style={{ color: "#b45309" }}>{pendingItemsProblem(acceptModal.pendingItemsToRaise)}</div>}
                     </div>
@@ -23487,26 +23453,11 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                   answers={answers}
                   onSetAll={(v) => setField({ answers: setAllAnswers(answers, v), error: "" })}
                 />
-                {answers.map((a, i) => (
-                  <div key={a.id || i} className="rounded-md px-2 py-1.5"
-                       style={{ background: "rgba(17,24,39,0.03)", border: `1px solid ${a.checked ? "rgba(34,197,94,0.3)" : "rgba(17,24,39,0.10)"}` }}>
-                    <label className="flex items-start gap-2 cursor-pointer">
-                      <input type="checkbox" checked={!!a.checked}
-                             onChange={(e) => setField({ answers: toggleAnswer(answers, i, e.target.checked), error: "" })}
-                             className="accent-emerald-500 w-4 h-4 mt-0.5" />
-                      <span className="flex-1 text-[11px] text-slate-700 leading-relaxed">
-                        {a.label}
-                        {a.required && <span className="ml-1 text-[9px] font-bold text-amber-700">• Must do</span>}
-                      </span>
-                    </label>
-                    {!a.checked && (
-                      <input type="text" value={a.remark || ""}
-                             onChange={(e) => setField({ answers: setAnswerRemark(answers, i, e.target.value), error: "" })}
-                             placeholder="Why not? (short note)"
-                             className="mt-1 w-full bg-slate-50 border border-slate-200 rounded px-2 py-1 text-[11px] text-slate-900 placeholder-slate-500 outline-none focus:border-blue-500/60" />
-                    )}
-                  </div>
-                ))}
+                <div data-during-checklist>
+                <ChecklistRows answers={answers}
+                  onToggle={(i, v) => setDuringWorkModal((prev) => prev ? { ...prev, error: "", answers: toggleAnswer(prev.answers, i, v) } : prev)}
+                  onRemark={(i, t) => setDuringWorkModal((prev) => prev ? { ...prev, error: "", answers: setAnswerRemark(prev.answers, i, t) } : prev)} />
+                </div>
                 {error && (
                   <div className="rounded-lg px-3 py-2 text-[11px] font-semibold"
                        style={{ background: "rgba(239,68,68,0.08)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.3)" }}>
@@ -23536,13 +23487,11 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
           before_receive template. Each point: ✓, or ✗ with a reason (the
           reason becomes a pending job; it does not block). */}
       {startChk && (() => {
-        const { queue, idx, template, answers, marks, busy, error } = startChk;
+        const { queue, idx, template, answers, busy, error } = startChk;
         const machine = queue[idx];
-        const bad = new Set(startChk.bad || []);
-        const setMark = (i, v) => setStartChk((prev) => prev ? { ...prev, marks: { ...prev.marks, [i]: v }, answers: toggleAnswer(prev.answers, i, v === "ok"), error: "", bad: (prev.bad || []).filter((x) => x !== i) } : prev);
         const setRemark = (i, fn) => setStartChk((prev) => prev ? { ...prev, error: "", answers: setAnswerRemark(prev.answers, i, typeof fn === "function" ? fn((prev.answers[i] || {}).remark || "") : fn) } : prev);
-        const ready = answers.every((a, i) => marks[i] === "ok" || (marks[i] === "x" && String(a.remark || "").trim()));
-        const doneCount = answers.filter((a, i) => marks[i] === "ok" || (marks[i] === "x" && String(a.remark || "").trim())).length;
+        const ready = validateChecklistAnswers(answers).ok;
+        const doneCount = answers.filter((a) => a.checked || String(a.remark || "").trim()).length;
         return (
           <div data-start-checklist className="modal-backdrop fixed inset-0 z-[97] flex items-center justify-center p-3"
                style={{ background: "rgba(17,24,39,0.45)", backdropFilter: "blur(10px)", zIndex: 97 }}
@@ -23559,39 +23508,13 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                 </div>
               </div>
               <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
-                {answers.map((a, i) => {
-                  const mk = marks[i];
-                  return (
-                    <div key={a.id || i} data-start-chk-row={i} data-mark={mk || ""}
-                         className="rounded-xl px-3 py-2"
-                         style={{ background: mk === "ok" ? "rgba(22,163,74,0.06)" : mk === "x" ? "rgba(220,38,38,0.05)" : "rgba(17,24,39,0.03)",
-                                  border: `1px solid ${bad.has(i) ? "rgba(220,38,38,0.7)" : mk === "ok" ? "rgba(22,163,74,0.35)" : mk === "x" ? "rgba(220,38,38,0.35)" : "rgba(17,24,39,0.10)"}` }}>
-                      <div className="flex items-center gap-2">
-                        <span className="flex-1 text-[14px] text-slate-800 leading-snug">{a.label}</span>
-                        <button type="button" data-start-chk-ok={i} aria-label="OK" aria-pressed={mk === "ok"} disabled={busy}
-                                onClick={() => setMark(i, "ok")}
-                                className="w-11 h-11 rounded-lg text-[18px] font-black flex-shrink-0 transition-transform active:scale-95"
-                                style={mk === "ok" ? { background: "#16a34a", color: "#fff", border: "1px solid #16a34a" } : { background: "#fff", color: "#16a34a", border: "1px solid rgba(22,163,74,0.45)" }}>✓</button>
-                        <button type="button" data-start-chk-x={i} aria-label="Not OK" aria-pressed={mk === "x"} disabled={busy}
-                                onClick={() => setMark(i, "x")}
-                                className="w-11 h-11 rounded-lg text-[18px] font-black flex-shrink-0 transition-transform active:scale-95"
-                                style={mk === "x" ? { background: "#dc2626", color: "#fff", border: "1px solid #dc2626" } : { background: "#fff", color: "#dc2626", border: "1px solid rgba(220,38,38,0.45)" }}>✗</button>
-                      </div>
-                      {mk === "x" && (
-                        <div className="mt-2 flex flex-wrap items-center gap-1 bg-white border border-slate-300 rounded-lg pl-2 pr-1 focus-within:border-blue-500/60">
-                          <input type="text" data-start-chk-reason={i} value={a.remark || ""} disabled={busy}
-                                 onChange={(e) => setRemark(i, e.target.value)}
-                                 placeholder="Reason"
-                                 className="flex-1 min-w-0 bg-transparent py-2 text-[14px] text-slate-900 placeholder-slate-400 outline-none" />
-                          {canVoice && (
-                            <VoiceNoteRecorder {...vnProps(machine.id, "Assembly")} place="Assembly start checklist" item={a.label} compact mini langs={false} disabled={!!busy}
-                                               setText={(fn) => setRemark(i, fn)} />
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                <ChecklistRows answers={answers} placeholder="Reason"
+                  onToggle={(i, v) => setStartChk((prev) => prev ? { ...prev, error: "", answers: toggleAnswer(prev.answers, i, v) } : prev)}
+                  onRemark={(i, t) => setRemark(i, t)}
+                  voice={canVoice ? (i, a, field) => (
+                    <VoiceNoteRecorder {...vnProps(machine.id, "Assembly")} place="Assembly start checklist" item={a.label} disabled={!!busy}
+                                       setText={(fn) => setRemark(i, fn)}>{field}</VoiceNoteRecorder>
+                  ) : null} />
                 {error && (
                   <div data-start-chk-error className="rounded-lg px-3 py-2 text-[12px] font-semibold"
                        style={{ background: "rgba(239,68,68,0.08)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.3)" }}>
