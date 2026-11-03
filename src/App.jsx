@@ -19178,10 +19178,10 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                 <button data-needs-net type="button" onClick={() => setJobAction({ item: p, action: "receive", notes: "", busy: false, error: "" })}
                                         className="text-[10.5px] font-bold px-2.5 py-1 rounded-lg border transition-all"
                                         style={{ background: "rgba(37,99,235,0.08)", border: "1px solid rgba(37,99,235,0.35)", color: "#1d4ed8" }}>
-                                  Part received
+                                  📦 Part received
                                 </button>
                               )}
-                              {canAct && onResolvePendingItem && p.status === "open" && (
+                              {canAct && onResolvePendingItem && p.status === "open" && !pendingItemIsPart(p) && (
                                 <button data-needs-net type="button" onClick={() => setJobAction({ item: p, action: "complete", notes: "", busy: false, error: "" })}
                                         className="text-[10.5px] font-bold px-2.5 py-1 rounded-lg border transition-all"
                                         style={{ background: "rgba(22,163,74,0.08)", border: "1px solid rgba(22,163,74,0.35)", color: "#15803d" }}>
@@ -19937,7 +19937,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                               {(p.itemCode || p.itemName) ? ` · part ${p.itemCode || p.itemName}${p.qty != null ? ` × ${p.qty}` : ""}` : ""}
                               {p.critical ? " · CRITICAL" : ""}
                               {stage === "received" ? " · part received, finish the work" : ""}
-                              {stage === "partial" ? ` · ${p.receivedQty} received, ${pendingItemRemaining(p)} still pending` : ""}
+                              {stage === "partial" ? ` · ${p.qty != null ? `${p.receivedQty} of ${p.qty}` : p.receivedQty} received · ${pendingItemRemaining(p) ?? 0} still pending` : ""}
                             </div>
                           </div>
                           {canJobs && (
@@ -19945,10 +19945,10 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                               {onReceivePendingItem && canReceiveJob(p) && !p.receivedAt && (
                                 <button data-needs-net type="button" className={btn} style={{ background: "rgba(37,99,235,0.08)", border: "1px solid rgba(37,99,235,0.4)", color: "#1d4ed8" }}
                                         onClick={() => setJobAction({ item: p, action: "receive", notes: "", busy: false, error: "" })}>
-                                  Part received
+                                  📦 Part received
                                 </button>
                               )}
-                              {onResolvePendingItem && (
+                              {onResolvePendingItem && !pendingItemIsPart(p) && (
                                 <button data-needs-net type="button" className={btn} style={{ background: "#15803d", color: "#fff" }}
                                         onClick={() => setJobAction({ item: p, action: "complete", notes: "", busy: false, error: "" })}>
                                   ✓ Work completed
@@ -21723,10 +21723,10 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                           <button data-needs-net onClick={() => setJobAction({ item: p, action: "receive", notes: "", busy: false, error: "" })}
                                                   className="text-[10px] font-bold px-2 py-0.5 rounded border"
                                                   style={{ color: "#1d4ed8", borderColor: "rgba(37,99,235,0.4)", background: "rgba(37,99,235,0.08)" }}>
-                                            Part received
+                                            📦 Part received
                                           </button>
                                         )}
-                                        {canFinishTransfer(canDo) && onResolvePendingItem && (
+                                        {canFinishTransfer(canDo) && onResolvePendingItem && !pendingItemIsPart(p) && (
                                           <button data-needs-net onClick={() => setJobAction({ item: p, action: "complete", notes: "", busy: false, error: "" })}
                                                   className="text-[10px] font-bold px-2 py-0.5 rounded border"
                                                   style={{ color: "#15803d", borderColor: "rgba(22,163,74,0.4)", background: "rgba(22,163,74,0.08)" }}>
@@ -22246,9 +22246,21 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
         })();
         const receiveReady = !isReceive || p.receivedAt || (!qtyProblem && !serialProblem && (critical && inputType === "serial" ? true : !!jobAction.verified));
         const receiveWhy = !isReceive || receiveReady ? "" : (qtyProblem || serialProblem || (critical ? "Tick the physical verification for this critical item." : "Tick that the part was physically received and checked."));
+        // 2026-11-03 — Work completed (work / comment jobs) needs a remark; a
+        // part job is never completed here — receiving the part completes it.
+        const remarkMissing = !isReceive && !String(jobAction.notes || "").trim();
+        const partNotReceived = !isReceive && pendingItemIsPart(p) && !p.receivedAt;
+        const blocked = !jobAction.busy && ((isReceive && !receiveReady) || remarkMissing || partNotReceived);
+        // Owner's rule: no long message — the box that still needs filling turns red.
+        const flagMissing = () => {
+          if (isReceive) flagField(qtyProblem ? "[data-receive-qty-box]" : "[data-receive-verify]");
+          else if (remarkMissing) flagField("[data-job-remark]");
+        };
         const submit = async () => {
           if (jobAction.busy) return;
-          if (isReceive && !receiveReady) { setJobAction((prev) => prev ? { ...prev, error: receiveWhy } : prev); return; }
+          if (isReceive && !receiveReady) { setJobAction((prev) => prev ? { ...prev, error: receiveWhy } : prev); flagMissing(); return; }
+          if (partNotReceived) { setJobAction((prev) => prev ? { ...prev, error: "A part job is completed by receiving the part — use Part received." } : prev); return; }
+          if (remarkMissing) { flagMissing(); return; }
           setJobAction((prev) => prev ? { ...prev, busy: true, error: "" } : prev);
           const filledSerials = serials.slice(0, serialCount).filter(Boolean);
           const verification = isReceive && !p.receivedAt
@@ -22261,7 +22273,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
             : await onResolvePendingItem(p.id, { notes: jobAction.notes.trim() });
           if (r && r.success === false) { setJobAction((prev) => prev ? { ...prev, busy: false, error: r.error || "Could not save." } : prev); return; }
           setJobAction(null);
-          showToast(isReceive ? (r && r.fullyReceived === false ? `Received ${recvQty} · ${r.remainingQty} still pending` : "Part received") : "Work completed",
+          showToast(isReceive ? (r && r.fullyReceived === false ? `Received ${recvQty} · ${r.remainingQty} still pending` : r && r.completed ? "Part received · job completed" : "Part received") : "Work completed",
                     `${m?.bomKey || ""}${m?.serialNo ? ` · S/N ${m.serialNo}` : ""}${p.itemCode ? ` · ${p.itemCode}` : p.itemName ? ` · ${p.itemName}` : ""}${isReceive && r && r.stockInwarded ? ` · ${recvQty} added to stock` : ""}`);
         };
         return (
@@ -22285,7 +22297,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                 <JobHistory item={p} users={allUsers} compact />
               </div>
               {isReceive && !p.receivedAt && (
-                <p className="text-[11px] text-slate-600 mb-2">Records the part arriving for this machine. The job stays open until the work is marked completed.</p>
+                <p className="text-[11px] text-slate-600 mb-2">Records the part arriving for this machine. When the full quantity has arrived, the job is completed.</p>
               )}
               {isReceive && !p.receivedAt && (
                 <div data-receive-qty-box className="rounded-lg px-3 py-2.5 mb-3" style={{ background: "rgba(37,99,235,0.05)", border: "1px solid rgba(37,99,235,0.3)" }}>
@@ -22371,13 +22383,19 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
               {!isReceive && (p.itemCode || p.itemName) && !p.receivedAt && (
                 <p className="text-[11px] font-bold mb-2" style={{ color: "#b45309" }}>This part has not been recorded as received. Mark it completed only if the work is actually done.</p>
               )}
-              <label className="block text-[11px] font-bold text-slate-600 mb-1">{isReceive ? "Receive remark / reason (optional)" : "Completion note (optional)"}</label>
-              <input value={jobAction.notes} disabled={jobAction.busy} autoFocus
+              <label className="block text-[11px] font-bold text-slate-600 mb-1">{isReceive ? "Receive remark / reason (optional)" : <>Completion remark <span className="text-red-500">*</span></>}</label>
+              <input value={jobAction.notes} disabled={jobAction.busy} autoFocus data-job-remark={isReceive ? undefined : ""}
                      onChange={(e) => setJobAction((prev) => prev ? { ...prev, notes: e.target.value, error: "" } : prev)}
                      onKeyDown={(e) => e.key === "Enter" && submit()}
                      placeholder={isReceive ? "e.g. received from Stores, 2 pcs — replacement for the damaged cover" : "e.g. fitted and tested"}
                      className="w-full rounded-lg px-3 py-2.5 text-[13px] text-slate-800 outline-none"
                      style={{ background: "var(--surface-elevated)", border: "1px solid rgba(17,24,39,0.12)" }} />
+              {!isReceive && canVoice && (
+                <div className="mt-2" data-job-remark-voice>
+                  <VoiceNoteRecorder {...vnProps(p.machineId, p.assignedDepartment || m?.currentDepartment || "")} place="Work completed" item={p.description || ""} compact
+                                     disabled={!!jobAction.busy} setText={(fn) => setJobAction((prev) => prev ? { ...prev, notes: fn(prev.notes || ""), error: "" } : prev)} />
+                </div>
+              )}
               {jobAction.error && (
                 <div className="mt-3 text-[11px] font-bold px-3 py-2 rounded-lg" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.4)", color: "#dc2626" }}>{jobAction.error}</div>
               )}
@@ -22386,12 +22404,14 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                         className="flex-1 h-11 rounded-lg text-[13px] font-bold text-slate-600 border transition-all disabled:opacity-40" style={{ borderColor: "rgba(17,24,39,0.12)" }}>
                   Cancel
                 </button>
-                <button data-needs-net type="button" data-job-submit onClick={submit} disabled={jobAction.busy || (isReceive && !receiveReady)}
-                        title={isReceive && !receiveReady ? receiveWhy : ""}
-                        className="flex-[2] h-11 rounded-lg text-[13px] font-black text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                        style={{ background: isReceive ? "#1d4ed8" : "linear-gradient(135deg,#16a34a,#15803d)", color: "#ffffff" }}>
+                <span className="flex-[2] flex" onClick={() => { if (blocked) flagMissing(); }}>
+                <button data-needs-net type="button" data-job-submit onClick={submit} disabled={jobAction.busy || (isReceive && !receiveReady) || remarkMissing || partNotReceived}
+                        title={isReceive && !receiveReady ? receiveWhy : remarkMissing ? "Write what was done" : ""}
+                        className="flex-1 h-11 rounded-lg text-[13px] font-black text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        style={{ background: isReceive ? "#1d4ed8" : "linear-gradient(135deg,#16a34a,#15803d)", color: "#ffffff", pointerEvents: blocked ? "none" : undefined }}>
                   {jobAction.busy ? "⏳ Please wait…" : isReceive ? (remaining != null && recvQty > 0 && recvQty < remaining ? `✓ Receive ${recvQty} · ${remaining - recvQty} stays pending` : "✓ Part received") : "✓ Work completed"}
                 </button>
+                </span>
               </div>
             </div>
           </div>
@@ -28831,7 +28851,8 @@ export default function App() {
   };
 
   // 2026-10-30 — the responsible department records that the missing part has
-  // arrived. The job stays open until "Work completed" (resolve) closes it.
+  // arrived. 2026-11-03: the receipt that completes the quantity also completes
+  // the job (no separate "Work completed" for part jobs).
   const handleReceivePendingItem = async (id, { qty, notes, verification = null }) => {
     if (!currentUser?.id) return { success: false, error: "Not authenticated" };
     const p = pendingHandoverItems.find((x) => x.id === id);
@@ -28887,7 +28908,37 @@ export default function App() {
         ref: machine?.bomKey || "", serialNo: machine?.serialNo || "",
         details: { itemId: id, receiptId: receipt.id, itemCode: p.itemCode || undefined, itemName: p.itemName || undefined, qtyReceived: recvQty, qtyPendingBefore: p.qty ?? undefined, remainingQty: res.remainingQty ?? undefined, fullyReceived: !!res.fullyReceived, stockInwarded, assignedDepartment: p.assignedDepartment || undefined, receivedInDepartment, notes: String(notes || "").trim(), originalReason: p.reason || undefined, verification: verification || undefined },
       });
-      return { ...res, stockInwarded };
+      // 2026-11-03 — for a PART job, receiving the part IS the completion: the
+      // receipt that brings the total up to the required quantity also closes
+      // the job. Two existing, separately-allowed writes in sequence (the
+      // receive RPC above, then the same resolve update "Work completed" uses —
+      // the 042/043 guard refuses receive + resolve columns in one update).
+      // The database resolve policy needs Finish & Transfer, so a Stores-only
+      // receiver leaves the job received and a department user closes it.
+      let completed = false, completeError = "";
+      const mayComplete = currentUser?.role === "super_admin" || currentUser?.role === "Admin" || canFinishTransfer(authCanDo);
+      if (res.fullyReceived && pendingItemIsPart(p) && mayComplete) {
+        const completionNote = String(notes || "").trim() || "Part received";
+        const resolvedInDepartment = machine?.currentDepartment || machine?.stage || "";
+        const done = await resolvePendingItem(id, { resolvedBy: currentUser.id, resolvedInDepartment, notes: completionNote });
+        if (done.success) {
+          completed = true;
+          const resolvedAt = done.item?.resolvedAt || new Date().toISOString();
+          setPendingHandoverItems((prev) => prev.map((x) => x.id === id
+            ? { ...x, status: "resolved", resolvedBy: currentUser.id, resolvedAt, resolvedInDepartment, resolutionNotes: completionNote }
+            : x));
+          logAudit({
+            type: "pending_item_completed_on_receipt", module: "Machine",
+            action: `Pending part completed on receipt${p.itemCode ? ` (${p.itemCode})` : p.itemName ? ` (${p.itemName})` : ""}${machine ? ` for ${machine.bomKey}${machine.serialNo ? ` [${machine.serialNo}]` : ""}` : ""}`,
+            ref: machine?.bomKey || "", serialNo: machine?.serialNo || "",
+            details: { itemId: id, receiptId: receipt.id, qtyRequired: p.qty ?? undefined, notes: completionNote },
+          });
+        } else {
+          completeError = done.error || "";
+          console.warn("[App] part fully received but the job could not be completed", completeError);
+        }
+      }
+      return { ...res, stockInwarded, completed, completeError };
     } finally {
       receivePartRef.current.delete(id);
     }
