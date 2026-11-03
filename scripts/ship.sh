@@ -59,7 +59,7 @@ cmd_check(){
   for i in $(seq 1 20); do curl -s "localhost:$PORT" >/dev/null && break; sleep 0.5; done
   trap 'pkill -f -- "--port $PORT --strictPort" 2>/dev/null || true' EXIT
   say "running browser suites in parallel ..."
-  local s; for s in tests/e2e/*.mjs; do [ -n "${E2E_ONLY:-}" ] && [[ "$(basename "$s" .mjs)" != *"$E2E_ONLY"* ]] && continue; job "e2e-$(basename "$s" .mjs)" timeout 420 node "$s"; done
+  local s; for s in tests/e2e/*.mjs; do [ -n "${E2E_ONLY:-}" ] && [[ "$(basename "$s" .mjs)" != *"$E2E_ONLY"* ]] && continue; while [ "$(jobs -rp | wc -l)" -ge "${E2E_PAR:-4}" ]; do sleep 0.5; done; job "e2e-$(basename "$s" .mjs)" timeout 420 node "$s"; done
   wait
   git checkout -- tests/screenshots 2>/dev/null || true   # e2e screenshots are not part of a change
   for s in "$LOGS"/e2e-*.rc; do j=$(basename "$s" .rc); printf '%-34s %s\n' "$j" "$(tail -1 "$LOGS/$j.log" | tr -d '\n')"; [ "$(cat "$s")" = 0 ] || bad=1; done
