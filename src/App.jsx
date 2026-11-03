@@ -86,7 +86,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-03-accept-people-first";
+const APP_BUILD = "2026-11-03-save-failed-alert";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -16896,6 +16896,11 @@ const pendingItemsProblem = (rows) => {
 // its top-right corner. Several closed only by tapping outside or by a Cancel
 // at the very bottom, which on a phone sat below the screen and left people
 // stuck. Disabled while the popup is saving, exactly like its Cancel.
+// A save that did not reach the server: log it AND tell the user in plain words.
+const saveFailed = (where, err) => {
+  console.warn(`[App] ${where} failed`, err);
+  try { window.dispatchEvent(new CustomEvent("erp-save-failed", { detail: { where } })); } catch { /* ignore */ }
+};
 function ModalX({ onClose, disabled = false, label = "Close" }) {
   return (
     <button type="button" aria-label={label} title={label} data-modal-close onClick={onClose} disabled={disabled}
@@ -17337,6 +17342,13 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
     setToast({ text, sub, priority: p });
     setTimeout(() => setToast(null), dur);
   };
+  // Big red message when any save did not reach the server.
+  useEffect(() => {
+    const onFail = () => showToast("❌ NOT SAVED", "Check your internet, then press the button again.", "urgent");
+    window.addEventListener("erp-save-failed", onFail);
+    return () => window.removeEventListener("erp-save-failed", onFail);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Open the Finish & Transfer modal for a given machine.
   // Everyone who may be recorded as having worked in a department today:
@@ -25631,7 +25643,7 @@ export default function App() {
     // local row is only ever added with the real id.
     const r = await machineCreate(newMachine);
     if (!r.success) {
-      console.warn("[App] Machine create Supabase failed:", r.error);
+      saveFailed("Machine create", r.error);
       flashSaveError("Machine not saved", `${bomKey}${serialNo ? ` · ${serialNo}` : ""}: ${r.error || "unknown error"}`);
       return { success: false, error: r.error || "Machine not saved" };
     }
@@ -25742,7 +25754,7 @@ export default function App() {
         departmentEnteredAt: nowIso,
       });
       if (!r.success) {
-        console.warn("[App] Machine stage Supabase failed:", r.error);
+        saveFailed("Machine stage", r.error);
         flashSaveError(`stage change to ${newStage}`,
           `${machine.bomKey}${machine.serialNo ? ` · ${machine.serialNo}` : ""}: ${r.error || "unknown error"}`);
         rtMach();
@@ -25794,7 +25806,7 @@ export default function App() {
         // makes sure the operator is told.
         const failed = results.filter((r) => !r.success);
         if (failed.length) {
-          console.warn("[App] handleStartProduction: Supabase machine updates failed", failed);
+          saveFailed("Start production", failed);
           failed.forEach((r, i) => {
             const m = targets[results.indexOf(r)] || targets[i];
             flashSaveError("Start Production",
@@ -26226,7 +26238,7 @@ export default function App() {
       if (trialCertificate) machUpd.trialCertificate = trialCertificate;
       machineUpdate(machineId, machUpd).then((r) => {
         if (!r.success) {
-          console.warn("[App] handleFinishTransfer: machine update failed", r.error);
+          saveFailed("Finish & Transfer", r.error);
           // The handover row itself is already committed and checked above. If
           // this half is lost the machine does not point at it, so the receiving
           // department never sees the machine and the sender can raise a second
@@ -26302,7 +26314,7 @@ export default function App() {
           details: { handoverId: res.handover.id, templateId: checklistTemplate.id, items: checklistAnswers.length, unchecked: checklistAnswers.filter((a) => !a.checked).length, stage: "before_dispatch" },
         });
       } else {
-        console.warn("[App] handleFinishTransfer: checklist save failed", cr.error);
+        saveFailed("Transfer checklist", cr.error);
         flashSaveError("Checklist not saved", `${machine.bomKey}${machine.serialNo ? ` · ${machine.serialNo}` : ""}: the Before Dispatch checklist (${checklistTemplate.name || ""}) was not recorded — ${cr.error || "unknown error"}`);
       }
     }
@@ -26337,7 +26349,7 @@ export default function App() {
           details: { machineId, itemId: pr.item?.id, handoverId: res.handover.id, kind: "owed", assignedDepartment: fromDepartment, description: text, itemCode: job.itemCode || undefined, qty: job.qty ?? undefined, reason: job.reason || undefined },
         });
       } else {
-        console.warn("[App] handleFinishTransfer: owed item save failed", pr.error);
+        saveFailed("Pending item", pr.error);
         flashSaveError("Pending job not saved", `${machine.bomKey}${machine.serialNo ? ` · ${machine.serialNo}` : ""}: "${text}" — ${pr.error || "unknown error"}. Raise it again from the machine card.`);
       }
     }
@@ -26467,7 +26479,7 @@ export default function App() {
         pendingHandoverId:   null,
       }).then((r) => {
         if (!r.success) {
-          console.warn("[App] handleAcceptHandover: machine promote failed", r.error);
+          saveFailed("Accept", r.error);
           // handover_events is already flipped to accepted and that write WAS
           // checked. Losing this one deadlocks the machine: it sits in the old
           // department with pending_handover_id still set, so Finish & Transfer
@@ -26524,7 +26536,7 @@ export default function App() {
           details: { handoverId, machineId: handover.machineId, raisedInDepartment: handover.fromDepartment, itemCode: job.itemCode || undefined, qty: job.qty ?? undefined, reason: job.reason || undefined },
         });
       } else {
-        console.warn("[App] handleAcceptHandover: pending-item save failed", pi.error);
+        saveFailed("Pending item", pi.error);
         flashSaveError("Pending item not saved", `${handover.bomKey}${handover.serialNo ? ` · ${handover.serialNo}` : ""}: "${desc}" — ${pi.error || "unknown error"}. Raise it again from the machine card.`);
       }
     }
@@ -26550,7 +26562,7 @@ export default function App() {
           details: { handoverId, templateId: checklistTemplate.id, items: checklistAnswers.length, unchecked: checklistAnswers.filter((a) => !a.checked).length, stage: "before_receive" },
         });
       } else {
-        console.warn("[App] handleAcceptHandover: before-receive checklist save failed", cr.error);
+        saveFailed("Accept checklist", cr.error);
         flashSaveError("Checklist not saved", `${handover.bomKey}${handover.serialNo ? ` · ${handover.serialNo}` : ""}: the Before Receive checklist (${checklistTemplate.name || ""}) was not recorded — ${cr.error || "unknown error"}`);
       }
     }
@@ -26575,7 +26587,7 @@ export default function App() {
             details: { handoverId, machineId: handover.machineId, kind: "owed", assignedDepartment: handover.fromDepartment, reason: job.reason, source: "checklist_after_acceptance" },
           });
         } else {
-          console.warn("[App] handleAcceptHandover: checklist pending job save failed", pi.error);
+          saveFailed("Pending job", pi.error);
           flashSaveError("Pending job not saved", `${handover.bomKey}${handover.serialNo ? ` · ${handover.serialNo}` : ""}: "${job.description}" — ${pi.error || "unknown error"}. Raise it again from the machine card.`);
         }
       }
