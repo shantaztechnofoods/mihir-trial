@@ -3616,3 +3616,17 @@ button.rack-btn:disabled { background: #e5e7eb !important; color: #6b7280 !impor
 }
 /* Customer report without a photo: no empty box. */
 .mr-doc .rpt-hero.no-photo { grid-template-columns: minmax(0, 1fr); }
+
+/* 2026-11-03 — Rack colour (owner preview): a calm steel crate; the model
+   colour is only a top strip and the model label (e.g. "R-10"), so a red
+   R-10 no longer reads as "problem". Status pills are unchanged. */
+.rack-crate {
+  background-color: #dfe4ea;
+  background-image:
+    linear-gradient(to bottom, var(--crate) 0, var(--crate) 7px, transparent 7px),
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.35) 0 6px, transparent 6px 14px);
+  border: 1.5px solid #a9b4c2;
+  box-shadow: 0 1px 0 rgba(15,23,42,0.06), 0 4px 12px rgba(17,24,39,0.08);
+}
+.rack-crate:hover { box-shadow: 0 1px 0 rgba(15,23,42,0.06), 0 8px 18px rgba(17,24,39,0.12); }
+.rack-crate-handle { top: 8px; background: rgba(71,85,105,0.45); }
