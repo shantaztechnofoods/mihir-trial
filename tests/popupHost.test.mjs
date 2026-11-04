@@ -13,9 +13,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import { appSource } from "./helpers/source.mjs";
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
-const app = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
+const app = appSource();
 const css = fs.readFileSync(path.join(root, "src/index.css"), "utf8");
 
 test("Machine Tracker BOM host card carries no-lift", () => {

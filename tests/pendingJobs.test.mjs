@@ -6,6 +6,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import { appSource } from "./helpers/source.mjs";
 
 const mem = new Map();
 globalThis.localStorage = {
@@ -19,7 +20,7 @@ const { createPendingItem, receivePendingItem, resolvePendingItem, fetchPendingI
 const { validateChecklistAnswers, checklistProblemText, incompleteChecklistJobs } = await import("../src/utils/checklistLogic.js");
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
-const app  = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
+const app  = appSource();
 
 test("a pending job records the missing part: code, name, qty, reason", async () => {
   const r = await createPendingItem({
@@ -118,7 +119,7 @@ test("racks are the fixed floor racks only — no capacity from the BOM", () => 
   // app must import it from there rather than carry its own copy.
   const rackSlots = fs.readFileSync(path.join(root, "src/utils/rackSlots.js"), "utf8");
   assert.match(rackSlots, /export function rackCapacityFor\(bomKey, _def, layout = PHYSICAL_RACK_LAYOUT\) \{\s*const slots = physicalRackSlots\(bomKey, layout\);\s*return slots != null \? slots : 0;/);
-  assert.match(app, /import \{[^}]*rackCapacityFor[^}]*\} from "\.\/utils\/rackSlots\.js"/);
+  assert.match(app, /import \{[^}]*rackCapacityFor[^}]*\} from "(?:\.\.?\/)+utils\/rackSlots\.js"/);
   assert.doesNotMatch(app, /\nfunction rackCapacityFor\(/);
 });
 

@@ -6,9 +6,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import { appSource, readSrc } from "./helpers/source.mjs";
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
-const app  = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
+const app  = appSource();
 const mp   = app.slice(app.indexOf("function MachinePage("), app.indexOf("function MachinePage(") + 420000);
 
 test("staffMode is derived from isAdminUser, and admins keep the full tracker", () => {
@@ -95,7 +96,7 @@ test("staff My Dashboard (2026-11-03): button in the staff layout, read-only pan
   const sd = mp.slice(mp.indexOf("{staffMode && (() => {"), mp.indexOf("data-staff-dashboard") + 20000);
   assert.match(sd, /\{!isProdHead && hasDepartments && \(\s*<button type="button" data-my-dashboard-open onClick=\{\(\) => setMyDashOpen\(true\)\}/);
   assert.match(mp, /\{staffMode && !isProdHead && hasDepartments && myDashOpen && \(\s*<StaffMyDashboard departments=\{myDepartments\}/);
-  const dash = app.slice(app.indexOf("function StaffMyDashboard("), app.indexOf("function MachinePage("));
+  const dash = readSrc("src/modules/machine-tracker/StaffMyDashboard.jsx");
   assert.ok(dash.length > 0, "StaffMyDashboard is defined");
   assert.match(dash, /mine\.has\(r\.department\)/, "stars: my departments only");
   assert.match(dash, /mine\.has\(h\.fromDepartment\)/, "finished machines: my departments only");

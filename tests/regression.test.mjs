@@ -33,39 +33,99 @@
 //  * Keep the inventory conservative: add an entry only when you want
 //    future deletions of that symbol to be blocked.
 
+//
+// 2026-11-04 — module-folder split. The code that lived in src/App.jsx now
+// lives in src/app (shell), src/modules/<module> and src/shared (see
+// docs/ARCHITECTURE.md). Every check below now scans ALL the screen code
+// (APP_SRC = every file under src/app, src/modules, src/shared), so a symbol
+// counts as present wherever it was moved to — but not if it only survives in
+// a store/util comment.
+// The inventory itself is unchanged. The size floors now apply to the
+// split folders as a whole AND to every module folder separately.
+
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, statSync } from "node:fs";
+import { readFileSync, statSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
+import { uiSource, srcFiles } from "./helpers/source.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const APP_JSX   = resolve(__dirname, "..", "src", "App.jsx");
-const MAIN_JSX  = resolve(__dirname, "..", "src", "main.jsx");
-const STORES    = resolve(__dirname, "..", "src", "stores");
-
-function read(path) { return readFileSync(path, "utf8"); }
+const ROOT      = resolve(__dirname, "..");
+const APP_JSX   = resolve(ROOT, "src", "app", "App.jsx");
+const BUILD_INFO = resolve(ROOT, "src", "shared", "buildInfo.js");
+const MAIN_JSX  = resolve(ROOT, "src", "main.jsx");
+const STORES    = resolve(ROOT, "src", "stores");
+// The screen code — every .js/.jsx file under src/app, src/modules and src/shared
+// (all of the former src/App.jsx, plus the old src/pages + src/components) — is
+// the corpus the inventory is checked against. Stores / utils / auth are NOT
+// included on purpose: a symbol removed from the UI must not be "found" in a
+// store comment. (Store exports are checked separately below.)
+const APP_SRC   = Symbol("screen code: src/app + src/modules + src/shared");
+let uiCache = null;
+function read(path) { return path === APP_SRC ? (uiCache ??= uiSource()) : readFileSync(path, "utf8"); }
 function has(src, needle) { return src.includes(needle); }
 
 // ─── File-size floor (first line of defense against mass deletion) ──────────
 
-test("regression: src/App.jsx is substantially populated (>= 10,000 lines)", () => {
-  const src = read(APP_JSX);
-  const lines = src.split("\n").length;
+const SPLIT_DIRS = ["src/app", "src/modules", "src/shared"];
+const splitFiles = () => SPLIT_DIRS.flatMap((d) => srcFiles(d));
+
+test("regression: the former App.jsx code (src/app + src/modules + src/shared) is substantially populated (>= 10,000 lines)", () => {
+  const lines = splitFiles().reduce((n, f) => n + read(resolve(ROOT, f)).split("\n").length, 0);
   assert.ok(
     lines >= 10000,
-    `src/App.jsx shrank to ${lines} lines — expected >= 10,000. ` +
+    `src/app + src/modules + src/shared shrank to ${lines} lines — expected >= 10,000. ` +
     `A sudden drop of this size has historically meant accidental ` +
     `wholesale deletion (see 2b71bbc post-mortem in CLAUDE.md).`
   );
 });
 
-test("regression: src/App.jsx is not pathologically small on disk (>= 400 KB)", () => {
-  const bytes = statSync(APP_JSX).size;
+test("regression: the former App.jsx code is not pathologically small on disk (>= 400 KB)", () => {
+  const bytes = splitFiles().reduce((n, f) => n + statSync(resolve(ROOT, f)).size, 0);
   assert.ok(
     bytes >= 400 * 1024,
-    `src/App.jsx is ${bytes} bytes — expected >= 400 KB.`
+    `src/app + src/modules + src/shared is ${bytes} bytes — expected >= 400 KB.`
   );
+});
+
+// Per-folder floors (about half of each folder's size at the split). A module
+// losing half its code in one change is the 2b71bbc pattern at module scale.
+const FOLDER_FLOORS = {
+  "src/app": 2500,
+  "src/shared": 1500,
+  "src/modules/machine-tracker": 3000,
+  "src/modules/trial-certificate": 400,
+  "src/modules/inventory": 2000,
+  "src/modules/bom": 1200,
+  "src/modules/purchase": 1500,
+  "src/modules/reports": 1500,
+  "src/modules/settings": 600,
+  "src/modules/whatsapp": 900,
+  "src/modules/dashboard": 250,
+  "src/modules/analytics": 100,
+  "src/modules/ai-assistant": 100,
+  "src/modules/pending-jobs": 150,
+  "src/modules/audit-trail": 200,
+  "src/modules/users-roles": 500,
+};
+for (const [dir, floor] of Object.entries(FOLDER_FLOORS)) {
+  test(`regression: ${dir} is substantially populated (>= ${floor} lines)`, () => {
+    const lines = srcFiles(dir).reduce((n, f) => n + read(resolve(ROOT, f)).split("\n").length, 0);
+    assert.ok(lines >= floor, `${dir} shrank to ${lines} lines — expected >= ${floor}.`);
+  });
+}
+
+test("regression: src/app/App.jsx (state wiring + handlers) is substantially populated (>= 2,000 lines)", () => {
+  const lines = read(APP_JSX).split("\n").length;
+  assert.ok(lines >= 2000, `src/app/App.jsx shrank to ${lines} lines — expected >= 2,000.`);
+});
+
+test("regression: every module folder has index.js (public exports) and README.md", () => {
+  for (const dir of Object.keys(FOLDER_FLOORS).filter((d) => d.startsWith("src/modules/"))) {
+    assert.ok(existsSync(resolve(ROOT, dir, "index.js")), `${dir}/index.js missing`);
+    assert.ok(existsSync(resolve(ROOT, dir, "README.md")), `${dir}/README.md missing`);
+  }
 });
 
 // ─── Top-level App-root handlers (BOM / Rack / Machine / Item / PO) ─────────
@@ -135,8 +195,8 @@ const APP_HANDLERS = [
 ];
 
 for (const name of APP_HANDLERS) {
-  test(`regression: src/App.jsx still defines ${name}`, () => {
-    const src = read(APP_JSX);
+  test(`regression: src/ still defines ${name}`, () => {
+    const src = read(APP_SRC);
     const re = new RegExp(`const\\s+${name}\\s*=`);
     assert.ok(
       re.test(src),
@@ -190,8 +250,8 @@ const PAGE_COMPONENTS = [
 ];
 
 for (const name of PAGE_COMPONENTS) {
-  test(`regression: src/App.jsx still defines ${name}`, () => {
-    const src = read(APP_JSX);
+  test(`regression: src/ still defines ${name}`, () => {
+    const src = read(APP_SRC);
     const re = new RegExp(`function\\s+${name}\\b`);
     assert.ok(re.test(src), `App.jsx no longer defines ${name}.`);
   });
@@ -206,7 +266,7 @@ const NAV_IDS = [
 ];
 
 test("regression: sidebar navItems contains all 16 modules", () => {
-  const src = read(APP_JSX);
+  const src = read(APP_SRC);
   // Scoped grep: must appear inside the navItems array definition.
   const navBlock = src.match(/const navItems\s*=\s*\[([\s\S]*?)\n\];/);
   assert.ok(navBlock, "navItems array not found in App.jsx");
@@ -258,7 +318,7 @@ const AUDIT_EVENT_TYPES = [
 
 for (const type of AUDIT_EVENT_TYPES) {
   test(`regression: audit event type "${type}" still emitted`, () => {
-    const src = read(APP_JSX);
+    const src = read(APP_SRC);
     assert.ok(
       has(src, `"${type}"`),
       `Audit event type "${type}" is no longer emitted anywhere in App.jsx.`
@@ -485,7 +545,7 @@ const USER_FACING_STRINGS = [
 
 for (const s of USER_FACING_STRINGS) {
   test(`regression: user-visible string "${s}" present in App.jsx`, () => {
-    const src = read(APP_JSX);
+    const src = read(APP_SRC);
     assert.ok(has(src, s), `User-visible string "${s}" removed from App.jsx.`);
   });
 }
@@ -539,17 +599,17 @@ for (const { file, exports: names } of STORE_SURFACE) {
 // import the parser, both BOM editors must still own a commit handler, and
 // the shared preview component must still be mounted in both of them.
 
-test("regression: App.jsx imports the BOM paste parser", () => {
-  const src = read(APP_JSX);
+test("regression: the ERP imports the BOM paste parser", () => {
+  const src = read(APP_SRC);
   assert.ok(
-    /import\s*\{[^}]*parseBomPaste[^}]*\}\s*from\s*["']\.\/utils\/bomPaste\.js["']/.test(src),
-    "App.jsx no longer imports parseBomPaste from ./utils/bomPaste.js — the BOM Paste-from-Excel flow is dead."
+    /import\s*\{[^}]*parseBomPaste[^}]*\}\s*from\s*["'](?:\.{1,2}\/)+utils\/bomPaste\.js["']/.test(src),
+    "No source file imports parseBomPaste from utils/bomPaste.js any more — the BOM Paste-from-Excel flow is dead."
   );
 });
 
 for (const name of ["applyPastedBOMLines", "applyPastedCreateItems"]) {
-  test(`regression: src/App.jsx still defines ${name}`, () => {
-    const src = read(APP_JSX);
+  test(`regression: src/ still defines ${name}`, () => {
+    const src = read(APP_SRC);
     assert.ok(
       new RegExp(`const\\s+${name}\\s*=`).test(src),
       `App.jsx no longer defines ${name} — a pasted BOM block would have nowhere to commit to.`
@@ -558,7 +618,7 @@ for (const name of ["applyPastedBOMLines", "applyPastedCreateItems"]) {
 }
 
 test("regression: BOMPasteLines is mounted in both BOM editors", () => {
-  const src = read(APP_JSX);
+  const src = read(APP_SRC);
   const mounts = src.match(/<BOMPasteLines\b/g) || [];
   assert.ok(
     mounts.length >= 2,
@@ -570,7 +630,7 @@ test("regression: BOMPasteLines is mounted in both BOM editors", () => {
 // ─── Auth imports (prevent silent-lockout regression recurrence) ────────────
 
 test("regression: App.jsx reads full useAuth contract (lockout retry screen)", () => {
-  const src = read(APP_JSX);
+  const src = read(APP_SRC);
   // The 8a2669b fix depends on these being destructured from useAuth().
   for (const prop of ["isLoading", "authLoadError", "retryAuthLoad", "supabaseMode"]) {
     assert.ok(has(src, prop), `App.jsx no longer destructures ${prop} from useAuth(); the silent-lockout retry screen will be dead.`);
@@ -583,7 +643,7 @@ test("regression: chipName() is never called with a user object (xe.startsWith c
   // Bug introduced 2026-10-27: chipName(mainUser) passed a user object instead
   // of the ID string, crashing with "xe.startsWith is not a function" the moment
   // a worker was auto-selected in the Finish & Transfer modal. Fix: chipName(mainId).
-  const src = read(APP_JSX);
+  const src = read(APP_SRC);
   assert.ok(
     !has(src, "chipName(mainUser)"),
     "chipName(mainUser) is back in App.jsx — this passes a user OBJECT to a function " +
@@ -595,11 +655,11 @@ test("regression: chipName() is never called with a user object (xe.startsWith c
 // ─── Build marker invariant (deploys stay observable) ───────────────────────
 
 test("regression: APP_BUILD / APP_BUILD_TAG match (deploy-marker consistency)", () => {
-  const app  = read(APP_JSX);
+  const app  = read(BUILD_INFO);
   const main = read(MAIN_JSX);
   const appTag  = app.match(/APP_BUILD\s*=\s*"([^"]+)"/);
   const mainTag = main.match(/APP_BUILD_TAG\s*=\s*"([^"]+)"/);
-  assert.ok(appTag,  "APP_BUILD constant missing from App.jsx");
+  assert.ok(appTag,  "APP_BUILD constant missing from src/shared/buildInfo.js");
   assert.ok(mainTag, "APP_BUILD_TAG constant missing from main.jsx");
   assert.equal(
     appTag[1], mainTag[1],

@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { rackViewLog, PHYSICAL_RACK_LAYOUT, rackOfBom, rackBoms, rackCapacityFor, familySlotIds, buildFamilyRacks, firstFreeSlot, canAssignSlot, slotLabel, slotStatusOf, pairSlotOf, setSlotOf, setLabel, bomFillCheck, rCrateIssues, freeSlotsFor } from "../src/utils/rackSlots.js";
+import { appSource, readSrc, readSrcs, srcFiles, stripComments } from "./helpers/source.mjs";
 
 const fam10 = PHYSICAL_RACK_LAYOUT.families[0];
 const m = (id, over = {}) => ({ id, bomKey: "KM10", serialNo: `S${id}`, stage: "BOM Issued", status: "active", createdDate: `2026-10-${String(10 + id).padStart(2, "0")}`, ...over });
@@ -140,17 +141,22 @@ test("App.jsx imports every rackSlots helper it uses", async () => {
   const fs = await import("node:fs");
   const path = await import("node:path");
   const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
-  const app = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
+  // 2026-11-04 module split: checked PER FILE — each file that uses a helper imports it itself.
   const lib = fs.readFileSync(path.join(root, "src/utils/rackSlots.js"), "utf8");
   const exported = [...lib.matchAll(/export (?:function|const) (\w+)/g)].map((m) => m[1]);
-  const imp = app.match(/import \{([^}]*)\} from "\.\/utils\/rackSlots\.js"/);
-  assert.ok(imp, "App.jsx must import from utils/rackSlots.js");
-  const imported = new Set(imp[1].split(",").map((x) => x.trim()));
-  for (const name of exported) {
-    const used = new RegExp(`\\b${name}\\b`).test(app.replace(imp[0], ""));
-    const locallyDefined = new RegExp(`(function|const|let) ${name}\\b`).test(app);
-    if (used && !locallyDefined) assert.ok(imported.has(name), `App.jsx uses ${name} but does not import it`);
+  let importers = 0;
+  for (const file of srcFiles("src").filter((f) => f !== "src/utils/rackSlots.js")) {
+    const code = stripComments(readSrc(file));
+    const imp = code.match(/import \{([^}]*)\} from "(?:\.\.?\/)+utils\/rackSlots\.js"/);
+    if (imp) importers++;
+    const imported = new Set(imp ? imp[1].split(",").map((x) => x.trim()) : []);
+    for (const name of exported) {
+      const used = new RegExp(`\\b${name}\\b`).test(imp ? code.replace(imp[0], "") : code);
+      const locallyDefined = new RegExp(`(function|const|let) ${name}\\b`).test(code);
+      if (used && !locallyDefined) assert.ok(imported.has(name), `${file} uses ${name} but does not import it`);
+    }
   }
+  assert.ok(importers > 0, "the app must import from utils/rackSlots.js");
 });
 
 // 2026-10-31 fixed racks — App wiring guards.
@@ -158,7 +164,7 @@ test("App: retired BOMs are not issuable; Fill opens only the rack's own BOM; ma
   const fs = await import("node:fs");
   const path = await import("node:path");
   const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
-  const app = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
+  const app = appSource();
   assert.match(app, /const boms = Object\.entries\(bomDefs \|\| \{\}\)\.filter\(\(\[, b\]\) => !\(b && b\.retiredAt\)\)/);
   assert.match(app, /onFillRack\(sl\.id, rack\.bom\.primary\)/, "Fill passes the rack's own BOM");
   assert.match(app, /const chk = bomFillCheck\(bomKey, bomDefs, stockOf\);\n    if \(!chk\.ok\) return \{ success: false/, "Fill refuses unless that rack's BOM is complete and in stock");
@@ -173,7 +179,7 @@ test("App: independent M/R units, BOM Outward rack picker, remove, release scope
   const fs = await import("node:fs");
   const path = await import("node:path");
   const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
-  const app = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
+  const app = appSource();
   assert.doesNotMatch(app, /mergeSetBomItems|setFillCheck/, "M and R BOMs are never merged");
   assert.match(app, /const drawerBom = bomDefs\[openBOM\];/, "the drawer always shows the rack's own BOM");
   // Fill Rack on any empty unit opens that rack's own BOM and fills that unit
@@ -232,7 +238,7 @@ test("App: unticked critical item on a rack BOM is Not Issued once it has a reas
   const fs = await import("node:fs");
   const path = await import("node:path");
   const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
-  const app = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
+  const app = appSource();
   assert.match(app, /const untickedCritical = rackBomForCheck\n    \? enriched\.filter\(\(i\) => !isItemChecked\(i\.code\) && i\.inv && i\.inv\.isCritical/);
   assert.match(app, /const criticalLines = \[\.\.\.checkedE\.filter\(\(i\) => i\.issueQty > 0 && i\.inv && i\.inv\.isCritical\), \.\.\.untickedCritical\];/);
   assert.match(app, /if \(!isItemChecked\(line\.code\)\) return false;   \/\/ unticked → never "verified"/);
@@ -248,7 +254,7 @@ test("App: finish Assembly returns a rack machine to its rack; admin transfers f
   const fs = await import("node:fs");
   const path = await import("node:path");
   const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
-  const app = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
+  const app = appSource();
   assert.match(app, /const rackReturn = !!machine\.rackSlot && fromDepartment === "Assembly" && isRackReleaseHop\(fromDepartment, toDepartment\);/);
   assert.match(app, /rackReturn \? `✓ Assembled · Return to \$\{slotLabel\(machine\.rackSlot\)\}` : `Finish & Transfer → \$\{toDepartment\}`/);
   assert.match(app, /const canSendFromRack = canDo\("machines", "release"\) \|\| isAdminUser;/);
@@ -306,7 +312,7 @@ test("App: release is pending-only, guarded against duplicates, and clears the r
   const fs = await import("node:fs");
   const path = await import("node:path");
   const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
-  const app = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
+  const app = appSource();
   assert.match(app, /const isAwaitingRelease = \(h\) => !!\(h && h\.status === "pending" && h\.releaseRequired && !h\.releasedAt\);/);
   assert.match(app, /if \(h\.status !== "pending"\) return \{ success: false, error: h\.status === "cancelled" \? "This hand-over was pulled back/);
   assert.match(app, /if \(releaseBusyRef\.current\.has\(handoverId\)\) return \{ success: false, error: "Transfer already in progress" \};/);
@@ -323,7 +329,7 @@ test("App: Accept Machine on the card reuses the accept modal and refuses duplic
   const fs = await import("node:fs");
   const path = await import("node:path");
   const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
-  const app = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
+  const app = appSource();
   // 2026-11-02 — Accept is on every machine card that waits for the receiving
   // department, on whichever tab (no hop to Transfer & Accept needed). Same
   // role/department check; an overdue (ON HOLD) hand-over is released by
@@ -344,7 +350,7 @@ test("App: Pending Jobs button on the card opens the shared job rows with existi
   const fs = await import("node:fs");
   const path = await import("node:path");
   const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
-  const app = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
+  const app = appSource();
   assert.match(app, /const renderJobGroup = \(m, list, key\) => \{/);
   assert.match(app, /\{renderJobBoard\(allJobsScoped, \{ detailsKey: "completed" \}\)\}/, "the Pending Jobs tab uses the shared board (parts / work / completed)");
   // 2026-11-01 — the same chip also carries the open-issue count
@@ -362,7 +368,7 @@ test("App: Part received asks for the item's configured verification and gates t
   const fs = await import("node:fs");
   const path = await import("node:path");
   const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
-  const app = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
+  const app = appSource();
   assert.match(app, /const inputType = inv && inv\.isCritical && inv\.outwardInputType === "serial" \? "serial" : "checkbox";/);
   // a pending item the operator classified Critical is critical even when it is not in the Item Master
   assert.match(app, /const critical = !!\(inv && inv\.isCritical\) \|\| !!p\.critical;/);
@@ -384,7 +390,7 @@ test("App: compact team picker, non-login Main Employee, migration 050", async (
   const fs = await import("node:fs");
   const path = await import("node:path");
   const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
-  const app = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
+  const app = appSource();
   const store = fs.readFileSync(path.join(root, "src/stores/handoverStore.js"), "utf8");
   // 2026-11-02 — Finish & Transfer no longer asks for / logs employee names
   // (the picker, "Main Employee" select and acting-main block are gone from the
@@ -409,7 +415,7 @@ test("App: trial certificate confirmation-only gate, edit-later path, On Hold fi
   const fs = await import("node:fs");
   const path = await import("node:path");
   const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
-  const app = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
+  const app = appSource();
   assert.match(app, /const incomplete = \[\];\n  if \(!String\(cert\.trialByName/);
   assert.match(app, /const missing = \[\];\n/, "nothing is mandatory on the certificate");
   assert.match(app, /data-cert-submit\n\s+disabled=\{busy \|\| !confirmed\}/);
@@ -431,7 +437,7 @@ test("App: Report Center navigation, seven reports, filters, exports and setting
   const fs = await import("node:fs");
   const path = await import("node:path");
   const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
-  const app = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
+  const app = appSource();
   assert.doesNotMatch(app, /\{ id: "reports",\s+Icon: TrendingUp,\s+label: "Report Center"/, "no sidebar entry");
   assert.match(app, /data-open-reports onClick=\{\(\) => onNavigate\("reports"\)\}/, "Reports button on the Machine Tracker top bar");
   for (const id of ["factory", "owner", "department", "stuck", "machine", "monthly", "customer"]) assert.match(app, new RegExp(`\\{ id: "${id}",\\s+label: "`), `report tab ${id}`);
@@ -459,12 +465,12 @@ test("App + migration 053: Admin Data Cleanup is disabled — notice only, no RP
   const fs = await import("node:fs");
   const path = await import("node:path");
   const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
-  const app = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
+  const app = appSource();
   // still mounted at the same admin gate, still wired (symbol kept for the regression inventory)
   assert.match(app, /\(isSuperAdmin \|\| canDo\("machines", "configDept"\)\) && \(\s*<AdminCleanupPanel machineLog=\{machineLog\} currentUser=\{currentUser\} onDone=\{onAdminCleanup\} \/>/);
   assert.match(app, /machineLog=\{machineLog\} onAdminCleanup=\{handleAdminCleanupDone\}/);
   assert.match(app, /function AdminCleanupPanel\(/);
-  const panel = app.slice(app.indexOf("function AdminCleanupPanel("), app.indexOf("function SettingsPage("));
+  const panel = readSrc("src/modules/settings/AdminCleanupPanel.jsx");
   assert.match(panel, /data-cleanup-disabled/);
   assert.match(panel, /Data Cleanup is disabled\./);
   // nothing in the panel can reach the database
@@ -489,7 +495,7 @@ test("App: Machine Tracker — Ready is the final stage, filters clear, cards ar
   const fs = await import("node:fs");
   const path = await import("node:path");
   const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
-  const app = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
+  const app = appSource();
   const css = fs.readFileSync(path.join(root, "src/index.css"), "utf8");
 
   // 1 — stages: Mechanical → Electrical → Trial → Ready, Ready last
@@ -548,7 +554,7 @@ test("App + migration 052: pending items added at BOM Outward", async () => {
   const fs = await import("node:fs");
   const path = await import("node:path");
   const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
-  const app = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
+  const app = appSource();
   const sql = fs.readFileSync(path.join(root, "supabase/migrations/052_pending_item_outward.sql"), "utf8");
   const store = fs.readFileSync(path.join(root, "src/stores/pendingItemsStore.js"), "utf8");
 
@@ -605,7 +611,7 @@ test("App: Machine Tracker navigation is the summary boxes, for staff and admin 
   const fs = await import("node:fs");
   const path = await import("node:path");
   const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
-  const app = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
+  const app = appSource();
 
   // no tab row; boxes carry all three destinations and are shown to every role
   assert.doesNotMatch(app, /\{ id: "production", label: "Production" \}/);
@@ -645,7 +651,7 @@ test("App: rack crate face is condition-aware and the panel is untouched", async
   const fs = await import("node:fs");
   const path = await import("node:path");
   const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
-  const app = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
+  const app = appSource();
   const css = fs.readFileSync(path.join(root, "src/index.css"), "utf8");
   const rackSlots = fs.readFileSync(path.join(root, "src/utils/rackSlots.js"), "utf8");
   const face = app.slice(app.indexOf("Crate face (2026-11-01)"), app.indexOf("Rack details panel"));
@@ -700,7 +706,7 @@ test("App: itemByCode is page-scoped, so the rack crate face can read stock", as
   const fs = await import("node:fs");
   const path = await import("node:path");
   const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
-  const app = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
+  const app = appSource();
   assert.equal((app.match(/const itemByCode\b/g) || []).length, 1, "exactly one definition");
   assert.match(app, /const itemByCode = useMemo\(\(\) => \{[\s\S]{0,260}?\}, \[items\]\);/);
   // defined before both readers: the crate face and the details panel
@@ -718,7 +724,7 @@ test("App: Pull Back is offered in the rack panel and on the card, with no lock"
   const fs = await import("node:fs");
   const path = await import("node:path");
   const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
-  const app = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
+  const app = appSource();
   // rack panel
   assert.match(app, /\{ho && isAdminUser && onPullBackHandover && \(\s*<button type="button" data-action="pullback"/);
   assert.match(app, /onClick=\{\(\) => \{ setRackPanel\(null\); setPullBack\(\{ handover: ho, reason: "", busy: false, error: "" \}\); \}\}/);
@@ -744,7 +750,7 @@ test("App: machine card carries no duplicate progress indicators", async () => {
   const fs = await import("node:fs");
   const path = await import("node:path");
   const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
-  const app = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
+  const app = appSource();
   assert.doesNotMatch(app, /Stage \{dispIdx \+ 1\} of \{DISPLAY_STAGES\.length\}/);
   assert.doesNotMatch(app, /\{pct\}%<\/span>/);
   assert.doesNotMatch(app, /<span className="text-slate-500">due \{dueTxt\}<\/span>/);
@@ -762,9 +768,11 @@ test("App: machine report, reachable from the card, and popups that always close
   const fs = await import("node:fs");
   const path = await import("node:path");
   const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
-  const app = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
+  const app = appSource();
   const css = fs.readFileSync(path.join(root, "src/index.css"), "utf8");
-  const rep = app.slice(app.indexOf("function AtoZMachineReport("), app.indexOf("function ReportCenterPage("));
+  // the report and the shared report pieces that used to sit between it and ReportCenterPage
+  const rep = readSrcs("src/modules/reports/AtoZMachineReport.jsx", "src/shared/printFormat.js", "src/modules/reports/reportFormat.js",
+    "src/modules/reports/reportParts.jsx", "src/modules/reports/MachineReports.jsx");
 
   // report: letterhead, facts, at-a-glance, numbered sections, red open issues, sign-off
   // D1: sentence case, no capitals (2026-11-04: through the shared title block)
@@ -812,9 +820,11 @@ test("Machine report: every recorded field is still printed, and the A4 rules ho
   const fs = await import("node:fs");
   const path = await import("node:path");
   const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
-  const app = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
+  const app = appSource();
   const css = fs.readFileSync(path.join(root, "src/index.css"), "utf8");
-  const rep = app.slice(app.indexOf("function AtoZMachineReport("), app.indexOf("function ReportCenterPage("));
+  // the report and the shared report pieces that used to sit between it and ReportCenterPage
+  const rep = readSrcs("src/modules/reports/AtoZMachineReport.jsx", "src/shared/printFormat.js", "src/modules/reports/reportFormat.js",
+    "src/modules/reports/reportParts.jsx", "src/modules/reports/MachineReports.jsx");
 
   const mustRead = [
     // header + references

@@ -3,6 +3,7 @@ process.env.TZ = "Asia/Kolkata";
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { appSource } from "./helpers/source.mjs";
 const { countDelayReasons, collectDelayEvents, classifyDelayText, delayPeriodRange } = await import("../src/utils/delayReasons.js");
 
 const NOW = new Date(2026, 10, 3, 12, 0); // 3 Nov 2026
@@ -76,7 +77,7 @@ test("empty data → zero, no crash", () => {
 });
 
 test("the note formats the helper reads are still the ones the app writes", () => {
-  const app = fs.readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
+  const app = appSource();
   assert.ok(app.includes("(ON HOLD — accepted late${holdReason ? `: ${holdReason}` : \"\"})"), "late-accept note format");
   assert.ok(app.includes("`Put ON HOLD by ${who}: ${why}`"), "manual hold note format");
   assert.ok(app.includes("overrunNarration: narration"), "finish narration field");

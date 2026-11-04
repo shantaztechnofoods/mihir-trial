@@ -4,6 +4,7 @@ import { test, mock } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import { appSource } from "./helpers/source.mjs";
 
 const mem = new Map();
 globalThis.localStorage = { getItem: (k) => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => mem.set(k, String(v)), removeItem: (k) => mem.delete(k) };
@@ -13,7 +14,7 @@ mock.module(new URL("../src/config/env.js", import.meta.url).href, {
 mock.module(new URL("../src/supabase/client.js", import.meta.url).href, { namedExports: { getSupabase: () => null, probeSupabase: async () => ({ ok: false }) } });
 const { pendingItemIsPart, pendingItemIsDone, pendingItemIsOpen } = await import("../src/stores/pendingItemsStore.js");
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
-const app = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
+const app = appSource();
 
 test("a job naming an item is a part; anything else is work", () => {
   assert.equal(pendingItemIsPart({ itemName: "Gearbox" }), true);

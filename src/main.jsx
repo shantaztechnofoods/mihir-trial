@@ -1,19 +1,19 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import App from './App.jsx'
+import App from './app/App.jsx'
 import './index.css'
 import './world-ui.css'
 import { installSheetGestures, installScrollReveal, installHeaderCompact } from './utils/worldMotion.js'
 import { AuthProvider } from './auth/AuthContext.jsx'
-import RootErrorBoundary from './components/RootErrorBoundary.jsx'
-import OfflineBanner from './components/OfflineBanner.jsx'
+import RootErrorBoundary from './shared/components/RootErrorBoundary.jsx'
+import OfflineBanner from './shared/components/OfflineBanner.jsx'
 
 // ── Boot build marker ──────────────────────────────────────────────────────────
 // Page-independent proof of which bundle is live. Shows a small green badge in the
 // bottom-left corner on EVERY screen (even the login page) + a console banner.
 // If you do NOT see "build 2026-05-29f" bottom-left in production, the served bundle
 // is stale or the URL you opened is not this deployment.
-export const APP_BUILD_TAG = "2026-11-04-logo-walltime";
+export const APP_BUILD_TAG = "2026-11-04-module-split";
 if (typeof console !== "undefined") {
   console.warn(`%c[APP BUILD] ${APP_BUILD_TAG}`, "background:#16a34a;color:#fff;padding:2px 6px;border-radius:4px;font-weight:bold");
 }

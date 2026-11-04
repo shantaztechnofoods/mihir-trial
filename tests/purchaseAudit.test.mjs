@@ -7,8 +7,9 @@ import { readFileSync } from "node:fs";
 import { isoToDisplayDate, parseDisplayDate } from "../src/utils/parseDate.js";
 import { poTaxLines, calculateGSTBreakdown } from "../src/utils/gst.js";
 import { buildPOHtml } from "../src/utils/poTemplate.js";
+import { uiSource } from "./helpers/source.mjs";
 
-const APP = readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
+const APP = uiSource();
 
 // ── Bug 1: custom follow-up / ETA date showed "NaNd left" ──────────────────
 

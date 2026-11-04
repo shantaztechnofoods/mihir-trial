@@ -7,8 +7,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { isoToDisplayDate, parseDisplayDate } from "../src/utils/parseDate.js";
+import { appSource } from "./helpers/source.mjs";
 
-const APP = readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
+const APP = appSource();
 const slice = (start, end) => {
   const i = APP.indexOf(start);
   assert.ok(i >= 0, `missing ${start}`);

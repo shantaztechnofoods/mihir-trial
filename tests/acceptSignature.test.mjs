@@ -4,6 +4,7 @@
 import { test, mock } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { appSource } from "./helpers/source.mjs";
 
 let CLIENT = null;
 const mem = new Map();
@@ -36,7 +37,7 @@ test("local (offline) accept keeps the signature too", async () => {
   assert.match(src, /acceptedSignatureSvg: acceptedSignatureSvg \|\| null, acceptedByName: acceptedByName \|\| null/);
 });
 
-const app = readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
+const app = appSource();
 const main = readFileSync(new URL("../src/main.jsx", import.meta.url), "utf8");
 const slice = (a, b) => { const i = app.indexOf(a); assert.ok(i > 0, a); const j = app.indexOf(b, i); assert.ok(j > i, b); return app.slice(i, j); };
 

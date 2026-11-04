@@ -3,6 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { appSource } from "./helpers/source.mjs";
 import {
   SENDER_UNDO_WINDOW_MS, senderUndoState, canTakeBackHandover, formatUndoCountdown,
 } from "../src/utils/handoverLogic.js";
@@ -68,7 +69,7 @@ test("countdown format", () => {
 });
 
 test("App.jsx: the pull-back handler re-checks the sender gate on a fresh read before writing", () => {
-  const src = fs.readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
+  const src = appSource();
   const start = src.indexOf("const handlePullBackHandover = async");
   assert.ok(start > 0);
   const body = src.slice(start, src.indexOf("const handleSetMachineHold", start));

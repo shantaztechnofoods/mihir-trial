@@ -5,8 +5,9 @@
   e2e-pick.py --changed <base>     suites related to files changed since <base> (incl. uncommitted);
                                    reasons go to stderr. The FULL suite always runs in CI.
 
-Changed-file -> suite map: a changed suite runs itself; src/App.jsx hunks are mapped by the
-top-level component they sit in; other src files by path. Anything unknown -> SMOKE.
+Changed-file -> suite map: a changed suite runs itself; hunks in the screen code (src/app,
+src/modules, src/shared — the former src/App.jsx, split 2026-11-04) are mapped by the top-level
+component they sit in; other src files by path. Anything unknown -> SMOKE.
 """
 import os
 import re
@@ -35,12 +36,20 @@ PATH_MAP = [
     (r"^src/realtime/|liveSync", ["live-sync"]),
     (r"online|offline", ["offline"]),
     (r"voice", ["voice-note", "voice-transcribe"]),
-    (r"^src/pages/(UserManagement|RoleManagement)|^src/auth/|^src/stores/admin", ["dept-staff-create"]),
-    (r"^src/pages/AuditHistory|^src/auth/audit", ["perf-budget"]),
+    (r"^src/modules/users-roles/|^src/auth/|^src/stores/admin", ["dept-staff-create"]),
+    (r"^src/modules/audit-trail/|^src/auth/audit", ["perf-budget"]),
     (r"^src/utils/(handover|rackSlots|pendingJobs|workCalendar|checklist|bomCost)", MT + ["bom-unselected", "assembly-start-checklist"]),
     (r"^src/utils/(poTemplate|gst|parseDate|itemImport|storeQty|store)", ["store-audit", "reports-v2"]),
     (r"^src/stores/", ["store-audit", "go-live-workflows"]),
-    (r"^src/components/(LazyCharts|useProgressiveCount|MoreRowsNote|DebouncedSearchInput)", ["perf-budget"]),
+    # module folders (fallback when a changed declaration matches no COMPONENT_MAP rule)
+    (r"^src/modules/(machine-tracker|trial-certificate|pending-jobs)/", MT + ["ready-popup", "delay-reasons", "trial-signature-report"]),
+    (r"^src/modules/bom/", ["bom-unselected", "fill-rack-pending-item", "bom-photo", "settings-bom-organised"]),
+    (r"^src/modules/inventory/", ["store-audit", "bom-unselected", "perf-budget"]),
+    (r"^src/modules/reports/", ["reports-v2", "reports-pdf", "perf-budget"]),
+    (r"^src/modules/(purchase|analytics)/", ["perf-budget", "store-audit"]),
+    (r"^src/modules/settings/", ["settings-bom-organised", "compact-checklist", "dept-staff-create"]),
+    (r"^src/modules/dashboard/", ["my-dashboard", "go-live-workflows"]),
+    (r"^src/shared/components/(LazyCharts|useProgressiveCount|MoreRowsNote|DebouncedSearchInput)", ["perf-budget"]),
     (r"^(src/|index\.html|vite\.config|package(-lock)?\.json|public/)", SMOKE),   # shared shell, styles, deps
 ]
 NO_E2E = re.compile(r"^(docs/|supabase/|scripts/|\.github/|tests/[^e]|tests/e[^2]|.*\.md$|\.gitignore$|\.nvmrc$)")
@@ -77,16 +86,25 @@ def git(*args):
     return subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=True).stdout
 
 
-def app_components(base):
-    """Top-level App.jsx declarations whose lines changed (in the new file)."""
-    diff = git("diff", "-U0", base, "--", "src/App.jsx")
-    lines = []
-    for m in re.finditer(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@", diff, re.M):
-        start, count = int(m.group(1)), int(m.group(2) or 1)
-        lines += list(range(start, start + max(count, 1)))
+SCREEN = re.compile(r"^src/(App\.jsx$|(app|modules|shared)/.*\.jsx?$)")
+
+
+def app_components(base, path="src/App.jsx"):
+    """Top-level declarations of a screen-code file whose lines changed (in the new file)."""
+    full = os.path.join(ROOT, path)
+    if not os.path.exists(full):
+        return {"(deleted file)"}
+    if path in git("ls-files", "-o", "--exclude-standard").split():   # new, untracked: every line
+        lines = list(range(1, open(full, encoding="utf-8").read().count("\n") + 2))
+    else:
+        diff = git("diff", "-U0", base, "--", path)
+        lines = []
+        for m in re.finditer(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@", diff, re.M):
+            start, count = int(m.group(1)), int(m.group(2) or 1)
+            lines += list(range(start, start + max(count, 1)))
     if not lines:
         return set()
-    src = open(os.path.join(ROOT, "src", "App.jsx"), encoding="utf-8").read().split("\n")
+    src = open(full, encoding="utf-8").read().split("\n")
     decl = re.compile(r"^(?:export\s+(?:default\s+)?)?(?:async\s+)?(?:function\s+(\w+)|const\s+(\w+)\s*=)")
     owner, names, cur = {}, set(), "(top)"
     want = set(lines)
@@ -119,14 +137,20 @@ def changed(base):
         if f == "tests/e2e/timings.txt" or NO_E2E.match(f):
             why.append(f"{f} -> no browser suite (unit tests / CI cover it)")
             continue
-        if f == "src/App.jsx":
-            for name in sorted(app_components(base)):
+        if SCREEN.match(f):
+            for name in sorted(app_components(base, f)):
                 for rx, suites in COMPONENT_MAP:
                     if re.match(rx, name):
-                        add(suites, f"App.jsx:{name}")
+                        add(suites, f"{f}:{name}")
                         break
                 else:
-                    add(SMOKE, f"App.jsx:{name} (no specific suite)")
+                    # no component rule: fall back to the module folder, then to the smoke walk-through
+                    for rx, suites in PATH_MAP:
+                        if re.search(rx, f) and suites is not SMOKE:
+                            add(suites, f"{f}:{name}")
+                            break
+                    else:
+                        add(SMOKE, f"{f}:{name} (no specific suite)")
             continue
         if f == "src/main.jsx" and set(re.findall(r"^[+-](?![+-]).*$", git("diff", "-U0", base, "--", f), re.M)) <= {
             l for l in re.findall(r"^[+-](?![+-]).*$", git("diff", "-U0", base, "--", f), re.M) if "APP_BUILD_TAG" in l}:

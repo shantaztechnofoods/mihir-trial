@@ -4,11 +4,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import { createIntroClock, INTRO_DEADLINE, MAX_STEP } from "../src/components/logoIntroClock.js";
+import { createIntroClock, INTRO_DEADLINE, MAX_STEP } from "../src/shared/components/logoIntroClock.js";
 
 const INTRO_END = 3.4;
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
-const scene = fs.readFileSync(path.join(root, "src/components/shantazLogoScene.js"), "utf8");
+const scene = fs.readFileSync(path.join(root, "src/shared/components/shantazLogoScene.js"), "utf8");
 
 // run frames every `ms` from t0 until `untilMs` of wall clock; returns the last timeline value
 // (the last frame lands exactly at t0 + untilMs, as a throttled browser's next frame would)
