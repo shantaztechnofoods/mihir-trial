@@ -4,6 +4,7 @@
 import { test, mock } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { appSource } from "./helpers/source.mjs";
 
 let CLIENT = null;
 mock.module(new URL("../src/config/env.js", import.meta.url).href, {
@@ -94,7 +95,7 @@ test("missing-function detection", () => {
 });
 
 test("App wiring: hold, stage, start, materials, transfer, accept use the append path; pull-back keeps its path", () => {
-  const app = fs.readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
+  const app = appSource();
   const between = (a, b) => { const i = app.indexOf(a); const j = app.indexOf(b, i + 1); assert.ok(i > 0 && j > i, a); return app.slice(i, j); };
   const hold = between("const handleSetMachineHold = async", "const handleDeleteMachine = async");
   assert.match(hold, /machineAppendHistory\(m\.id, \{/);

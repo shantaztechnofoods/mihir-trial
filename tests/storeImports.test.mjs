@@ -11,34 +11,45 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+//
+// 2026-11-04 — since the module-folder split this runs PER FILE over every
+// source file under src/: a store function called in a file must be imported
+// (or defined) in THAT file. An import in some other file does not count.
+import { srcFiles, readSrc, stripComments } from "./helpers/source.mjs";
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
-const app = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
 const storeDir = path.join(root, "src/stores");
 
-const imported = new Set();
-for (const m of app.matchAll(/import\s*\{([^}]*)\}\s*from\s*["'][^"']+["']/g)) {
-  for (const part of m[1].split(",")) {
-    const [orig, alias] = part.trim().split(/\s+as\s+/);
-    if (orig) imported.add((alias || orig).trim());
-  }
-}
-const defined = (name) =>
-  new RegExp(`(const|let|var|function)\\s+${name}\\b`).test(app)
-  // const { name } = await import("./stores/…") — the lazy-loaded stores.
-  || new RegExp(`const\\s*\\{[^}]*\\b${name}\\b[^}]*\\}\\s*=`).test(app)
-  || imported.has(name);
-
-test("App.jsx imports every store function it calls by name", () => {
-  const missing = [];
-  for (const f of fs.readdirSync(storeDir).filter((x) => x.endsWith(".js"))) {
-    const src = fs.readFileSync(path.join(storeDir, f), "utf8");
-    for (const m of src.matchAll(/export\s+(?:async\s+)?function\s+([A-Za-z0-9_]+)/g)) {
-      const name = m[1];
-      // Called directly (not as obj.name, not inside a dynamic import()).
-      const called = new RegExp(`(^|[^.\\w])${name}\\s*\\(`, "m").test(app);
-      if (called && !defined(name)) missing.push(`${name} (${f})`);
+function importedIn(code) {
+  const imported = new Set();
+  for (const m of code.matchAll(/import\s*\{([^}]*)\}\s*from\s*["'][^"']+["']/g)) {
+    for (const part of m[1].split(",")) {
+      const [orig, alias] = part.trim().split(/\s+as\s+/);
+      if (orig) imported.add((alias || orig).trim());
     }
   }
-  assert.deepEqual(missing, [], `Called in App.jsx but never imported: ${missing.join(", ")}`);
+  return imported;
+}
+const definedIn = (code, imported, name) =>
+  new RegExp(`(const|let|var|function)\\s+${name}\\b`).test(code)
+  // const { name } = await import("./stores/…") — the lazy-loaded stores.
+  || new RegExp(`const\\s*\\{[^}]*\\b${name}\\b[^}]*\\}\\s*=`).test(code)
+  || imported.has(name);
+
+test("every source file imports each store function it calls by name", () => {
+  const exportsByStore = fs.readdirSync(storeDir).filter((x) => x.endsWith(".js")).map((f) => {
+    const src = fs.readFileSync(path.join(storeDir, f), "utf8");
+    return [f, [...src.matchAll(/export\s+(?:async\s+)?function\s+([A-Za-z0-9_]+)/g)].map((m) => m[1])];
+  });
+  const missing = [];
+  for (const file of srcFiles("src")) {
+    const code = stripComments(readSrc(file));
+    const imported = importedIn(code);
+    for (const [f, names] of exportsByStore) for (const name of names) {
+      // Called directly (not as obj.name, not inside a dynamic import()).
+      const called = new RegExp(`(^|[^.\\w])${name}\\s*\\(`, "m").test(code);
+      if (called && !definedIn(code, imported, name)) missing.push(`${name} (${f}) in ${file}`);
+    }
+  }
+  assert.deepEqual(missing, [], `Called but never imported: ${missing.join(", ")}`);
 });

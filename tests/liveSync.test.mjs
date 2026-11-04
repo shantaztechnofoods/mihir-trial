@@ -5,10 +5,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import { appSource } from "./helpers/source.mjs";
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
 const rtSrc = fs.readFileSync(path.join(root, "src/realtime/useRealtimeTables.js"), "utf8");
-const app = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
+const app = appSource();
 
 // The hook imports supabase/env modules; read the frozen maps from source text
 // instead of importing (keeps this test free of module mocks).

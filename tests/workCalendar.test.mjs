@@ -63,7 +63,8 @@ test("settings round-trip keeps the calendar; the module calendar drives the def
 // App wiring (string checks against the source — the behaviour itself is
 // covered above and by the browser run).
 import fs from "node:fs"; import path from "node:path";
-const app = fs.readFileSync(path.resolve(path.dirname(new URL(import.meta.url).pathname), "../src/App.jsx"), "utf8");
+import { appSource } from "./helpers/source.mjs";
+const app = appSource();
 test("app keeps the calendar in sync and uses working time on the acceptance list and card timers", () => {
   assert.match(app, /useEffect\(\(\) => \{ setWorkCalendar\(readDeptWorkflowSettings\(settings\)\); \}, \[settings\]\)/);
   assert.match(app, /const sentMin\s+= computeElapsedMinutes\(h\.sentAt, nowTick\)/);

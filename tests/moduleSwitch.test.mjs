@@ -2,12 +2,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { appSource } from "./helpers/source.mjs";
 import {
   MODULE_IDS, LIVE_MODULES, ALWAYS_ON_MODULES, parseModuleList, effectiveEnabledModules,
   isModuleOn, envLockedModules, normaliseModuleSelection, SETTINGS_TAB_MODULE,
 } from "../src/utils/modules.js";
 
-const APP = readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
+const APP = appSource();
 const NAV_BLOCK = APP.slice(APP.indexOf("const navItems = ["), APP.indexOf("];", APP.indexOf("const navItems = [")));
 const NAV_ORDER = [...NAV_BLOCK.matchAll(/\{ id: "([a-z]+)",/g)].map((m) => m[1]);
 

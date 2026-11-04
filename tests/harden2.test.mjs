@@ -5,10 +5,11 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { makeInFlight, makeLatest, BUSY_RESULT } from "../src/utils/inFlight.js";
+import { appSource } from "./helpers/source.mjs";
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
-const app = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
-const sb = fs.readFileSync(path.join(root, "src/components/SafeBoundary.jsx"), "utf8");
+const app = appSource();
+const sb = fs.readFileSync(path.join(root, "src/shared/components/SafeBoundary.jsx"), "utf8");
 const quiet = async (fn) => { const w = console.warn; console.warn = () => {}; try { return await fn(); } finally { console.warn = w; } };
 const deferred = () => { let res, rej; const p = new Promise((a, b) => { res = a; rej = b; }); return { p, res, rej }; };
 

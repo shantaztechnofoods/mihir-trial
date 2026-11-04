@@ -7,6 +7,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import { appSource } from "./helpers/source.mjs";
 const { monthIndex, parseDisplayDate } = await import("../src/utils/parseDate.js");
 
 test("'Sept' and every other month spelling resolve by their first three letters", () => {
@@ -36,8 +37,8 @@ test("'5 Sept 2026' parses as 5 September, not 5 January", () => {
 
 test("App.jsx parseDate uses the shared month matcher (no exact-key month map left)", () => {
   const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
-  const app = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
-  assert.match(app, /import \{ monthIndex, parseDisplayDate \} from "\.\/utils\/parseDate\.js";/);
+  const app = appSource();
+  assert.match(app, /import \{ monthIndex, parseDisplayDate \} from "(?:\.\.?\/)+utils\/parseDate\.js";/);
   assert.match(app, /const parseDate = \(str\) => \{\s*\n\s*if \(!str\) return new Date\(\);[\s\S]{0,400}?parseDisplayDate\(str\)/);
   assert.doesNotMatch(app, /Jan:0,Feb:1,Mar:2/, "the exact-key month map is gone");
 });

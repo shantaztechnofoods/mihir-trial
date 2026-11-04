@@ -1,10 +1,10 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import App from './App.jsx'
+import App from './app/App.jsx'
 import './index.css'
 import { AuthProvider } from './auth/AuthContext.jsx'
-import RootErrorBoundary from './components/RootErrorBoundary.jsx'
-import OfflineBanner from './components/OfflineBanner.jsx'
+import RootErrorBoundary from './shared/components/RootErrorBoundary.jsx'
+import OfflineBanner from './shared/components/OfflineBanner.jsx'
 
 // ── Boot build marker ──────────────────────────────────────────────────────────
 // Page-independent proof of which bundle is live. Shows a small green badge in the

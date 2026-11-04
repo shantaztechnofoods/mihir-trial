@@ -3,6 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { appSource } from "./helpers/source.mjs";
 import {
   READY_FIRST_WINDOW_MS, isReadyPopupRole, readyAtOf, readyInfoOf, trialSignedBy,
   newReadySince, readLastSeenReady, writeLastSeenReady, formatReadyWhen,
@@ -75,7 +76,7 @@ test("when-label says Today / Yesterday and drops the time for date-only rows", 
 });
 
 test("App wires the popup for admins only, with OK / View and the bell", () => {
-  const app = fs.readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
+  const app = appSource();
   assert.match(app, /function ReadyMachinesPopup\(/);
   assert.match(app, /const readyAdmin = isReadyPopupRole\(currentUser\)/);
   assert.match(app, /readyAdmin && readyPopupItems\.length > 0 && \(activePage === "dashboard" \|\| activePage === "machines"\)/);

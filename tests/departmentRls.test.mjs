@@ -5,7 +5,7 @@ import { readFileSync, existsSync } from "node:fs";
 // Static checks only: the behavioural proof is tests/db/058_department_tests.sql.
 const mig = readFileSync("supabase/migrations/058_department_rls.sql", "utf8");
 const edge = readFileSync("supabase/functions/admin-create-user/index.ts", "utf8");
-const page = readFileSync("src/pages/UserManagementPage.jsx", "utf8");
+const page = readFileSync("src/modules/users-roles/UserManagementPage.jsx", "utf8");
 
 test("058 defines the department helpers, derived from the DB profile", () => {
   for (const fn of ["my_departments", "dept_unscoped", "eff_dept", "in_dept", "machine_in_scope", "machine_can_act", "pending_can_act"])

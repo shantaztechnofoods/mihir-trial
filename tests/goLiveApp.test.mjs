@@ -6,21 +6,24 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import { appSource, readSrc } from "./helpers/source.mjs";
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
-const app = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
+const app = appSource();
 const rt  = fs.readFileSync(path.join(root, "src/realtime/useRealtimeTables.js"), "utf8");
 const fn  = (name, until) => app.slice(app.indexOf(name), app.indexOf(until, app.indexOf(name)));
 
 test("H: no user-supplied SVG is injected as markup — signatures render through an <img> data URI", () => {
   assert.doesNotMatch(app, /dangerouslySetInnerHTML/, "no dangerouslySetInnerHTML anywhere in App.jsx");
-  for (const f of ["src/components", "src/utils", "src/stores"]) {
+  // 2026-11-04 module split: src/components moved to src/shared/components (POSettings to modules/purchase)
+  for (const f of ["src/shared/components", "src/utils", "src/stores"]) {
     const dir = path.join(root, f);
     for (const file of fs.readdirSync(dir)) {
       if (!/\.(js|jsx)$/.test(file)) continue;
       assert.doesNotMatch(fs.readFileSync(path.join(dir, file), "utf8"), /dangerouslySetInnerHTML|\.innerHTML\s*=/, `${f}/${file}`);
     }
   }
+  assert.doesNotMatch(readSrc("src/modules/purchase/POSettings.jsx"), /dangerouslySetInnerHTML|\.innerHTML\s*=/, "POSettings.jsx");
   assert.match(app, /const svgDataUri = \(svg\) => `data:image\/svg\+xml;charset=utf-8,\$\{encodeURIComponent\(String\(svg \|\| ""\)\)\}`;/);
   // 2026-11-04 — every signature prints once, in the signature register, as an <img> data URI.
   assert.match(app, /src: svgDataUri\(h\.mainEmployeeSignatureSvg\)/);
@@ -55,7 +58,7 @@ test("J + B: BOM issue creates the machine row first (awaited), audits only afte
   assert.ok(after.indexOf("auditCreated(realId)") > after.indexOf("if (!r.success)"), "audit after the insert succeeded");
   assert.match(create, /if \(!isSupabaseEnabled\(\)\) \{\s*setMachineLog\(\(prev\) => \[newMachine, \.\.\.prev\]\);\s*auditCreated\(newMachine\.id\);/, "local mode logs immediately");
   // the drawer: machine before moves, abort after a refused move, id handed on
-  const drawer = fn("function BOMDrawer({", "function OutwardPage({");
+  const drawer = readSrc("src/modules/bom/BOMDrawer.jsx");
   const machineFirst = drawer.indexOf("mr = await onCreateMachineFirst({");
   const moves = drawer.indexOf("const results = await Promise.all(moves.map((m) =>");
   assert.ok(machineFirst > 0 && machineFirst < moves, "machine row is created before the stock moves run");

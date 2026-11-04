@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { DEFAULT_ROLES } from "../src/auth/authStore.js";
 
-const page = readFileSync("src/pages/UserManagementPage.jsx", "utf8");
+const page = readFileSync("src/modules/users-roles/UserManagementPage.jsx", "utf8");
 const mig = readFileSync("supabase/migrations/059_service_caller_and_dept_staff.sql", "utf8");
 
 test("Department Staff role: floor permissions only", () => {

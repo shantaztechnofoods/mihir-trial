@@ -5,6 +5,7 @@ import { test, mock } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import { appSource } from "./helpers/source.mjs";
 
 let CLIENT = null;
 const mem = new Map();
@@ -17,7 +18,7 @@ mock.module(new URL("../src/supabase/client.js", import.meta.url).href, {
 });
 const { fetchMachines, updateMachine } = await import("../src/stores/machinesStore.js");
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
-const app = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
+const app = appSource();
 const mig = fs.readFileSync(path.join(root, "supabase/migrations/055_machine_hold.sql"), "utf8");
 
 test("store: hold columns map both ways and updateMachine writes them without stripping", async () => {

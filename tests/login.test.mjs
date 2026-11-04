@@ -3,10 +3,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import { appSource } from "./helpers/source.mjs";
 
 const root  = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
-const login = fs.readFileSync(path.join(root, "src/pages/LoginPage.jsx"), "utf8");
-const app   = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
+const login = fs.readFileSync(path.join(root, "src/app/LoginPage.jsx"), "utf8");
+const app   = appSource();
 
 test("login fields are uncontrolled — what is visible is what is submitted", () => {
   // A controlled value={…} disagrees with a browser-autofilled field until the

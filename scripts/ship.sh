@@ -2,7 +2,7 @@
 # SHANTAZ ERP — fast, safe ship script.   Usage: scripts/ship.sh <command> [args]
 #   check                 preflight + guards + npm test, build and ALL browser suites IN PARALLEL
 #                         (E2E_ONLY=<name-part> scripts/ship.sh check  → only matching browser suites, for quick loops; always run the full check before `pr`)
-#   bump <tag>            set APP_BUILD (src/App.jsx) and APP_BUILD_TAG (src/main.jsx) to the same tag
+#   bump <tag>            set APP_BUILD (src/shared/buildInfo.js) and APP_BUILD_TAG (src/main.jsx) to the same tag
 #   pr "<title>" <body-file>   commit everything, push, open the PR (body file = markdown; attribution is appended)
 #   wait [pr#]            poll CI until every check finishes (exit 1 on failure)
 #   merge <pr#>           refuse unless CI is green, then merge (merge commit)
@@ -10,7 +10,7 @@
 #   all "<title>" <body-file> <tag>   bump -> check -> pr -> wait   (+ merge when SHIP_AUTOMERGE=1, CI is green AND
 #                         code-review:code-review has passed for that exact commit — see "Code-review gate" below)
 # Rules baked in (CLAUDE.md): never on main, never force-push, never commit secrets, stop if >200 lines are
-# removed from src/App.jsx, tests + build must be green, build tags must match. Migrations/prod DB are NOT
+# removed from the screen code (src/app, src/modules, src/shared — formerly src/App.jsx), tests + build must be green, build tags must match. Migrations/prod DB are NOT
 # touched here — apply those by hand (shantaz-erp-database) before `merge`.
 # Speed (same checks): one shared heavy-job lock (/tmp/aud/heavy.lock) so agents take turns on the CPUs,
 # ONE vite build reused for every browser suite and cached by source hash, longest suites first,
@@ -49,14 +49,15 @@ preflight(){
 guards(){
   local base removed
   base=$(git merge-base HEAD origin/main 2>/dev/null || echo HEAD)
-  removed=$(git diff "$base" --numstat -- src/App.jsx | awk '{r+=$2} END{print r+0}')
-  [ "$removed" -gt 200 ] && [ -z "${SHIP_REMOVAL_REASON:-}" ] && die "src/App.jsx loses $removed lines (>200) — justify every removal before shipping"
+  # screen code = the former src/App.jsx, now in module folders (docs/ARCHITECTURE.md); -M so a pure file move is not "removed"
+  removed=$(git diff "$base" -M --numstat -- src/App.jsx src/app src/modules src/shared | awk '{r+=$2} END{print r+0}')
+  [ "$removed" -gt 200 ] && [ -z "${SHIP_REMOVAL_REASON:-}" ] && die "screen code (src/app, src/modules, src/shared) loses $removed lines (>200) — justify every removal before shipping"
   if git diff "$base" | grep -E '^\+' | grep -Eq 'eyJ[A-Za-z0-9_-]{30,}\.[A-Za-z0-9_-]{20,}|sb_secret_|service_role.{0,20}[:=].{0,5}["'\'']eyJ|AIza[0-9A-Za-z_-]{30,}'; then die "possible secret in the diff — remove it"; fi
-  local a t; a=$(grep -o 'APP_BUILD = "[^"]*"' src/App.jsx | cut -d'"' -f2); t=$(grep -o 'APP_BUILD_TAG = "[^"]*"' src/main.jsx | cut -d'"' -f2)
-  [ "$a" = "$t" ] || die "build tags differ: App.jsx=$a main.jsx=$t"
-  say "guards ok (App.jsx removed=$removed, build tag=$a)"
+  local a t; a=$(grep -o 'APP_BUILD = "[^"]*"' src/shared/buildInfo.js | cut -d'"' -f2); t=$(grep -o 'APP_BUILD_TAG = "[^"]*"' src/main.jsx | cut -d'"' -f2)
+  [ "$a" = "$t" ] || die "build tags differ: src/shared/buildInfo.js=$a main.jsx=$t"
+  say "guards ok (screen code removed=$removed, build tag=$a)"
 }
-cmd_bump(){ [ -n "${1:-}" ] || die "usage: bump <tag>"; sed -i -E "s/(APP_BUILD = \")[^\"]*(\")/\1$1\2/" src/App.jsx; sed -i -E "s/(APP_BUILD_TAG = \")[^\"]*(\")/\1$1\2/" src/main.jsx; guards; }
+cmd_bump(){ [ -n "${1:-}" ] || die "usage: bump <tag>"; sed -i -E "s/(APP_BUILD = \")[^\"]*(\")/\1$1\2/" src/shared/buildInfo.js; sed -i -E "s/(APP_BUILD_TAG = \")[^\"]*(\")/\1$1\2/" src/main.jsx; guards; }
 
 # ── shared heavy-job lock: builds + browser suites take turns on the shared CPUs ──
 LOCK="${SHIP_LOCK:-/tmp/aud/heavy.lock}"

@@ -31,7 +31,8 @@ export default defineConfig(({ mode }) => {
       pure: ['console.log', 'console.info', 'console.debug'],
     },
     build: {
-      // The app is one large App.jsx. Vendor deps are split out below; heavy
+      // App code is in src/app + src/modules + src/shared (docs/ARCHITECTURE.md);
+      // it is bundled as one app chunk. Vendor deps are split out below; heavy
       // libraries that only some screens need (recharts, xlsx) and the admin-only
       // pages are loaded on demand with dynamic import() — see LazyCharts.jsx.
       chunkSizeWarningLimit: 1400,

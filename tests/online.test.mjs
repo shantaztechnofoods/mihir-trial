@@ -4,6 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { readOnline, subscribeOnline, bannerReducer, offlineGuardTarget, NEEDS_NET_ATTR, BACK_MS } from "../src/utils/online.js";
+import { appSource } from "./helpers/source.mjs";
 
 test("readOnline follows navigator.onLine and defaults to online when unknown", () => {
   assert.equal(readOnline({ onLine: true }), true);
@@ -55,9 +56,9 @@ test("offlineGuardTarget refuses only marked elements, only while offline", () =
   assert.equal(offlineGuardTarget(null, false), null);
 });
 
-const app = fs.readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
+const app = appSource();
 const main = fs.readFileSync(new URL("../src/main.jsx", import.meta.url), "utf8");
-const banner = fs.readFileSync(new URL("../src/components/OfflineBanner.jsx", import.meta.url), "utf8");
+const banner = fs.readFileSync(new URL("../src/shared/components/OfflineBanner.jsx", import.meta.url), "utf8");
 
 test("the banner is mounted app-wide and carries the agreed words", () => {
   assert.match(main, /<OfflineBanner \/>/);

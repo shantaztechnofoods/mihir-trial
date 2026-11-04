@@ -5,6 +5,7 @@ import { test, mock } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import { appSource } from "./helpers/source.mjs";
 
 let ENABLED = false;
 let CLIENT = null;
@@ -19,7 +20,7 @@ mock.module(new URL("../src/supabase/client.js", import.meta.url).href, {
 });
 const store = await import("../src/stores/pendingItemsStore.js");
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
-const app = fs.readFileSync(path.join(root, "src/App.jsx"), "utf8");
+const app = appSource();
 
 const seed = (extra = {}) => {
   const job = { id: 1, machineId: 7, status: "open", qty: 100, receivedQty: 0, receipts: [], receivedAt: null, itemCode: "GBX", ...extra };
