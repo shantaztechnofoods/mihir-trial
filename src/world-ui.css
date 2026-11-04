@@ -218,7 +218,7 @@
   .page-header > .flex-1 { min-width: 0 !important; flex: 1 1 0 !important; }
   .page-header h1 { font-size: 19px !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .page-header h1 + p { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12.5px !important; }
-  .page-header .nav-menu-btn { width: 40px !important; height: 40px !important; border-radius: 12px !important; color: var(--ink) !important; background: var(--paper) !important; border: 0 !important; box-shadow: var(--e1); }
+  .page-header .nav-menu-btn { width: 44px !important; height: 44px !important; border-radius: 12px !important; color: var(--ink) !important; background: var(--paper) !important; border: 0 !important; box-shadow: var(--e1); }
   .page-header .page-header-actions { flex-wrap: nowrap !important; flex: 0 0 auto !important; width: auto !important; }
   .page-header .page-header-actions button, .page-header .page-header-actions > a { min-height: 40px; white-space: nowrap; }
   .page-header .page-header-actions button[aria-label^="Departments called"] { min-width: 40px; }
@@ -459,7 +459,7 @@
   .wu-timer .lead-icon { width: 14px; height: 14px; }
   .wu-timer.is-wait { color: var(--wait); background: var(--wait-wash); }
   .wu-timer.is-bad { color: var(--bad); background: var(--bad-wash); }
-  .wu-chip { min-height: 40px; padding: 0 12px; border-radius: 999px; font-size: 13.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+  .wu-chip { min-height: 44px; padding: 0 12px; border-radius: 999px; font-size: 13.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
   .wu-chip-bad { color: var(--bad); background: var(--bad-wash); border: 0; }
 
   /* Buttons: 48 px, flat, one anatomy; tone = meaning */
@@ -547,7 +547,7 @@
   .wu-md-title { font: 650 20px/1.2 var(--font-ui); letter-spacing: -0.02em; display: flex; align-items: center; gap: 8px; }
   .wu-md-title .lead-icon { color: var(--action); }
   .wu-md-sub { font-size: 14px; color: var(--ink-3); margin-top: 2px; }
-  .wu-md-close { background: var(--sunk) !important; color: var(--ink) !important; border: 0 !important; font-size: 14px; font-weight: 600; border-radius: 999px !important; min-height: 40px !important; }
+  .wu-md-close { background: var(--sunk) !important; color: var(--ink) !important; border: 0 !important; font-size: 14px; font-weight: 600; border-radius: 999px !important; min-height: 44px !important; }
   .wu-md-h { font: 600 14px/1.2 var(--font-ui); color: var(--ink-3); display: flex; align-items: center; justify-content: flex-start; gap: 6px; }
   .wu-md-num { font: 700 44px/1 var(--font-ui); letter-spacing: -0.035em; color: var(--ink); font-variant-numeric: tabular-nums; }
   .wu-md-row { background: var(--paper) !important; border: 0 !important; border-bottom: 1px solid var(--line) !important; border-radius: 0 !important; }

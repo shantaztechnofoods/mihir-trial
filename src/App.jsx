@@ -954,8 +954,8 @@ function DashboardPage({ items = {}, pos = [], vendorList = [], machineLog = [],
 
   // Same reasoning as the navigation: these nine tiles are the first thing
   // anyone sees, and emoji rendered in nine different device fonts is what made
-  // the dashboard look assembled rather than designed. Stroked icons take each
-  // tile's own colour instead of fighting it.
+  // the dashboard look assembled rather than designed. Stroked icons, all in
+  // one quiet ink; meaning is a status dot + word, never a coloured number.
   const kpis = [
     { label: "Total SKUs",        value: totalSKUs,                                              Icon: Boxes,        color: "#2E50D6", nav: "inventory",  sub: `${safeItems.length} safe`,        alert: false },
     { label: "Critical Stock",    value: criticalN,                                              Icon: AlertOctagon, color: "#b91c1c", nav: "inventory",  sub: `${warningItems.length} warning`,  alert: criticalN > 0 },
