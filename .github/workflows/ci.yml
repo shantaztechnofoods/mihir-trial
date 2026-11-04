@@ -1,15 +1,19 @@
 # CI for SHANTAZ ERP — tests + production build must pass before merge.
 #
-# This workflow is intentionally minimal (install → test → build) because
+# This workflow is intentionally minimal (install → test + build) because
 # that is already enough to catch:
 #   * 2b71bbc-class mass-deletion regressions (tests/regression.test.mjs)
 #   * Pure-logic regressions in gst / itemImport / auth
 #   * Build-time errors (missing imports, JSX syntax, broken paths)
 #
 # The job name is "ci" because the GitHub branch-protection "Required
-# status checks" setting is keyed on job name. Enabling branch
-# protection on main → require "ci" to pass → merges and auto-deploys
-# cannot proceed with a red build.
+# status checks" setting is keyed on job name (and scripts/ship.sh waits
+# for a check named "ci"). Enabling branch protection on main → require
+# "ci" to pass → merges and auto-deploys cannot proceed with a red build.
+#
+# Speed (same checks): node_modules is cached on the exact lockfile + Node
+# version (no npm ci on a hit), and the unit tests and the production build
+# run at the same time inside the one job (each still fails the job).
 name: ci
 
 on:
@@ -18,11 +22,12 @@ on:
   pull_request:
     branches: ["**"]
 
-# One run per branch at a time — if a new push arrives, cancel the
-# in-flight run instead of queuing. Keeps the PR status fresh.
+# One run per branch at a time — a new push to a feature branch cancels the
+# superseded in-flight run. Runs on main are never cancelled: every merge
+# commit gets its own complete run.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   ci:
@@ -34,28 +39,43 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Node
+        id: node
         uses: actions/setup-node@v4
         with:
           # Reads .nvmrc at repo root — must match the Vercel runtime.
           node-version-file: ".nvmrc"
-          cache: "npm"
+
+      - name: Cache node_modules
+        id: deps
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          # Exact key only (no restore-keys): a hit is byte-for-byte the tree
+          # `npm ci` would produce for this lockfile on this Node version.
+          key: nm-${{ runner.os }}-node${{ steps.node.outputs.node-version }}-${{ hashFiles('package-lock.json') }}
 
       - name: Install dependencies
         # `npm ci` is strict about package-lock.json integrity — exactly
         # what we want in CI (reproducible), as opposed to `npm install`.
-        run: npm ci
+        if: steps.deps.outputs.cache-hit != 'true'
+        run: npm ci --no-audit --no-fund
 
-      - name: Run tests (unit + regression)
-        # tests/regression.test.mjs is the tripwire that would have
-        # blocked the 2b71bbc mass-deletion. Keep this step BEFORE build:
-        # a failed test is cheaper than a failed build.
-        run: npm test
-
-      - name: Production build
-        # Catches missing imports, JSX syntax, and any transformation
-        # error Vite would hit on Vercel. Env vars are intentionally
-        # unset here — the build must succeed without live Supabase
-        # creds (localStorage mode fallback).
+      - name: Run tests (unit + regression) and production build in parallel
+        # tests/regression.test.mjs is the tripwire that would have blocked
+        # the 2b71bbc mass-deletion. The build catches missing imports, JSX
+        # syntax, and any transformation error Vite would hit on Vercel.
+        # Env vars are intentionally unset — the build must succeed without
+        # live Supabase creds (localStorage mode fallback). Both always run
+        # to the end; either one failing fails the job.
         env:
           VITE_USE_SUPABASE: "false"
-        run: npm run build
+        run: |
+          set +e   # the default shell is `bash -e`; collect both exit codes ourselves
+          npm test > unit.log 2>&1 & t=$!
+          npm run build > build.log 2>&1 & b=$!
+          wait $t; trc=$?; wait $b; brc=$?
+          echo "::group::npm test (exit $trc)"; cat unit.log; echo "::endgroup::"
+          echo "::group::npm run build (exit $brc)"; cat build.log; echo "::endgroup::"
+          [ $trc = 0 ] || echo "::error::npm test failed (exit $trc)"
+          [ $brc = 0 ] || echo "::error::npm run build failed (exit $brc)"
+          [ $trc = 0 ] && [ $brc = 0 ]
