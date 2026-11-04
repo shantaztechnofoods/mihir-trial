@@ -53,12 +53,25 @@ const keyMs = await p.evaluate(async () => {
 ok(`Item Master search: a keystroke takes < ${BUDGET_KEY_MS} ms`, keyMs < BUDGET_KEY_MS, `${keyMs.toFixed(0)} ms avg`);
 await p.waitForTimeout(600);
 ok("search still finds items from the whole list", (await p.locator("tbody tr", { hasText: "part 199" }).count()) > 0);
+// xlsx is loaded on demand: the Item Master Export button still downloads a sheet
+{
+  const exp = p.locator(".page-header button", { hasText: "Export" }).first();
+  const [dl] = await Promise.all([p.waitForEvent("download", { timeout: 15000 }).catch(() => null), exp.click()]);
+  ok("Item Master Export downloads an .xlsx (xlsx loaded on demand)", !!dl && /\.xlsx$/.test(dl.suggestedFilename()), dl ? dl.suggestedFilename() : "no download");
+}
 // 3. History & Reports with 5,000 audit rows
 const tH = await tapPage("History & Reports", "History & Reports"); await p.waitForTimeout(400);
 ok(`History & Reports opens within ${BUDGET_PAGE_MS} ms`, tH < BUDGET_PAGE_MS, `${tH.toFixed(0)} ms`);
 ok("History activity list draws a slice, the rest on scroll", Number(await p.locator("[data-more-rows]").first().getAttribute("data-more-rows").catch(() => 0)) > 4000);
 // 4. other page switches stay inside the budget
-for (const [l, re] of [["Inward", "^Inward"], ["Machine Tracker", "Machine Tracker"], ["Dashboard", "👋"]]) { const t = await tapPage(l, re); ok(`${l} opens within ${BUDGET_PAGE_MS} ms`, t < BUDGET_PAGE_MS, `${t.toFixed(0)} ms`); await p.waitForTimeout(300); }
+for (const [l, re] of [["Inward", "^Inward"], ["Machine Tracker", "Machine Tracker"], ["Dashboard", "👋"]]) {
+  const t = await tapPage(l, re); ok(`${l} opens within ${BUDGET_PAGE_MS} ms`, t < BUDGET_PAGE_MS, `${t.toFixed(0)} ms`); await p.waitForTimeout(300);
+  if (l === "Inward") {
+    ok("Inward log draws a slice of the 2,000 entries", Number(await p.locator("[data-more-rows]").first().getAttribute("data-more-rows").catch(() => 0)) > 1500);
+    const [dl] = await Promise.all([p.waitForEvent("download", { timeout: 15000 }).catch(() => null), p.locator(".page-header button", { hasText: "Export" }).first().click()]);
+    ok("Inward Export Log downloads an .xlsx (xlsx loaded on demand)", !!dl && /\.xlsx$/.test(dl.suggestedFilename()), dl ? dl.suggestedFilename() : "no download");
+  }
+}
 // 5. on-demand pieces still arrive: charts on Analytics, the lazy admin pages
 await tapPage("Analytics", "Analytics"); await p.waitForTimeout(2500);
 ok("Analytics charts load on demand and draw", (await p.locator("svg.recharts-surface").count()) >= 3, String(await p.locator("svg.recharts-surface").count()));
