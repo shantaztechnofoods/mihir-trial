@@ -212,8 +212,8 @@ export default function LoginPage({ notice = "", onRetry = null }) {
           </form>
 
           <p className="lg-foot">Forgot password? Ask your admin.</p>
+          <MadeInIndia className="lg-india" />
         </div>
-        <MadeInIndia className="lg-india" />
       </main>
     </div>
   );

@@ -582,10 +582,11 @@
   .wu-reveal { opacity: 0; transform: translateY(10px); transition: opacity 320ms var(--ease-enter), transform 320ms var(--ease-enter); }
   .wu-reveal.wu-in { opacity: 1; transform: none; }
 
-  /* Sticky header compacts once the page scrolls */
-  .page-header { transition: padding var(--dur-ui) var(--ease-enter), box-shadow var(--dur-ui) var(--ease-enter); }
-  .page-header.is-compact { padding-top: 8px !important; padding-bottom: 8px !important; box-shadow: 0 6px 20px -14px rgba(14, 23, 38, .45); }
-  .page-header.is-compact p { display: none; }
+  /* Sticky header lifts (shadow) once the page scrolls */
+  .page-header { transition: box-shadow var(--dur-ui) var(--ease-enter); }
+  /* scrolled: a shadow only — never a size change (a height change at the scroll
+     end re-clamps scrollTop and makes the header flip back and forth) */
+  .page-header.is-compact { box-shadow: 0 6px 20px -14px rgba(14, 23, 38, .45); }
 
   /* Sidebar: active indicator grows in; hover is quiet */
   .app-sidebar .sb-indicator { animation: wu-ind 260ms var(--ease-enter) backwards; transform-origin: center; }
@@ -828,3 +829,9 @@
   .sb-logo-wide .shz-tag { color: #AEB8C8; }
 }
 @media (prefers-reduced-motion: reduce) { .shz-shine::after { animation: none !important; display: none !important; } }
+
+@media screen {
+  /* L16: Made in India sits inside the card footer (no seam on a phone) */
+  .lg-card .lg-india { display: flex; margin-top: 18px; padding: 14px 0 0 !important; width: 100%; max-width: none; border-top: 1px solid rgba(255, 255, 255, .12); background: transparent !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+  @media (max-width: 1023px) { .lg-card { padding-bottom: calc(16px + env(safe-area-inset-bottom)) !important; } }
+}

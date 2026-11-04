@@ -85,7 +85,8 @@ export function installSheetGestures() {
 //                    view (≤40ms stagger per batch). Anything already on screen
 //                    is left alone, so nothing a worker can see is ever hidden,
 //                    and a click is never delayed. Reduced motion: off.
-// installHeaderCompact()  the sticky page header tightens once the page scrolls.
+// installHeaderCompact()  the sticky page header gets a soft shadow once the page scrolls
+//                    (shadow only — no size change, so it can never oscillate).
 const REVEAL = ".section-card, .kpi-tile, .hero-tile, .wu-card, .wu-tile, .rack-crate, .wu-sent";
 export function installScrollReveal() {
   if (typeof window === "undefined" || window.__wuReveal || !("IntersectionObserver" in window) || reduced()) return;
