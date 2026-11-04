@@ -18,6 +18,8 @@
 //         compared (the path is re-pointed to the file's new folder; section 2
 //         proves the moved target file itself is unchanged);
 //       * the two-line "moved verbatim" header of each new file is ignored;
+//       * the VALUE of `const APP_BUILD = "…"` is ignored (the build tag is
+//         bumped on every ship; the line itself must still exist);
 //       * blank lines and trailing spaces are ignored.
 //     "New files" = every file under src/ that carries the header line
 //     "moved verbatim from the former single-file src/App.jsx".
@@ -59,6 +61,8 @@ function nonImportLines(code) {
 }
 const norm = (l) => l
   .replace(/^export (?=(async )?(function|const|let|var|class) )/, "")
+  // the build tag value is release metadata (scripts/ship.sh bump changes it on every ship)
+  .replace(/^(const APP_BUILD = )"[^"]*";/, '$1"<build tag>";')
   .replace(/import\((["'])(?:\.\.?\/)+(?:[^"']*\/)?([^"'/]+)\1\)/g, "import($1$2$1)")
   .trimEnd();
 function multiset(lines) {
