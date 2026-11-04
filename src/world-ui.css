@@ -712,3 +712,10 @@
   @media (max-width: 767.98px) { .sb-india { display: none; } }
 }
 @media (prefers-reduced-motion: reduce) { .lg-logo2d::after { animation: none !important; display: none; } }
+
+@media screen {
+  .wu-hold-badge { margin-top: 8px; display: flex; align-items: flex-start; gap: 6px; padding: 8px 10px; border-radius: 10px; font-size: 14px; font-weight: 600; line-height: 1.35; color: var(--bad); background: var(--bad-wash); border: 1px solid var(--bad-line); word-break: break-word; }
+  .wu-held { min-height: 48px; display: flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 600; color: var(--bad); }
+  .wu-soft-ok { color: var(--ok) !important; background: #fff; border-color: var(--ok-line); }
+  @media (hover: hover) and (pointer: fine) { .wu-soft-ok:hover { background: var(--ok-wash); } }
+}
