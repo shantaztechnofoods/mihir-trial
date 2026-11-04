@@ -36,7 +36,7 @@ Database tables touched through those stores: _none_
 Database functions (RPC): _none_
 Migrations this module relies on (by file name in `supabase/migrations/`): _none of its own_
 Edge Functions / serverless: 
-- `ai-assistant` (secret `GEMINI_API_KEY`; optional `GEMINI_MODEL` / `GEMINI_MODELS`)
+- `ai-assistant` (secret `GEMINI_API_KEY`; the model is the `GEMINI_MODEL` constant in its index.ts)
 
 ## Permissions (`canDo(module, action)` keys checked here or in its handlers)
 _none checked inside the module — page access is gated by `canView(<nav id>)` in the app shell_
@@ -47,7 +47,7 @@ _none_
 Every audit type is also listed in `AUDIT_EVENT_TYPES` in `tests/regression.test.mjs` when it must never disappear.
 
 ## Tests
-Unit / static tests that read this module: `tests/regression.test.mjs`; plus `tests/regression.test.mjs` (inventory + size floor for this folder).
+Unit / static tests that read this module: _none specific_; plus `tests/regression.test.mjs` (inventory + size floor for this folder).
 Browser suites (`tests/e2e/`): _none specific — covered by the page smoke check_
 
 ## How to verify it

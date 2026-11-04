@@ -74,7 +74,7 @@ The database (RLS policies) is the real enforcer; the UI gates only hide buttons
 Every audit type is also listed in `AUDIT_EVENT_TYPES` in `tests/regression.test.mjs` when it must never disappear.
 
 ## Tests
-Unit / static tests that read this module: `tests/rackSlots.test.mjs`, `tests/regression.test.mjs`; plus `tests/regression.test.mjs` (inventory + size floor for this folder).
+Unit / static tests that read this module: `tests/rackSlots.test.mjs`; plus `tests/regression.test.mjs` (inventory + size floor for this folder).
 Browser suites (`tests/e2e/`): `settings-bom-organised`
 
 ## How to verify it

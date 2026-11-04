@@ -55,7 +55,7 @@ Local try-out without any database: `echo "VITE_USE_SUPABASE=false" > .env.local
 ```bash
 supabase link --project-ref <ref>
 supabase secrets set GEMINI_API_KEY=<key>            # ai-assistant, voice-transcribe
-# optional: GEMINI_MODEL / GEMINI_MODELS to pin models
+# the Gemini model is a constant (GEMINI_MODEL) inside each function's index.ts — edit it there, then redeploy
 supabase functions deploy admin-create-user admin-reset-password admin-deactivate-user admin-delete-user
 supabase functions deploy ai-assistant voice-transcribe whatsapp-send whatsapp-agent
 ```

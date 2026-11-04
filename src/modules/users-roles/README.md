@@ -14,7 +14,7 @@ User Management (create users incl. Department Staff, reset password, deactivate
 |---|---|
 | `RoleManagementPage.jsx` | 388 |
 | `UserManagementPage.jsx` | 711 |
-| `index.js` | 5 |
+| `index.js` | 7 |
 
 `index.js` is the public surface — the app shell and other modules import only from it:
 `RoleManagementPage`, `UserManagementPage`

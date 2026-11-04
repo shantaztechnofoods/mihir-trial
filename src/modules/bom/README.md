@@ -53,7 +53,7 @@ _none_
 Every audit type is also listed in `AUDIT_EVENT_TYPES` in `tests/regression.test.mjs` when it must never disappear.
 
 ## Tests
-Unit / static tests that read this module: `tests/goLiveApp.test.mjs`, `tests/regression.test.mjs`; plus `tests/regression.test.mjs` (inventory + size floor for this folder).
+Unit / static tests that read this module: `tests/goLiveApp.test.mjs`; plus `tests/regression.test.mjs` (inventory + size floor for this folder).
 Browser suites (`tests/e2e/`): `bom-unselected`, `bom-photo`, `settings-bom-organised`, `fill-rack-pending-item`, `go-live-workflows`
 
 ## How to verify it

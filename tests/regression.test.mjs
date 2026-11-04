@@ -36,8 +36,10 @@
 //
 // 2026-11-04 — module-folder split. The code that lived in src/App.jsx now
 // lives in src/app (shell), src/modules/<module> and src/shared (see
-// docs/ARCHITECTURE.md). Every check below now scans ALL source files under
-// src/ (APP_SRC), so a symbol counts as present wherever it was moved to.
+// docs/ARCHITECTURE.md). Every check below now scans ALL the screen code
+// (APP_SRC = every file under src/app, src/modules, src/shared), so a symbol
+// counts as present wherever it was moved to — but not if it only survives in
+// a store/util comment.
 // The inventory itself is unchanged. The size floors now apply to the
 // split folders as a whole AND to every module folder separately.
 
@@ -46,7 +48,7 @@ import assert from "node:assert/strict";
 import { readFileSync, statSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { appSource, srcFiles } from "./helpers/source.mjs";
+import { uiSource, srcFiles } from "./helpers/source.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT      = resolve(__dirname, "..");
@@ -54,10 +56,14 @@ const APP_JSX   = resolve(ROOT, "src", "app", "App.jsx");
 const BUILD_INFO = resolve(ROOT, "src", "shared", "buildInfo.js");
 const MAIN_JSX  = resolve(ROOT, "src", "main.jsx");
 const STORES    = resolve(ROOT, "src", "stores");
-// Every .js/.jsx file under src/, joined — the corpus the inventory is checked against.
-const APP_SRC   = Symbol("every .js/.jsx file under src/");
-
-function read(path) { return path === APP_SRC ? appSource() : readFileSync(path, "utf8"); }
+// The screen code — every .js/.jsx file under src/app, src/modules and src/shared
+// (all of the former src/App.jsx, plus the old src/pages + src/components) — is
+// the corpus the inventory is checked against. Stores / utils / auth are NOT
+// included on purpose: a symbol removed from the UI must not be "found" in a
+// store comment. (Store exports are checked separately below.)
+const APP_SRC   = Symbol("screen code: src/app + src/modules + src/shared");
+let uiCache = null;
+function read(path) { return path === APP_SRC ? (uiCache ??= uiSource()) : readFileSync(path, "utf8"); }
 function has(src, needle) { return src.includes(needle); }
 
 // ─── File-size floor (first line of defense against mass deletion) ──────────

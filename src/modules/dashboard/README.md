@@ -52,7 +52,7 @@ _none_
 Every audit type is also listed in `AUDIT_EVENT_TYPES` in `tests/regression.test.mjs` when it must never disappear.
 
 ## Tests
-Unit / static tests that read this module: `tests/purchaseAudit2.test.mjs`, `tests/regression.test.mjs`; plus `tests/regression.test.mjs` (inventory + size floor for this folder).
+Unit / static tests that read this module: `tests/purchaseAudit2.test.mjs`; plus `tests/regression.test.mjs` (inventory + size floor for this folder).
 Browser suites (`tests/e2e/`): `mobile-sweep`
 
 ## How to verify it

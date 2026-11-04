@@ -12,7 +12,7 @@ Read-only view of the append-only audit log (who did what, when).
 | file | lines |
 |---|---|
 | `AuditHistoryPage.jsx` | 437 |
-| `index.js` | 4 |
+| `index.js` | 6 |
 
 `index.js` is the public surface — the app shell and other modules import only from it:
 `AuditHistoryPage`

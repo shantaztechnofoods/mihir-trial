@@ -56,7 +56,7 @@ _none_
 Every audit type is also listed in `AUDIT_EVENT_TYPES` in `tests/regression.test.mjs` when it must never disappear.
 
 ## Tests
-Unit / static tests that read this module: `tests/rackSlots.test.mjs`, `tests/regression.test.mjs`, `tests/staffMode.test.mjs`, `tests/workCalendar.test.mjs`; plus `tests/regression.test.mjs` (inventory + size floor for this folder).
+Unit / static tests that read this module: `tests/rackSlots.test.mjs`, `tests/staffMode.test.mjs`, `tests/workCalendar.test.mjs`; plus `tests/regression.test.mjs` (inventory + size floor for this folder).
 Browser suites (`tests/e2e/`): `reports-pdf`, `reports-v2`, `trial-signature-report`
 
 ## How to verify it
