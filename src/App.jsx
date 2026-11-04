@@ -20,6 +20,7 @@ import { useAuth } from "./auth/AuthContext.jsx";
 // the dept roster in the Finish & Transfer worker picker.
 import { fetchDeptRoster, updateUserDepartments } from "./auth/authStore.js";
 import LoginPage from "./pages/LoginPage.jsx";
+import { celebrate } from "./utils/worldMotion.js";
 import BrandLogo from "./components/BrandLogo.jsx";
 import { LeadIcon, LeadLabel, Glyph } from "./components/LeadIcon.jsx";
 import UserManagementPage from "./pages/UserManagementPage.jsx";
@@ -18927,6 +18928,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
         return;
       }
       setTrialCertModal(null);
+      celebrate("Sent");   // world UI: success moment (visual only)
       showToast(
         `${machine.bomKey} → Ready`,
         "Trial Certificate saved. Awaiting Ready acceptance."
@@ -18995,6 +18997,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
         return;
       }
       setFinishModal(null);
+      celebrate("Sent");   // world UI: success moment (visual only)
       const backToRack = !!machine.rackSlot && fromDepartment === "Assembly" && isRackReleaseHop(fromDepartment, toDepartment);
       showToast(backToRack ? `${machine.bomKey}${machine.serialNo ? ` — ${machine.serialNo}` : ""} · Assembled · Ready` : `${machine.bomKey} → ${toDepartment}`,
         backToRack ? `Back on ${slotLabel(machine.rackSlot)} — an admin sends it to ${toDepartment} from the Rack View` : (overrunMinutes > 0 ? `Awaiting accept · Overrun ${formatDuration(overrunMinutes)}` : "Awaiting accept"));
@@ -19099,6 +19102,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
       return;
     }
     setAcceptModal(null);
+    celebrate(handover.toDepartment === "Ready" ? "Ready" : "Accepted");   // world UI: success moment (visual only)
     showToast(`Accepted into ${handover.toDepartment}`,
       `${handover.bomKey}${handover.serialNo ? ` · S/N ${handover.serialNo}` : ""}${pendingItemsToRaise.length ? ` · ${pendingItemsToRaise.length} pending item${pendingItemsToRaise.length === 1 ? "" : "s"} raised` : ""}`);
   };
@@ -19756,9 +19760,10 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
 
       {/* Arrival alert banner (staff only) — tap to go to that machine's card. */}
       {staffMode && arrival && (
-        <div className="arrival-banner" role="alert" data-arrival-banner>
+        <div className="arrival-banner" role="alert" data-arrival-banner
+             data-arrival-tone={arrival.deadline ? (String(arrival.text).startsWith("⏰") ? "bad" : "wait") : "ok"}>
           <button type="button" className="arrival-banner-main" onClick={openArrival} data-arrival-open>
-            {arrival.text}
+            <LeadLabel text={arrival.text} />
           </button>
           <button type="button" className="arrival-banner-close" aria-label="Close" onClick={() => setArrival(null)}>✕</button>
         </div>
@@ -19917,7 +19922,8 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
             signatures and checklists are untouched. No machine history,
             ratings or reports: those stay admin-only. */}
         {staffMode && (() => {
-          const btn = "min-h-[48px] w-full sm:w-auto px-5 rounded-xl text-[15px] font-black transition-all active:scale-[0.98]";
+          // World UI (2026-11-04): one button anatomy, tone by meaning (classes in world-ui.css).
+          const btn = "min-h-[48px] w-full sm:w-auto text-[15px] wu-btn";
           const canAccept  = canAcceptHandover(canDo) && !!onAcceptHandover;
           const canFinish  = canFinishTransfer(canDo) && !!onFinishTransfer;
           const canJobs    = canFinishTransfer(canDo);
@@ -19934,19 +19940,39 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
           const myJobs     = (pendingHandoverItems || []).filter((p) => pendingItemIsOpen(p) && myDepartments.includes(p.assignedDepartment));
           const awaitingRelease = startedAll.filter((m) => { const h = machineHandover(m); return !!(h && isAwaitingRelease(h)); });
           const Section = ({ title, count, hint, children }) => (
-            <div className="section-card no-lift p-4 sm:p-5" data-staff-section={title}>
-              <div className="flex items-baseline gap-2 flex-wrap mb-3">
-                <h2 className="text-[16px] font-black" style={{ color: "var(--text-strong)" }}>{title}</h2>
-                <span className="text-[14px] font-black tabular-nums" style={{ color: count ? "#2640B0" : "var(--text-dim)" }}>({count})</span>
-                {hint && <span className="text-[12px]" style={{ color: "var(--text-dim)" }}>{hint}</span>}
+            <div className="wu-section" data-staff-section={title}>
+              <div className="wu-section-head">
+                <h2 className="wu-section-title">{title}</h2>
+                <span className={`wu-count${count ? " is-on" : ""}`}>({count})</span>
+                {hint && <span className="wu-section-hint">{hint}</span>}
               </div>
               {children}
             </div>
           );
-          const Empty = ({ text }) => <div className="text-[14px] py-3" style={{ color: "var(--text-dim)" }}>{text}</div>;
-          const Card  = ({ children, tone }) => (
-            <div className="mt-card no-lift p-4 flex flex-col gap-3" style={tone ? { borderColor: tone } : undefined}>{children}</div>
+          // Empty state: a small line drawing + one line saying what happens next.
+          const Empty = ({ text }) => (
+            <div className="wu-empty">
+              <svg viewBox="0 0 64 48" width="56" height="42" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round">
+                <path d="M8 18l24-10 24 10-24 10z" /><path d="M8 18v16l24 10 24-10V18" /><path d="M32 28v16" />
+              </svg>
+              <span>{text}</span>
+            </div>
           );
+          const Card  = ({ children, tone }) => (
+            <div className="mt-card no-lift wu-card" data-tone={tone || undefined}>{children}</div>
+          );
+          // Where the machine is on the line (display only — read from its stage).
+          const LINE = ["Assembly", "Mechanical", "Electrical", "Trial", "Ready"];
+          const stageLine = (stage) => {
+            const at = LINE.indexOf(stage);
+            if (at < 0) return null;
+            return (
+              <div className="wu-line" data-wu-stages aria-label={`Stage: ${stage}`}>
+                {LINE.map((d, i) => <span key={d} className={i < at ? "is-done" : i === at ? "is-now" : ""} title={d} />)}
+                <em>{stage}</em>
+              </div>
+            );
+          };
           // 2026-11-03 — "▶ 🎤 2": the machine has voice notes; tap plays the latest.
           const voiceBadge = (m) => {
             const vs = m ? voiceNotesFor(attachments, m.id) : [];
@@ -19955,16 +19981,27 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
           };
           // Migration 061 — the BOM's machine photo (64px) at the left of the
           // card's title block, so workers recognise the machine at a glance.
+          // World UI: picture first on every card; a machine without a BOM photo
+          // gets a quiet machine tile so all cards line up the same way.
           const withPhoto  = (m, h, body) => {
             const url = (bomDefs || {})[(m && m.bomKey) || (h && h.bomKey)]?.photoUrl;
-            if (!url) return body;
             return (
-              <div className="flex items-start gap-3">
-                <BomPhotoThumb url={url} size={64} />
+              <div className="wu-card-top">
+                <BomPhotoThumb url={url} size={64} className="wu-photo"
+                               fallback={<span className="wu-photo wu-photo-ph" aria-hidden="true"><Wrench size={24} strokeWidth={1.7} /></span>} />
                 <div className="min-w-0 flex-1">{body}</div>
               </div>
             );
           };
+          // Route: Rack → Accept → Work → Send, with counts. Tap a step to jump to it.
+          const route = [
+            { key: "rack",   label: "Rack",   n: rackForMe.length,  sec: "On the rack for you" },
+            { key: "accept", label: "Accept", n: toAccept.length,   sec: "To accept" },
+            { key: "work",   label: "Work",   n: myWorking.length,  sec: "In your department" },
+            { key: "send",   label: "Send",   n: sentOn.length,     sec: "Sent on" },
+          ];
+          const nowStep = (route.find((r) => r.key !== "send" && r.n > 0) || route[3]).key;
+          const goStep = (sec) => { try { document.querySelector(`[data-staff-section='${sec}']`)?.scrollIntoView({ behavior: "smooth", block: "start" }); } catch { /* ignore */ } };
           // No department: say so and show nothing else. A Store Manager still
           // keeps the BOM section above when the role may issue a BOM.
           if (!isProdHead && !hasDepartments) {
@@ -19979,33 +20016,47 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
             );
           }
           return (
-            <div className="space-y-4" data-staff-dashboard>
-              {/* My Dashboard — opens the read-only scorecard for my departments */}
-              {!isProdHead && hasDepartments && (
-                <button type="button" data-my-dashboard-open onClick={() => setMyDashOpen(true)}
-                        className="w-full min-h-[64px] px-5 rounded-2xl text-[20px] font-black text-white flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
-                        style={{ background: "#2640B0", boxShadow: "0 8px 24px rgba(38,64,176,0.25)" }}>
-                  <LeadIcon e="📊" />My Dashboard
-                </button>
-              )}
-              {/* Header */}
-              <div className="flex items-baseline gap-2 flex-wrap px-1">
-                <span className="text-[12px] font-bold uppercase tracking-[0.08em]" style={{ color: "var(--text-dim)" }}>
-                  {isProdHead ? "Production Head" : `Your department${myDepartments.length === 1 ? "" : "s"}:`}
-                </span>
-                <span className="text-[18px] font-black" style={{ color: "var(--text-strong)" }}>
-                  {isProdHead ? "Rack release" : myDepartments.join(", ")}
-                </span>
-                {currentUser?.fullName && <span className="text-[12px] ml-auto" style={{ color: "var(--text-dim)" }}>{currentUser.fullName}</span>}
-                {!isProdHead && (
-                  <button type="button" data-arrival-toggle aria-pressed={arrivalOn} onClick={toggleArrival}
-                          aria-label={arrivalOn ? "Arrival alert on — tap to turn off" : "Arrival alert off — tap to turn on"}
-                          title={arrivalOn ? "Alert sound ON" : "Alert sound OFF"}
-                          className={`${currentUser?.fullName ? "" : "ml-auto "}min-w-[44px] h-[44px] px-3 rounded-xl text-[15px] font-black inline-flex items-center justify-center gap-1 transition-all active:scale-[0.97]`}
-                          style={arrivalOn
-                            ? { background: "rgba(21,128,61,0.10)", color: "#15803d", border: "1px solid rgba(21,128,61,0.35)" }
-                            : { background: "var(--surface-card)", color: "var(--text-dim)", border: "1px solid var(--border-subtle)" }}>
-                    <LeadLabel text={arrivalOn ? "🔔 On" : "🔕 Off"} />
+            <div className="wu-staff" data-staff-dashboard>
+              {/* World UI header: who I am, the route with counts, My Dashboard. */}
+              <div className="wu-staff-hero" data-staff-hero>
+                <div className="wu-hero-row">
+                  <div className="min-w-0 flex-1">
+                    <span className="wu-hero-k">
+                      {isProdHead ? "Production Head" : `Your department${myDepartments.length === 1 ? "" : "s"}:`}
+                    </span>
+                    <span className="wu-hero-dept">
+                      {isProdHead ? "Rack release" : myDepartments.join(", ")}
+                    </span>
+                    {currentUser?.fullName && <span className="wu-hero-name">{currentUser.fullName}</span>}
+                  </div>
+                  {!isProdHead && (
+                    <button type="button" data-arrival-toggle aria-pressed={arrivalOn} onClick={toggleArrival}
+                            aria-label={arrivalOn ? "Arrival alert on — tap to turn off" : "Arrival alert off — tap to turn on"}
+                            title={arrivalOn ? "Alert sound ON" : "Alert sound OFF"}
+                            className={`wu-alert${arrivalOn ? " is-on" : ""}`}>
+                      <LeadLabel text={arrivalOn ? "🔔 On" : "🔕 Off"} />
+                    </button>
+                  )}
+                </div>
+                {!isProdHead && hasDepartments && (
+                  <nav className="wu-route" aria-label="Your work, step by step" data-staff-route>
+                    {route.map((r, i) => (
+                      <React.Fragment key={r.key}>
+                        {i > 0 && <span className="wu-route-sep" aria-hidden="true" />}
+                        <button type="button" data-staff-route-step={r.key} onClick={() => goStep(r.sec)}
+                                className={`wu-step${r.key === nowStep ? " is-now" : ""}${r.n ? " has" : ""}`}
+                                aria-current={r.key === nowStep ? "step" : undefined}>
+                          <span className="wu-step-n tabular-nums">{r.n}</span>
+                          <span className="wu-step-l">{r.label}</span>
+                        </button>
+                      </React.Fragment>
+                    ))}
+                  </nav>
+                )}
+                {/* My Dashboard — opens the read-only scorecard for my departments */}
+                {!isProdHead && hasDepartments && (
+                  <button type="button" data-my-dashboard-open onClick={() => setMyDashOpen(true)} className="wu-mydash">
+                    <LeadIcon e="📊" />My Dashboard
                   </button>
                 )}
               </div>
@@ -20020,8 +20071,8 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                       return (
                         <Card key={m.id}>
                           {withPhoto(m, h, <div>
-                            <div className="text-[17px] font-black" style={{ color: "var(--text-strong)" }}>{titleOf(m, h)}</div>
-                            <div className="text-[13px] mt-0.5" style={{ color: "var(--text-dim)" }}>
+                            <div className="wu-title">{titleOf(m, h)}</div>
+                            <div className="wu-meta">
                               {m.bomLabel || ""}{m.rackSlot ? ` · ${slotLabel(m.rackSlot)}` : " · on the rack"} · to {h.toDepartment}
                             </div>
                           </div>)}
@@ -20029,7 +20080,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                               (details panel / crate face — same handler, same
                               gate). This opens that machine's rack panel. */}
                           {canReleaseFromRack && onReleaseHandover && (
-                            <button type="button" data-staff-release={h.id} className={btn} style={{ background: "#4338ca", color: "#fff" }}
+                            <button type="button" data-staff-release={h.id} className={`${btn} wu-rack`}
                                     onClick={() => {
                                       if (m.rackSlot) { setRackPanel(m.rackSlot); return; }
                                       try { document.querySelector(".rack-shelf")?.scrollIntoView({ behavior: "smooth", block: "start" }); } catch {}
@@ -20051,15 +20102,15 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                     {rackForMe.map((h) => {
                       const m = machineOf(h);
                       return (
-                        <Card key={h.id} tone="rgba(67,56,202,0.45)">
+                        <Card key={h.id} tone="rack">
                           {withPhoto(m, h, <div>
-                            <div className="text-[17px] font-black" style={{ color: "var(--text-strong)" }}>{titleOf(m, h)}</div>
-                            <div className="text-[13px] mt-0.5" style={{ color: "var(--text-dim)" }}>
+                            <div className="wu-title">{titleOf(m, h)}</div>
+                            <div className="wu-meta">
                               {m?.bomLabel ? `${m.bomLabel} · ` : ""}{m?.rackSlot ? slotLabel(m.rackSlot) : "on the rack"} → {h.toDepartment}
                             </div>
                           </div>)}
                           {canTakeFromRack && canAccept ? (
-                            <button data-needs-net type="button" data-staff-take={h.id} className={btn} style={{ background: "#4338ca", color: "#fff" }}
+                            <button data-needs-net type="button" data-staff-take={h.id} className={`${btn} wu-rack`}
                                     disabled={!!acceptModal || rackTakeBusy === h.id}
                                     onClick={async () => {
                                       if (acceptModal || rackTakeBusy) return;
@@ -20072,7 +20123,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                               <LeadLabel text={rackTakeBusy === h.id ? "⏳ Please wait…" : "📥 Take from Rack"} />
                             </button>
                           ) : (
-                            <div className="text-[13px] font-bold" style={{ color: "#4338ca" }}>Waiting for your head to take it</div>
+                            <div className="wu-note wu-note-rack">Waiting for your head to take it</div>
                           )}
                         </Card>
                       );
@@ -20091,17 +20142,18 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                       const late = isHoldOverdue(h.sentAt, h.acceptTimeoutMinutes, nowTick);
                       const waited = h.sentAt ? formatDuration(Math.max(0, Math.floor((nowTick - Date.parse(h.sentAt)) / 60000))) : "";
                       return (
-                        <Card key={h.id} tone={late ? "rgba(239,68,68,0.5)" : "rgba(217,119,6,0.45)"}>
+                        <Card key={h.id} tone={late ? "bad" : "wait"}>
                           {withPhoto(m, h, <div>
-                            <div className="text-[17px] font-black" style={{ color: "var(--text-strong)" }}>{titleOf(m, h)}</div>
-                            <div className="text-[13px] mt-0.5" style={{ color: "var(--text-dim)" }}>
+                            <div className="wu-title">{titleOf(m, h)}</div>
+                            <div className="wu-meta">
                               {m?.bomLabel ? `${m.bomLabel} · ` : ""}from {h.fromDepartment} → {h.toDepartment}{waited ? ` · waiting ${waited}` : ""}
                             </div>
-                            {late && <div className="text-[13px] font-black mt-1" style={{ color: "#dc2626" }}><LeadIcon e="🚦" />ON HOLD — accept deadline passed</div>}
+                            {stageLine(h.toDepartment)}
+                            {late && <div className="wu-note wu-note-bad"><LeadIcon e="🚦" />ON HOLD — accept deadline passed</div>}
                             {voiceBadge(m) && <div className="mt-2">{voiceBadge(m)}</div>}
                           </div>)}
                           {canAccept && (
-                            <button data-needs-net type="button" data-staff-accept={h.id} className={btn} style={{ background: "#15803d", color: "#fff" }}
+                            <button data-needs-net type="button" data-staff-accept={h.id} className={`${btn} wu-ok wu-main`}
                                     disabled={!!acceptModal} onClick={() => { if (!acceptModal) openAcceptModal(h); }}>
                               ✓ Accept into {h.toDepartment}
                             </button>
@@ -20127,51 +20179,46 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                       return (
                         <Card key={m.id}>
                           {withPhoto(m, null, <div>
-                            <div className="text-[17px] font-black" style={{ color: "var(--text-strong)" }}>{titleOf(m)}</div>
-                            <div className="text-[13px] mt-0.5" style={{ color: "var(--text-dim)" }}>{m.bomLabel || ""}{m.bomLabel ? " · " : ""}in {dept}</div>
+                            <div className="wu-title">{titleOf(m)}</div>
+                            <div className="wu-meta">{m.bomLabel || ""}{m.bomLabel ? " · " : ""}in {dept}</div>
+                            {stageLine(dept)}
                             <div className="flex items-center gap-2 flex-wrap mt-2">
                               {t && (
-                                <span className="text-[13px] font-bold px-2.5 py-1 rounded-full" data-staff-timer={m.id} data-timer-level={level}
-                                      title={`⏱ ${formatDuration(t.actualMinutes)}${target ? ` / ${formatDuration(target)}` : ""}`}
-                                      style={t.isOverrun ? { background: "rgba(239,68,68,0.1)", color: "#b91c1c", border: "1px solid rgba(239,68,68,0.35)" }
-                                           : level === 80 ? { background: "rgba(217,119,6,0.12)", color: "#b45309", border: "1px solid rgba(217,119,6,0.45)" }
-                                           : { background: "rgba(21,128,61,0.08)", color: "#15803d", border: "1px solid rgba(21,128,61,0.3)" }}>
+                                <span className={`wu-timer ${t.isOverrun ? "is-bad" : level === 80 ? "is-wait" : "is-ok"}`} data-staff-timer={m.id} data-timer-level={level}
+                                      title={`⏱ ${formatDuration(t.actualMinutes)}${target ? ` / ${formatDuration(target)}` : ""}`}>
                                   {t.isOverrun ? `⏰ Late by ${formatDuration(t.overrunMinutes)}`
                                     : level === 80 ? `⏳ ${formatDuration(leftMinutes)} left`
                                     : `⏱ ${formatDuration(t.actualMinutes)}${target ? ` / ${formatDuration(target)}` : ""}`}
                                 </span>
                               )}
                               {jobs.length > 0 && (
-                                <button type="button" data-staff-jobs={m.id} onClick={() => setJobsDrawer(m.id)}
-                                        className="min-h-[44px] text-[14px] font-black px-3 rounded-xl"
-                                        style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.35)", color: "#b91c1c" }}>
+                                <button type="button" data-staff-jobs={m.id} onClick={() => setJobsDrawer(m.id)} className="wu-chip wu-chip-bad">
                                   <LeadIcon e="⚠" />{jobs.length} open job{jobs.length === 1 ? "" : "s"}
                                 </button>
                               )}
                               {voiceBadge(m)}
                             </div>
                           </div>)}
-                          <div className="flex flex-col sm:flex-row gap-2 sm:flex-wrap">
+                          <div className="wu-actions">
                             {during && (
-                              <button type="button" data-staff-during={m.id} className={btn} style={{ background: "#2640B0", color: "#fff" }} onClick={() => openDuringWorkModal(m)}>
+                              <button type="button" data-staff-during={m.id} className={`${btn} wu-soft`} onClick={() => openDuringWorkModal(m)}>
                                 <LeadIcon e="📋" />During-Work Checks
                               </button>
                             )}
                             {canReport && (
-                              <button type="button" data-staff-issue={m.id} className={btn}
-                                      style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.4)", color: "#dc2626" }}
+                              <button type="button" data-staff-issue={m.id} className={`${btn} wu-soft-bad`}
                                       onClick={() => { setRaiseModal({ machine: m }); setRaiseText(""); setRaiseDept(""); setRaiseErr(""); setRaisePart(emptyPendingJob()); }}>
                                 Report Issue
                               </button>
                             )}
                             {m.trialCertificate && canFinish && onUpdateTrialCertificate && (
-                              <button type="button" className={btn} style={{ background: "rgba(217,119,6,0.10)", border: "1px solid rgba(217,119,6,0.4)", color: "#b45309" }}
+                              <button type="button" className={`${btn} wu-soft`}
                                       onClick={() => setTrialCertModal({ machine: m, editOnly: true })}>
                                 <LeadIcon e="✎" />Certificate
                               </button>
                             )}
                             {next && canFinish && (
-                              <button data-needs-net type="button" data-staff-finish={m.id} className={btn} style={{ background: "#15803d", color: "#fff" }} onClick={() => openFinishModal(m)}>
+                              <button data-needs-net type="button" data-staff-finish={m.id} className={`${btn} wu-ok wu-main`} onClick={() => openFinishModal(m)}>
                                 ✓ Finish → {next}
                               </button>
                             )}
@@ -20191,8 +20238,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                       // 2026-11-03 — Sender Undo: the button shows itself only for the
                       // sender, within 5 min, while not yet accepted (senderUndoState).
                       return (
-                      <div key={m.id} data-sent-on={m.id} className="text-[14px] px-3 py-2 rounded-xl flex flex-col sm:flex-row sm:items-center gap-2"
-                           style={{ background: "rgba(17,24,39,0.03)", color: "var(--text-strong)" }}>
+                      <div key={m.id} data-sent-on={m.id} className="wu-sent">
                         <div className="flex-1 min-w-0">
                           <span className="font-black">{titleOf(m, h)}</span> <span style={{ color: "var(--text-dim)" }}>→ {h.toDepartment} · awaiting accept</span>
                         </div>
@@ -20214,10 +20260,10 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                       const m = (machineLog || []).find((x) => String(x.id) === String(p.machineId)) || null;
                       const stage = pendingItemStage(p);
                       return (
-                        <div key={p.id} className="mt-card no-lift p-3.5 flex flex-col gap-2.5" data-staff-job={p.id}>
+                        <div key={p.id} className="mt-card no-lift wu-card wu-job" data-staff-job={p.id}>
                           <div>
-                            <div className="text-[14px] font-black" style={{ color: "var(--text-strong)" }}>{p.description}</div>
-                            <div className="text-[13px] mt-0.5" style={{ color: "var(--text-dim)" }}>
+                            <div className="wu-title wu-title-sm">{p.description}</div>
+                            <div className="wu-meta">
                               {m ? `${m.bomKey}${m.serialNo ? ` · S/N ${m.serialNo}` : ""}` : "Machine"}
                               {(p.itemCode || p.itemName) ? ` · part ${p.itemCode || p.itemName}${p.qty != null ? ` × ${p.qty}` : ""}` : ""}
                               {p.critical ? " · CRITICAL" : ""}
@@ -20226,15 +20272,15 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                             </div>
                           </div>
                           {canJobs && (
-                            <div className="flex flex-col sm:flex-row gap-2">
+                            <div className="wu-actions">
                               {onReceivePendingItem && pendingItemIsPart(p) && canReceiveJob(p) && !p.receivedAt && (
-                                <button data-needs-net type="button" className={btn} style={{ background: "rgba(37,99,235,0.08)", border: "1px solid rgba(37,99,235,0.4)", color: "#1d4ed8" }}
+                                <button data-needs-net type="button" className={`${btn} wu-soft`}
                                         onClick={() => setJobAction({ item: p, action: "receive", notes: "", busy: false, error: "" })}>
                                   <LeadLabel text="📦 Part received" />
                                 </button>
                               )}
                               {onResolvePendingItem && !pendingItemIsPart(p) && (
-                                <button data-needs-net type="button" className={btn} style={{ background: "#15803d", color: "#fff" }}
+                                <button data-needs-net type="button" className={`${btn} wu-ok`}
                                         onClick={() => setJobAction({ item: p, action: "complete", notes: "", busy: false, error: "" })}>
                                   ✓ Work completed
                                 </button>
@@ -23154,6 +23200,21 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
               <div className="px-6 py-5 border-b border-slate-100 flex-shrink-0 bg-white">
                 <div className="text-sm font-black text-slate-900">{rackReturn ? "Finish Assembly · Return to Rack" : "Finish & Transfer"}</div>
                 <div className="text-[11px] text-slate-500 mt-0.5">{machine.bomKey}{machine.serialNo ? ` · S/N ${machine.serialNo}` : ""}{rackReturn ? ` · back to ${slotLabel(machine.rackSlot)}` : ""}</div>
+                {(() => {
+                  // World UI: required steps done so far (display only).
+                  const steps = [
+                    ...(isOverrun ? [!!narration.trim()] : []),
+                    ...(finishModal.template && Array.isArray(finishModal.answers) && finishModal.answers.length ? [validateChecklistAnswers(finishModal.answers).ok] : []),
+                    !pendingItemsProblem(finishModal.owedItems),
+                  ];
+                  const done = steps.filter(Boolean).length;
+                  return (
+                    <div className="wu-progress" data-wu-progress aria-label={`${done} of ${steps.length} steps done`}>
+                      <div className="wu-progress-track"><i style={{ transform: `scaleX(${done / steps.length})` }} /></div>
+                      <span>{done} of {steps.length} done</span>
+                    </div>
+                  );
+                })()}
               </div>
               <div className="p-5 space-y-4 flex-1 overflow-y-auto">
                 <div className="grid grid-cols-2 gap-3">
@@ -23328,6 +23389,21 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                    style={{ background: "linear-gradient(90deg,rgba(34,197,94,0.10),rgba(22,163,74,0.05))" }}>
                 <div className="text-sm font-black text-slate-900">Accept into {handover.toDepartment}</div>
                 <div className="text-[11px] text-slate-400 mt-0.5">{handover.bomKey}{handover.serialNo ? ` · S/N ${handover.serialNo}` : ""}</div>
+                {(() => {
+                  // World UI: how far along the required steps are (display only).
+                  const steps = [
+                    ...(acceptDeptEmps.length > 0 ? [selectedTeam.filter(Boolean).length > 0] : []),
+                    !!sigSvg,
+                    ...(hasChecklist ? [validateChecklistAnswers(acceptModal.checklistAnswers || []).ok] : []),
+                  ];
+                  const done = steps.filter(Boolean).length;
+                  return (
+                    <div className="wu-progress" data-wu-progress aria-label={`${done} of ${steps.length} steps done`}>
+                      <div className="wu-progress-track"><i style={{ transform: `scaleX(${steps.length ? done / steps.length : 1})` }} /></div>
+                      <span>{done} of {steps.length} done</span>
+                    </div>
+                  );
+                })()}
               </div>
               <div className="p-5 space-y-4 flex-1 overflow-y-auto">
                 {handover.overrunNarration && (

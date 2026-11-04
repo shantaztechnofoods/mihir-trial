@@ -6,7 +6,7 @@ import {
   Info, ShoppingCart, ArrowUpFromLine, Hand, Gauge, Hourglass, Users, PenLine, Receipt, Wrench, Bell,
   Search, Download, Siren, Inbox, Upload, Timer, Plus, Lock, Camera, Printer, Paperclip, Clock, User,
   MapPin, Wallet, Trophy, PartyPopper, Ruler, FolderOpen, Flag, BookOpen, CreditCard, Flame, Sparkles,
-  HardHat, BellOff, Pause, Play,
+  HardHat, BellOff, Pause, Play, AlarmClock,
 } from "lucide-react";
 
 // One professional icon set in place of emoji glyphs. The words next to the
@@ -24,6 +24,7 @@ const MAP = {
   "🖨": Printer, "🖨️": Printer, "📎": Paperclip, "🕐": Clock, "👤": User, "📍": MapPin, "💰": Wallet, "🏆": Trophy,
   "🎉": PartyPopper, "📐": Ruler, "📂": FolderOpen, "🏁": Flag, "📒": BookOpen, "💳": CreditCard, "🔥": Flame,
   "✦": Sparkles, "▶": Play, "▶️": Play, "📧": Mail, "📩": Mail, "👷": HardHat, "🔕": BellOff, "⏸": Pause, "⏸️": Pause,
+  "⏰": AlarmClock,
 };
 // Status dots: colour = meaning (red problem, amber waiting, green ok, violet rack).
 const DOTS = { "🔴": "#dc2626", "🟠": "#d97706", "🟡": "#ca8a04", "🟢": "#16a34a", "🟣": "#7c3aed" };

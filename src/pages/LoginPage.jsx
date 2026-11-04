@@ -1,4 +1,5 @@
-import React, { useRef, useState } from "react";
+import React, { Suspense, lazy, useEffect, useRef, useState } from "react";
+import { Eye, EyeOff, LogIn } from "lucide-react";
 import { useAuth } from "../auth/AuthContext.jsx";
 import BrandLogo from "../components/BrandLogo.jsx";
 
@@ -25,6 +26,31 @@ import BrandLogo from "../components/BrandLogo.jsx";
 // profile or a disabled account is shown here, on the one login screen,
 // instead of on a separate "Sign in again" page (the "duplicate login
 // screen").
+// 2026-11-04 (world UI) — new look only. The logic above the return (fields,
+// autofill guard, submit, error handling) is unchanged. The 3D scene is a
+// separate lazy chunk that starts only after the form has painted: three.js
+// rack on capable devices, the CSS-3D rack otherwise, and a still CSS rack for
+// reduced motion / low-end phones (deviceMemory <= 2, Save-Data).
+const LoginScene3D = lazy(() => import("./LoginScene3D.jsx"));
+const LoginHero = lazy(() => import("./LoginHero.jsx"));
+
+const heroMode = () => {
+  try {
+    const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const nav = navigator || {};
+    const low = (nav.deviceMemory && nav.deviceMemory <= 2) || (nav.connection && nav.connection.saveData) || (nav.hardwareConcurrency && nav.hardwareConcurrency <= 2);
+    if (reduce || low) return "still";
+    const c = document.createElement("canvas");
+    const gl = c.getContext("webgl2") || c.getContext("webgl");
+    return gl ? "webgl" : "css";
+  } catch { return "still"; }
+};
+
+// The company name comes from Settings (cached in this browser), never hard-coded.
+const cachedCompany = () => {
+  try { return String((JSON.parse(localStorage.getItem("erp_settings") || "{}") || {}).companyName || "").trim(); } catch { return ""; }
+};
+
 export default function LoginPage({ notice = "", onRetry = null }) {
   const { login } = useAuth();
   const formRef  = useRef(null);
@@ -57,68 +83,66 @@ export default function LoginPage({ notice = "", onRetry = null }) {
     }
   };
 
-  const fieldStyle = { background: "#ffffff", border: "1px solid rgba(15,23,42,0.18)", color: "#0B1220" };
-  const focusOn  = (e) => { e.target.style.borderColor = "#2E50D6"; e.target.style.boxShadow = "0 0 0 3px rgba(46,80,214,0.16)"; };
-  const focusOff = (e) => { e.target.style.borderColor = "rgba(15,23,42,0.18)"; e.target.style.boxShadow = "none"; };
+  const focusOn  = (e) => { e.target.closest(".lg-field")?.classList.add("is-focus"); };
+  const focusOff = (e) => { e.target.closest(".lg-field")?.classList.remove("is-focus"); };
+
+  // Visual only: which hero to draw, and when (after first paint + idle).
+  const [hero, setHero] = useState("");
+  useEffect(() => {
+    let done = false;
+    const go = () => { if (!done) { done = true; setHero(heroMode()); } };
+    const ric = window.requestIdleCallback;
+    const id = ric ? ric(go, { timeout: 900 }) : setTimeout(go, 250);
+    return () => { done = true; if (ric && window.cancelIdleCallback) window.cancelIdleCallback(id); else clearTimeout(id); };
+  }, []);
+  const company = cachedCompany();
+  const line = "Purchase, stock and production, on one floor.";
 
   return (
-    <div
-      data-login-screen
-      className="min-h-screen flex"
-      style={{ background: "#F4F6FA", fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}
-    >
-      {/* Brand panel — large screens only */}
-      <aside className="hidden lg:flex flex-col justify-between w-[46%] max-w-[640px] p-12 relative overflow-hidden"
-             style={{ background: "#0C1424", color: "#E6EBF5" }} aria-hidden="true">
-        <div className="absolute inset-0 pointer-events-none"
-             style={{ background: "radial-gradient(900px 500px at 0% 0%, rgba(58,91,232,0.28), transparent 60%)" }} />
-        <div className="relative">
-          <BrandLogo size={168} rounded={22} />
-          <div className="mt-5 text-[11px] font-semibold tracking-[0.2em]" style={{ color: "#8E9AB5" }}>TECHNOFOODS ERP</div>
-        </div>
-        <div className="relative max-w-[420px]">
-          <h1 className="text-[32px] leading-[1.15] font-semibold tracking-[-0.025em]" style={{ color: "#F4F7FD" }}>
-            Purchase, stock and production, on one floor.
-          </h1>
-          <ul className="mt-8 space-y-4 text-[14px]" style={{ color: "#B9C3D6" }}>
-            {["Every machine, from BOM issue to ready", "Handovers signed and recorded by department", "Stock and purchase orders always in step"].map((t) => (
-              <li key={t} className="flex items-start gap-3">
-                <span className="mt-[7px] w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#7C93FF" }} />
-                <span>{t}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-        <div className="relative text-[12px]" style={{ color: "#75829E" }}>Shantaz Technofoods — internal use only</div>
-      </aside>
+    <div data-login-screen className="lg-root">
+      {/* Stage: static steel + amber light paints at once; the 3D rack fades in over it. */}
+      <div className="lg-stage" aria-hidden="true">
+        <div className="lg-grid" />
+        <div className="lg-light" />
+        {hero && (
+          <Suspense fallback={null}>
+            {hero === "webgl"
+              ? <LoginScene3D onFail={() => setHero("css")} />
+              : <div className="lg-css3d"><LoginHero still={hero === "still"} /></div>}
+          </Suspense>
+        )}
+        <div className="lg-vignette" />
+      </div>
 
-      <main className="flex-1 flex items-center justify-center px-5 py-10">
-        <div className="w-full max-w-[380px]">
-          <div className="lg:hidden flex items-center gap-4 mb-8">
-            <BrandLogo size={88} rounded={16} />
-            <div className="text-[10px] font-semibold tracking-[0.18em]" style={{ color: "#556077" }}>TECHNOFOODS ERP</div>
-          </div>
+      <header className="lg-brand">
+        <span className="lg-logo"><BrandLogo size={64} rounded={16} /></span>
+        <div className="lg-brand-text">
+          {company && <div className="lg-company">{company}</div>}
+          <p className="lg-line" aria-label={line}>
+            {line.split(" ").map((w, i) => <span key={i} style={{ animationDelay: `${180 + i * 60}ms` }}>{w} </span>)}
+          </p>
+        </div>
+      </header>
 
-          <div className="mb-7">
-            <h2 className="text-[24px] font-semibold tracking-[-0.02em] mb-1.5" style={{ color: "#0B1220" }}>Sign in</h2>
-            <p className="text-[13px]" style={{ color: "#556077" }}>Use the username and password given to you by your administrator.</p>
+      <main className="lg-panel">
+        <div className="lg-card">
+          <div className="lg-card-head">
+            <h2 className="lg-title">Sign in</h2>
+            <p className="lg-sub">Use the username and password given to you by your administrator.</p>
           </div>
 
           {notice && (
-            <div role="status" className="mb-4 px-3.5 py-2.5 rounded-[10px] text-[12px] leading-snug"
-                 style={{ background: "rgba(217,119,6,0.08)", border: "1px solid rgba(217,119,6,0.25)", color: "#92400e" }}>
+            <div role="status" className="lg-notice">
               {notice}
               {onRetry && (
-                <button type="button" onClick={onRetry} className="ml-2 font-bold underline" style={{ color: "#92400e" }}>Retry</button>
+                <button type="button" onClick={onRetry} className="lg-retry">Retry</button>
               )}
             </div>
           )}
 
-          <form ref={formRef} onSubmit={handleSubmit} className="space-y-4" noValidate>
-            <div>
-              <label htmlFor="login-username" className="block text-[12px] font-semibold mb-1.5" style={{ color: "#33405A" }}>
-                Username
-              </label>
+          <form ref={formRef} onSubmit={handleSubmit} className="lg-form" noValidate>
+            <div className="lg-field">
+              <label htmlFor="login-username" className="lg-label">Username</label>
               <input
                 id="login-username"
                 ref={userRef}
@@ -132,18 +156,15 @@ export default function LoginPage({ notice = "", onRetry = null }) {
                 spellCheck={false}
                 autoFocus
                 onInput={() => error && setError("")}
-                className="w-full px-3.5 py-3 rounded-[10px] text-[16px] sm:text-[13px] outline-none transition-all"
-                style={fieldStyle}
+                className={`lg-input text-[16px] sm:text-[13px]${error ? " is-bad" : ""}`}
                 onFocus={focusOn}
                 onBlur={focusOff}
               />
             </div>
 
-            <div>
-              <label htmlFor="login-password" className="block text-[12px] font-semibold mb-1.5" style={{ color: "#33405A" }}>
-                Password
-              </label>
-              <div className="relative">
+            <div className="lg-field">
+              <label htmlFor="login-password" className="lg-label">Password</label>
+              <div className="lg-pw">
                 <input
                   id="login-password"
                   ref={passRef}
@@ -158,8 +179,7 @@ export default function LoginPage({ notice = "", onRetry = null }) {
                   readOnly={pwLocked}
                   onPointerDown={unlockPw}
                   onInput={() => error && setError("")}
-                  className="w-full px-3.5 py-3 pr-16 rounded-[10px] text-[16px] sm:text-[13px] outline-none transition-all"
-                  style={fieldStyle}
+                  className={`lg-input lg-input-pw text-[16px] sm:text-[13px]${error ? " is-bad" : ""}`}
                   onFocus={(e) => { unlockPw(); focusOn(e); }}
                   onBlur={focusOff}
                 />
@@ -169,35 +189,29 @@ export default function LoginPage({ notice = "", onRetry = null }) {
                   aria-label={showPw ? "Hide password" : "Show password"}
                   aria-pressed={showPw}
                   aria-controls="login-password"
-                  className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[12px] font-semibold px-2.5 rounded-lg"
-                  style={{ color: "#2640B0", minHeight: 36, minWidth: 52 }}
+                  className="lg-eye"
                 >
-                  {showPw ? "Hide" : "Show"}
+                  {showPw ? <EyeOff size={19} aria-hidden="true" /> : <Eye size={19} aria-hidden="true" />}
                 </button>
               </div>
             </div>
 
             {error && (
-              <div role="alert" className="px-3.5 py-2.5 rounded-[10px] text-[12.5px] font-medium"
-                   style={{ background: "rgba(220,38,38,0.07)", border: "1px solid rgba(220,38,38,0.2)", color: "#b91c1c" }}>
-                {error}
-              </div>
+              <div role="alert" className="lg-error">{error}</div>
             )}
 
             <button
               type="submit"
               disabled={loading}
               aria-busy={loading}
-              className="w-full py-3 rounded-[10px] text-[14px] font-semibold text-white transition-all mt-1"
-              style={{ background: loading ? "rgba(46,80,214,0.55)" : "#2E50D6", border: "1px solid #2640B0", boxShadow: loading ? "none" : "0 1px 2px rgba(15,23,42,0.12), 0 6px 14px -4px rgba(46,80,214,0.45)", cursor: loading ? "not-allowed" : "pointer", minHeight: 46 }}
+              className={`lg-submit${loading ? " is-busy" : ""}`}
             >
-              {loading ? "Signing in…" : "Sign In"}
+              {loading ? <span className="lg-spin" aria-hidden="true" /> : <LogIn size={18} aria-hidden="true" />}
+              <span>{loading ? "Signing in…" : "Sign In"}</span>
             </button>
           </form>
 
-          <p className="text-[12px] mt-8" style={{ color: "#66728B" }}>
-            Forgot your password? Ask your administrator to reset it.
-          </p>
+          <p className="lg-foot">Forgot your password? Ask your administrator to reset it.</p>
         </div>
       </main>
     </div>
