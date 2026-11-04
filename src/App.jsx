@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo, useDeferredValue } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import * as XLSX from "xlsx";
+// 2026-11-04 (fix/perf-1) — xlsx (~430 kB) loads only when a sheet is imported or exported.
+const loadXLSX = () => import("xlsx");
 // Navigation icons. Named imports so the bundler keeps only these sixteen.
 import {
   LayoutDashboard, Package, ArrowDownToLine, ArrowUpFromLine, Hourglass,
@@ -22,8 +23,9 @@ import { fetchDeptRoster, updateUserDepartments } from "./auth/authStore.js";
 import LoginPage from "./pages/LoginPage.jsx";
 import BrandLogo from "./components/BrandLogo.jsx";
 import { LeadIcon, LeadLabel } from "./components/LeadIcon.jsx";
-import UserManagementPage from "./pages/UserManagementPage.jsx";
-import RoleManagementPage from "./pages/RoleManagementPage.jsx";
+// 2026-11-04 (fix/perf-1) — admin-only pages load on first open (smaller first bundle).
+const UserManagementPage = React.lazy(() => importWithReload(() => import("./pages/UserManagementPage.jsx")));
+const RoleManagementPage = React.lazy(() => importWithReload(() => import("./pages/RoleManagementPage.jsx")));
 import AccessDeniedPage from "./components/AccessDeniedPage.jsx";
 import UserProfileMenu from "./components/UserProfileMenu.jsx";
 import PageErrorBoundary from "./components/PageErrorBoundary.jsx";
@@ -38,7 +40,7 @@ import { MobileNavContext } from "./components/PageHeader.jsx";
 import ItemSearchSelect from "./components/ItemSearchSelect.jsx";
 import VendorSearchSelect from "./components/VendorSearchSelect.jsx";
 import { appendAuditWithUser, getAuditLog, subscribeAudit } from "./auth/auditStore.js";
-import AuditHistoryPage from "./pages/AuditHistoryPage.jsx";
+const AuditHistoryPage = React.lazy(() => importWithReload(() => import("./pages/AuditHistoryPage.jsx")));
 import { isSupabaseEnabled, IS_PROD, ALLOW_DEMO } from "./config/env.js";
 import { getSupabase } from "./supabase/client.js";
 import { loadSettings, saveSettings } from "./stores/settingsStore.js";
@@ -71,6 +73,7 @@ import { reconcileTeam, pickRememberedMain, readTeamMemory, writeTeamMemory } fr
 import { useRealtimeTables } from "./realtime/useRealtimeTables.js";
 import { reconcileOpenRecord, mergeRemoteSettings, parseLocalSync } from "./realtime/liveRecord.js";
 import { monthIndex, parseDisplayDate } from "./utils/parseDate.js";
+import { isoToDisplayDate } from "./utils/parseDate.js";
 import { fetchRecentMovements, MOVEMENT_META } from "./stores/stockMovementsStore.js";
 import { sendPOWhatsApp, openVendorWhatsApp, waErrorToast } from "./utils/whatsapp.js";
 import { uploadItemMedia, MAX_UPLOAD_BYTES } from "./utils/storage.js";
@@ -78,7 +81,7 @@ import POSettings from "./components/POSettings.jsx";
 import SearchableSelect from "./components/SearchableSelect.jsx";
 import {
   PURCHASE_TYPES, PURCHASE_TYPE_BY_KEY, ITEM_GST_RATES, DEFAULT_PURCHASE_TYPE_KEY,
-  getPurchaseType, calculateGSTBreakdown, filterPurchaseTypes, todayIso,
+  getPurchaseType, calculateGSTBreakdown, filterPurchaseTypes, todayIso, poTaxLines,
 } from "./utils/gst.js";
 import { mapRow as vendorMapRow, parseRows as vendorParseRows } from "./utils/vendorImport.js";
 import { parseRows as itemParseRows, generateItemCode, buildRowsFromSheet as itemBuildRowsFromSheet } from "./utils/itemImport.js";
@@ -91,16 +94,16 @@ import { receivedPoRates, bomCostLines, bomCostSummary, validateBomLines, format
 import { VOICE_MAX_SECONDS, pickVoiceMime, baseMime, isVoiceAttachment, voiceNotesFor, formatClock, micErrorMessage, transcribeVoiceBlob, VOICE_WRITING_TEXT, VOICE_WRITE_PROMPT, tidySpoken, appendSpoken, isAppleMobile, readVoiceLang } from "./utils/voiceNote.js";
 import { PHYSICAL_RACK_LAYOUT, rackOfBom, physicalRackFamily, physicalRackSlots, rackCapacityFor, buildFamilyRacks, firstFreeSlot, canAssignSlot, slotLabel, rackKeyNorm, rackViewLog, setSlotOf, setLabel, pairSlotOf, bomFillCheck, rCrateIssues, rackBoms, freeSlotsFor, tierOfSlot } from "./utils/rackSlots.js";
 import { getActiveCompany, normalizePOSettings, openPOPdf, PO_TEMPLATE_OPTIONS } from "./utils/poTemplate.js";
-import {
-  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
-  Legend, ResponsiveContainer, RadialBarChart, RadialBar
-} from "recharts";
+// 2026-11-04 (fix/perf-1) — recharts loads on demand (Analytics / History & Reports only).
+import { ChartSlot, loadCharts } from "./components/LazyCharts.jsx";
+import { importWithReload } from "./utils/lazyImport.js";
+import { useProgressiveCount } from "./components/useProgressiveCount.js";
+import MoreRowsNote from "./components/MoreRowsNote.jsx";
 
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-04-store-1";
+const APP_BUILD = "2026-11-04-perf-1";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -891,7 +894,9 @@ function DashboardPage({ items = {}, pos = [], vendorList = [], machineLog = [],
   }, [moveSignal]);
 
   const pendingPOs  = pos.filter((p) => ["pending","review","draft"].includes(p.status));
-  const openPOValue = pos.filter((p) => p.status !== "received").reduce((s, p) => s + p.amount, 0);
+  // Open = not received and not rejected (a rejected PO will never be paid).
+  const openPOs     = pos.filter((p) => !["received", "rejected"].includes(p.status));
+  const openPOValue = openPOs.reduce((s, p) => s + (Number(p.amount) || 0), 0);
 
   const curr    = getCurrSymbol(settings.currency);
   const fmtVal  = (v) =>
@@ -951,7 +956,7 @@ function DashboardPage({ items = {}, pos = [], vendorList = [], machineLog = [],
     { label: "Total SKUs",        value: totalSKUs,                                              Icon: Boxes,        color: "#2E50D6", nav: "inventory",  sub: `${safeItems.length} safe` },
     { label: "Critical Stock",    value: criticalN,                                              Icon: AlertOctagon, color: "#b91c1c", nav: "inventory",  sub: `${warningItems.length} warning`,  alert: criticalN > 0 },
     { label: "Pending POs",       value: pendingPOs.length,                                      Icon: AlertTriangle,color: "#b45309", nav: "pipeline",   sub: "awaiting approval",               alert: pendingPOs.length > 0 },
-    { label: "Open PO Value",     value: fmtVal(openPOValue),                                    Icon: Wallet,       color: "#15803d", nav: "pipeline",   sub: `${pos.filter(p=>p.status!=="received").length} open` },
+    { label: "Open PO Value",     value: fmtVal(openPOValue),                                    Icon: Wallet,       color: "#15803d", nav: "pipeline",   sub: `${openPOs.length} open` },
     { label: "In Production",     value: machineLog.filter((m) => m.status === "active" && m.stage !== "BOM Issued").length, Icon: Cog, color: "#2640B0", nav: "machines",   sub: "machines active" },
     { label: "Machines Ready",    value: machineLog.filter((m) => m.status === "completed").length, Icon: CircleCheckBig, color: "#15803d", nav: "machines", sub: "completed" },
     { label: "Pending Materials", value: pendingLog.length,                                      Icon: Hourglass,    color: "#b45309", nav: "pending",    sub: "items pending",                   alert: pendingLog.length > 0 },
@@ -2182,7 +2187,7 @@ function ItemDetailModal({ item, category, onClose, onDelete, onUpdateStock, onE
 
 // ─── ADD ITEM MODAL ───────────────────────────────────────────────────────────
 
-function AddItemModal({ machines, onSave, onClose, initialValues = null, vendorList = [], existingCodes = [] }) {
+function AddItemModal({ machines, onSave, onClose, initialValues = null, vendorList = [], existingCodes = [], codeLockReason = "" }) {
   const isEdit = Boolean(initialValues);
   useEffect(() => {
     const h = (e) => { if (e.key === "Escape") onClose(); };
@@ -2336,6 +2341,10 @@ function AddItemModal({ machines, onSave, onClose, initialValues = null, vendorL
       const c = form.code.trim().toUpperCase();
       const own = isEdit ? String(initialValues.code || "").toUpperCase() : null;
       if (c !== own && existingCodes.includes(c)) e.code = `Code ${c} is already used by another item`;
+      // BOM lines, pending shortfalls and open POs point at an item by its
+      // code. Renaming the code left them pointing at nothing: the BOM showed
+      // the part as missing and its shortfall could never be issued again.
+      else if (isEdit && codeLockReason && c !== own) e.code = `Code cannot change — ${codeLockReason}`;
     }
     if (form.stock === "" || isNaN(Number(form.stock)))  e.stock = "Enter a valid number";
     else if (!isEdit && Number(form.stock) < 0)          e.stock = "Stock cannot be negative";
@@ -2345,13 +2354,18 @@ function AddItemModal({ machines, onSave, onClose, initialValues = null, vendorL
     return Object.keys(e).length === 0;
   };
 
+  // A second Save tap while the first write was still running created the
+  // item twice (local) or hit a duplicate-key alert (Supabase).
+  const savingRef = useRef(false);
   const handleSave = () => {
+    if (savingRef.current) return;
     if (!validate()) return;
     const stock = Number(form.stock);
     const min   = Number(form.min);
     const preferredLink = vendorLinks.find((l) => l.role === "Preferred") || vendorLinks[0];
     const primaryVendor = preferredLink ? vendorList.find((v) => v.id === preferredLink.vendorId) : null;
-    onSave(form.machine, {
+    savingRef.current = true;
+    Promise.resolve(onSave(form.machine, {
       code:             form.code.toUpperCase().trim(),
       name:             form.name.trim(),
       unit:             form.unit || "Nos",
@@ -2381,7 +2395,7 @@ function AddItemModal({ machines, onSave, onClose, initialValues = null, vendorL
         const d = cpDraft.trim();
         return d && !checkPoints.includes(d) ? [...checkPoints, d] : checkPoints;
       })(),
-    });
+    })).finally(() => { savingRef.current = false; });
   };
 
   const nameRef  = useRef(null);
@@ -2914,6 +2928,7 @@ function ItemImportModal({ items, onImport, onClose }) {
     setError(""); setRows(null); setFileName(file.name);
     try {
       const data = await file.arrayBuffer();
+      const XLSX = await loadXLSX();
       const wb   = XLSX.read(data, { type: "array" });
       const ws   = wb.Sheets[wb.SheetNames[0]];
 
@@ -3378,8 +3393,11 @@ function InventoryPage({ items, setItems, handleUpdateStock, pos = [], inwardLog
   // was the bottleneck the audit flagged: every render walked the full list
   // four times (filter, sort, alerts, filteredVal). Now each only re-runs when
   // its real dependencies change.
+  // 2026-11-04 (fix/perf-1) — the box shows every key at once; the table
+  // follows a moment later (useDeferredValue) so typing never waits for it.
+  const deferredSearch = useDeferredValue(search);
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = deferredSearch.trim().toLowerCase();
     return allItems.filter((i) => {
       if (statusFilter !== "all" && i.status !== statusFilter) return false;
       if (catFilter !== "all" && i.category !== catFilter)    return false;
@@ -3388,7 +3406,7 @@ function InventoryPage({ items, setItems, handleUpdateStock, pos = [], inwardLog
                !(i.location || "").toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [allItems, search, statusFilter, catFilter]);
+  }, [allItems, deferredSearch, statusFilter, catFilter]);
 
   const sorted = useMemo(() => {
     return [...filtered].sort((a, b) => {
@@ -3415,6 +3433,8 @@ function InventoryPage({ items, setItems, handleUpdateStock, pos = [], inwardLog
   };
 
   const alerts      = useMemo(() => allItems.filter((i) => i.status !== "safe"), [allItems]);
+  // 2026-11-04 (fix/perf-1) — draw the table in slices (150 rows, more on scroll).
+  const masterRows = useProgressiveCount(sorted.length, `${deferredSearch}|${statusFilter}|${catFilter}|${sortCol}|${sortDir}`);
   const filteredVal = useMemo(() => sorted.reduce((s, i) => s + (i.stock * (i.lastPurchaseRate || 0)), 0), [sorted]);
   const filtersActive = search || statusFilter !== "all" || catFilter !== "all";
   const clearFilters  = () => { setSearch(""); setStatusFilter("all"); setCatFilter("all"); };
@@ -3571,7 +3591,16 @@ function InventoryPage({ items, setItems, handleUpdateStock, pos = [], inwardLog
       )}
       {editingItem && canDo("inventory","edit") && (
         <AddItemModal machines={machines} onSave={handleSaveEdit} onClose={() => setEditingItem(null)}
-                      initialValues={{ ...editingItem.item, machine: editingItem.category }} vendorList={vendorList} existingCodes={allCodes} />
+                      initialValues={{ ...editingItem.item, machine: editingItem.category }} vendorList={vendorList} existingCodes={allCodes}
+                      codeLockReason={(() => {
+                        const code = editingItem.item.code;
+                        const boms = Object.entries(bomDefs).filter(([, d]) => (d.items || []).some((m) => m.code === code)).map(([k]) => k);
+                        if (boms.length) return `used in BOM ${boms.join(", ")}`;
+                        if (pendingLog.some((p) => p.code === code)) return "it has open pending stock";
+                        const po = pos.find((p) => !["rejected", "received"].includes(p.status) && (p.lineItems || []).some((li) => li.code === code));
+                        if (po) return `it is on open purchase order ${po.id}`;
+                        return "";
+                      })()} />
       )}
       {quickAdjust && (
         <QuickStockModal item={quickAdjust.item} mode={quickAdjust.mode}
@@ -3644,9 +3673,10 @@ function InventoryPage({ items, setItems, handleUpdateStock, pos = [], inwardLog
       )}
 
       <Topbar title="Item Master" subtitle="Unified inventory across all categories">
-        <Btn variant="ghost" size="sm" onClick={() => {
+        <Btn variant="ghost" size="sm" onClick={async () => {
           // Was a dead button. Exports what the table shows (filters + sort applied).
           if (!sorted.length) { alert("Nothing to export for current filters."); return; }
+          const XLSX = await loadXLSX();
           const ws = XLSX.utils.json_to_sheet(sorted.map((i) => ({ Code: i.code, Name: i.name, Category: i.category, Unit: i.unit, Stock: i.stock, Min: i.min, "Rate ₹": i.lastPurchaseRate || 0, Status: i.status, Critical: i.isCritical ? "Yes" : "", Vendor: i.vendor || "", Location: i.location || "" })));
           const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Items");
           XLSX.writeFile(wb, `item-master-${new Date().toISOString().slice(0, 10)}.xlsx`);
@@ -3814,7 +3844,7 @@ function InventoryPage({ items, setItems, handleUpdateStock, pos = [], inwardLog
                       {filtersActive && <button onClick={clearFilters} className="text-blue-600 font-bold ml-1 hover:underline">Clear filters</button>}
                     </td>
                   </tr>
-                ) : sorted.map((item) => {
+                ) : sorted.slice(0, masterRows.shown).map((item) => {
                   const cfg      = statusConfig[item.status];
                   const stockPct = item.min > 0 ? Math.min((item.stock / item.min) * 100, 100) : 0;
                   const barColor = item.status === "critical" ? "#ef4444" : item.status === "warning" ? "#D97706" : "#22c55e";
@@ -3885,6 +3915,13 @@ function InventoryPage({ items, setItems, handleUpdateStock, pos = [], inwardLog
                     </tr>
                   );
                 })}
+                {masterRows.more > 0 && (
+                  <tr ref={masterRows.sentinelRef} data-more-rows={masterRows.more}>
+                    <td colSpan={11} className="px-4 py-3 text-center text-[11px]" style={{ color: "var(--text-muted)" }}>
+                      <MoreRowsNote rows={masterRows} />
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -4680,7 +4717,7 @@ function PODetailModal({ po, onClose, onApprove, onMarkOrdered, onMarkReceived, 
                 </table>
               </div>
               <div className="mt-2 px-3 flex justify-between text-[10px]">
-                <span className="text-slate-500">GST (18%): ₹{(po.gst || 0).toLocaleString("en-IN")}</span>
+                <span className="text-slate-500">{poTaxLines(po).map((t) => `${t.label}: ₹${t.amount.toLocaleString("en-IN")}`).join(" · ")}</span>
                 <span className="font-bold text-green-700">Total: ₹{po.amount.toLocaleString("en-IN")}</span>
               </div>
             </div>
@@ -4761,12 +4798,12 @@ function PurchasePage({ pos, vendorList, items, onCreatePO, onUpdatePO, onReceiv
 
   const filtered = pos.filter((po) => {
     const q = search.toLowerCase();
-    const matchSearch = po.id.toLowerCase().includes(q) || po.vendor.toLowerCase().includes(q);
+    const matchSearch = String(po.id || "").toLowerCase().includes(q) || String(po.vendor || "").toLowerCase().includes(q);
     const matchFilter = filter === "all" || po.status === filter;
     return matchSearch && matchFilter;
   });
 
-  const totalAmt  = pos.filter((p) => !["received"].includes(p.status)).reduce((s, p) => s + p.amount, 0);
+  const totalAmt  = pos.filter((p) => !["received", "rejected"].includes(p.status)).reduce((s, p) => s + (Number(p.amount) || 0), 0);
   const overdueN  = pos.filter((p) => p.status === "overdue").length;
   const receivedN = pos.filter((p) => p.status === "received").length;
   const pendingN  = pos.filter((p) => ["pending","review","draft"].includes(p.status)).length;
@@ -4934,6 +4971,7 @@ function VendorImportModal({ vendorList, onImport, onClose }) {
     setError(""); setRows(null); setFileName(file.name);
     try {
       const data  = await file.arrayBuffer();
+      const XLSX  = await loadXLSX();
       const wb    = XLSX.read(data, { type: "array" });
       const ws    = wb.Sheets[wb.SheetNames[0]];
       const raw   = XLSX.utils.sheet_to_json(ws, { defval: "" });
@@ -5121,7 +5159,7 @@ function VendorImportModal({ vendorList, onImport, onClose }) {
 
 // ─── VENDOR MODAL ─────────────────────────────────────────────────────────────
 
-function VendorModal({ initialVendor, onSave, onClose }) {
+function VendorModal({ initialVendor, onSave, onClose, existingNames = [] }) {
   const isEdit = Boolean(initialVendor);
   useEffect(() => {
     const h = (e) => { if (e.key === "Escape") onClose(); };
@@ -5140,6 +5178,14 @@ function VendorModal({ initialVendor, onSave, onClose }) {
   const handleSave = () => {
     const e = {};
     if (!form.name.trim())  e.name  = "Required";
+    // POs, item links and vendor stats find a vendor by its NAME, so two
+    // vendors with the same name got their POs and totals mixed together.
+    else {
+      const key = (s) => String(s || "").trim().replace(/\s+/g, " ").toLowerCase();
+      const own = isEdit ? key(initialVendor.name) : null;
+      if (key(form.name) !== own && existingNames.some((n) => key(n) === key(form.name)))
+        e.name = `A vendor named "${form.name.trim()}" already exists`;
+    }
     setErrors(e);
     if (Object.keys(e).length) return;
     const id = initialVendor?.id || `V${String(Date.now()).slice(-4)}`;
@@ -5339,6 +5385,7 @@ function VendorsPage({ vendorList, pos, items, onAddVendor, onEditVendor, onDele
       {showModal && (
         <VendorModal
           initialVendor={editingVendor}
+          existingNames={vendorList.map((v) => v.name)}
           onSave={(data) => {
             if (editingVendor) { onEditVendor(data); showToast(`${data.name} updated`); }
             else               { onAddVendor(data);  showToast(`${data.name} added`);   }
@@ -5973,6 +6020,7 @@ function AnalyticsPage({ items, pos, vendorList, settings = SETTINGS_DEFAULTS })
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="section-card p-5">
             <SectionHeader><LeadIcon e="📊" />PO Value by Month (₹K)</SectionHeader>
+            <ChartSlot height={220}>{({ ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip }) => (
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={monthlyPOTrend.length > 0 ? monthlyPOTrend : monthlyPOData} barSize={28}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(17,24,39,0.08)" />
@@ -5982,10 +6030,12 @@ function AnalyticsPage({ items, pos, vendorList, settings = SETTINGS_DEFAULTS })
                 <Bar dataKey="value" name="PO Value (₹K)" fill="#2E50D620" stroke="#2E50D6" strokeWidth={1.5} radius={[3, 3, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
+            )}</ChartSlot>
           </div>
 
           <div className="section-card p-5">
             <SectionHeader><LeadIcon e="📈" />Inventory Turnover Rate</SectionHeader>
+            <ChartSlot height={220}>{({ ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip }) => (
             <ResponsiveContainer width="100%" height={220}>
               <AreaChart data={turnoverData}>
                 <defs>
@@ -6001,6 +6051,7 @@ function AnalyticsPage({ items, pos, vendorList, settings = SETTINGS_DEFAULTS })
                 <Area type="monotone" dataKey="rate" name="Turnover" stroke="#a78bfa" fill="url(#tGrad)" strokeWidth={2} dot={{ fill: "#a78bfa", r: 4 }} />
               </AreaChart>
             </ResponsiveContainer>
+            )}</ChartSlot>
           </div>
         </div>
 
@@ -6009,6 +6060,7 @@ function AnalyticsPage({ items, pos, vendorList, settings = SETTINGS_DEFAULTS })
             <SectionHeader><LeadIcon e="🥧" />Spend by Category</SectionHeader>
             {spendByCat.length > 0 ? (
               <>
+                <ChartSlot height={180}>{({ ResponsiveContainer, PieChart, Pie, Cell, Tooltip }) => (
                 <ResponsiveContainer width="100%" height={180}>
                   <PieChart>
                     <Pie data={spendByCat} cx="50%" cy="50%" innerRadius={45} outerRadius={70} dataKey="value" stroke="none">
@@ -6017,6 +6069,7 @@ function AnalyticsPage({ items, pos, vendorList, settings = SETTINGS_DEFAULTS })
                     <Tooltip content={<CustomTooltip />} />
                   </PieChart>
                 </ResponsiveContainer>
+                )}</ChartSlot>
                 <div className="flex flex-wrap gap-x-3 gap-y-1.5 justify-center mt-2">
                   {spendByCat.map((d) => (
                     <div key={d.name} className="flex items-center gap-1.5 text-[11px]" style={{ color: "var(--text-muted)" }}>
@@ -6037,6 +6090,7 @@ function AnalyticsPage({ items, pos, vendorList, settings = SETTINGS_DEFAULTS })
           <div className="section-card p-5">
             <SectionHeader><LeadIcon e="🏭" />Vendor-wise PO Count</SectionHeader>
             {vendorPOData.length > 0 ? (
+              <ChartSlot height={220}>{({ ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip }) => (
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={vendorPOData} layout="vertical" barSize={14}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(17,24,39,0.08)" />
@@ -6046,6 +6100,7 @@ function AnalyticsPage({ items, pos, vendorList, settings = SETTINGS_DEFAULTS })
                   <Bar dataKey="count" name="PO Count" fill="#22c55e20" stroke="#22c55e" strokeWidth={1.5} radius={[0, 3, 3, 0]} />
                 </BarChart>
               </ResponsiveContainer>
+              )}</ChartSlot>
             ) : (
               <div className="h-[220px] flex flex-col items-center justify-center gap-1 text-center">
                 <div className="text-2xl" style={{ opacity: 0.45 }}>🏭</div>
@@ -6056,6 +6111,7 @@ function AnalyticsPage({ items, pos, vendorList, settings = SETTINGS_DEFAULTS })
 
           <div className="section-card p-5">
             <SectionHeader><LeadIcon e="📉" />Stock Status</SectionHeader>
+            <ChartSlot height={180}>{({ ResponsiveContainer, PieChart, Pie, Cell, Tooltip }) => (
             <ResponsiveContainer width="100%" height={180}>
               <PieChart>
                 <Pie data={stockDist} cx="50%" cy="50%" innerRadius={45} outerRadius={70} dataKey="value" stroke="none">
@@ -6064,6 +6120,7 @@ function AnalyticsPage({ items, pos, vendorList, settings = SETTINGS_DEFAULTS })
                 <Tooltip content={<CustomTooltip />} />
               </PieChart>
             </ResponsiveContainer>
+            )}</ChartSlot>
             <div className="space-y-2 mt-3">
               {stockDist.map((d) => (
                 <div key={d.name} className="flex items-center gap-2 text-xs">
@@ -9925,7 +9982,8 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
   const receivedPOs  = pos.filter(p => p.status === "received").sort((a, b) => parseDate(b.receivedDate||b.date) - parseDate(a.receivedDate||a.date));
 
   const enrichedFU    = followUps.map(f => {
-    const diff  = Math.floor((parseDate(f.nextFollowUp) - today) / 86400000);
+    // isoToDisplayDate heals rows saved with a raw "yyyy-mm-dd" custom date.
+    const diff  = Math.floor((parseDate(isoToDisplayDate(f.nextFollowUp)) - today) / 86400000);
     return { ...f, daysRemaining: diff, fstat: diff < 0 ? "fu-overdue" : diff === 0 ? "fu-due" : "fu-pending" };
   }).sort((a,b) => a.daysRemaining - b.daysRemaining);
 
@@ -9938,12 +9996,12 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
   const handleConfirm = () => {
     if (!eta) return;
     const d = new Date(); d.setDate(d.getDate() + +eta);
-    onConfirmOrder(moModal.id, eta === "custom" ? etaCustom : fmtDate(d));
+    onConfirmOrder(moModal.id, eta === "custom" ? isoToDisplayDate(etaCustom) : fmtDate(d));
     setMoModal(null); setEta(""); setEtaCustom("");
   };
   const handleFuDone = () => {
     const d = new Date(); d.setDate(d.getDate() + (fuFreq === "custom" ? 0 : fuFreq));
-    onFollowUpDone(fuModal.id, fuFreq, fuFreq === "custom" ? fuCustom : fmtDate(d));
+    onFollowUpDone(fuModal.id, fuFreq, fuFreq === "custom" ? isoToDisplayDate(fuCustom) : fmtDate(d));
     setFuModal(null); setFuFreq(1); setFuCustom("");
   };
   const handleReceive = (poId) => {
@@ -10299,11 +10357,11 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
                       </div>
                       <div>
                         <div className="text-slate-600 mb-0.5">ETA</div>
-                        <div className="font-bold text-slate-500">{f.eta||"—"}</div>
+                        <div className="font-bold text-slate-500">{isoToDisplayDate(f.eta)||"—"}</div>
                       </div>
                       <div>
                         <div className="text-slate-600 mb-0.5">Next Follow-up</div>
-                        <div className="font-bold text-purple-300">{f.nextFollowUp}</div>
+                        <div className="font-bold text-purple-300">{isoToDisplayDate(f.nextFollowUp)}</div>
                       </div>
                       {f.lastFollowUp && (
                         <div>
@@ -10532,7 +10590,7 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
                   <div className="grid gap-y-1.5 text-[10.5px]" style={{ gridTemplateColumns:"auto 1fr" }}>
                     <span className="text-slate-500 pr-3">PO Number</span><span className="font-mono font-bold text-slate-900">{viewPO.id}</span>
                     <span className="text-slate-500 pr-3">Date</span><span className="font-semibold text-slate-500">{viewPO.date}</span>
-                    <span className="text-slate-500 pr-3">ETA</span><span className="font-semibold text-slate-500">{viewPO.eta || viewPO.delivery || "—"}</span>
+                    <span className="text-slate-500 pr-3">ETA</span><span className="font-semibold text-slate-500">{isoToDisplayDate(viewPO.eta) || viewPO.delivery || "—"}</span>
                     <span className="text-slate-500 pr-3">Priority</span>
                     <span className={`font-bold uppercase text-[9px] ${viewPO.priority==="urgent"?"text-red-400":viewPO.priority==="high"?"text-amber-700":"text-slate-400"}`}>{viewPO.priority||"normal"}</span>
                     <span className="text-slate-500 pr-3">Items</span><span className="font-semibold text-slate-500">{viewPO.lineItems?.length||0} line items</span>
@@ -10579,10 +10637,12 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
                         <span className="text-slate-500">Subtotal</span>
                         <span className="font-mono font-semibold text-slate-500">₹{subtotal.toLocaleString("en-IN")}</span>
                       </div>
-                      <div className="flex justify-between px-3 py-1.5 text-[10px]">
-                        <span className="text-slate-500">GST (18%)</span>
-                        <span className="font-mono font-semibold text-amber-700">₹{poGst.toLocaleString("en-IN")}</span>
-                      </div>
+                      {poTaxLines(viewPO).map((t) => (
+                        <div key={t.key} data-po-tax={t.key} className="flex justify-between px-3 py-1.5 text-[10px]">
+                          <span className="text-slate-500">{t.label}</span>
+                          <span className="font-mono font-semibold text-amber-700">₹{t.amount.toLocaleString("en-IN")}</span>
+                        </div>
+                      ))}
                       <div className="flex justify-between px-3 py-2.5" style={{ borderTop:"1px solid rgba(17,24,39,0.06)" }}>
                         <span className="text-[12px] font-bold text-slate-900">Grand Total</span>
                         <span className="text-[13px] font-black font-mono text-green-400">₹{poTotal.toLocaleString("en-IN")}</span>
@@ -10917,10 +10977,12 @@ function InwardPage({ items, handleUpdateStock, vendorList, onInwardComplete, on
   const [errors,       setErrors]       = useState({});
   const [submitting,   setSubmitting]   = useState(false);
 
-  const allFlatItems = Object.entries(items).flatMap(([cat, list]) =>
+  // 2026-11-04 (fix/perf-1) — flatten once per items change, not on every keystroke.
+  const allFlatItems = useMemo(() => Object.entries(items).flatMap(([cat, list]) =>
     list.map((item) => ({ ...item, category: cat }))
-  );
+  ), [items]);
   const selectedItem = allFlatItems.find((i) => i.code === selectedCode);
+  const inwardLogRows = useProgressiveCount(appInwardLog.length, "inward-log");
   const parsedQty    = parseStoreQty(qty);
   const newStock     = selectedItem && parsedQty > 0 ? roundQty(selectedItem.stock + parsedQty) : null;
 
@@ -10978,9 +11040,10 @@ function InwardPage({ items, handleUpdateStock, vendorList, onInwardComplete, on
       )}
 
       <Topbar title="Inward" subtitle="Goods receipt & stock addition">
-        <Btn variant="ghost" size="sm" onClick={() => {
+        <Btn variant="ghost" size="sm" onClick={async () => {
           // Was a dead button.
           if (!appInwardLog.length) { alert("No inward entries to export yet."); return; }
+          const XLSX = await loadXLSX();
           const ws = XLSX.utils.json_to_sheet(appInwardLog.map((e) => ({ Date: e.date, Code: e.code, Item: e.item, Qty: e.qty, Unit: e.unit, Vendor: e.vendor, Notes: e.notes, PO: e.fromPO || "" })));
           const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Inward");
           XLSX.writeFile(wb, `inward-log-${new Date().toISOString().slice(0, 10)}.xlsx`);
@@ -11012,7 +11075,7 @@ function InwardPage({ items, handleUpdateStock, vendorList, onInwardComplete, on
             <div>
               <ILabel text="Select Item" req />
               <ItemSearchSelect
-                items={Object.entries(items).flatMap(([cat, list]) => list.map((it) => ({ ...it, category: cat })))}
+                items={allFlatItems}
                 value={selectedCode}
                 onChange={setSelectedCode}
                 showStock={true}
@@ -11138,7 +11201,7 @@ function InwardPage({ items, handleUpdateStock, vendorList, onInwardComplete, on
                     </tr>
                   </thead>
                   <tbody>
-                    {combined.map((entry) => (
+                    {combined.slice(0, inwardLogRows.shown).map((entry) => (
                       <tr key={entry.id} className={`border-b border-slate-200 hover:bg-transparent transition-colors ${entry.fromPO ? "bg-green-500/[0.02]" : ""}`}>
                         <td className="px-4 py-2 text-[10px] text-slate-500 font-mono">{entry.date}</td>
                         <td className="px-4 py-2 text-[10px] text-slate-400">
@@ -11151,6 +11214,11 @@ function InwardPage({ items, handleUpdateStock, vendorList, onInwardComplete, on
                         <td className="px-4 py-2 text-[10px] text-slate-500">{entry.notes}</td>
                       </tr>
                     ))}
+                    {inwardLogRows.more > 0 && (
+                      <tr ref={inwardLogRows.sentinelRef} data-more-rows={inwardLogRows.more}>
+                        <td colSpan={6} className="px-4 py-3 text-center text-[11px] text-slate-500"><MoreRowsNote rows={inwardLogRows} /></td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -16219,8 +16287,9 @@ function ReportCenterPage({
     .filter((r) => !machineFilter || machineMatches((machineLog || []).find((m) => m.id === r.machineId) || {}));
 
   // ── Export helpers (xlsx is already a dep) ──
-  const downloadWorkbook = (rows, filename, sheetName = "Report") => {
+  const downloadWorkbook = async (rows, filename, sheetName = "Report") => {
     if (!rows || rows.length === 0) { alert("Nothing to export for current filters."); return; }
+    const XLSX = await loadXLSX();
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, sheetName.slice(0, 31));
@@ -19951,10 +20020,10 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
   // 2026-11-01 — Escape closes the top-most popup, in the same order they
   // stack on screen; a popup that is saving ignores it, like its Cancel.
   // Declared after every popup's state so its dependency list is initialised.
-  useEffect(() => {
-    const onKey = (e) => {
-      if (e.key !== "Escape") return;
-      const steps = [
+  // 2026-11-04 (MT audit) — the same list closes the top-most popup on the
+  // phone's Back button (below), so Back never throws a worker out of the
+  // ERP with a half-filled Accept / Finish screen.
+  const popupSteps = () => [
         [startChk,           () => !startChk?.busy && setStartChk(null)],
         [jobAction,          () => !jobAction?.busy && setJobAction(null)],
         [reportMachineId,    () => setReportMachineId(null)],
@@ -19968,19 +20037,40 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
         [removeRackConfirm,  () => setRemoveRackConfirm(null)],
         [pullBack,           () => !pullBack?.busy && setPullBack(null)],
         [undoAsk,            () => !undoAsk?.busy && setUndoAsk(null)],
+        [holdModal,          () => !holdModal?.busy && setHoldModal(null)],
+        [deleteModal,        () => !deleteModal?.busy && setDeleteModal(null)],
         [raiseModal,        () => !raiseBusy && setRaiseModal(null)],
         [jobsDrawer,         () => setJobsDrawer(null)],
         [rackPanel,          () => setRackPanel(null)],
         [issuePopup,         () => setIssuePopup(null)],
         [showCalled,         () => setShowCalled(false)],
+        [myDashOpen,         () => setMyDashOpen(false)],
       ];
-      const top = steps.find(([open]) => !!open);
-      if (top) { e.stopPropagation(); top[1](); }
+  const closeTopPopupRef = useRef(null);
+  closeTopPopupRef.current = () => { const top = popupSteps().find(([open]) => !!open); if (top) top[1](); return !!top; };
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key !== "Escape") return;
+      if (closeTopPopupRef.current()) e.stopPropagation();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [jobAction, reportMachineId, reportDoc, reportsMenu, trialCertModal, trialCertViewModal, finishModal, transferBusy, acceptModal, duringWorkModal, startChk,
-      removeRackConfirm, pullBack, undoAsk, raiseModal, raiseBusy, jobsDrawer, rackPanel, issuePopup, showCalled]);
+  }, []);
+  // Back button: while a popup is open there is one extra history entry; Back
+  // pops it and closes the top popup (a popup that is saving stays, and the
+  // entry is pushed again). No URL change, nothing else in history.
+  const anyPopupOpen = popupSteps().some(([open]) => !!open);
+  const [backArmed, setBackArmed] = useState(false);
+  useEffect(() => {
+    if (!anyPopupOpen || backArmed) return;
+    try { window.history.pushState({ erpPopup: 1 }, ""); } catch { /* ignore */ }
+    setBackArmed(true);
+  }, [anyPopupOpen, backArmed]);
+  useEffect(() => {
+    const onPop = () => { setBackArmed(false); closeTopPopupRef.current(); };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
   // 2026-11-04 (fix/live-sync) — an open popup holds the machine / hand-over /
   // pending job it was opened for. When someone else changes that record (live
   // update), the popup shows the fresh copy; if the change makes the popup's
@@ -24892,8 +24982,11 @@ function inDateRange(dateStr, from, to) {
 function fmtTs(iso) {
   if (!iso) return "—";
   const d = new Date(iso);
-  return d.toLocaleString("en-IN", { day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" });
+  // 2026-11-04 (fix/perf-1) — one shared formatter (same output as toLocaleString
+  // with these options); building a new one per row cost ~0.2 s on 5,000 rows.
+  return isNaN(d.getTime()) ? "Invalid Date" : FMT_TS.format(d);
 }
+const FMT_TS = new Intl.DateTimeFormat("en-IN", { day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" });
 
 function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, machineLog, items, vendorList, bomDefs, settings = {} }) {
   const [tab,           setTab]           = useState("activity");
@@ -25172,6 +25265,12 @@ function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, machine
 
   const CARD_STYLE = { background: "rgba(17,24,39,0.03)", border: "1px solid rgba(17,24,39,0.06)", borderRadius: 12 };
 
+  // 2026-11-04 (fix/perf-1) — long History lists draw in slices (150 rows, more
+  // on scroll). Filters, counts and every export still use the full lists.
+  const hpKey = `${tab}|${search}|${dateFrom}|${dateTo}|${vendorFilter}|${itemFilter}|${machineFilter}|${serialFilter}`;
+  const hpActivity = useProgressiveCount(activityRows.length, hpKey);
+  const hpInv      = useProgressiveCount(invRows.length, hpKey);
+  const hpStock    = useProgressiveCount(stockReportExport.length, hpKey);
   return (
     <div className="hr-page flex-1 overflow-y-auto flex flex-col min-h-0">
       <Topbar title="History & Reports" subtitle="Permanent audit trail — all ERP activity" />
@@ -25222,7 +25321,7 @@ function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, machine
               <div className="text-center py-20 text-slate-600 text-sm">No activity recorded yet. Start using the ERP to see entries here.</div>
             ) : (
               <div className="space-y-1">
-                {activityRows.map((a) => {
+                {activityRows.slice(0, hpActivity.shown).map((a) => {
                   const meta = AUDIT_META[a.type] || { label: a.type, icon: "•", color: "#64748b" };
                   return (
                     <div key={a.id} className="flex items-start gap-3 px-4 py-3 rounded-xl hover:bg-transparent transition-all" style={CARD_STYLE}>
@@ -25248,6 +25347,7 @@ function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, machine
                     </div>
                   );
                 })}
+                {hpActivity.more > 0 && <div ref={hpActivity.sentinelRef} data-more-rows={hpActivity.more} className="px-4 py-3 text-center text-[11px] text-slate-500"><MoreRowsNote rows={hpActivity} /></div>}
               </div>
             )}
           </div>
@@ -25395,7 +25495,7 @@ function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, machine
                      style={{ gridTemplateColumns:"90px 130px 50px 90px 1fr 70px 60px 120px 120px", background:"rgba(17,24,39,0.03)", borderBottom:"1px solid rgba(17,24,39,0.06)" }}>
                   <div>Date</div><div>Type</div><div>Dir</div><div>Code</div><div>Item</div><div className="text-right">Qty</div><div>Unit</div><div>Vendor</div><div>Reference</div>
                 </div>
-                {invRows.map((r, i) => {
+                {invRows.slice(0, hpInv.shown).map((r, i) => {
                   const isIn = r.direction === "+";
                   return (
                     <div key={i} className="grid items-center px-4 py-2.5 text-xs hover:bg-transparent transition-all"
@@ -25412,6 +25512,7 @@ function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, machine
                     </div>
                   );
                 })}
+                {hpInv.more > 0 && <div ref={hpInv.sentinelRef} data-more-rows={hpInv.more} className="px-4 py-3 text-center text-[11px] text-slate-500"><MoreRowsNote rows={hpInv} /></div>}
               </div>
             )}
           </div>
@@ -25440,7 +25541,7 @@ function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, machine
                     </tr>
                   </thead>
                   <tbody>
-                    {stockReportExport.map((r, i) => (
+                    {stockReportExport.slice(0, hpStock.shown).map((r, i) => (
                       <tr key={r.code || i} className="hover:bg-transparent transition-all" style={{ borderTop:"1px solid rgba(17,24,39,0.04)" }}>
                         {stockReportCols.map((c) => (
                           <td key={c.key} className={`px-3 py-2 whitespace-nowrap ${c.key==="code"?"font-mono text-slate-400 text-[10px]":"text-slate-500"}`}>
@@ -25451,6 +25552,7 @@ function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, machine
                         ))}
                       </tr>
                     ))}
+                    {hpStock.more > 0 && <tr ref={hpStock.sentinelRef} data-more-rows={hpStock.more}><td colSpan={99} className="px-3 py-3 text-center text-[11px] text-slate-500"><MoreRowsNote rows={hpStock} /></td></tr>}
                   </tbody>
                 </table>
               </div>
@@ -25712,6 +25814,7 @@ function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, machine
               <div className="rounded-xl p-4" style={CARD_STYLE}>
                 <div className="text-xs font-bold text-slate-900 mb-3">Monthly Purchase Value (₹)</div>
                 {monthlyPurchase.length === 0 ? <div className="text-center text-slate-600 py-8 text-xs">No data</div> : (
+                  <ChartSlot height={180}>{({ ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip }) => (
                   <ResponsiveContainer width="100%" height={180}>
                     <AreaChart data={monthlyPurchase} margin={{top:4,right:4,left:0,bottom:4}}>
                       <defs><linearGradient id="hrPG" x1="0" y1="0" x2="0" y2="1"><stop offset="10%" stopColor="#2E50D6" stopOpacity={0.25}/><stop offset="95%" stopColor="#2E50D6" stopOpacity={0}/></linearGradient></defs>
@@ -25722,6 +25825,7 @@ function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, machine
                       <Area type="monotone" dataKey="amount" stroke="#2E50D6" strokeWidth={2} fill="url(#hrPG)" name="Amount ₹" />
                     </AreaChart>
                   </ResponsiveContainer>
+                  )}</ChartSlot>
                 )}
               </div>
 
@@ -25729,6 +25833,7 @@ function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, machine
               <div className="rounded-xl p-4" style={CARD_STYLE}>
                 <div className="text-xs font-bold text-slate-900 mb-3">Vendor-wise Purchase Value (₹)</div>
                 {vendorPurchase.length === 0 ? <div className="text-center text-slate-600 py-8 text-xs">No data</div> : (
+                  <ChartSlot height={180}>{({ ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip }) => (
                   <ResponsiveContainer width="100%" height={180}>
                     <BarChart data={vendorPurchase} margin={{top:4,right:4,left:0,bottom:4}}>
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(17,24,39,0.04)" />
@@ -25738,6 +25843,7 @@ function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, machine
                       <Bar dataKey="value" fill="#2640B0" radius={[4,4,0,0]} name="Amount ₹" />
                     </BarChart>
                   </ResponsiveContainer>
+                  )}</ChartSlot>
                 )}
               </div>
 
@@ -25802,6 +25908,7 @@ function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, machine
               <div className="rounded-xl p-4" style={CARD_STYLE}>
                 <div className="text-xs font-bold text-slate-900 mb-3">Inward Report — Monthly Volume</div>
                 {inwardByMonth.length === 0 ? <div className="text-center text-slate-600 py-8 text-xs">No inward data</div> : (
+                  <ChartSlot height={160}>{({ ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip }) => (
                   <ResponsiveContainer width="100%" height={160}>
                     <BarChart data={inwardByMonth} margin={{top:4,right:4,left:0,bottom:4}}>
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(17,24,39,0.04)" />
@@ -25811,6 +25918,7 @@ function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, machine
                       <Bar dataKey="qty" fill="#10b981" radius={[4,4,0,0]} name="Qty" />
                     </BarChart>
                   </ResponsiveContainer>
+                  )}</ChartSlot>
                 )}
               </div>
 
@@ -26456,6 +26564,15 @@ export default function App() {
   // department / acceptance timer. Kept in sync with settings here so the pure
   // helpers in handoverLogic never need React.
   useEffect(() => { setWorkCalendar(readDeptWorkflowSettings(settings)); }, [settings]);
+  // 2026-11-04 (fix/perf-1) — warm the charts chunk in the background once the
+  // app is idle, only for people who can open a page with charts.
+  useEffect(() => {
+    if (!currentUser || !(canView("analytics") || canView("history"))) return undefined;
+    const ric = window.requestIdleCallback || ((f) => setTimeout(f, 3000));
+    const cic = window.cancelIdleCallback || clearTimeout;
+    const id = ric(() => { loadCharts().catch(() => {}); }, { timeout: 8000 });
+    return () => cic(id);
+  }, [currentUser, canView]);
   // Migration 029 — list of all users (for the Settings dept-employee picker +
   // the Finish & Transfer worker/main-employee picker). Fetched once on mount
   // when Supabase is enabled; falls back silently to [] if the schema isn't
@@ -26970,7 +27087,7 @@ export default function App() {
     ...safeFollowUps.map((f) => ({
       id: `followup-${f?.id}`, type: "followup",
       title: `Follow-Up Due: ${f?.poId || ""}`,
-      desc:  `${f?.vendor || ""} · Next: ${f?.nextFollowUp || ""}`,
+      desc:  `${f?.vendor || ""} · Next: ${isoToDisplayDate(f?.nextFollowUp) || ""}`,
     })),
     ...(safePending.length > 0 ? [{
       id: "pending_alert-all", type: "pending_alert",
@@ -27306,6 +27423,10 @@ export default function App() {
     const wasReceived  = po?.status === "received";
     setPos((prev) => prev.filter((p) => p.id !== id));
     if (isSupabaseEnabled()) poDelete(id).then((r) => { if (!r.success) console.warn("[App] PO delete Supabase failed:", r.error); });
+    // Its follow-ups go too (same as Receive): left behind they kept showing
+    // on Order Pipeline and in notifications for a PO that no longer exists.
+    setFollowUps((prev) => prev.filter((f) => f.poId !== id));
+    if (isSupabaseEnabled()) deleteFollowUpsByPO(id).then((r) => { if (!r.success) console.warn("[App] FollowUp delete Supabase failed:", r.error); });
     logAudit({
       type: wasReceived ? "po_deleted_received" : "po_deleted",
       module: "Purchase",
@@ -30311,7 +30432,7 @@ export default function App() {
         onNavigateHome={() => setActivePage("dashboard")}
       >
         {canView(activePage)
-          ? (pages[activePage] || <DashboardPage />)
+          ? <React.Suspense fallback={<div className="flex-1 p-6" data-page-loading><SkeletonLoader /></div>}>{pages[activePage] || <DashboardPage />}</React.Suspense>
           : <>
               <Topbar title="Access Denied" />
               <AccessDeniedPage onNavigateHome={() => {
