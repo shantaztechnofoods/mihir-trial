@@ -7,7 +7,7 @@ import { summarizeMachineRatings } from "../../utils/ratingLogic.js";
 import { isVoiceAttachment } from "../../utils/voiceNote.js";
 import { rackCapacityFor, slotLabel } from "../../utils/rackSlots.js";
 import { JobHistory } from "../pending-jobs/index.js";
-import { RPT_STAGE_DEPTS, collectHoldEvents, rptCommentGroups, rptCompany, rptCriticalItems, rptCriticalSummary, rptDeptRecords, rptMs } from "./reportFormat.js";
+import { RPT_STAGE_DEPTS, rptChecksSentence, rptCommentTable, rptCompany, rptCount, rptCriticalItems, rptCriticalSummary, rptDeptRecords, rptDur, rptFindings, rptFindingsHeadline, rptList, rptMs, rptWhen } from "./reportFormat.js";
 import { RptLetterhead, RptPageStyle, RptSignatureRegister, RptTitleBlock, trialCertSignatureRows } from "./reportParts.jsx";
 import { TC_SHEET_CSS, TrialCertificateSheet } from "../trial-certificate/index.js";
 import { svgDataUri } from "../../shared/format.js";
@@ -138,8 +138,11 @@ export function AtoZMachineReport({
           <div className="mr-machine">{machine.bomLabel || bom.label || machine.bomKey}</div>
           <div className="mr-mono mr-serial">Model {machine.bomKey}{machine.serialNo ? ` · Serial no. ${machine.serialNo}` : ""}</div>
         </div>
-        <div data-report-status className={`mr-stamp ${isReady ? "is-done" : "is-progress"}`}>
-          {isReady ? "Ready for dispatch" : `In production · ${displayStageOf(machine) || machine.stage}`}
+        <div className="rpt-stamp-wrap">
+          <div data-report-status className={`mr-stamp ${isReady ? "is-done" : "is-progress"}`}>
+            {isReady ? "Ready for dispatch" : `In production · ${displayStageOf(machine) || machine.stage}`}
+          </div>
+          {isReady && findings.counts.High > 0 && <div className="mr-red mr-small rpt-stamp-note" data-report-stamp-note>{rptCount(findings.counts.High, "high finding")} open — see section 00</div>}
         </div>
       </div>
       <div className="mr-facts rpt-facts-5">
@@ -157,10 +160,10 @@ export function AtoZMachineReport({
       <div className="mr-summary" data-report-glance>
         {[
           { k: "Departments done", v: `${deptsDone} of 4` },
-          { k: "Checklists", v: machineResponses.length },
+          { k: "Findings", v: findings.counts.total ? `${findings.counts.total}${findings.counts.High ? ` · ${findings.counts.High} high` : ""}` : "None", red: findings.counts.High > 0 },
           { k: "Signatures", v: sigRows.length, attr: { "data-report-sig-count": "" } },
           { k: "Open issues", v: openJobs.length, red: openJobs.length > 0 },
-          { k: "Resolved issues", v: resolvedJobs.length },
+          { k: "Closed issues", v: resolvedJobs.length },
           { k: "Average rating", v: sum.average !== null ? rate(sum.average) : "Not rated" },
         ].map((g) => (
           <div key={g.k} className={`mr-sum ${g.red ? "is-red" : ""}`}><div className="mr-sum-v" {...(g.attr || {})}>{g.v}</div><div className="mr-label">{g.k}</div></div>
@@ -221,20 +224,93 @@ export function AtoZMachineReport({
     </Sec>
   );
 
+  // ── 2026-11-04 (content v4) — Exceptions and findings ─────────────────
+  // The first thing the company reader sees: every delay against target, hold,
+  // open job, checklist point not done, rework, missing signature and
+  // critical part without a serial — each one full sentence with severity,
+  // owner (department), when, the reason / detail and its status.
+  const findings = rptFindings({ machine, handovers: machineHandovers, checklistResponses: machineResponses, pendingItems: machinePending, auditLog, critical: criticalRows, allUsers });
+  const SEV_CLS = { High: "is-high", Medium: "is-medium", Low: "is-low" };
+  const FindingGroup = ({ g }) => (
+    <div className="rpt-sub mr-avoid-head" data-report-finding-group={g.key}>
+      <div className="rpt-subh">{g.title} <span className="mr-count">{g.rows.length}</span></div>
+      <div className="mr-label rpt-finding-note">{g.note}</div>
+      <div className="mr-table">
+        <div className="mr-tr mr-th" style={{ gridTemplateColumns: "0.75fr 2.9fr 1.2fr 1.15fr 2.1fr 1.25fr" }}><div>Severity</div><div>Finding</div><div>Owner</div><div>When</div><div>Reason / detail</div><div>Status</div></div>
+        {g.rows.map((r) => (
+          <div key={r.k} className="mr-tr" data-report-finding={r.sev.toLowerCase()} style={{ gridTemplateColumns: "0.75fr 2.9fr 1.2fr 1.15fr 2.1fr 1.25fr" }}>
+            <div className="mr-td" data-l="Severity"><span className={`rpt-sev ${SEV_CLS[r.sev]}`}>{r.sev}</span></div>
+            <div className="mr-td" data-l="Finding">{r.what}</div>
+            <div className="mr-td" data-l="Owner">{r.owner || "Not recorded"}</div>
+            <div className="mr-td" data-l="When">{rptWhen(r.when) || "Not recorded"}</div>
+            <div className="mr-td" data-l="Reason / detail">{r.detail || <span className="mr-muted">—</span>}</div>
+            <div className={`mr-td ${/^Open|^Missing|^Not followed|^Follow-up job open|^Waiting/.test(r.status) ? "mr-red" : ""}`} data-l="Status">{r.status}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+  const Findings = () => {
+    const c = findings.counts;
+    const timeGroups = findings.groups.filter((g) => g.key === "delays" || g.key === "holds");
+    const otherGroups = findings.groups.filter((g) => g.key !== "delays" && g.key !== "holds");
+    return (
+      <Sec n="00" title="Exceptions and findings" count={c.total}
+           extra={c.High ? <span className="mr-red mr-count-strong">{c.High} high</span> : c.total ? <span className="mr-amber mr-count-strong">none high</span> : <span className="mr-green mr-count-strong">none</span>}>
+        <div data-report-findings>
+          <p className={`rpt-findings-lead ${c.High ? "is-high" : ""}`} data-report-findings-headline>{rptFindingsHeadline(findings)}</p>
+          {c.High > 0 && (
+            <ol className="rpt-action-list" data-report-action-list>
+              {findings.groups.flatMap((g) => g.rows).filter((r) => r.sev === "High").map((r) => (
+                <li key={r.k}>{r.what.startsWith(r.owner || "\u0000") ? null : <b>{r.owner || "Not assigned"}: </b>}{r.what} <span className="mr-red">{r.status}.</span></li>
+              ))}
+            </ol>
+          )}
+          <div data-report-holds>{timeGroups.map((g) => <FindingGroup key={g.key} g={g} />)}</div>
+          {otherGroups.map((g) => <FindingGroup key={g.key} g={g} />)}
+          {findings.clean.length > 0 && c.total > 0 && <p className="mr-label rpt-table-note" data-report-findings-clean>Nothing was recorded under: {rptList(findings.clean.map((t) => t.charAt(0).toLowerCase() + t.slice(1)))}.</p>}
+          <p className="mr-label rpt-table-note">Severity: High — still open on a Ready machine, a hold still running, a must-do point not done, a critical part without its serial, or a delay of half the target or more. Medium — open while in production, a delay, a hold without a reason, or a missing signature. Low — closed, kept for the record.</p>
+        </div>
+      </Sec>
+    );
+  };
+
+  // 2026-11-04 (content v4) — one row per department, in build order: when
+  // it received the machine and from whom, when it handed over, time taken
+  // against target, how long the machine waited to be accepted, and the
+  // checks and jobs of that stage, in full sentences.
+  const deptRecords = rptDeptRecords(machine, machineHandovers, machineResponses, machineRatings);
+  const DeptTimeline = () => (
+    <div className="mr-table" data-report-timeline>
+      <div className="mr-tr mr-th" style={{ gridTemplateColumns: "1.05fr 1.45fr 1.35fr 1.4fr 1.4fr 2.3fr" }}><div>Department</div><div>Received</div><div>Handed over</div><div>Time vs target</div><div>Wait to be accepted</div><div>Checks and jobs</div></div>
+      {deptRecords.map((r) => {
+        const inHop = r.inHop; const waitMin = inHop && inHop.acceptedAt && inHop.sentAt ? Math.max(0, Math.round(((rptMs(inHop.acceptedAt) || 0) - (rptMs(inHop.sentAt) || 0)) / 60000)) : null;
+        const win = inHop ? Number(inHop.acceptTimeoutMinutes) || 0 : 0; const lateWait = waitMin != null && win > 0 && waitMin > win;
+        const notDone = r.checks.flatMap((cr) => (cr.answers || []).filter((a) => !a.checked).map((a) => a.label));
+        const raised = machinePending.filter((p) => p.raisedInDepartment === r.dept); const openRaised = raised.filter((p) => p.status !== "resolved").length;
+        const stateText = r.state === "done" ? "Completed" : r.state === "current" ? "In progress" : "Not started";
+        return (
+          <div key={r.dept} className={`mr-tr is-${r.state}`} data-report-timeline-dept={r.dept} style={{ gridTemplateColumns: "1.05fr 1.45fr 1.35fr 1.4fr 1.4fr 2.3fr" }}>
+            <div className="mr-td" data-l="Department"><div><div className="font-semibold">{r.dept === "Ready" ? "Final inspection" : r.dept}</div><div className={`mr-small ${r.state === "done" ? "mr-green" : r.state === "current" ? "mr-amber" : "mr-muted"}`}>{stateText}</div></div></div>
+            <div className="mr-td" data-l="Received">{r.state === "pending" ? <span className="mr-muted">—</span> : <div><div>{rptWhen(r.inAt) || "Date not recorded"}</div><div className="mr-label">{r.accepted ? `Accepted by ${r.accepted.name || "an unnamed person"} from ${r.accepted.from}` : r.dept === "Assembly" ? "Started from the BOM issue" : inHop && inHop.status === "pending" ? `Sent by ${inHop.fromDepartment}, not yet accepted` : "No acceptance recorded"}</div></div>}</div>
+            <div className="mr-td" data-l="Handed over">{r.dept === "Ready" ? (r.state === "done" ? <div>Released for dispatch</div> : <span className="mr-muted">—</span>) : r.outHop ? <div><div>{rptWhen(r.outAt)}</div><div className="mr-label">to {r.outHop.toDepartment}{r.handedOver && r.handedOver.name ? `, lead ${r.handedOver.name}` : ""}</div></div> : <span className="mr-muted">{r.state === "current" ? "Still working" : "—"}</span>}</div>
+            <div className="mr-td" data-l="Time vs target">{r.actual || r.target ? <div className={r.over > 0 ? "mr-red" : ""}><div>{rptDur(r.actual)}{r.target ? ` — target ${rptDur(r.target)}` : ""}</div><div className="mr-small">{r.over > 0 ? `${rptDur(r.over)} over target` : r.target ? "Within target" : "No target set"}</div></div> : <span className="mr-muted">{r.dept === "Ready" || r.state === "pending" ? "—" : "Not recorded"}</span>}</div>
+            <div className="mr-td" data-l="Wait to be accepted">{waitMin == null ? <span className="mr-muted">—</span> : <div className={lateWait ? "mr-red" : ""}><div>{rptDur(waitMin)}{win ? ` — window ${rptDur(win)}` : ""}</div><div className="mr-small">{lateWait ? `${rptDur(waitMin - win)} past the window` : win ? "Within the window" : ""}</div></div>}</div>
+            <div className="mr-td" data-l="Checks and jobs"><div>
+              <div className={notDone.length ? "mr-red" : ""}>{r.points ? rptChecksSentence(r.passed, r.points, notDone) : r.state === "pending" ? "Not started yet." : "No checklist was recorded."}</div>
+              {raised.length > 0 && <div className={`mr-small ${openRaised ? "mr-red" : ""}`}>{rptCount(raised.length, "job")} raised here — {openRaised ? `${openRaised} still open` : "all closed"}.</div>}
+            </div></div>
+          </div>
+        );
+      })}
+    </div>
+  );
+
   // D5 — process strip + one row per hand-over; full checklist answers in Appendix A.
   const Journey = () => (
     <Sec n="02" title="Department journey" count={`${machineHandovers.length} hand-over${machineHandovers.length === 1 ? "" : "s"}`}>
-      <div className="mr-strip">
-        {JOURNEY.map((d, i) => {
-          const st = deptState(d, i);
-          // 2026-11-04 — state only; the dates and times are in the table below.
-          const sub = st === "done" ? "Done" : st === "current" ? "In progress" : "Not started";
-          return (
-            <div key={d} className={`mr-step is-${st}`}><div className="mr-step-name">{d}</div><div className="mr-label">{sub}</div></div>
-          );
-        })}
-      </div>
-      {machineHandovers.length === 0 ? <p className="mr-empty">No hand-overs recorded yet. The machine is at {machine.stage}.</p> : (
+      <DeptTimeline />
+      {machineHandovers.length === 0 ? <p className="mr-empty">No hand-overs have been recorded yet. The machine is in {machine.currentDepartment || machine.stage}.</p> : (
         <div className="mr-table">
           {/* 2026-11-04 — signatures moved to the one signature register. */}
           <div className="mr-tr mr-th" style={{ gridTemplateColumns: "1.25fr 1.05fr 1.4fr 1.15fr 1.25fr 1fr" }}>
@@ -265,27 +341,28 @@ export function AtoZMachineReport({
                     {(h.acceptedByName || userName(h.acceptedBy)) && <div className="mr-label" data-report-accepted-by>by {h.acceptedByName || userName(h.acceptedBy)}</div>}
                     {h.acceptedAt && h.acceptedInDepartment && h.acceptedInDepartment !== h.toDepartment && <div className="mr-label">into {h.acceptedInDepartment}</div>}
                     {show.showEmployees !== false && Array.isArray(h.acceptedByTeamSnapshot) && h.acceptedByTeamSnapshot.length > 0 && (
-                      <div className="mr-label" data-report-accept-team>team: {h.acceptedByTeamSnapshot.map((x) => (x && (x.fullName || x.username || x.name)) || "").filter((n) => n && n !== (h.acceptedByName || userName(h.acceptedBy))).join(", ") || "none named"}</div>
+                      <div className="mr-label" data-report-accept-team>Team: {h.acceptedByTeamSnapshot.map((x) => (x && (x.fullName || x.username || x.name)) || "").filter((n) => n && n !== (h.acceptedByName || userName(h.acceptedBy))).join(", ") || "no one else named"}</div>
                     )}
-                    <div className="mr-label">Accept window {dur(h.acceptTimeoutMinutes)}</div>
-                    {h.status === "accepted" && !(h.acceptedSignatureSvg || h.mainEmployeeSignatureSvg) && <div className="mr-label">Signed on file (earlier record)</div>}
+                    <div className="mr-label">Accept window: {dur(h.acceptTimeoutMinutes)}</div>
+                    {h.status === "accepted" && !(h.acceptedSignatureSvg || h.mainEmployeeSignatureSvg) && <div className="mr-label">{h.acceptedBySignatureId ? "Signature on file (earlier record)" : "No signature on file"}</div>}
                   </div></div>
                   <div className="mr-td" data-l="Time / target"><div>
-                    <div className={`rpt-nowrap ${over ? "mr-red" : ""}`}>{!h.actualDurationMinutes && !h.expectedDurationMinutes ? "" : `${dur(h.actualDurationMinutes)} of ${dur(h.expectedDurationMinutes)}`}</div>
-                    {over && <div className="mr-red mr-small">Over by {dur(h.overrunMinutes)}</div>}
+                    <div className={`rpt-nowrap ${over ? "mr-red" : ""}`}>{!h.actualDurationMinutes && !h.expectedDurationMinutes ? "Not recorded" : `${dur(h.actualDurationMinutes)} of ${dur(h.expectedDurationMinutes)}`}</div>
+                    {over ? <div className="mr-red mr-small">Over by {dur(h.overrunMinutes)}</div> : h.expectedDurationMinutes ? <div className="mr-green mr-small">Within target</div> : null}
                   </div></div>
                   <div className="mr-td" data-l="Team">{show.showEmployees !== false && (ordered.length
                     ? <div>{ordered.map((uid) => <div key={uid} className={uid === lead ? "font-bold" : ""} title={uid === lead ? "Lead / main employee" : undefined}>{nameFromSnap(uid, h.workedBySnapshot)}</div>)}</div>
                     : null)}</div>
                   <div className="mr-td" data-l="Checks">{show.showChecklists !== false && (hopResp.length ? <div>{hopResp.map((cr) => {
                       const ans = cr.answers || []; const done = ans.filter((a) => a.checked).length; const miss = ans.length - done;
-                      return <div key={cr.id} className="rpt-badges"><span className={`rpt-badge ${miss ? "is-warn" : "is-ok"}`}>{({ before_dispatch: "Dispatch", before_receive: "Receive", during_work: "During work" })[cr.stage] || "Checklist"} {done} of {ans.length}</span>{miss ? <span className="rpt-badge is-no">{miss} open</span> : null}</div>;
-                    })}<div className="mr-label">Full answers: Appendix A</div></div> : null)}</div>
+                      return <div key={cr.id} className={`mr-small ${miss ? "mr-red" : ""}`} data-report-hop-checks={cr.stage || ""}><b>{STAGE_LABEL[cr.stage] || "Checklist"}:</b> {rptChecksSentence(done, ans.length, ans.filter((a) => !a.checked).map((a) => a.label))}</div>;
+                    })}<div className="mr-label">Full answers: Appendix A</div></div> : <span className="mr-muted mr-small">No checklist recorded</span>)}</div>
                 </div>
-                {/* The delay reason is printed once, in "Holds and late reasons" below. */}
+                {/* The delay reason is printed once, in "Exceptions and findings" (section 00). */}
                 {raised.length > 0 && (
                   <div className="mr-hop-note">
-                    {raised.length > 0 && <div className={raised.some((p) => p.status !== "resolved") ? "mr-red" : ""}>{raised.length} issue{raised.length === 1 ? "" : "s"} raised at this hand-over ({raised.filter((p) => p.status !== "resolved").length} open) — see section 04</div>}
+                    {raised.length > 0 && (() => { const o = raised.filter((p) => p.status !== "resolved").length;
+                      return <div className={o ? "mr-red" : ""}>{rptCount(raised.length, "job was", "jobs were")} raised at this hand-over; {o === 0 ? (raised.length === 1 ? "it is closed" : "all are closed") : o === raised.length ? (raised.length === 1 ? "it is still open" : "all are still open") : `${o} still open`}. See section 04.</div>; })()}
                   </div>
                 )}
               </div>
@@ -294,42 +371,8 @@ export function AtoZMachineReport({
           {machineHandovers.some((h) => h.acceptedSignatureSvg || h.mainEmployeeSignatureSvg) && <p className="mr-label rpt-table-note">Hand-over and acceptance signatures, with name, department and date, are in the signature register at the end of this report.</p>}
         </div>
       )}
-      {/* 2026-11-03 — holds and late reasons for this machine (read-only). */}
-      {(() => {
-        // 2026-11-04 — only THIS machine's holds. The audit rows of every machine
-        // are read, and a hold on another machine printed here too.
-        const holds = collectHoldEvents({ machineLog: [machine], handovers: machineHandovers, auditLog, allUsers })
-          .filter((r) => String(r.machineId) === String(machine.id));
-        const late = machineHandovers.filter((h) => h.overrunNarration);
-        return (
-          <div className="rpt-sub" data-report-holds>
-            <div className="rpt-subh">Holds and late reasons <span className="mr-count">{holds.length + late.length}</span></div>
-            {holds.length + late.length === 0 ? <p className="mr-empty">No holds and no late work recorded.</p> : (
-              <div className="mr-table">
-                <div className="mr-tr mr-th" style={{ gridTemplateColumns: "1.3fr 1.3fr 0.9fr 2.4fr 1.1fr" }}><div>What</div><div>Where / when</div><div className="text-right">Length</div><div>Reason</div><div>Who</div></div>
-                {holds.map((r) => (
-                  <div key={r.key} className="mr-tr" style={{ gridTemplateColumns: "1.3fr 1.3fr 0.9fr 2.4fr 1.1fr" }}>
-                    <div className="mr-td" data-l="What"><span className={r.open ? "mr-red font-semibold" : "mr-amber font-semibold"}>{r.label}{r.open ? " · open" : ""}</span></div>
-                    <div className="mr-td" data-l="Where / when"><div><div>{r.to ? `${r.from} → ${r.to}` : r.from}</div><div className="mr-label">{fmtDT(r.startAt)}</div></div></div>
-                    <div className="mr-td md:text-right" data-l="Length">{r.minutes != null ? dur(r.minutes) : ""}</div>
-                    <div className="mr-td" data-l="Reason">{r.reason || <span className="mr-muted">No reason given</span>}</div>
-                    <div className="mr-td" data-l="Who">{r.by || ""}{r.releasedBy ? <div className="mr-label">released by {r.releasedBy}</div> : null}</div>
-                  </div>
-                ))}
-                {late.map((h) => (
-                  <div key={`ov-${h.id}`} className="mr-tr" style={{ gridTemplateColumns: "1.3fr 1.3fr 0.9fr 2.4fr 1.1fr" }}>
-                    <div className="mr-td" data-l="What"><span className="mr-amber font-semibold">Work over target</span></div>
-                    <div className="mr-td" data-l="Where / when"><div><div>{h.fromDepartment}</div><div className="mr-label">{fmtDT(h.sentAt)}</div></div></div>
-                    <div className="mr-td md:text-right" data-l="Length">{dur(h.overrunMinutes)}</div>
-                    <div className="mr-td" data-l="Reason">{h.overrunNarration}</div>
-                    <div className="mr-td" data-l="Who">{userName(h.sentBy) || ""}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        );
-      })()}
+      {/* 2026-11-04 (content v4) — holds, late accepts and delay reasons are in
+          "Exceptions and findings" at the top (printed once). */}
     </Sec>
   );
 
@@ -350,15 +393,17 @@ export function AtoZMachineReport({
     // 2026-11-04 (reports v2) — the same jobs, each printed once, in three
     // groups: parts pending / received, 💬 comments by the department that
     // raised them, and follow-ups from unticked checklist points.
+    // 2026-11-04 (content v4) — parts keep their full receive history; every
+    // comment, issue and checklist follow-up is one row of a structured table
+    // per raising department: date, by, type, text, status, closed by / when
+    // and the resolution.
     const parts = jobs.filter((p) => pendingItemIsPart(p));
-    const commentGroups = rptCommentGroups(jobs.filter((p) => !pendingItemIsPart(p)));
-    const commentIds = new Set(commentGroups.flatMap((g) => g.rows.map((p) => String(p.id))));
-    const followUps = jobs.filter((p) => !pendingItemIsPart(p) && !commentIds.has(String(p.id)));
+    const commentDepts = rptCommentTable(jobs.filter((p) => !pendingItemIsPart(p)), allUsers);
     const PART_STAGE = { awaiting: "Awaiting part", partial: "Part received in part", received: "Part received", completed: "Completed" };
     const Row = ({ p }) => {
       const open = p.status !== "resolved";
       const hop = p.raisedInHandoverId ? hopOf(p.raisedInHandoverId) : null;
-      const src = commentIds.has(String(p.id)) ? "Comment" : SOURCE[p.source] || (/^Part not issued at BOM Outward/.test(p.description || "") ? SOURCE.not_issued : p.kind === "owed" ? "Owed work" : "Reported issue");
+      const src = SOURCE[p.source] || (/^Part not issued at BOM Outward/.test(p.description || "") ? SOURCE.not_issued : p.kind === "owed" ? "Owed work" : "Reported issue");
       const isPart = pendingItemIsPart(p);
       const stage = isPart ? pendingItemStage(p) : (open ? "awaiting" : "completed");
       const done = !open || (isPart && stage === "received");
@@ -392,12 +437,27 @@ export function AtoZMachineReport({
            extra={openJobs.length ? <span className="mr-red mr-count-strong">{openJobs.length} open</span> : <span className="mr-green mr-count-strong">{jobs.length ? "all resolved" : "none recorded"}</span>}>
         <div data-report-issues>
           {parts.length > 0 && <Group title="Parts pending and received" list={parts} attr={{ "data-report-parts": "" }} />}
-          {commentGroups.length > 0 && (
+          {commentDepts.length > 0 && (
             <div data-report-comments>
-              {commentGroups.map((g) => <Group key={g.dept} title={`Comments raised in ${g.dept}`} list={g.rows} attr={{ "data-report-comments-dept": g.dept }} />)}
+              {commentDepts.map((g) => (
+                <div key={g.dept} className="rpt-sub" data-report-comments-dept={g.dept}>
+                  <div className="rpt-subh">Comments and issues raised in {g.dept} <span className="mr-count">{g.rows.length}</span>{g.open ? <span className="mr-red mr-count"> · {g.open} open</span> : <span className="mr-green mr-count"> · all closed</span>}</div>
+                  <div className="mr-table">
+                    <div className="mr-tr mr-th" style={{ gridTemplateColumns: "1.25fr 0.95fr 2.6fr 1.3fr 2.2fr" }}><div>Raised</div><div>Type</div><div>Comment / issue</div><div>Status</div><div>Closed by / when · resolution</div></div>
+                    {g.rows.map((r) => (
+                      <div key={r.id} className={`mr-tr mr-issue ${r.open ? "is-open" : "is-done"}`} data-report-comment-row={r.open ? "open" : "closed"} style={{ gridTemplateColumns: "1.25fr 0.95fr 2.6fr 1.3fr 2.2fr" }}>
+                        <div className="mr-td" data-l="Raised"><div><div>{rptWhen(r.raisedAt) || "Date not recorded"}</div><div className="mr-label">{r.by ? `by ${r.by}` : "Raised by: not recorded"}</div></div></div>
+                        <div className="mr-td" data-l="Type">{r.critical ? <span className="mr-tag">Critical</span> : null}{r.type}</div>
+                        <div className="mr-td" data-l="Comment / issue"><div><div className={r.open ? "mr-red" : ""}>{r.text}</div>{r.assigned && r.assigned !== g.dept ? <div className="mr-label">Assigned to {r.assigned}</div> : null}{r.reason ? <div className="mr-label">Reason: {r.reason}</div> : null}</div></div>
+                        <div className={`mr-td font-semibold ${r.open ? "mr-red" : "mr-green"}`} data-l="Status">{r.status}</div>
+                        <div className="mr-td" data-l="Closed by / when">{r.open ? <span className="mr-muted">Not closed yet</span> : <div><div>{rptWhen(r.closedAt) || "Date not recorded"}{r.closedBy ? ` · ${r.closedBy}` : ""}{r.closedIn ? ` · ${r.closedIn}` : ""}</div><div className="mr-label">{r.resolution ? `Resolution: ${r.resolution}` : "No completion note was recorded."}</div></div>}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
-          {followUps.length > 0 && <Group title="Checklist follow-ups" list={followUps} attr={{ "data-report-followups": "" }} />}
           {jobs.length === 0 && <p className="mr-empty">No issues or pending jobs were recorded for this machine.</p>}
         </div>
       </Sec>
@@ -498,12 +558,12 @@ export function AtoZMachineReport({
         <div key={cr.id} className="mr-check mr-avoid" data-report-appendix-checklist={cr.stage || ""}>
           <div className="mr-check-head">
             <div className="font-semibold">{cr.department || ""} · {STAGE_LABEL[cr.stage] || cr.stage || "Checklist"}{hop ? <span className="mr-label"> · {hop.fromDepartment} → {hop.toDepartment}</span> : null}</div>
-            <div className="mr-label">{cr.templateName || ""} v{cr.templateVersion || 1}{cr.submittedAt ? ` · ${fmtDT(cr.submittedAt)}` : ""}{userName(cr.submittedBy) ? ` · ${userName(cr.submittedBy)}` : ""} · <span className={done < ans.length ? "mr-red" : "mr-green"}>{done} of {ans.length} done</span></div>
+            <div className="mr-label">{cr.templateName || ""} v{cr.templateVersion || 1}{cr.submittedAt ? ` · ${fmtDT(cr.submittedAt)}` : ""}{userName(cr.submittedBy) ? ` · ${userName(cr.submittedBy)}` : ""} · <span className={done < ans.length ? "mr-red" : "mr-green"}>{rptChecksSentence(done, ans.length, ans.filter((a) => !a.checked).map((a) => a.label))}</span></div>
           </div>
           {ans.map((a, i) => (
             <div key={i} className="mr-check-row">
               <span className={a.checked ? "mr-green" : "mr-red"}>{a.checked ? "✓" : "✗"}</span>
-              <div className="min-w-0"><span>{a.label}</span>{a.required && <span className="mr-label"> · must-do</span>}{a.remark && <div className="mr-label">Remark: {a.remark}</div>}</div>
+              <div className="min-w-0"><span>{a.label}</span>{a.required && <span className="mr-label"> · must-do point</span>}{a.remark && <div className="mr-label">Remark: {a.remark}</div>}</div>
             </div>
           ))}
         </div>
@@ -530,6 +590,7 @@ export function AtoZMachineReport({
         <thead><tr><td><div className="mr-runhead"><span>{company.name || RPT_LEGAL_NAME} · Machine production report</span><span className="mr-mono">{reportRef}</span></div></td></tr></thead>
         <tbody><tr><td>
           <Hdr />
+          <Findings />
           <CriticalParts />
           <Journey />
           <TrialCertificate />

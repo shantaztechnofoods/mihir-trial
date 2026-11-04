@@ -2,7 +2,7 @@
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
 import React from "react";
 import { BRAND_LOGO_DATA_URI } from "../../utils/brandLogo.js";
-import { RPT_CL_STAGES, RPT_DEPT_SCOPE, rptCompany, rptCssStr, rptDur, rptPointFixed, rptPointJob, rptUserName } from "./reportFormat.js";
+import { RPT_CL_STAGES, RPT_DEPT_SCOPE, RPT_DEPT_SCOPE_TODO, rptChecksSentence, rptCompany, rptCssStr, rptDur, rptPointFixed, rptPointJob, rptUserName, rptWhen } from "./reportFormat.js";
 import { tcSigSrc } from "../trial-certificate/index.js";
 import { svgDataUri } from "../../shared/format.js";
 import { RPT_LEGAL_NAME, rptContactLine, rptFmtD, rptFmtDT } from "../../shared/printFormat.js";
@@ -91,14 +91,20 @@ export function trialCertSignatureRows(machine, handovers = []) {
   ].filter(Boolean);
 }
 
-export function RptDeptRecord({ r, customer = false, comments = [], users = [], certNo = "", jobs = [] }) {
+export function RptDeptRecord({ r, customer = false, comments = [], users = [], certNo = "", jobs = [], ready = false, hasCert = false }) {
   const stateText = r.state === "done" ? "Completed" : r.state === "current" ? "In progress" : "Not started";
   const timeText = r.actual || r.target ? `${rptDur(r.actual)}${r.target ? ` · target ${rptDur(r.target)}` : ""}` : "";
+  // 2026-11-04 (content v4) — no empty cells: a fact without a value is left
+  // out (the customer copy says in a sentence what is not recorded), and a
+  // bare date never prints a made-up "00:00".
   const facts = [
-    ["In", rptFmtDT(r.inAt) || ""],
-    ["Out", r.dept === "Ready" ? (r.state === "done" ? "Released" : "") : (rptFmtDT(r.outAt) || "")],
+    ["In", rptWhen(r.inAt) || ""],
+    ["Out", r.dept === "Ready" ? (r.state === "done" ? "Released for dispatch" : "") : (rptWhen(r.outAt) || "")],
     ...(customer ? [] : [["Time taken", r.dept === "Ready" ? "" : timeText, r.over > 0]]),
-  ];
+  ].filter(([, v]) => !customer || v);
+  const scope = r.state !== "done" ? (RPT_DEPT_SCOPE_TODO[r.dept] || RPT_DEPT_SCOPE[r.dept])
+    : customer && r.dept === "Trial" && !hasCert ? "Machine run under load." : RPT_DEPT_SCOPE[r.dept];
+  const showAccepted = !customer || !!r.accepted;
   const sig = r.accepted && r.accepted.sig ? svgDataUri(r.accepted.sig) : "";
   return (
     <div className={`rpt-dept is-${r.state}`} data-report-dept={r.dept}>
@@ -106,27 +112,30 @@ export function RptDeptRecord({ r, customer = false, comments = [], users = [], 
         <div className="rpt-dept-name">{r.dept === "Ready" ? "Final inspection · Ready" : r.dept}</div>
         <span className={`rpt-dept-state rpt-badge rpt-status ${r.state === "done" ? "mr-green" : r.state === "current" ? "mr-amber" : "mr-muted"}`}>{stateText}</span>
       </div>
-      <div className="rpt-dept-scope">{RPT_DEPT_SCOPE[r.dept]}{r.dept === "Trial" && certNo ? " See the trial certificate below." : ""}</div>
-      <div className={`rpt-dept-grid${customer ? " is-3" : ""}`}>
+      <div className="rpt-dept-scope">{scope}{r.dept === "Trial" && certNo && (!customer || hasCert) ? " See the trial certificate below." : ""}</div>
+      {customer && r.dept === "Assembly" && !r.accepted && r.state !== "pending" && <div className="mr-label rpt-dept-line">Work started from the bill-of-materials issue.</div>}
+      {customer && r.state === "done" && facts.length === 0 && !r.accepted && r.dept !== "Assembly" && <div className="mr-label rpt-dept-line">Completed. The hand-over dates for this stage were not recorded.</div>}
+      {customer && r.state === "pending" && <div className="mr-label rpt-dept-line">This stage has not started yet.</div>}
+      {(facts.length > 0 || showAccepted) && <div className={`rpt-dept-grid${customer ? " is-3" : ""}`}>
         {facts.map(([k, v, red]) => (
           <div key={k} className="min-w-0"><div className="mr-label">{k}</div><div className={`rpt-dept-v rpt-nowrap ${red ? "mr-red" : ""}`}>{v}</div></div>
         ))}
-        <div className="min-w-0 rpt-dept-acc" data-report-dept-accepted>
-          <div className="mr-label">Accepted by</div>
+        {showAccepted && <div className="min-w-0 rpt-dept-acc" data-report-dept-accepted>
+          <div className="mr-label">{customer ? "Received and accepted by" : "Accepted by"}</div>
           {r.accepted ? (
             <div className="rpt-dept-accrow">
               <div className="min-w-0"><div className="rpt-dept-v">{r.accepted.name || ""}</div><div className="mr-label">{rptFmtDT(r.accepted.at)}</div></div>
               {sig ? <div className="rpt-sigbox rpt-sigbox-sm"><img src={sig} alt={`Signature: ${r.accepted.name || r.dept}`} /></div> : null}
             </div>
           ) : <div className="rpt-dept-v mr-muted">{r.dept === "Assembly" ? "Started from BOM issue" : ""}</div>}
-        </div>
-      </div>
+        </div>}
+      </div>}
       {!customer && r.handedOver && (
         <div className="mr-label rpt-dept-line">Handed over by <b>{r.handedOver.name || ""}</b>{r.handedOver.team.length ? ` · team ${r.handedOver.team.join(", ")}` : ""}{r.rating ? ` · rating ${Number(r.rating.rating).toFixed(1)} / 5` : ""}</div>
       )}
       {r.notes.length > 0 && <div className="mr-label rpt-dept-line">{r.notes.map((h) => h.note).join(" · ")}</div>}
       <div className="rpt-dept-checks" data-report-quality>
-        {r.checks.length === 0 ? <div className="mr-label">{r.state === "pending" ? "Checklists are recorded when this stage is worked." : "No checklist was set for this stage."}</div> : r.checks.map((cr) => {
+        {r.checks.length === 0 ? (r.state === "pending" && customer ? null : <div className="mr-label">{r.state === "pending" ? "Checklists are recorded when this stage is worked." : r.state === "current" ? "No checklist has been recorded for this stage yet." : "No checklist was recorded for this stage."}</div>) : r.checks.map((cr) => {
           const ans = cr.answers || [];
           const fixed = (a) => customer && !a.checked && rptPointFixed(a.label, jobs);
           const done = ans.filter((a) => a.checked || fixed(a)).length;
@@ -135,16 +144,16 @@ export function RptDeptRecord({ r, customer = false, comments = [], users = [], 
               <div className="rpt-cl-head">
                 <span className="font-semibold">{(RPT_CL_STAGES.find(([k]) => k === cr.stage) || [null, "Checklist"])[1]}</span>
                 <span className="mr-label"> · {cr.templateName || "Checklist"}{cr.submittedAt ? ` · ${rptFmtDT(cr.submittedAt)}` : ""}{!customer && rptUserName(users, cr.submittedBy) ? ` · ${rptUserName(users, cr.submittedBy)}` : ""}</span>
-                <span className={`rpt-cl-score ${done === ans.length ? "mr-green" : "mr-red"}`}>{done} of {ans.length} OK</span>
+                <span className={`rpt-cl-score ${done === ans.length ? "mr-green" : "mr-red"}`}>{rptChecksSentence(done, ans.length, ans.filter((a) => !(a.checked || fixed(a))).map((a) => a.label))}</span>
               </div>
               {ans.map((a, i) => {
                 const ok = a.checked || fixed(a);
-                const note = !customer ? (a.remark || "") : a.checked ? "OK" : ok ? "Fixed before dispatch" : rptPointJob(a.label, jobs, "open") ? "Follow-up in progress" : "Not ticked";
+                const note = !customer ? (a.remark || "") : a.checked ? "Done" : ok ? "Fixed before dispatch" : rptPointJob(a.label, jobs, "open") ? "Follow-up in progress" : ready ? "Not completed — to be closed before dispatch" : "Not completed yet";
                 return (
                   <div key={i} className="rpt-cl-row" data-report-point={a.checked ? "ok" : ok ? "fixed" : "open"}>
                     <span className={`rpt-tick ${ok ? "is-ok" : "is-no"}`} aria-label={ok ? "OK" : "Not OK"}>{ok ? "✓" : "✗"}</span>
                     <span className="min-w-0">{a.label}</span>
-                    <span className="mr-label min-w-0">{note}</span>
+                    <span className={`mr-label min-w-0 ${customer && !ok ? "mr-red" : ""}`}>{note}</span>
                   </div>
                 );
               })}

@@ -6,7 +6,7 @@ import { summarizeMachineRatings, buildDepartmentScoreboard } from "../../utils/
 import { rackKeyNorm } from "../../utils/rackSlots.js";
 import { AtoZMachineReport } from "./AtoZMachineReport.jsx";
 import { REPORT_LANGS, rt } from "./i18n.js";
-import { RPT_STAGE_DEPTS, customerStagesDone, isTestRecord, machineReportRef, printWithTitle, rptCellText, rptColLabel, rptCompany, rptIsComment, rptUserName } from "./reportFormat.js";
+import { RPT_STAGE_DEPTS, customerStagesDone, isTestRecord, machineReportRef, printWithTitle, rptCellText, rptColLabel, rptCompany, rptIsComment, rptJobType, rptUserName } from "./reportFormat.js";
 import { RptLetterhead, RptPageStyle, RptTitleBlock } from "./reportParts.jsx";
 import { loadXLSX } from "../../shared/loadXlsx.js";
 import { STAGE_COLORS } from "../../shared/machineStages.js";
@@ -176,7 +176,7 @@ export function ReportCenterPage({
       const m = (machineLog || []).find((mm) => String(mm.id) === String(p.machineId));
       return {
         Department: p.raisedInDepartment || "Unassigned", Machine: m?.bomKey || "", Serial: m?.serialNo || "",
-        Comment: p.description, RaisedBy: rptUserName(allUsers, p.raisedBy), RaisedAt: p.raisedAt || "",
+        Comment: p.description, Type: rptJobType(p), RaisedBy: rptUserName(allUsers, p.raisedBy), RaisedAt: p.raisedAt || "",
         AssignedTo: p.assignedDepartment || "", CompletedBy: rptUserName(allUsers, p.resolvedBy), CompletedAt: p.resolvedAt || "",
         CompletionRemark: p.resolutionNotes || "", Status: p.status === "resolved" ? "Completed" : "Open",
       };

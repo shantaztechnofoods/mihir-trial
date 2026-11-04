@@ -86,7 +86,16 @@ ok("customer: Electrical shows its during-work and dispatch checklists",
   && elec.includes("Panel gland sealed") && elec.includes("Earthing continuity"));
 ok("customer: an unticked point that was fixed reads Fixed before dispatch, never the worker's remark",
   await p.locator('[data-report-dept="Electrical"] [data-report-point="fixed"]').count() === 1 && elec.includes("Fixed before dispatch") && !doc.includes("gland on order") && !doc.includes("INTERNAL-REMARK"));
-ok("customer: an unticked point with no follow-up job reads Not ticked (no invented status)", (await p.locator('[data-report-dept="Assembly"]').innerText()).includes("Not ticked") && !doc.includes("Follow-up in progress"));
+ok("customer: an unticked point with no follow-up job is clearly marked Not completed (no invented status)", (await p.locator('[data-report-dept="Assembly"]').innerText()).includes("Not completed — to be closed before dispatch") && !doc.includes("Follow-up in progress"));
+// 2026-11-04 (content v4) — Ready with a point not done is a contradiction: the stamp does not claim
+// "Ready for dispatch", and the on-screen pre-send check (outside the printed sheet) names the point.
+ok("customer: stamp reads Final checks open while a point is not done", (await p.locator('[data-report-kind="customer"] [data-report-status]').innerText()).trim() === "Final checks open");
+const pre = await p.locator('[data-report-customer-precheck="issues"]').innerText();
+ok("customer: pre-send check names the open point and the open job", pre.includes("Guard fitted (Assembly)") && pre.includes("Warning label to be stuck"), pre.replace(/\n/g, " | ").slice(0, 400));
+ok("customer: pre-send check is not printed", await p.evaluate(async () => { const el = document.querySelector("[data-report-customer-precheck]"); return !!el && !el.closest(".mr-doc"); }));
+const sum = await p.locator("[data-report-customer-summary]").innerText();
+ok("customer: build summary in full sentences", /was built and checked\./.test(sum) && /10 of 11 quality check points have been completed; 1 point is still open and will be closed before dispatch\./.test(sum) && /trial certificate is included in section 04\./.test(sum), sum.replace(/\n/g, " | "));
+ok("customer: no invented trial result", !/Passed/.test(doc) && /Certificate issued/.test(doc));
 ok("customer: Mechanical before-receive checklist listed", (await p.locator('[data-report-dept="Mechanical"]').innerText()).includes("Frame received square"));
 ok("customer: Trial and Ready checklists listed", (await p.locator('[data-report-dept="Trial"]').innerText()).includes("Machine clean for trial") && (await p.locator('[data-report-dept="Ready"]').innerText()).includes("Name plate fixed"));
 ok("customer: acceptance signatures printed per department", await p.locator("[data-report-dept] [data-report-dept-accepted] img").count() >= 4);
@@ -125,12 +134,20 @@ ok("company: BOM photo beside the machine details", await p.locator("[data-repor
 const ccrit = await p.locator("[data-report-critical]").innerText();
 ok("company: critical serials and who issued them", ccrit.includes("MTR-A1001") && ccrit.includes("MTR-A1002") && ccrit.includes("Store Keeper"), ccrit.replace(/\n/g, " | ").slice(0, 300));
 ok("company: critical summary", /3 critical items, all serials recorded/.test(await p.locator("[data-report-critical-summary]").first().innerText()));
-ok("company: comment groups are titled by the department that raised them", (await p.locator('[data-report-comments-dept="Electrical"]').innerText()).includes("Comments raised in Electrical"));
+ok("company: comment groups are titled by the department that raised them", (await p.locator('[data-report-comments-dept="Electrical"]').innerText()).includes("Comments and issues raised in Electrical"));
+// 2026-11-04 (content v4) — Exceptions and findings first, per-department timeline.
+ok("company: Exceptions and findings is the first section", await p.evaluate(() => { const s = [...document.querySelectorAll(".mr-doc .mr-sec")]; return s.length > 1 && !!s[0].querySelector("[data-report-findings]"); }));
+const fd = await p.locator("[data-report-findings]").innerText();
+ok("company: findings name the open comment, the point not done and the delay, with severity and owner",
+  fd.includes("Warning label to be stuck") && fd.includes("“Guard fitted” was not ticked") && fd.includes("Mechanical took 9 h 35 min against a target of 8 h") && /High/.test(fd) && fd.includes("Not followed up"), fd.replace(/\n/g, " | ").slice(0, 500));
+ok("company: action list for high findings", await p.locator("[data-report-action-list] li").count() >= 2);
+ok("company: per-department timeline, five rows", await p.locator("[data-report-timeline-dept]").count() === 5);
+ok("company: timeline uses sentences for checks", (await p.locator('[data-report-timeline-dept="Assembly"]').innerText()).includes("2 of 3 checks done — 1 not done: Guard fitted."));
 ok("company: checklist remark kept verbatim on the internal copy", doc.includes("gland on order") && /target/.test(doc));
 ok("company: comments grouped by department (Mechanical, Electrical)",
   await p.locator('[data-report-comments-dept="Mechanical"]').count() === 1 && await p.locator('[data-report-comments-dept="Electrical"]').count() === 1);
 const ce = await p.locator('[data-report-comments-dept="Electrical"]').innerText();
-ok("company: comment shows completion remark and the open one", ce.includes("Re-tied with clamp") && ce.includes("Warning label to be stuck") && ce.includes("Work completed"), ce.replace(/\n/g, " | ").slice(0, 300));
+ok("company: comment shows completion remark and the open one", ce.includes("Resolution: Re-tied with clamp") && ce.includes("Warning label to be stuck") && ce.includes("Closed") && ce.includes("Open — assigned to Electrical") && ce.includes("by Super Admin"), ce.replace(/\n/g, " | ").slice(0, 300));
 ok("company: each job printed once", (doc.match(/Side cover not painted/g) || []).length === 1);
 for (const d of ["Assembly", "Mechanical", "Electrical", "Trial", "Ready"])
   ok(`company: appendix has department ${d}`, await p.locator(`[data-report-appendix-dept="${d}"]`).count() === 1);

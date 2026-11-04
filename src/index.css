@@ -4207,3 +4207,30 @@ button.rack-btn:disabled { background: #e5e7eb !important; color: #6b7280 !impor
 @media print {
   .rpt-docsub, .mr-doc .mr-label, .mr-doc .mr-stamp, .mr-doc .mr-th, .mr-doc .rpt-status { text-transform: uppercase; }
 }
+
+/* 2026-11-04 (report content v4) — "Exceptions and findings" severity labels,
+   the one-line headline above them, and the customer copy's pre-send check
+   (screen only; never printed). Scoped to the report sheet. */
+.mr-doc .rpt-sev { display: inline-block; min-width: 52px; text-align: center; border-radius: 3px; padding: 0 5px; font-size: 10px; font-weight: 700; line-height: 1.6; border: 1px solid currentColor; white-space: nowrap; }
+.mr-doc .rpt-sev.is-high { color: #fff; background: var(--rpt-red); border-color: var(--rpt-red); }
+.mr-doc .rpt-sev.is-medium { color: var(--rpt-amber); }
+.mr-doc .rpt-sev.is-low { color: #5d6470; border-color: #c5c9d0; }
+.mr-doc .rpt-findings-lead { font-size: 12px; font-weight: 600; margin: 2px 0 4px; padding: 6px 10px; background: var(--rpt-panel); border-left: 2px solid var(--rpt-green); }
+.mr-doc .rpt-findings-lead.is-high { border-left-color: var(--rpt-red); }
+.mr-doc .rpt-finding-note { margin-bottom: 4px; }
+.mr-doc .rpt-summary-text { font-size: 11.5px; line-height: 1.6; margin: 0 0 6px; }
+.rpt-precheck { margin: 0 auto 12px; max-width: 210mm; border: 1px solid #e0a3a3; background: #fff6f5; color: #7a1a1a; border-radius: 8px; padding: 10px 14px; font-size: 12px; }
+.rpt-precheck.is-ok { border-color: #a9d3a0; background: #f4faf2; color: #2f6a1f; }
+.rpt-precheck ul { margin: 6px 0 0 18px; list-style: disc; }
+.rpt-precheck li { margin: 3px 0; }
+@media print {
+  .mr-doc .rpt-sev { font-size: 7pt; border-width: 0.6pt; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .mr-doc .rpt-findings-lead { font-size: 8.5pt; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .mr-doc .rpt-summary-text { font-size: 8.5pt; }
+  .rpt-precheck { display: none !important; }
+}
+.mr-doc .rpt-action-list { margin: 4px 0 6px 18px; list-style: decimal; font-size: 11.5px; line-height: 1.5; }
+.mr-doc .rpt-action-list li { margin: 2px 0; }
+.mr-doc .rpt-stamp-note { text-transform: none; letter-spacing: 0; font-weight: 600; margin-top: 3px; }
+@media print { .mr-doc .rpt-action-list { font-size: 8.5pt; } }
+.mr-doc .rpt-stamp-wrap { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }

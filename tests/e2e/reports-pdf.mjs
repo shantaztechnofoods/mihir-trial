@@ -98,7 +98,9 @@ ok("customer report opens", await p.locator('[data-report-kind="customer"]').cou
 for (const s of ["data-report-customer-hero", "data-report-journey", "data-report-quality", "data-report-trial", "data-report-docs", "data-report-customer-signoff", "data-report-generated"])
   ok(`customer report has ${s}`, await p.locator(`[${s}]`).count() >= 1);
 ok("customer report shows the BOM machine photo", await p.locator("[data-report-photo]").count() === 1);
-ok("customer report shows model, serial and Ready status", doc.includes("SN-105") && doc.includes("M-10") && /Ready for dispatch/.test(doc));
+// 2026-11-04 (content v4) — SN-105 is completed but "Guard fitted" was never ticked: the stamp says so
+// ("Final checks open") instead of "Ready for dispatch".
+ok("customer report shows model, serial and an honest status", doc.includes("SN-105") && doc.includes("M-10") && /Final checks open/.test(doc) && /will be closed before dispatch/.test(doc));
 ok("customer report lists the customer-visible document only", doc.includes("Operating manual") && !doc.includes("INTERNAL weld photo") && !doc.includes("Noise at 1400 rpm"));
 // 2026-11-04 (reports v2) — the owner asked for who accepted each stage (name +
 // signature) on the customer copy; workers' remarks, the worker team, delay
