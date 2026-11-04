@@ -59,5 +59,12 @@ ok(`History & Reports opens within ${BUDGET_PAGE_MS} ms`, tH < BUDGET_PAGE_MS, `
 ok("History activity list draws a slice, the rest on scroll", Number(await p.locator("[data-more-rows]").first().getAttribute("data-more-rows").catch(() => 0)) > 4000);
 // 4. other page switches stay inside the budget
 for (const [l, re] of [["Inward", "^Inward"], ["Machine Tracker", "Machine Tracker"], ["Dashboard", "👋"]]) { const t = await tapPage(l, re); ok(`${l} opens within ${BUDGET_PAGE_MS} ms`, t < BUDGET_PAGE_MS, `${t.toFixed(0)} ms`); await p.waitForTimeout(300); }
+// 5. on-demand pieces still arrive: charts on Analytics, the lazy admin pages
+await tapPage("Analytics", "Analytics"); await p.waitForTimeout(2500);
+ok("Analytics charts load on demand and draw", (await p.locator("svg.recharts-surface").count()) >= 3, String(await p.locator("svg.recharts-surface").count()));
+for (const l of ["User Management", "Role Management", "Audit Trail"]) {
+  await p.evaluate((l) => [...document.querySelectorAll(".app-sidebar button")].find((x) => x.innerText.trim().startsWith(l)).click(), l); await p.waitForTimeout(1500);
+  ok(`${l} (loaded on first open) renders`, (await p.locator("[data-page-loading]").count()) === 0 && (await p.locator("main, #root").first().innerText()).length > 50);
+}
 ok("no page errors", errs.length === 0, errs.join(" | "));
 await done(b);
