@@ -71,6 +71,7 @@ import { reconcileTeam, pickRememberedMain, readTeamMemory, writeTeamMemory } fr
 import { useRealtimeTables } from "./realtime/useRealtimeTables.js";
 import { reconcileOpenRecord, mergeRemoteSettings, parseLocalSync } from "./realtime/liveRecord.js";
 import { monthIndex, parseDisplayDate } from "./utils/parseDate.js";
+import { isoToDisplayDate } from "./utils/parseDate.js";
 import { fetchRecentMovements, MOVEMENT_META } from "./stores/stockMovementsStore.js";
 import { sendPOWhatsApp, openVendorWhatsApp, waErrorToast } from "./utils/whatsapp.js";
 import { uploadItemMedia, MAX_UPLOAD_BYTES } from "./utils/storage.js";
@@ -78,7 +79,7 @@ import POSettings from "./components/POSettings.jsx";
 import SearchableSelect from "./components/SearchableSelect.jsx";
 import {
   PURCHASE_TYPES, PURCHASE_TYPE_BY_KEY, ITEM_GST_RATES, DEFAULT_PURCHASE_TYPE_KEY,
-  getPurchaseType, calculateGSTBreakdown, filterPurchaseTypes, todayIso,
+  getPurchaseType, calculateGSTBreakdown, filterPurchaseTypes, todayIso, poTaxLines,
 } from "./utils/gst.js";
 import { mapRow as vendorMapRow, parseRows as vendorParseRows } from "./utils/vendorImport.js";
 import { parseRows as itemParseRows, generateItemCode, buildRowsFromSheet as itemBuildRowsFromSheet } from "./utils/itemImport.js";
@@ -100,7 +101,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-04-store-1";
+const APP_BUILD = "2026-11-04-purchase-1";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -4680,7 +4681,7 @@ function PODetailModal({ po, onClose, onApprove, onMarkOrdered, onMarkReceived, 
                 </table>
               </div>
               <div className="mt-2 px-3 flex justify-between text-[10px]">
-                <span className="text-slate-500">GST (18%): ₹{(po.gst || 0).toLocaleString("en-IN")}</span>
+                <span className="text-slate-500">{poTaxLines(po).map((t) => `${t.label}: ₹${t.amount.toLocaleString("en-IN")}`).join(" · ")}</span>
                 <span className="font-bold text-green-700">Total: ₹{po.amount.toLocaleString("en-IN")}</span>
               </div>
             </div>
@@ -9925,7 +9926,8 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
   const receivedPOs  = pos.filter(p => p.status === "received").sort((a, b) => parseDate(b.receivedDate||b.date) - parseDate(a.receivedDate||a.date));
 
   const enrichedFU    = followUps.map(f => {
-    const diff  = Math.floor((parseDate(f.nextFollowUp) - today) / 86400000);
+    // isoToDisplayDate heals rows saved with a raw "yyyy-mm-dd" custom date.
+    const diff  = Math.floor((parseDate(isoToDisplayDate(f.nextFollowUp)) - today) / 86400000);
     return { ...f, daysRemaining: diff, fstat: diff < 0 ? "fu-overdue" : diff === 0 ? "fu-due" : "fu-pending" };
   }).sort((a,b) => a.daysRemaining - b.daysRemaining);
 
@@ -9938,12 +9940,12 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
   const handleConfirm = () => {
     if (!eta) return;
     const d = new Date(); d.setDate(d.getDate() + +eta);
-    onConfirmOrder(moModal.id, eta === "custom" ? etaCustom : fmtDate(d));
+    onConfirmOrder(moModal.id, eta === "custom" ? isoToDisplayDate(etaCustom) : fmtDate(d));
     setMoModal(null); setEta(""); setEtaCustom("");
   };
   const handleFuDone = () => {
     const d = new Date(); d.setDate(d.getDate() + (fuFreq === "custom" ? 0 : fuFreq));
-    onFollowUpDone(fuModal.id, fuFreq, fuFreq === "custom" ? fuCustom : fmtDate(d));
+    onFollowUpDone(fuModal.id, fuFreq, fuFreq === "custom" ? isoToDisplayDate(fuCustom) : fmtDate(d));
     setFuModal(null); setFuFreq(1); setFuCustom("");
   };
   const handleReceive = (poId) => {
@@ -10299,11 +10301,11 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
                       </div>
                       <div>
                         <div className="text-slate-600 mb-0.5">ETA</div>
-                        <div className="font-bold text-slate-500">{f.eta||"—"}</div>
+                        <div className="font-bold text-slate-500">{isoToDisplayDate(f.eta)||"—"}</div>
                       </div>
                       <div>
                         <div className="text-slate-600 mb-0.5">Next Follow-up</div>
-                        <div className="font-bold text-purple-300">{f.nextFollowUp}</div>
+                        <div className="font-bold text-purple-300">{isoToDisplayDate(f.nextFollowUp)}</div>
                       </div>
                       {f.lastFollowUp && (
                         <div>
@@ -10532,7 +10534,7 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
                   <div className="grid gap-y-1.5 text-[10.5px]" style={{ gridTemplateColumns:"auto 1fr" }}>
                     <span className="text-slate-500 pr-3">PO Number</span><span className="font-mono font-bold text-slate-900">{viewPO.id}</span>
                     <span className="text-slate-500 pr-3">Date</span><span className="font-semibold text-slate-500">{viewPO.date}</span>
-                    <span className="text-slate-500 pr-3">ETA</span><span className="font-semibold text-slate-500">{viewPO.eta || viewPO.delivery || "—"}</span>
+                    <span className="text-slate-500 pr-3">ETA</span><span className="font-semibold text-slate-500">{isoToDisplayDate(viewPO.eta) || viewPO.delivery || "—"}</span>
                     <span className="text-slate-500 pr-3">Priority</span>
                     <span className={`font-bold uppercase text-[9px] ${viewPO.priority==="urgent"?"text-red-400":viewPO.priority==="high"?"text-amber-700":"text-slate-400"}`}>{viewPO.priority||"normal"}</span>
                     <span className="text-slate-500 pr-3">Items</span><span className="font-semibold text-slate-500">{viewPO.lineItems?.length||0} line items</span>
@@ -10579,10 +10581,12 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
                         <span className="text-slate-500">Subtotal</span>
                         <span className="font-mono font-semibold text-slate-500">₹{subtotal.toLocaleString("en-IN")}</span>
                       </div>
-                      <div className="flex justify-between px-3 py-1.5 text-[10px]">
-                        <span className="text-slate-500">GST (18%)</span>
-                        <span className="font-mono font-semibold text-amber-700">₹{poGst.toLocaleString("en-IN")}</span>
-                      </div>
+                      {poTaxLines(viewPO).map((t) => (
+                        <div key={t.key} data-po-tax={t.key} className="flex justify-between px-3 py-1.5 text-[10px]">
+                          <span className="text-slate-500">{t.label}</span>
+                          <span className="font-mono font-semibold text-amber-700">₹{t.amount.toLocaleString("en-IN")}</span>
+                        </div>
+                      ))}
                       <div className="flex justify-between px-3 py-2.5" style={{ borderTop:"1px solid rgba(17,24,39,0.06)" }}>
                         <span className="text-[12px] font-bold text-slate-900">Grand Total</span>
                         <span className="text-[13px] font-black font-mono text-green-400">₹{poTotal.toLocaleString("en-IN")}</span>
@@ -26970,7 +26974,7 @@ export default function App() {
     ...safeFollowUps.map((f) => ({
       id: `followup-${f?.id}`, type: "followup",
       title: `Follow-Up Due: ${f?.poId || ""}`,
-      desc:  `${f?.vendor || ""} · Next: ${f?.nextFollowUp || ""}`,
+      desc:  `${f?.vendor || ""} · Next: ${isoToDisplayDate(f?.nextFollowUp) || ""}`,
     })),
     ...(safePending.length > 0 ? [{
       id: "pending_alert-all", type: "pending_alert",

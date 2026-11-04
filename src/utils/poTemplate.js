@@ -1,5 +1,6 @@
 // Purchase Order template engine — company profiles, template presets, and PDF/HTML builder.
 // All data lives in settings.po (persisted to Supabase via the settings store).
+import { poTaxLines } from "./gst.js";
 
 // ── Template presets ──────────────────────────────────────────────────────────
 // Each preset is a visual style; the layout/sections are controlled by `show` toggles.
@@ -287,7 +288,7 @@ export function buildPOHtml(po, vendor = {}, company = {}, opts = {}) {
   <table class="totals">
     <tbody>
       <tr><td style="color:#666">Subtotal</td><td style="text-align:right;font-weight:600">₹${subtotal.toLocaleString("en-IN")}</td></tr>
-      <tr><td style="color:#666">GST (18%)</td><td style="text-align:right;font-weight:600">₹${gst.toLocaleString("en-IN")}</td></tr>
+      ${poTaxLines(po).map((t) => `<tr><td style="color:#666">${esc(t.label)}</td><td style="text-align:right;font-weight:600">₹${t.amount.toLocaleString("en-IN")}</td></tr>`).join("")}
       <tr class="grand"><td>Grand Total</td><td style="text-align:right">₹${total.toLocaleString("en-IN")}</td></tr>
     </tbody>
   </table>
