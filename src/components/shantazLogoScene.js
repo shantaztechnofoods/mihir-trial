@@ -219,9 +219,9 @@ export function createLogoScene(host, { svgText, fullBleed = false, onFail } = {
   const bgScene = new Scene(), bgCam = new OrthographicCamera(-1, 1, 1, -1, 0, 1);
   const bgMat = new ShaderMaterial({
     depthTest: false, depthWrite: false,
-    uniforms: { uRes: { value: new Vector2(1, 1) }, uPool: { value: new Vector2(0.3, 0.5) }, uPoolR: { value: 300 }, uShadow: { value: new Vector2(0.3, 0.3) }, uShadowW: { value: 300 }, uOn: { value: 0 } },
+    uniforms: { uRes: { value: new Vector2(1, 1) }, uPool: { value: new Vector2(0.3, 0.5) }, uPoolR: { value: 300 }, uShadow: { value: new Vector2(0.3, 0.3) }, uShadowW: { value: 300 }, uOn: { value: 0 }, uShade: { value: 0 } },
     vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }",
-    fragmentShader: `uniform vec2 uRes, uPool, uShadow; uniform float uPoolR, uShadowW, uOn; varying vec2 vUv;
+    fragmentShader: `uniform vec2 uRes, uPool, uShadow; uniform float uPoolR, uShadowW, uOn, uShade; varying vec2 vUv;
       vec3 lin(vec3 c){ return pow(c, vec3(2.2)); }
       float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
       void main(){
@@ -232,7 +232,7 @@ export function createLogoScene(host, { svgText, fullBleed = false, onFail } = {
         vec2 q = (px - uPool * uRes) / uPoolR; float pool = exp(-dot(q, q) * 1.25);
         vec2 q2 = (px - uPool * uRes) / (uPoolR * vec2(2.8, 1.25)); pool += exp(-dot(q2, q2) * 1.6) * 0.4;
         col += lin(vec3(0.42, 0.56, 0.80)) * pool * 0.36 * uOn;
-        vec2 s = (px - uShadow * uRes) / vec2(uShadowW, uShadowW * 0.05); col *= 1.0 - 0.45 * exp(-dot(s, s) * 1.5) * uOn;
+        vec2 s = (px - uShadow * uRes) / vec2(uShadowW, uShadowW * 0.08); col *= 1.0 - 0.32 * exp(-dot(s, s) * 1.5) * uShade;
         col += (hash(px) - 0.5) / 255.0;   // dither: no banding in the gradients
         gl_FragColor = vec4(col, 1.0);
       }`,
@@ -310,6 +310,8 @@ export function createLogoScene(host, { svgText, fullBleed = false, onFail } = {
     glint.scale.setScalar(0.6 + 0.6 * span(t, 0.78, 0.6));
     glint.rotation.z = 0.6 * span(t, 0.78, 0.6);
     bgMat.uniforms.uOn.value = 0.35 + 0.65 * outCubic(span(t, 0.1, 1.2));
+    // soft contact shade under the logo: only once the wordmark has landed (no shadow of nothing)
+    bgMat.uniforms.uShade.value = outCubic(span(t, 1.9, 1.0));
     // 2. wheat grows stalk by stalk (clip plane rises), grains settle as it passes
     const span0 = wheatTopY - wheatBaseY + 0.3;
     stalks.forEach((s, i) => {

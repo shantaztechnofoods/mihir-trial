@@ -957,7 +957,7 @@ function DashboardPage({ items = {}, pos = [], vendorList = [], machineLog = [],
   // the dashboard look assembled rather than designed. Stroked icons take each
   // tile's own colour instead of fighting it.
   const kpis = [
-    { label: "Total SKUs",        value: totalSKUs,                                              Icon: Boxes,        color: "#2E50D6", nav: "inventory",  sub: `${safeItems.length} safe` },
+    { label: "Total SKUs",        value: totalSKUs,                                              Icon: Boxes,        color: "#2E50D6", nav: "inventory",  sub: `${safeItems.length} safe`,        alert: false },
     { label: "Critical Stock",    value: criticalN,                                              Icon: AlertOctagon, color: "#b91c1c", nav: "inventory",  sub: `${warningItems.length} warning`,  alert: criticalN > 0 },
     { label: "Pending POs",       value: pendingPOs.length,                                      Icon: AlertTriangle,color: "#b45309", nav: "pipeline",   sub: "awaiting approval",               alert: pendingPOs.length > 0 },
     { label: "Open PO Value",     value: fmtVal(openPOValue),                                    Icon: Wallet,       color: "#15803d", nav: "pipeline",   sub: `${openPOs.length} open` },
@@ -996,42 +996,30 @@ function DashboardPage({ items = {}, pos = [], vendorList = [], machineLog = [],
 
       <div className="p-6 space-y-6">
 
-        {/* ── Hero Stats (top 3 large) ── */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {kpis.slice(0, 3).map((kpi) => (
+        {/* ── KPI tiles: ONE anatomy for all nine (icon · status, number, label, sub).
+             The number is always ink; meaning is a dot + one word, never a coloured number. ── */}
+        {(() => {
+          const tile = (kpi, big) => (
             <button key={kpi.label} onClick={() => canOpen(kpi.nav) && onNavigate?.(kpi.nav)} aria-disabled={!canOpen(kpi.nav) || undefined}
-              className="hero-tile group" style={{ "--tile": kpi.color, cursor: canOpen(kpi.nav) ? undefined : "default" }}>
-              <div className="hero-tile-icon" style={{ background: kpi.color + "14", color: kpi.color }}>
-                <kpi.Icon size={21} strokeWidth={2} aria-hidden="true" />
+              className={`dash-tile group${big ? " dash-tile--lg" : ""}`} style={{ cursor: canOpen(kpi.nav) ? undefined : "default" }}>
+              <div className="dash-tile-head">
+                <kpi.Icon size={big ? 18 : 16} strokeWidth={2} aria-hidden="true" className="dash-tile-icon" />
+                {"alert" in kpi && (
+                  <span className={`dash-tile-status${kpi.alert ? " is-bad" : ""}`}>{kpi.alert ? "Action" : "On track"}</span>
+                )}
               </div>
-              <div className="hero-tile-body">
-                <CountUpValue value={kpi.value} className="hero-tile-value" style={{ color: kpi.alert ? kpi.color : "var(--text-strong)" }} />
-                <div className="hero-tile-label">{kpi.label}</div>
-                <div className="hero-tile-sub">{kpi.sub}</div>
-              </div>
-              <span className="hero-tile-trend" style={{
-                background: kpi.alert ? "rgba(220,38,38,0.08)" : "rgba(5,150,105,0.08)",
-                color: kpi.alert ? "#b91c1c" : "#047857",
-              }}>{kpi.alert ? "Action" : "On track"}</span>
+              <CountUpValue value={kpi.value} className="dash-tile-value" />
+              <div className="dash-tile-label">{kpi.label}</div>
+              <div className="dash-tile-sub">{kpi.sub}</div>
             </button>
-          ))}
-        </div>
-
-        {/* ── Secondary KPI Cards ── */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          {kpis.slice(3).map((kpi) => (
-            <button key={kpi.label} onClick={() => canOpen(kpi.nav) && onNavigate?.(kpi.nav)} aria-disabled={!canOpen(kpi.nav) || undefined}
-              className="kpi-tile group" style={{ cursor: canOpen(kpi.nav) ? undefined : "default" }}>
-              <div className="flex items-center justify-between mb-2">
-                <span style={{ color: kpi.color }}><kpi.Icon size={17} strokeWidth={2} aria-hidden="true" /></span>
-                {kpi.alert && <span className="w-1.5 h-1.5 rounded-full" style={{ background: kpi.color }} />}
-              </div>
-              <CountUpValue value={kpi.value} className="kpi-value block text-[22px] font-extrabold tabular-nums leading-none tracking-[-0.02em]" style={{ color: kpi.alert ? kpi.color : "var(--text-strong)" }} />
-              <div className="text-[11px] font-semibold mt-2 leading-tight" style={{ color: "var(--text-muted)" }}>{kpi.label}</div>
-              <div className="text-[10px] mt-1 truncate" style={{ color: "var(--text-dim)" }}>{kpi.sub}</div>
-            </button>
-          ))}
-        </div>
+          );
+          return (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">{kpis.slice(0, 3).map((k) => tile(k, true))}</div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">{kpis.slice(3).map((k) => tile(k, false))}</div>
+            </>
+          );
+        })()}
 
         {/* ── Production overview (live data) ── */}
         <div className="section-card overflow-hidden">
@@ -1051,16 +1039,19 @@ function DashboardPage({ items = {}, pos = [], vendorList = [], machineLog = [],
             {/* Alerts row */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               {[
-                { label: "Delayed machines", n: production.delayed.length, color: "#b91c1c", bg: "rgba(239,68,68,0.08)", nav: "machines", hint: "Past the department target" },
-                { label: "On Hold", n: production.onHold.length + production.manualHold, color: "#4338ca", bg: "rgba(99,102,241,0.10)", nav: "machines", hint: "Acceptance overdue / put on hold" },
-                { label: "Awaiting acceptance", n: production.awaiting, color: "#b45309", bg: "rgba(217,119,6,0.10)", nav: "machines", hint: production.onRack > 0 ? `Not yet accepted · ${production.onRack} on rack` : "Transferred, not yet accepted" },
-                { label: "Open pending jobs", n: production.openJobs.length, color: "#0e7490", bg: "rgba(14,116,144,0.10)", nav: "machines", hint: "Must close before Ready" },
+                { label: "Delayed machines", n: production.delayed.length, Icon: Clock, tone: "bad", nav: "machines", hint: "Past the department target" },
+                { label: "On Hold", n: production.onHold.length + production.manualHold, Icon: AlertCircle, tone: "bad", nav: "machines", hint: "Acceptance overdue / put on hold" },
+                { label: "Awaiting acceptance", n: production.awaiting, Icon: Hourglass, tone: "warn", nav: "machines", hint: production.onRack > 0 ? `Not yet accepted · ${production.onRack} on rack` : "Transferred, not yet accepted" },
+                { label: "Open pending jobs", n: production.openJobs.length, Icon: ClipboardList, tone: "warn", nav: "machines", hint: "Must close before Ready" },
               ].map((a) => (
-                <button key={a.label} onClick={() => onNavigate?.(a.nav)} className="wu-tile text-left rounded-xl px-3.5 py-3" data-on={a.n > 0 || undefined}
-                        style={{ "--tone": a.color }}>
-                  <CountUpValue value={a.n} className="kpi-value block text-[22px] font-extrabold tabular-nums leading-none" style={{ color: a.n > 0 ? a.color : "var(--text-strong)" }} />
-                  <div className="text-[11px] font-semibold mt-1.5" style={{ color: "var(--text-muted)" }}>{a.label}</div>
-                  <div className="text-[10px] mt-0.5" style={{ color: "var(--text-dim)" }}>{a.hint}</div>
+                <button key={a.label} onClick={() => onNavigate?.(a.nav)} className="dash-tile dash-tile--sm" data-on={a.n > 0 || undefined}>
+                  <div className="dash-tile-head">
+                    <a.Icon size={16} strokeWidth={2} aria-hidden="true" className="dash-tile-icon" />
+                    {a.n > 0 && <span className={`dash-tile-dot is-${a.tone}`} aria-hidden="true" />}
+                  </div>
+                  <CountUpValue value={a.n} className="dash-tile-value" />
+                  <div className="dash-tile-label">{a.label}</div>
+                  <div className="dash-tile-sub">{a.hint}</div>
                 </button>
               ))}
             </div>
@@ -1072,9 +1063,9 @@ function DashboardPage({ items = {}, pos = [], vendorList = [], machineLog = [],
                 <div className="text-[10px] font-semibold mb-1.5" style={{ color: "var(--text-dim)" }}>Machines by current stage</div>
                 <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
                   {Object.entries(production.byStage).map(([st, n]) => (
-                    <div key={st} className="wu-tile wu-tile-sm rounded-lg px-2.5 py-2 text-center">
-                      <CountUpValue value={n} className="kpi-value block text-[18px] font-extrabold tabular-nums leading-none" style={{ color: n > 0 ? "var(--text-strong)" : "var(--text-dim)" }} />
-                      <div className="text-[10px] font-semibold mt-1 leading-tight" style={{ color: "var(--text-muted)" }}>{st === "BOM Issued" ? "Issued" : st}</div>
+                    <div key={st} className="dash-stage" data-zero={n > 0 ? undefined : ""}>
+                      <CountUpValue value={n} className="dash-stage-value" />
+                      <div className="dash-stage-label">{st === "BOM Issued" ? "Issued" : st}</div>
                     </div>
                   ))}
                 </div>

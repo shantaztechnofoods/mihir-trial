@@ -301,7 +301,7 @@
   @keyframes lg-logo-in { from { opacity: 0; transform: translateY(10px) scale(.97); filter: blur(4px); } to { opacity: 1; transform: none; filter: none; } }
 
   /* panel + card */
-  .lg-panel { position: relative; z-index: 2; grid-row: 2; display: flex; justify-content: center; padding: 0 16px; }
+  .lg-panel { position: relative; z-index: 2; grid-row: 2; display: flex; align-items: flex-start; justify-content: center; padding: 0 16px; }
   .lg-card {
     position: relative; overflow: hidden; width: 100%; max-width: 440px; color: #EEF2F8;
     border-radius: 24px; padding: 24px 20px 20px;
@@ -355,7 +355,7 @@
   .lg-foot { margin-top: 16px; font-size: 13px; color: #8F9AAE; }
 
   /* Made in India: a small tricolour pill under the card (phone), bottom-left of the scene (laptop) */
-  .lg-made { position: relative; z-index: 2; grid-row: 3; display: flex; justify-content: center; padding: 16px 16px calc(18px + env(safe-area-inset-bottom)); animation: wu-fade 800ms var(--ease-enter) 700ms backwards; }
+  .lg-made { position: relative; z-index: 2; grid-row: 3; align-self: end; display: flex; justify-content: center; padding: 16px 16px calc(18px + env(safe-area-inset-bottom)); animation: wu-fade 800ms var(--ease-enter) 700ms backwards; }
   .lg-india { padding: 7px 12px 7px 9px; border-radius: 999px; color: #C3CAD6; background: rgba(255, 255, 255, .05); border: 1px solid rgba(255, 255, 255, .09); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
 
   /* Laptop: the scene fills the screen, the card floats on the right */
@@ -478,6 +478,13 @@
   }
   .wu-btn:disabled { background: #EEF0F3 !important; color: var(--ink-4) !important; box-shadow: none !important; border-color: transparent !important; opacity: 1 !important; filter: none !important; }
   .wu-actions .wu-main { order: 9; }
+  /* Phone: the two quiet actions (Report Issue · ON HOLD) share one row; the
+     green Finish stays full width below. A lone secondary takes the full row. */
+  @media (max-width: 639px) {
+    .wu-actions { flex-direction: row; flex-wrap: wrap; }
+    .wu-actions > .wu-btn { flex: 1 1 calc(50% - 4px); min-width: 0; padding: 0 12px; }
+    .wu-actions > .wu-main, .wu-actions > :not(.wu-btn) { flex-basis: 100%; }
+  }
   @media (min-width: 640px) {
     .wu-actions { flex-direction: row; flex-wrap: wrap; }
     .wu-btn { width: auto; }
@@ -650,4 +657,34 @@
   .wu-attn { background: var(--paper) !important; border: 0 !important; box-shadow: var(--e1); }
   .wu-attn-chip { background: var(--sunk) !important; border: 0 !important; color: var(--ink-2) !important; font-family: var(--font-ui) !important; font-weight: 500 !important; font-size: 11.5px !important; border-radius: 999px !important; }
   .wu-attn-chip[data-status="critical"] { color: var(--bad) !important; }
+}
+
+/* ═══ ADMIN DASHBOARD — one tile anatomy (KPI, production alerts, stages) ═══ */
+@media screen {
+  .dash-tile { position: relative; display: flex; flex-direction: column; align-items: stretch; text-align: left; min-width: 0;
+    padding: 14px 16px 14px; border-radius: var(--r-card); background: var(--paper); border: 0; box-shadow: var(--e1);
+    transition: box-shadow var(--dur-ui) var(--ease-enter); }
+  .dash-tile--lg { padding: 18px 20px; }
+  .dash-tile-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 20px; margin-bottom: 10px; }
+  .dash-tile-icon { color: var(--ink-4); flex-shrink: 0; }
+  .dash-tile-status { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 500; color: var(--ok); white-space: nowrap; }
+  .dash-tile-status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .dash-tile-status.is-bad { color: var(--bad); }
+  .dash-tile-dot { width: 7px; height: 7px; border-radius: 50%; }
+  .dash-tile-dot.is-bad { background: var(--bad); } .dash-tile-dot.is-warn { background: var(--wait); }
+  .dash-tile-value { display: block; font: 650 24px/1 var(--font-ui); letter-spacing: -0.025em; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .dash-tile--lg .dash-tile-value { font-size: 30px; }
+  .dash-tile-label { margin-top: 8px; font-size: 13.5px; font-weight: 500; line-height: 1.25; color: var(--ink-2); }
+  .dash-tile-sub { margin-top: 3px; font-size: 12.5px; line-height: 1.3; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dash-tile--sm .dash-tile-sub { white-space: normal; }
+  @media (hover: hover) and (pointer: fine) { button.dash-tile:hover { box-shadow: var(--e2); } }
+  button.dash-tile:active { transform: scale(.99); }
+  .dash-stage { padding: 10px 8px; border-radius: var(--r-sm); background: var(--paper); border: 1px solid var(--line); text-align: center; }
+  .dash-stage-value { display: block; font: 650 18px/1 var(--font-ui); color: var(--ink); font-variant-numeric: tabular-nums; }
+  .dash-stage[data-zero] .dash-stage-value { color: var(--ink-4); }
+  .dash-stage-label { margin-top: 5px; font-size: 12px; font-weight: 500; color: var(--ink-3); line-height: 1.2; }
+  @media (max-width: 639px) {
+    .dash-tile--lg { padding: 14px 16px; }
+    .dash-tile--lg .dash-tile-value { font-size: 26px; }
+  }
 }
