@@ -1,6 +1,7 @@
 // Outward Log store — public.outward_log (append-only)
 import { isSupabaseEnabled } from "../config/env.js";
 import { getSupabase } from "../supabase/client.js";
+import { fetchAllRows, readLocalJson } from "../utils/fetchAll.js";
 import { localIsoDate } from "./localDate.js";
 
 const LOCAL_KEY = "erp_outward";
@@ -40,7 +41,7 @@ function toIsoDate(s) {
   return localIsoDate(d);
 }
 
-function getLocal() { try { const s = localStorage.getItem(LOCAL_KEY); if (s) return JSON.parse(s); } catch {} return []; }
+function getLocal() { return readLocalJson(LOCAL_KEY, []); }
 function setLocal(a) { try { localStorage.setItem(LOCAL_KEY, JSON.stringify(a)); } catch {} }
 
 export async function fetchOutward() {

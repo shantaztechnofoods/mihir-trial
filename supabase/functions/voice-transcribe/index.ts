@@ -2,9 +2,9 @@
 // Deployed via the Supabase CLI / dashboard (NOT Vercel):
 //   supabase functions deploy voice-transcribe        (verify JWT: ON)
 //
-// Owner requirement 2026-11-03: every voice note must become text in the box
-// (reports need text), even on phones where browser dictation does not work
-// (iPhone Safari, Firefox). The audio itself is only the backup.
+// Owner requirement 2026-11-03/04: the 🎤 writes TEXT into the box (reports
+// need text), even on phones where browser dictation does not work (iPhone
+// Safari, Firefox). No audio is kept.
 //
 // Request body:  { audioBase64: string, mimeType: string }   (≤ ~2 MB, ≤ 60 s)
 // Response 200:  { text: string }      (may be "" when nothing was said)
@@ -13,8 +13,11 @@
 // Rules:
 //   - Caller must be a logged-in, active ERP user (same auth as ai-assistant).
 //   - Gemini only gets the audio + a fixed instruction; it never sees any key
-//     or any ERP data. Nothing is stored here; the audio is already saved as a
-//     machine attachment by the app before this is called.
+//     or any ERP data. Nothing is stored here, and since 2026-11-04 the app
+//     does not store the audio either — the clip is sent straight here and
+//     discarded; only the returned text is kept (in the remark box).
+//   - Request shape is unchanged since 2026-11-03, so old and new app builds
+//     both work with either deployed version.
 //   - Language as spoken: Gujarati → Gujarati script, Hindi → Devanagari,
 //     English → English. No translation.
 
@@ -33,10 +36,16 @@ const MAX_AUDIO_BYTES = 2 * 1024 * 1024;
 const MAX_B64_CHARS   = Math.ceil(MAX_AUDIO_BYTES / 3) * 4 + 16;
 const ALLOWED_MIME    = new Set(["audio/webm", "audio/ogg", "audio/mp4", "audio/aac", "audio/x-m4a", "audio/mpeg", "audio/mp3", "audio/wav", "audio/x-wav", "audio/flac"]);
 
+// 2026-11-04 (owner): the app keeps NO audio — this text is all that stays,
+// so it must read neatly: proper sentences, punctuation, filler removed.
 const INSTRUCTION =
-  "Transcribe exactly what is said, in the same language and script it is spoken (Gujarati/Hindi/English, mixed allowed). " +
-  "Gujarati must be written in Gujarati script, Hindi in Devanagari, English in English. " +
-  "Do not translate, do not add anything. Return only the text. If nothing is said, return an empty answer.";
+  "You write down what a factory worker said, to be saved as a short written remark. " +
+  "Write it in the same language and script it is spoken (Gujarati/Hindi/English, mixed allowed): " +
+  "Gujarati in Gujarati script, Hindi in Devanagari, English in English. Do not translate. " +
+  "Write clean, complete sentences with correct punctuation and capital letters (Hindi sentences end with ।). " +
+  "Remove filler words (um, uh, hmm, matlab, wo, like), repeated words and false starts. " +
+  "Keep every fact, number, part name and machine name exactly as said; do not add, explain or summarise. " +
+  "Return only the text. If nothing is said, return an empty answer.";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin":  "*",
@@ -101,7 +110,7 @@ serve(async (req: Request) => {
     // 3) Ask Gemini for a verbatim transcript.
     const geminiReq = {
       contents: [{ role: "user", parts: [{ text: INSTRUCTION }, { inline_data: { mime_type: mime, data: audio } }] }],
-      generationConfig: { temperature: 0 },
+      generationConfig: { temperature: 0.1 },
     };
     let resp: Response;
     try {

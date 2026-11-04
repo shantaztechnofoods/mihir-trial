@@ -3,6 +3,7 @@
 
 import { isSupabaseEnabled } from "../config/env.js";
 import { getSupabase } from "../supabase/client.js";
+import { fetchAllRows, readLocalJson } from "../utils/fetchAll.js";
 
 const LOCAL_KEY = "erp_pending_handover_items";
 
@@ -174,19 +175,19 @@ function isMissingColumnError(error) {
     || msg.includes("schema cache");
 }
 
-const getLocal = () => { try { const s = localStorage.getItem(LOCAL_KEY); if (s) return JSON.parse(s); } catch {} return []; };
+const getLocal = () => readLocalJson(LOCAL_KEY, []);
 const setLocal = (a) => { try { localStorage.setItem(LOCAL_KEY, JSON.stringify(a)); } catch {} };
 
 export async function fetchPendingItems() {
   if (!isSupabaseEnabled()) return getLocal();
   const c = getSupabase(); if (!c) return getLocal();
-  const { data, error } = await c.from("pending_handover_items").select("*").order("raised_at", { ascending: false });
+  const { data, error } = await fetchAllRows(() => c.from("pending_handover_items").select("*").order("raised_at", { ascending: false }).order("id", { ascending: false }), { tag: "pending_items:load" });
   if (error) { console.warn("[pending_items] load failed", error); return getLocal(); }
   const out = (data || []).map(fromRow);
   // Migration 054 — attach each job's receipts. A missing table (054 not
   // applied yet) just means no receipts.
   try {
-    const rc = await c.from("pending_item_receipts").select("*").order("received_at", { ascending: true }).order("id", { ascending: true });
+    const rc = await fetchAllRows(() => c.from("pending_item_receipts").select("*").order("received_at", { ascending: true }).order("id", { ascending: true }), { tag: "pending_item_receipts:load" });
     if (!rc.error) {
       const by = new Map();
       for (const r of (rc.data || []).map(receiptFromRow)) { if (!by.has(r.pendingItemId)) by.set(r.pendingItemId, []); by.get(r.pendingItemId).push(r); }
