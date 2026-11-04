@@ -56,6 +56,8 @@ export function createLogoScene(host, { svgText, fullBleed = false, onFail } = {
   catch { fail(); return () => {}; }
   const reduced = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
   renderer.setPixelRatio(Math.min(Math.max(window.devicePixelRatio || 1, 1), 1.5));
+  // production: skip per-program info-log checks (a driver may return a null log -> three throws mid-frame)
+  renderer.debug.checkShaderErrors = false;
   renderer.outputColorSpace = SRGBColorSpace;
   renderer.toneMapping = ACESFilmicToneMapping;
   renderer.toneMappingExposure = 0.8;
