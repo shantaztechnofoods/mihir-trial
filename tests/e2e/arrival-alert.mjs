@@ -74,7 +74,7 @@ await b.close();
     await gotoMachineTracker(pd); await pd.waitForTimeout(900); };
   await reopen();
   const chip = pd.locator("[data-staff-timer='1']");
-  ok("at 86% the timer chip turns amber: '⏳ 1h 40m left'", (await chip.innerText()).includes("⏳ 1h 40m left") && (await chip.getAttribute("data-timer-level")) === "80", await chip.innerText());
+  ok("at 86% the timer chip turns amber: '⏳ 1h 40m left'", (await chip.innerText()).includes("1h 40m left") && (await chip.getAttribute("data-timer-level")) === "80", await chip.innerText());
   const bn = pd.locator("[data-arrival-banner]");
   ok("near-deadline banner shows", (await bn.count()) === 1 && /M-10 · SN-101 — 1h 40m left in Mechanical/.test(await bn.innerText()));
   let a = await pd.evaluate(() => window.__alerts);
@@ -84,7 +84,7 @@ await b.close();
   a = await pd.evaluate(() => window.__alerts);
   ok("after a refresh the 80% alert does not repeat", a.vibrate.length === 0 && a.speak.length === 0 && (await bn.count()) === 0);
   await pd.clock.setFixedTime(new Date("2026-11-02T16:00:00")); await reopen();
-  ok("over 100%: red chip 'Late by 20m'", (await chip.innerText()).includes("⏰ Late by 20m") && (await chip.getAttribute("data-timer-level")) === "100", await chip.innerText());
+  ok("over 100%: red chip 'Late by 20m'", (await chip.innerText()).includes("Late by 20m") && (await chip.getAttribute("data-timer-level")) === "100", await chip.innerText());
   // The page re-opened straight on Machine Tracker with no touch yet: the browser blocks sound
   // until the first touch, so the chime + speech wait for it.
   a = await pd.evaluate(() => window.__alerts);
@@ -121,7 +121,7 @@ await pa.reload({ waitUntil: "networkidle" }); await pa.waitForTimeout(600); awa
 if (await pa.locator("#login-username").count()) await loginAdmin(pa);
 await gotoMachineTracker(pa);
 const late = (await today.innerText()).replace(/\s+/g, " ");
-ok("a late machine shows '🔴 1 late'", /🔴 1 late/.test(late), late);
+ok("a late machine shows a red dot + '1 late'", /1 late/.test(late) && await pa.locator("[data-mt-today-chip='hold'] .lead-dot").count() === 1, late);
 await pa.locator("[data-mt-today-chip='hold']").click(); await pa.waitForTimeout(500);
 ok("tapping 'late' applies the On HOLD filter", await pa.locator("[data-summary-card='hold'][aria-current='page']").count() === 1);
 if (SHOTS) {

@@ -666,7 +666,7 @@ test("App: rack crate face is condition-aware and the panel is untouched", async
   // assembly progress and missing parts, only where they belong
   assert.match(face, /sl\.status === "assembling" && \([\s\S]{0,420}?data-rack-progress="assembling"/);
   // 2026-11-01 (C3): measured bench time only — no fixed-width bar
-  assert.match(face, /⏱ \{inAssemblyFor \|\| "just started"\} on the bench/);
+  assert.match(face, /<LeadIcon e="⏱" \/>\{inAssemblyFor \|\| "just started"\} on the bench/);
   assert.doesNotMatch(app, /width: niN \? "60%" : "85%"/);
   assert.match(face, /\$\{niN\} part\$\{niN === 1 \? "" : "s"\} missing/);
   assert.match(face, /\(sl\.status === "set" \|\| sl\.status === "assembling"\) && \(/);
