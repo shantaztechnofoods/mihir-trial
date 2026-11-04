@@ -814,24 +814,24 @@
   }
 }
 
-/* ═══ ShantazLogo2D — traced artwork + real-text tagline ═══════════════════ */
-@media screen {
-  .shz-logo { position: relative; display: block; container-type: inline-size; }
-  .shz-logo > img { display: block; width: 100%; height: auto; }
-  .shz-tag { position: absolute; left: 31.7%; width: 60.1%; top: 83.6%; display: flex; justify-content: space-between;
-    font: 500 4.05cqw/1 "Cinzel", "Trajan Pro", Georgia, serif; color: #C9D1DE; letter-spacing: 0; white-space: nowrap; }
-  .shz-shine::after { content: ""; position: absolute; inset: 0; pointer-events: none;
-    background: linear-gradient(110deg, transparent 38%, rgba(255, 255, 255, .75) 50%, transparent 62%) no-repeat; background-size: 250% 100%; background-position: 130% 0;
-    -webkit-mask: var(--logo) center / contain no-repeat; mask: var(--logo) center / contain no-repeat; animation: lg-shine2 1.3s var(--ease-enter) .5s 1 forwards; }
-  .lg-logo2d.shz-logo > img { filter: drop-shadow(0 18px 30px rgba(0, 0, 0, .45)); }
-  .lg-logo2d::after { display: none; }
-  .lg-logo2d.shz-shine::after { display: block; }
-  .sb-logo-wide .shz-tag { color: #AEB8C8; }
-}
-@media (prefers-reduced-motion: reduce) { .shz-shine::after { animation: none !important; display: none !important; } }
 
 @media screen {
   /* L16: Made in India sits inside the card footer (no seam on a phone) */
   .lg-card .lg-india { display: flex; margin-top: 18px; padding: 14px 0 0 !important; width: 100%; max-width: none; border-top: 1px solid rgba(255, 255, 255, .12); background: transparent !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
   @media (max-width: 1023px) { .lg-card { padding-bottom: calc(16px + env(safe-area-inset-bottom)) !important; } }
 }
+
+/* ═══ Login 3D logo (feat/logo-3d LoginBrand3D, full bleed) ═══════════════ */
+@media screen {
+  .lg-brand3d--full .lg-3d { inset: 0 !important; }
+  .lg-brand3d--full canvas { -webkit-mask-image: none !important; mask-image: none !important; }
+  /* the card sheen runs once per logo light sweep (event "shantaz:sweep") */
+  .lg-card::before { animation: none !important; }
+  .lg-card.is-sweep::before { animation: lg-sheen-once var(--sweep-ms, 1100ms) var(--ease-move) 1 !important; }
+  @keyframes lg-sheen-once { from { transform: translateX(-70%); } to { transform: translateX(70%); } }
+  .lg-logo2d { width: min(86vw, 420px); display: block; }
+  .lg-logo2d svg { width: 100%; height: auto; display: block; filter: drop-shadow(0 18px 30px rgba(0, 0, 0, .45)); }
+  .sb-logo-wide { display: block; width: 100%; max-width: 176px; height: auto; }
+  @media (min-width: 1024px) { .lg-logo2d { width: min(46vw, 560px); } }
+}
+@media (prefers-reduced-motion: reduce) { .lg-card.is-sweep::before { animation: none !important; } }

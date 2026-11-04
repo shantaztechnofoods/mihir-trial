@@ -1,6 +1,6 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { Eye, EyeOff, LogIn } from "lucide-react";
-import ShantazLogo2D from "../components/ShantazLogo2D.jsx";
+import ShantazLogoSVG from "../components/ShantazLogoSVG.jsx";
 import { MadeInIndia } from "../components/IndiaFlag.jsx";
 import { useAuth } from "../auth/AuthContext.jsx";
 
@@ -29,10 +29,12 @@ import { useAuth } from "../auth/AuthContext.jsx";
 // screen").
 // 2026-11-04 (world UI) — new look only. The logic above the return (fields,
 // autofill guard, submit, error handling) is unchanged. The 3D scene is a
-// hook point for the 3D logo (feat/logo-3d delivers LoginBrand3D; it is wired
-// here as a lazy chunk once it lands). Until then, and always for reduced
-// motion / low-end phones (deviceMemory <= 2, Save-Data) / no WebGL, the real
-// logo is shown flat with one soft shine. Every user sees the same login.
+// separate lazy chunk that starts only after the form has painted: the real
+// SHANTAZ logo in 3D (LoginBrand3D, traced from the owner's artwork), full
+// bleed behind the glass card. Reduced motion / low-end phones (deviceMemory
+// <= 2, Save-Data) / no WebGL / a lost context get the same logo flat
+// (ShantazLogoSVG) with one soft shine. Every user sees the same login.
+const LoginBrand3D = lazy(() => import("../components/LoginBrand3D.jsx"));
 
 let heroModeMemo = "";
 const heroMode = () => {
@@ -103,6 +105,18 @@ export default function LoginPage({ notice = "", onRetry = null }) {
     const id = ric ? ric(go, { timeout: 900 }) : setTimeout(go, 250);
     return () => { done = true; if (ric && window.cancelIdleCallback) window.cancelIdleCallback(id); else clearTimeout(id); };
   }, []);
+  const onHeroFail = React.useCallback(() => setHero("still"), []);
+  // The glass card's sheen runs with each light sweep across the logo.
+  const cardRef = useRef(null);
+  useEffect(() => {
+    const onSweep = (e) => {
+      const el = cardRef.current; if (!el) return;
+      el.style.setProperty("--sweep-ms", `${(e.detail && e.detail.duration) || 1100}ms`);
+      el.classList.remove("is-sweep"); void el.offsetWidth; el.classList.add("is-sweep");
+    };
+    window.addEventListener("shantaz:sweep", onSweep);
+    return () => window.removeEventListener("shantaz:sweep", onSweep);
+  }, []);
   const company = cachedCompany();
   const line = "Purchase, stock and production, on one floor.";
 
@@ -114,9 +128,16 @@ export default function LoginPage({ notice = "", onRetry = null }) {
       <div className="lg-stage" aria-hidden="true">
         <div className="lg-grid" />
         <div className="lg-light" />
-        <div className="lg-brand2d" data-hero={hero || "pending"}>
-          <ShantazLogo2D className="lg-logo2d" shine />
-        </div>
+        {hero === "webgl" && (
+          <Suspense fallback={null}>
+            <LoginBrand3D fullBleed onFail={onHeroFail} />
+          </Suspense>
+        )}
+        {(hero === "still" || hero === "css") && (
+          <div className="lg-brand2d" data-hero={hero}>
+            <ShantazLogoSVG tone="dark" shine className="lg-logo2d" />
+          </div>
+        )}
         {company && <div className="lg-company-line">{company}</div>}
         <div className="lg-vignette" />
       </div>
@@ -125,7 +146,7 @@ export default function LoginPage({ notice = "", onRetry = null }) {
       <h1 className="sr-only">{company || "SHANTAZ"} — {line}</h1>
 
       <main className="lg-panel">
-        <div className="lg-card">
+        <div className="lg-card" ref={cardRef}>
           <div className="lg-card-head">
             <h2 className="lg-title">Sign in</h2>
             <p className="lg-sub">Use the login your admin gave you.</p>

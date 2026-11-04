@@ -21,7 +21,7 @@ import { useAuth } from "./auth/AuthContext.jsx";
 import { fetchDeptRoster, updateUserDepartments } from "./auth/authStore.js";
 import LoginPage from "./pages/LoginPage.jsx";
 import { celebrate } from "./utils/worldMotion.js";
-import ShantazLogo2D from "./components/ShantazLogo2D.jsx";
+import ShantazLogoSVG from "./components/ShantazLogoSVG.jsx";
 import BrandLogo from "./components/BrandLogo.jsx";
 import { LeadIcon, LeadLabel, Glyph } from "./components/LeadIcon.jsx";
 import UserManagementPage from "./pages/UserManagementPage.jsx";
@@ -575,7 +575,7 @@ function Sidebar({ activePage, setActivePage, collapsed, setCollapsed, badges = 
               const initial = name[0]?.toUpperCase() || "S";
               return (
                 <div className="sb-brand mb-3">
-                  <ShantazLogo2D className="sb-logo-wide" />
+                  <ShantazLogoSVG tone="dark" className="sb-logo-wide" />
                   <BrandLogo logo={settings.logo} size={64} rounded={14} />
                   <div className="min-w-0">
                     <div className="text-[13px] font-extrabold leading-none tracking-widest truncate sb-logo-name">{line1}</div>
