@@ -166,10 +166,10 @@ cmd_check(){
     job build cached_build e2e env VITE_USE_SUPABASE=false npx vite build; jobs+=(build)
   fi
   wait
-  DIST="$(cat "$LOGS/dist.path" 2>/dev/null)"; [ -f "$DIST/index.html" ] || { heavy_unlock; die "build output missing ($DIST)"; }
   local bad=0 j
   for j in "${jobs[@]}"; do [ "$(cat "$LOGS/$j.rc")" = 0 ] || { say "${c_bad}✗ $j failed${c_off} — $LOGS/$j.log"; tail -15 "$LOGS/$j.log"; bad=1; }; done
   [ $bad = 0 ] || { heavy_unlock; die "stopped before the browser suites"; }
+  DIST="$(cat "$LOGS/dist.path" 2>/dev/null)"; [ -f "$DIST/index.html" ] || { heavy_unlock; die "build output missing ($DIST)"; }
   echo "phase-unit+build $(since "$tp")" >>"$LOGS/times"
   grep -E '^# (pass|fail)' "$LOGS/unit.log" | tr '\n' ' '; grep -h 'reused cached build' "$LOGS"/build.log "$LOGS"/e2ebuild.log 2>/dev/null | head -1; say; say "${c_ok}✓ unit + build ($(el))${c_off}"
   curl -s "localhost:$PORT" >/dev/null && { heavy_unlock; die "port $PORT is already in use — another preview is running there; pick another E2E_PORT"; }
