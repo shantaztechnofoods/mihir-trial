@@ -78,3 +78,10 @@ test("Settings tabs of OFF modules hide", () => {
 test("a stale Settings form can't flip modules", () => {
   assert.match(APP, /if \(Object\.prototype\.hasOwnProperty\.call\(before, "enabledModules"\)\) newSettings\.enabledModules = before\.enabledModules;/);
 });
+
+test("TRIAL ribbon only when VITE_ERP_INSTANCE=trial (Live: unset ⇒ no ribbon)", () => {
+  const ENV = readFileSync(new URL("../src/config/env.js", import.meta.url), "utf8");
+  assert.match(ENV, /export const ERP_INSTANCE = String\(env\.VITE_ERP_INSTANCE \|\| ""\)/);
+  assert.match(APP, /\{ERP_INSTANCE === "trial" && \(\s*\n\s*<div data-trial-ribbon/);
+  assert.match(APP, /pointerEvents: "none"/);
+});

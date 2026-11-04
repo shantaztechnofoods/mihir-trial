@@ -39,7 +39,7 @@ import ItemSearchSelect from "./components/ItemSearchSelect.jsx";
 import VendorSearchSelect from "./components/VendorSearchSelect.jsx";
 import { appendAuditWithUser, getAuditLog, subscribeAudit } from "./auth/auditStore.js";
 import AuditHistoryPage from "./pages/AuditHistoryPage.jsx";
-import { isSupabaseEnabled, IS_PROD, ALLOW_DEMO, ENABLED_MODULES_ENV } from "./config/env.js";
+import { isSupabaseEnabled, IS_PROD, ALLOW_DEMO, ENABLED_MODULES_ENV, ERP_INSTANCE } from "./config/env.js";
 import { MODULES, ALWAYS_ON_MODULES, SETTINGS_TAB_MODULE, effectiveEnabledModules, isModuleOn, envLockedModules, normaliseModuleSelection } from "./utils/modules.js";
 import { getSupabase } from "./supabase/client.js";
 import { loadSettings, saveSettings } from "./stores/settingsStore.js";
@@ -30685,6 +30685,16 @@ export default function App() {
               <button className="toast-close" onClick={() => setToasts((prev) => prev.filter((x) => x.id !== t.id))}>✕</button>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* ── Go-live 2026-11-04 — TRIAL ribbon (VITE_ERP_INSTANCE=trial only).
+          Click-through (pointer-events: none) so it never blocks work. ── */}
+      {ERP_INSTANCE === "trial" && (
+        <div data-trial-ribbon role="note" aria-label="This is the TRIAL ERP, not the real company ERP"
+             className="no-print fixed left-1/2 -translate-x-1/2 z-[300] text-[11px] font-black tracking-wider px-3 py-0.5 rounded-b-lg"
+             style={{ top: 0, background: "#B45309", color: "#fff", pointerEvents: "none", boxShadow: "0 2px 6px rgba(0,0,0,0.18)" }}>
+          TRIAL — not the real ERP
         </div>
       )}
 
