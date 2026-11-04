@@ -99,7 +99,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-04-mtaudit-2";
+const APP_BUILD = "2026-11-04-mtaudit-3";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -19616,10 +19616,10 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
   // 2026-11-01 — Escape closes the top-most popup, in the same order they
   // stack on screen; a popup that is saving ignores it, like its Cancel.
   // Declared after every popup's state so its dependency list is initialised.
-  useEffect(() => {
-    const onKey = (e) => {
-      if (e.key !== "Escape") return;
-      const steps = [
+  // 2026-11-04 (MT audit) — the same list closes the top-most popup on the
+  // phone's Back button (below), so Back never throws a worker out of the
+  // ERP with a half-filled Accept / Finish screen.
+  const popupSteps = () => [
         [startChk,           () => !startChk?.busy && setStartChk(null)],
         [jobAction,          () => !jobAction?.busy && setJobAction(null)],
         [reportMachineId,    () => setReportMachineId(null)],
@@ -19633,19 +19633,40 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
         [removeRackConfirm,  () => setRemoveRackConfirm(null)],
         [pullBack,           () => !pullBack?.busy && setPullBack(null)],
         [undoAsk,            () => !undoAsk?.busy && setUndoAsk(null)],
+        [holdModal,          () => !holdModal?.busy && setHoldModal(null)],
+        [deleteModal,        () => !deleteModal?.busy && setDeleteModal(null)],
         [raiseModal,        () => !raiseBusy && setRaiseModal(null)],
         [jobsDrawer,         () => setJobsDrawer(null)],
         [rackPanel,          () => setRackPanel(null)],
         [issuePopup,         () => setIssuePopup(null)],
         [showCalled,         () => setShowCalled(false)],
+        [myDashOpen,         () => setMyDashOpen(false)],
       ];
-      const top = steps.find(([open]) => !!open);
-      if (top) { e.stopPropagation(); top[1](); }
+  const closeTopPopupRef = useRef(null);
+  closeTopPopupRef.current = () => { const top = popupSteps().find(([open]) => !!open); if (top) top[1](); return !!top; };
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key !== "Escape") return;
+      if (closeTopPopupRef.current()) e.stopPropagation();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [jobAction, reportMachineId, reportDoc, reportsMenu, trialCertModal, trialCertViewModal, finishModal, transferBusy, acceptModal, duringWorkModal, startChk,
-      removeRackConfirm, pullBack, undoAsk, raiseModal, raiseBusy, jobsDrawer, rackPanel, issuePopup, showCalled]);
+  }, []);
+  // Back button: while a popup is open there is one extra history entry; Back
+  // pops it and closes the top popup (a popup that is saving stays, and the
+  // entry is pushed again). No URL change, nothing else in history.
+  const anyPopupOpen = popupSteps().some(([open]) => !!open);
+  const [backArmed, setBackArmed] = useState(false);
+  useEffect(() => {
+    if (!anyPopupOpen || backArmed) return;
+    try { window.history.pushState({ erpPopup: 1 }, ""); } catch { /* ignore */ }
+    setBackArmed(true);
+  }, [anyPopupOpen, backArmed]);
+  useEffect(() => {
+    const onPop = () => { setBackArmed(false); closeTopPopupRef.current(); };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
   // Pending part awaiting "Confirm issue" in the rack panel, and the one in flight.
   const [pendIssueAsk, setPendIssueAsk] = useState(null);
   const [pendIssueBusy, setPendIssueBusy] = useState(null);
