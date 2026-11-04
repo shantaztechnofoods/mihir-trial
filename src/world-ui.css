@@ -631,13 +631,13 @@
 /* ═══ Login 3D framing: the reflection fades out softly below the floor ═══ */
 @media screen {
   .lg-brand3d--full .lg-3d {
-    -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 27%, rgba(0, 0, 0, .35) 31%, transparent 50%);
-            mask-image: linear-gradient(to bottom, #000 0%, #000 27%, rgba(0, 0, 0, .35) 31%, transparent 50%); }
+    -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 28%, rgba(0, 0, 0, .22) 30.5%, transparent 40%);
+            mask-image: linear-gradient(to bottom, #000 0%, #000 28%, rgba(0, 0, 0, .22) 30.5%, transparent 40%); }
   .lg-floor { top: 28%; }
   @media (min-width: 1024px) {
     .lg-brand3d--full .lg-3d {
-      -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 60%, rgba(0, 0, 0, .35) 64%, transparent 82%);
-              mask-image: linear-gradient(to bottom, #000 0%, #000 60%, rgba(0, 0, 0, .35) 64%, transparent 82%); }
+      -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 58.5%, rgba(0, 0, 0, .22) 61%, transparent 72%);
+              mask-image: linear-gradient(to bottom, #000 0%, #000 58.5%, rgba(0, 0, 0, .22) 61%, transparent 72%); }
     .lg-floor { top: 59%; }
   }
 }
