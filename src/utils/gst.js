@@ -133,13 +133,14 @@ export function calculateGSTBreakdown(subtotal, purchaseTypeKey, lineItems = [])
 
   if (t.gstType === "local") {
     out.cgst = Math.round((totalTax / 2) * 100) / 100;
-    out.sgst = totalTax - out.cgst;          // absorb rounding so cgst+sgst === totalTax
+    // absorb rounding so cgst+sgst === totalTax; re-round so 10.01 - 5 is 5.01, not 5.0099999…
+    out.sgst = Math.round((totalTax - out.cgst) * 100) / 100;
   } else {
     // interstate / import — single IGST line
     out.igst = totalTax;
   }
-  out.gst   = out.cgst + out.sgst + out.igst;
-  out.total = sub + out.gst;
+  out.gst   = Math.round((out.cgst + out.sgst + out.igst) * 100) / 100;
+  out.total = Math.round((sub + out.gst) * 100) / 100;
   return out;
 }
 
@@ -153,4 +154,43 @@ export function todayIso() {
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${dd}`;
+}
+
+// ── Tax lines for showing a saved PO ────────────────────────────────────────
+// The View PO modal, the PO card and the printable PO template used a
+// hard-coded "GST (18%)" label, so an interstate 12% PO read "GST (18%)"
+// instead of "IGST (12%)" and a local PO never showed its CGST + SGST split.
+// Returns the rows to show under Subtotal: [{ key, label, amount }].
+//   local                 → CGST (r/2%) + SGST (r/2%)
+//   interstate / import   → IGST (r%)
+//   exempt / nil / zero   → one "GST (Exempt)" row at ₹0
+//   legacy (no type)      → one "GST" row; the % is shown only when a whole
+//                           rate matches the stored amount (old POs were 18%).
+// Uses the stored cgst / sgst / igst when they add up to the stored gst
+// (Supabase maps missing columns to 0); otherwise splits the stored gst.
+const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+const pctText = (n) => `${Number.isInteger(n) ? n : round2(n)}%`;
+
+export function poTaxLines(po = {}) {
+  const items = Array.isArray(po?.lineItems) ? po.lineItems : [];
+  const subtotal = items.reduce((s, li) => s + (Number(li?.amount) || 0), 0);
+  const gst = po?.gst != null ? (Number(po.gst) || 0) : Math.round(subtotal * 0.18);
+  const t = getPurchaseType(po?.purchaseType);
+  if (!t) {
+    const rate = subtotal > 0 ? Math.round((gst / subtotal) * 100) : 0;
+    const exact = rate > 0 && Math.abs((subtotal * rate) / 100 - gst) < 1;
+    return [{ key: "gst", label: exact ? `GST (${rate}%)` : "GST", amount: gst }];
+  }
+  if (t.exempt) return [{ key: "gst", label: "GST (Exempt)", amount: 0 }];
+  const c = Number(po.cgst) || 0, s = Number(po.sgst) || 0, i = Number(po.igst) || 0;
+  const storedOk = c + s + i > 0 && Math.abs(c + s + i - gst) < 0.01;
+  if (t.gstType === "local") {
+    const cg = storedOk ? c : round2(gst / 2);
+    const sg = storedOk ? s : round2(gst - cg);
+    return [
+      { key: "cgst", label: t.rate ? `CGST (${pctText(t.rate / 2)})` : "CGST", amount: cg },
+      { key: "sgst", label: t.rate ? `SGST (${pctText(t.rate / 2)})` : "SGST", amount: sg },
+    ];
+  }
+  return [{ key: "igst", label: t.rate ? `IGST (${pctText(t.rate)})` : "IGST", amount: storedOk ? i : gst }];
 }
