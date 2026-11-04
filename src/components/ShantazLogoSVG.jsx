@@ -1,54 +1,53 @@
 import React, { useId } from "react";
-import { BRAND, partPath, shantazLogo, toPath } from "./shantazLogoGeometry.js";
+import { shantazLogo } from "./shantazLogoGeometry.js";
 
 // 2D SHANTAZ logo (gear + wheat + wordmark + ® + tagline) as one inline SVG,
-// a clean vector redraw of the owner's logo file — same geometry as the 3D
-// login hero.
+// drawn from the EXACT paths of the owner's CorelDRAW master
+// (src/assets/shantaz-logo.svg) — the same paths the 3D login hero extrudes.
 // For the sidebar/header, reports, and the login fallback (reduced motion /
 // no WebGL). Self-contained: needs no CSS.
-//   tone="light"  – real colours, for light backgrounds
-//   tone="dark"   – gear stays black gunmetal with a fine cool rim line; ® and
-//                   tagline in light steel so they read on navy
+//   tone="light"  – the file's own colours, for light backgrounds
+//   tone="dark"   – same true colours on navy; the black gear only gets a thin
+//                   cool rim line, and the (black) tagline + ® switch to light
+//                   steel so they can be read
 //   shine         – one soft light sweep across the logo (plays once)
 //   showTagline   – drop the tagline for tiny sizes
+const STEEL = "#C3CCDB";
+
 export default function ShantazLogoSVG({ tone = "light", shine = false, showTagline = true, className = "", style, title = "SHANTAZ — Innovation for Life" }) {
   const L = shantazLogo();
   const uid = useId().replace(/:/g, "");
   const dark = tone === "dark";
-  const gearFill = dark ? "#16181C" : BRAND.gear;
-  const inkFill = dark ? "#C3CCDB" : BRAND.ink;
   const b = L.box;
-  const tagTop = L.tag.baseline - L.tag.size * 0.75;
-  const h = showTagline ? b.h : tagTop - 3 - b.y;
-  const g1 = dark ? "#2C6A1E" : BRAND.green, g2 = dark ? "#327524" : BRAND.green2;
-  // flat list of paths (a <clipPath> may only hold shapes, no groups)
-  const parts = [
-    { d: toPath(L.gear.outer), fill: gearFill, rim: dark },
-    ...L.wheat.flatMap((s) => [
-      { d: toPath(s.stem), fill: g1 },
-      ...s.grains.filter((g) => g.awn).map((g) => ({ d: toPath(g.awn), fill: g1 })),
-      ...s.grains.map((g) => ({ d: toPath(g.pts), fill: g.tone ? g2 : g1 })),
-    ]),
-    ...L.word.map((p) => ({ d: partPath(p), fill: BRAND.red })),
-    ...L.reg.map((p) => ({ d: partPath(p), fill: inkFill })),
-    ...(showTagline ? L.tag.glyphs.map((g) => ({ d: g.d, fill: inkFill })) : []),
-  ];
-  const shapes = (fill) => parts.map((p, i) => (
-    <path key={i} d={p.d} fill={fill ? p.fill : undefined} fillRule="evenodd"
-      {...(fill && p.rim ? { stroke: "#9FB3CF", strokeOpacity: 0.55, strokeWidth: 0.7, strokeLinejoin: "round" } : {})} />
-  ));
-  const sweepW = 60;
+  const gid = (id) => `${id}-${uid}`;
+  const parts = L.parts.filter((p) => showTagline || p.part !== "tagline");
+  const fillOf = (p) => {
+    if (p.fill && p.fill.startsWith("url(#")) return `url(#${gid(p.fill.slice(5, -1))})`;
+    if (dark && (p.part === "tagline" || p.part === "registered")) return STEEL;
+    return p.fill;
+  };
+  const rim = { stroke: "#9FB3CF", strokeOpacity: 0.6, strokeWidth: 0.55, strokeLinejoin: "round" };
+  const sweepW = 70;
   return (
     <svg
       className={`shantaz-logo ${className}`}
       style={{ display: "block", ...style }}
-      viewBox={`${b.x.toFixed(1)} ${b.y.toFixed(1)} ${b.w.toFixed(1)} ${h.toFixed(1)}`}
+      viewBox={`${b.x} ${b.y} ${b.w} ${b.h}`}
       role="img"
       aria-label={title}
       xmlns="http://www.w3.org/2000/svg"
     >
       <title>{title}</title>
-      {shapes(true)}
+      <defs>
+        {L.gradients.map((g) => (
+          <linearGradient key={g.id} id={gid(g.id)} gradientUnits="userSpaceOnUse" x1={g.x1} y1={g.y1} x2={g.x2} y2={g.y2}>
+            {g.stops.map((s, i) => <stop key={i} offset={s.offset} stopColor={s.color} />)}
+          </linearGradient>
+        ))}
+      </defs>
+      {parts.map((p) => (
+        <path key={p.id} d={p.d} fill={fillOf(p)} fillRule="evenodd" {...(dark && p.part === "gear" ? rim : {})} />
+      ))}
       {shine && (
         <>
           <defs>
@@ -57,7 +56,7 @@ export default function ShantazLogoSVG({ tone = "light", shine = false, showTagl
               <stop offset=".5" stopColor="#fff" stopOpacity=".7" />
               <stop offset="1" stopColor="#fff" stopOpacity="0" />
             </linearGradient>
-            <clipPath id={`sh-c-${uid}`}>{shapes(false)}</clipPath>
+            <clipPath id={`sh-c-${uid}`}>{parts.map((p) => <path key={p.id} d={p.d} fillRule="evenodd" />)}</clipPath>
           </defs>
           <g clipPath={`url(#sh-c-${uid})`}>
             <g transform={`skewX(-18) translate(${(b.h * 0.33).toFixed(1)} 0)`}>
