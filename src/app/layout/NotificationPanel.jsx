@@ -5,6 +5,7 @@ import { EmptyState } from "../../shared/ui/primitives.jsx";
 
 export function NotificationPanel({ notifications, dismissed, onClose, onNavigate, onDismiss, onDismissAll }) {
   const TYPE_CFG = {
+    machine_waiting: { label: "Machine waiting for you", icon: "📥", color: "#c2410c", nav: "machines" },
     critical:      { label: "Critical Stock",     icon: "🔴", color: "#b91c1c", nav: "inventory" },
     warning:       { label: "Low Stock Alert",    icon: "🟠", color: "#b45309", nav: "inventory" },
     approval:      { label: "Approval Pending",   icon: "📋", color: "#2E50D6", nav: "pipeline" },

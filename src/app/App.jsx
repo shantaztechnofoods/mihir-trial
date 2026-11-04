@@ -804,7 +804,25 @@ export default function App() {
   const allItemsForNotif = Object.entries(safeItems).flatMap(([cat, list]) =>
     Array.isArray(list) ? list.map((i) => ({ ...(i || {}), category: cat })) : []
   );
+  // 2026-11-04 (MT audit, owner decision) — "machine waiting for you": every
+  // pending hand-over addressed to one of my departments (to accept, or on the
+  // rack for me to take). Read-only, derived from the same `handovers` state
+  // the Machine Tracker uses; a new hand-over has a new id, so it shows again.
+  const myBellDepts = Array.isArray(currentUser?.departments) ? currentUser.departments.filter(Boolean) : [];
+  const waitingForMe = myBellDepts.length && canOpenPage("machines")
+    ? (Array.isArray(handovers) ? handovers : []).filter((h) => h && h.status === "pending" && myBellDepts.includes(h.toDepartment))
+    : [];
   const notifications = [
+    ...waitingForMe.map((h) => {
+      const m = safeMachines.find((x) => String(x?.id) === String(h.machineId)) || null;
+      const onRack = !!(h.releaseRequired && !h.releasedAt);
+      const late = !onRack && isHoldOverdue(h.sentAt, h.acceptTimeoutMinutes, Date.now());
+      return {
+        id: `machine_waiting-${h.id}`, type: "machine_waiting",
+        title: `${late ? "Late · " : ""}${onRack ? "On the rack for you" : "Waiting for you to accept"}: ${(m && m.bomKey) || h.bomKey || "Machine"}`,
+        desc:  `${(m && m.serialNo) || h.serialNo ? `S/N ${(m && m.serialNo) || h.serialNo} · ` : ""}from ${h.fromDepartment || "—"} → ${h.toDepartment}`,
+      };
+    }),
     ...allItemsForNotif.filter((i) => i?.status === "critical").map((i) => ({
       id: `critical-${i.code}`, type: "critical",
       title: `Critical: ${i.name}`,
