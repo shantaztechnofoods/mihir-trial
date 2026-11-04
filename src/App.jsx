@@ -50,7 +50,7 @@ import { fetchInward, createInward, bulkCreateInward, deleteInwardByPO } from ".
 import { fetchOutward, createOutward, updateOutwardRef, deleteOutwardByIssueId } from "./stores/outwardStore.js";
 import { fetchPending, bulkCreatePending, updatePending as pendingUpdate, deletePending as pendingDelete, clearAllPending, updatePendingBomKey } from "./stores/pendingStore.js";
 import { fetchFollowUps, createFollowUp as followupCreate, updateFollowUp as followupUpdate, deleteFollowUpsByPO } from "./stores/followupsStore.js";
-import { fetchMachines, createMachine as machineCreate, updateMachine as machineUpdate, updateMachineBomKey, deleteMachine as machineDelete, fetchMachineLockState } from "./stores/machinesStore.js";
+import { fetchMachines, createMachine as machineCreate, updateMachine as machineUpdate, updateMachineBomKey, deleteMachine as machineDelete, fetchMachineLockState, appendMachineHistory as machineAppendHistory, STALE_MACHINE_MSG } from "./stores/machinesStore.js";
 import { fetchHandovers, createHandover as handoverCreate, acceptHandover as handoverAccept, releaseHandover, adminCancelHandover, fetchHandoverById } from "./stores/handoverStore.js";
 import { getMySignature, saveMySignature, reauthenticateByPassword } from "./stores/signaturesStore.js";
 import {
@@ -99,7 +99,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-04-rc-fix";
+const APP_BUILD = "2026-11-04-hist-photo";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -27966,7 +27966,10 @@ export default function App() {
       flashSaveError("Stage not changed", `${machine?.bomKey || ""}${machine?.serialNo ? ` · ${machine.serialNo}` : ""}: ${msg}`);
       return { success: false, error: msg };
     }
-    const auditStage = () => logAudit({ type: isComplete ? "machine_completed" : "machine_stage", module: "Machine", action: `${machine?.bomKey || ""} [${machine?.serialNo || ""}] → ${newStage}`, ref: machine?.bomKey || "", serialNo: machine?.serialNo || "", details: { from: machine?.stage, to: newStage, bomLabel: machine?.bomLabel } });
+    const stageAuditEntry = { type: isComplete ? "machine_completed" : "machine_stage", module: "Machine", action: `${machine?.bomKey || ""} [${machine?.serialNo || ""}] → ${newStage}`, ref: machine?.bomKey || "", serialNo: machine?.serialNo || "", details: { from: machine?.stage, to: newStage, bomLabel: machine?.bomLabel } };
+    // 063: when the database already wrote the audit row in the same
+    // transaction, keep the local entry only (mirror:false — no duplicate).
+    const auditStage = (dbAudited) => appendAuditWithUser(stageAuditEntry, dbAudited ? { mirror: false } : undefined);
     setMachineLog((prev) => prev.map((m) => {
       if (m.id !== machineId) return m;
       return {
@@ -27980,18 +27983,31 @@ export default function App() {
         departmentEnteredAt: nowIso,
       };
     }));
+    let dbAudited = false;
     if (isSupabaseEnabled() && machine) {
       // Awaited: the audit entry and the caller's success toast follow the
       // database answer. A refused write rolls the optimistic row back to
       // the DB truth (refetch) and is reported.
-      const r = await machineUpdate(machineId, {
-        stage: newStage,
-        status: isComplete ? "completed" : "active",
-        completedDate: isComplete ? dateStr : machine.completedDate,
-        history: [...(machine.history || []), { stage: newStage, date: dateStr }],
-        currentDepartment:   newStage,
-        departmentEnteredAt: nowIso,
+      // 063: append-only + compare-and-set on the stage the operator saw.
+      const entry = { stage: newStage, date: dateStr };
+      const r = await machineAppendHistory(machineId, {
+        entries: [entry],
+        fullHistory: [...(machine.history || []), entry],
+        expectedStage: machine.stage,
+        updates: {
+          stage: newStage,
+          status: isComplete ? "completed" : "active",
+          completedDate: isComplete ? dateStr : machine.completedDate,
+          currentDepartment:   newStage,
+          departmentEnteredAt: nowIso,
+        },
+        audit: stageAuditEntry,
       });
+      if (r.stale) {
+        flashSaveError("Stage not changed", `${machine.bomKey}${machine.serialNo ? ` · ${machine.serialNo}` : ""}: ${STALE_MACHINE_MSG}`);
+        rtMach();
+        return { success: false, error: STALE_MACHINE_MSG, stale: true };
+      }
       if (!r.success) {
         saveFailed("Machine stage", r.error);
         flashSaveError(`stage change to ${newStage}`,
@@ -27999,8 +28015,9 @@ export default function App() {
         rtMach();
         return { success: false, error: r.error || "Stage not saved" };
       }
+      dbAudited = !!r.audited;
     }
-    auditStage();
+    auditStage(dbAudited);
     return { success: true };
   };
 
@@ -28028,22 +28045,27 @@ export default function App() {
       };
     }));
     if (isSupabaseEnabled()) {
-      Promise.all(targets.map((m) =>
-        machineUpdate(m.id, {
-          stage: "Assembly",
-          status: "active",
-          history: [...(m.history || []), { stage: "Assembly", date: dateStr, note: m.rackSlot ? `Started assembly from rack ${slotLabel(m.rackSlot)}` : "Started production from rack" }],
-          currentDepartment:   "Assembly",
-          departmentEnteredAt: nowIso,
-        })
-      )).then((results) => {
+      Promise.all(targets.map((m) => {
+        const entry = { stage: "Assembly", date: dateStr, note: m.rackSlot ? `Started assembly from rack ${slotLabel(m.rackSlot)}` : "Started production from rack" };
+        // 063: append-only; refused as stale if someone already moved it off the rack.
+        return machineAppendHistory(m.id, {
+          entries: [entry],
+          fullHistory: [...(m.history || []), entry],
+          expectedStage: "BOM Issued",
+          updates: { stage: "Assembly", status: "active", currentDepartment: "Assembly", departmentEnteredAt: nowIso },
+        });
+      })).then((results) => {
+        if (results.some((r) => r.stale)) {
+          flashSaveError("Start Production", STALE_MACHINE_MSG);
+          rtMach();
+        }
         // This is the exact call that lost a Start Production on 2026-10-29:
         // the UI moved the machine to Assembly, Postgres kept it at BOM Issued,
         // and the only trace was a console.warn nobody was watching — in fact
         // not even that, because updateMachine was reporting success for an
         // UPDATE that matched no rows. Both halves are fixed now; this half
         // makes sure the operator is told.
-        const failed = results.filter((r) => !r.success);
+        const failed = results.filter((r) => !r.success && !r.stale);
         if (failed.length) {
           saveFailed("Start production", failed);
           failed.forEach((r, i) => {
@@ -28304,9 +28326,10 @@ export default function App() {
       return { ...m, history: [...m.history, { stage: m.stage, date: dateStr, note: "All materials issued" }] };
     }));
     if (isSupabaseEnabled() && targets.length) {
-      Promise.all(targets.map((m) =>
-        machineUpdate(m.id, { history: [...(m.history || []), { stage: m.stage, date: dateStr, note: "All materials issued" }] })
-      )).then((results) => {
+      Promise.all(targets.map((m) => {
+        const entry = { stage: m.stage, date: dateStr, note: "All materials issued" };
+        return machineAppendHistory(m.id, { entries: [entry], fullHistory: [...(m.history || []), entry] });
+      })).then((results) => {
         const failed = results.filter((r) => !r.success);
         if (failed.length) console.warn("[App] notifyMachineComplete: Supabase failed", failed);
       });
@@ -28470,12 +28493,11 @@ export default function App() {
         : m
     ));
     if (isSupabaseEnabled()) {
-      const machUpd = {
-        pendingHandoverId: res.handover.id,
-        history: [...(machine.history || []), { stage: machine.stage, date: dateStr, note: historyNote }],
-      };
+      const machUpd = { pendingHandoverId: res.handover.id };
       if (trialCertificate) machUpd.trialCertificate = trialCertificate;
-      machineUpdate(machineId, machUpd).then((r) => {
+      // 063: append-only (no stage check — the hand-over row is already committed).
+      const sentEntry = { stage: machine.stage, date: dateStr, note: historyNote };
+      machineAppendHistory(machineId, { entries: [sentEntry], fullHistory: [...(machine.history || []), sentEntry], updates: machUpd }).then((r) => {
         if (!r.success) {
           saveFailed("Finish & Transfer", r.error);
           // The handover row itself is already committed and checked above. If
@@ -28708,14 +28730,18 @@ export default function App() {
         : m
     ));
     if (isSupabaseEnabled()) {
-      machineUpdate(handover.machineId, {
-        stage: newStage,
-        status: isComplete ? "completed" : "active",
-        completedDate: isComplete ? dateStr : machine.completedDate,
-        history: [...(machine.history || []), historyEntry],
-        currentDepartment:   newStage,
-        departmentEnteredAt: nowIso,
-        pendingHandoverId:   null,
+      // 063: append-only (no stage check — the acceptance is already committed).
+      machineAppendHistory(handover.machineId, {
+        entries: [historyEntry],
+        fullHistory: [...(machine.history || []), historyEntry],
+        updates: {
+          stage: newStage,
+          status: isComplete ? "completed" : "active",
+          completedDate: isComplete ? dateStr : machine.completedDate,
+          currentDepartment:   newStage,
+          departmentEnteredAt: nowIso,
+          pendingHandoverId:   null,
+        },
       }).then((r) => {
         if (!r.success) {
           saveFailed("Accept", r.error);
@@ -29130,20 +29156,33 @@ export default function App() {
       ? { holdActive: true, holdReason: why, holdBy: currentUser.id, holdAt: now }
       : { holdActive: false, holdReason: "", holdBy: null, holdAt: null };
     const before = { holdActive: !!m.holdActive, holdReason: m.holdReason || "", holdBy: m.holdBy || null, holdAt: m.holdAt || null, history: m.history || [] };
-    setMachineLog((prev) => prev.map((x) => String(x.id) === String(machineId) ? { ...x, ...patch, history: nextHistory } : x));
-    if (isSupabaseEnabled()) {
-      const r = await machineUpdate(m.id, { holdActive: patch.holdActive, holdReason: hold ? why : "", history: nextHistory });
-      if (!r.success) {
-        setMachineLog((prev) => prev.map((x) => String(x.id) === String(machineId) ? { ...x, ...before } : x));
-        return { success: false, error: r.error || "The hold could not be saved." };
-      }
-    }
-    logAudit({
+    const holdAuditEntry = {
       type: hold ? "machine_hold_set" : "machine_hold_released", module: "Machine",
       action: `${hold ? "Put ON HOLD" : "Released from ON HOLD"}: ${m.bomKey}${m.serialNo ? ` [${m.serialNo}]` : ""}${why ? ` — ${why}` : ""}`,
       ref: m.bomKey, serialNo: m.serialNo || "",
       details: { machineId: m.id, department: m.currentDepartment || m.stage, reason: why, previousReason: m.holdReason || "" },
-    });
+    };
+    setMachineLog((prev) => prev.map((x) => String(x.id) === String(machineId) ? { ...x, ...patch, history: nextHistory } : x));
+    let dbAudited = false;
+    if (isSupabaseEnabled()) {
+      // 063: append only this entry, so a stage change made at the same moment
+      // by someone else keeps its history line too. No stage check: a hold is
+      // valid at any stage.
+      const r = await machineAppendHistory(m.id, {
+        entries: [nextHistory[nextHistory.length - 1]],
+        fullHistory: nextHistory,
+        updates: { holdActive: patch.holdActive, holdReason: hold ? why : "" },
+        audit: holdAuditEntry,
+      });
+      if (!r.success) {
+        setMachineLog((prev) => prev.map((x) => String(x.id) === String(machineId) ? { ...x, ...before } : x));
+        return { success: false, error: r.error || "The hold could not be saved." };
+      }
+      dbAudited = !!r.audited;
+      // Show the database row (it carries the other person's entries, if any).
+      if (r.machine) setMachineLog((prev) => prev.map((x) => String(x.id) === String(machineId) ? { ...x, history: r.machine.history, holdActive: r.machine.holdActive, holdReason: r.machine.holdReason, holdBy: r.machine.holdBy, holdAt: r.machine.holdAt } : x));
+    }
+    appendAuditWithUser(holdAuditEntry, dbAudited ? { mirror: false } : undefined);
     return { success: true };
   };
 
