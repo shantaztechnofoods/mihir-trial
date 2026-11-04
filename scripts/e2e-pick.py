@@ -13,7 +13,7 @@ import re
 import subprocess
 import sys
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.environ.get("E2E_PICK_ROOT") or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 E2E = os.path.join(ROOT, "tests", "e2e")
 SMOKE = ["go-live-workflows", "mobile-sweep"]          # whole-app walk-through, phone + desktop
 MT = ["go-live-workflows", "pending-part-or-comment", "sender-undo", "staff-hold", "mt-polish", "back-closes-popup"]
