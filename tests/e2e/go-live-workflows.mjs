@@ -11,8 +11,9 @@
 // machine → Admin pulls a hand-over back → Admin keeps the full tracker and
 // the machine report; staff cannot open it. LOCAL TEST DATA ONLY.
 import pw from "/usr/local/lib/node_modules_global/playwright/index.js";
+import { track, settle, waitSignedIn } from "./lib/helpers.mjs";
 const BASE = process.env.E2E_BASE || "http://localhost:5183/";
-const b = await pw.chromium.launch({ args: ["--no-sandbox", "--disable-dev-shm-usage"] });
+const b = track(await pw.chromium.launch({ args: ["--no-sandbox", "--disable-dev-shm-usage"] }));
 const results = [];
 const ok = (name, cond, note = "") => { results.push([!!cond, name]); console.log(`${cond ? "PASS" : "FAIL"}  ${name}${note ? "  — " + note : ""}`); };
 
@@ -56,10 +57,10 @@ const seed = () => {
 };
 const login = async (p, u, pass) => {
   await p.locator("#login-username").fill(u); await p.locator("#login-password").click(); await p.locator("#login-password").fill(pass);
-  await p.getByRole("button", { name: "Sign In" }).click(); await p.waitForTimeout(1500);
+  await p.getByRole("button", { name: "Sign In" }).click(); await waitSignedIn(p);
 };
 const logout = async (p) => { await p.evaluate(() => { localStorage.removeItem("erp_session"); sessionStorage.clear(); }); };
-const gotoMT = async (p) => { const mt = p.locator("button, a").filter({ hasText: /^Machine Tracker/ }); if (await mt.count()) { await mt.first().click(); await p.waitForTimeout(1200); } };
+const gotoMT = async (p) => { const mt = p.locator("button, a").filter({ hasText: /^Machine Tracker/ }); if (await mt.count()) { await mt.first().click(); await settle(p, 1200); } };
 const draw = async (p, canvas) => {
   const box = await canvas.boundingBox();
   await p.mouse.move(box.x + 30, box.y + 80); await p.mouse.down();
