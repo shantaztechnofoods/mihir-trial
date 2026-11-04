@@ -16,6 +16,10 @@ export const IS_PROD           = APP_ENV === "production";
 // never appear in a Supabase-backed or production build.
 export const ALLOW_DEMO        = String(env.VITE_ALLOW_DEMO || "").toLowerCase() === "true";
 
+// Module on/off ceiling (src/utils/modules.js). Comma list of module ids, e.g.
+// ERP LIVE: "machines,reports,settings,users,roles". Unset ⇒ no ceiling (Trial).
+export const ENABLED_MODULES_ENV = String(env.VITE_ENABLED_MODULES || "").trim();
+
 // When this returns true, app should route persistence through Supabase.
 // When false (default), the existing localStorage paths run unchanged.
 export const isSupabaseEnabled = () => !!USE_SUPABASE;
