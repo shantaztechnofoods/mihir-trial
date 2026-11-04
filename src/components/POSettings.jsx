@@ -1,4 +1,5 @@
 import React, { useMemo, useRef, useState } from "react";
+import { LeadIcon, Glyph } from "./LeadIcon.jsx";
 import {
   PO_TEMPLATES, PO_TEMPLATE_OPTIONS, emptyCompanyProfile, normalizePOSettings,
   buildPOHtml, DEFAULT_TERMS, DEFAULT_DECLARATION,
@@ -216,7 +217,7 @@ export default function POSettings({ value, onChange, onPersist, isSuperAdmin = 
                       }}>
                 {c.logo
                   ? <img src={c.logo} alt="" className="w-9 h-9 rounded object-contain bg-white/5 flex-shrink-0" />
-                  : <div className="w-9 h-9 rounded flex items-center justify-center bg-white/5 flex-shrink-0 text-base">🏭</div>}
+                  : <div className="w-9 h-9 rounded flex items-center justify-center bg-white/5 flex-shrink-0 text-base"><Glyph e="🏭" size={18} /></div>}
                 <div className="min-w-0 flex-1">
                   <div className="text-[12px] font-bold text-slate-900 truncate">{c.name || "(unnamed)"}</div>
                   <div className="flex items-center gap-1.5 mt-0.5">
@@ -249,7 +250,7 @@ export default function POSettings({ value, onChange, onPersist, isSuperAdmin = 
                       title="Save all companies to Supabase"
                       className="text-[11px] font-bold px-3 py-1.5 rounded-lg text-white border border-blue-500/50 transition-all"
                       style={{ background: "#2640B0", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
-                💾 Save Company
+                <LeadIcon e="💾" />Save Company
               </button>
             )}
             {po.activeCompanyId === active.id
@@ -276,7 +277,7 @@ export default function POSettings({ value, onChange, onPersist, isSuperAdmin = 
                  style={{ background: "rgba(26,31,46,0.04)", border: "1px solid rgba(26,31,46,0.06)" }}>
               <div className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden"
                    style={{ background: "rgba(26,31,46,0.05)", border: "1px solid rgba(26,31,46,0.1)" }}>
-                {active[key] ? <img src={active[key]} alt={key} className="w-full h-full object-contain" /> : <span className="text-xl">{fallback}</span>}
+                {active[key] ? <img src={active[key]} alt={key} className="w-full h-full object-contain" /> : <span className="text-xl text-slate-400"><Glyph e={fallback} size={22} /></span>}
               </div>
               <div className="min-w-0 flex-1">
                 <div className="text-[11px] font-semibold text-slate-600 mb-1">{label}</div>

@@ -3874,6 +3874,108 @@ button.rack-btn:disabled { background: #e5e7eb !important; color: #6b7280 !impor
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   PRO POLISH (2026-11-04) — one calm token system, applied on screen only.
+   Visual only: no layout, order, words or logic change. Printed reports
+   (.mr-*, .rpt-*, trial certificate) are not touched by anything below.
+   Type   12 / 13 / 14 / 15 / 16 / 18 / 22   (phone body 15–16)
+   Space  4 / 8 / 12 / 16 / 24 / 32
+   Radius chip 6 · control 10 · card 14 · sheet 16 · pill 999
+   Shadow 1 = resting card · 2 = dialog / menu (nothing else)
+   Colour neutral ink + slate lines; colour only for meaning:
+          green ok · amber waiting · violet rack · red problem · grey done
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root {
+  --fs-12: 12px; --fs-13: 13px; --fs-14: 14px; --fs-15: 15px; --fs-16: 16px; --fs-18: 18px; --fs-22: 22px;
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-6: 24px; --sp-8: 32px;
+  --r-chip: 6px; --r-ctl: 10px; --r-card: 14px; --r-sheet: 16px; --r-pill: 999px;
+  --sh-1: 0 1px 2px rgba(15, 23, 42, .05), 0 1px 1px rgba(15, 23, 42, .03);
+  --sh-2: 0 24px 56px -16px rgba(15, 23, 42, .30), 0 0 0 1px rgba(15, 23, 42, .06);
+  --ink-900: #0F172A; --ink-700: #334155; --ink-500: #64748B; --ink-400: #94A3B8;
+  --line: #E2E8F0; --line-strong: #CBD5E1;
+  --ok: #15803D; --wait: #B45309; --rack: #6D28D9; --bad: #B91C1C; --done: #64748B;
+  --ring: 0 0 0 3px rgba(46, 80, 214, .22);
+  --v2-grid: rgba(46, 80, 214, 0.022);          /* blueprint grid: half as loud */
+  --v2-lift: var(--sh-1);
+}
+
+@media screen {
+  /* Icons: one line set, one stroke, sitting on the text baseline */
+  .lead-icon, .glyph-icon { flex-shrink: 0; }
+  .glyph-icon { display: inline-block; vertical-align: middle; }
+  .lead-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: .5em; vertical-align: .08em; flex-shrink: 0; }
+  .lead-dot-solo { margin-right: 0; }
+  .empty-state-icon, .empty-state-icon .glyph-icon { color: var(--ink-400); opacity: 1; }
+
+  /* Cards: one radius, one resting shadow, no hover jump */
+  body .section-card, .kpi-tile, .hero-tile, .premium-card { border-radius: var(--r-card); box-shadow: var(--sh-1); }
+  .kpi-tile:hover, .hero-tile:hover, .section-card:hover { transform: none !important; box-shadow: var(--sh-1); }
+  button.kpi-tile:hover, .hero-tile:hover { border-color: var(--line-strong); }
+  .hero-tile::before { background: #2E50D6; }
+  .rounded-3xl:not(.mr-paper *):not(.mr-doc *) { border-radius: var(--r-sheet); }
+
+  /* Dialogs: one deep shadow */
+  .modal-panel, .modal-backdrop > div { box-shadow: var(--sh-2); }
+
+  /* Weight: 900 shouts in Inter; 800 keeps the same hierarchy */
+  .font-black:not(.mr-paper *):not(.mr-doc *):not(.tc-form *) { font-weight: 800; }
+
+  /* KPI labels: sentence case, readable ink — the dot carries the colour */
+  .kpi-tile .uppercase.tracking-\[0\.08em\], .mt-kpis .mt-kpi-label {
+    text-transform: none; letter-spacing: 0; font-size: var(--fs-13) !important; font-weight: 600; color: var(--ink-500) !important;
+  }
+  .mt-kpis .mt-kpi-value { color: var(--ink-900) !important; }
+  .mt-kpis .mt-kpi-sub { font-size: var(--fs-12) !important; color: var(--ink-500) !important; }
+
+  /* Tables: quiet header */
+  table:not(.mr-table) thead th { letter-spacing: .04em; color: var(--ink-500); font-weight: 600; }
+
+  /* Focus: one ring everywhere */
+  input:focus-visible, select:focus-visible, textarea:focus-visible { outline: none; box-shadow: var(--ring); border-color: #5A78EA; }
+
+  /* Machine Tracker header: Reports / Settings are secondary buttons */
+  [data-reports-menu], [data-mt-settings] {
+    background: var(--surface-card, #fff) !important; color: var(--ink-900) !important;
+    border: 1px solid var(--line-strong) !important; font-weight: 600 !important; box-shadow: var(--sh-1);
+  }
+  [data-reports-menu]:hover, [data-mt-settings]:hover { background: #F8FAFC !important; }
+
+  /* "Today" line: white chips; the dot carries the meaning */
+  [data-mt-today-chip] {
+    background: var(--surface-card, #fff) !important; color: var(--ink-900) !important;
+    border: 1px solid var(--line-strong) !important; font-size: var(--fs-14) !important; font-weight: 600 !important;
+    box-shadow: var(--sh-1);
+  }
+  [data-mt-today-chip][aria-pressed="true"] { border-color: #2E50D6 !important; box-shadow: var(--ring); }
+  [data-mt-today] > span:first-child { font-size: var(--fs-15) !important; font-weight: 700 !important; }
+  [data-mt-today-ok] { font-size: var(--fs-15) !important; font-weight: 600 !important; }
+
+  /* Delay card period switch: a calm segmented control */
+  .delay-card [role="group"][aria-label="Period"] { background: #F1F5F9; padding: 3px; border-radius: var(--r-ctl); gap: 2px; max-width: 460px; }
+  .delay-card [data-delay-period] { min-height: 40px !important; border: 0 !important; border-radius: 8px !important; background: transparent !important; color: var(--ink-700) !important; }
+  .delay-card [data-delay-period][aria-pressed="true"] { background: #fff !important; color: var(--ink-900) !important; box-shadow: var(--sh-1); }
+
+  /* Staff: My Dashboard is a way in, not the main action */
+  [data-my-dashboard-open] {
+    min-height: 52px !important; font-size: var(--fs-16) !important; font-weight: 700 !important; border-radius: var(--r-card) !important;
+    background: var(--surface-card, #fff) !important; color: #1D3187 !important;
+    border: 1px solid var(--line-strong) !important; box-shadow: var(--sh-1) !important;
+  }
+
+  /* Form fields in dialogs: one height, one radius */
+  .modal-backdrop select,
+  .modal-backdrop input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]) {
+    height: 42px !important; min-height: 42px !important; border-radius: var(--r-ctl) !important;
+  }
+}
+@media screen and (max-width: 767px) {
+  .delay-card [data-delay-period] { min-height: 44px !important; }
+  .modal-backdrop select,
+  .modal-backdrop input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]) {
+    height: 44px !important; min-height: 44px !important; font-size: 16px;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    Reports v2 (2026-11-04)
    Premium letterhead (name in spaced capitals, a thin double rule), the
    department stage records, checklist ✓ / ✗ rows, critical items and the
@@ -3947,4 +4049,161 @@ button.rack-btn:disabled { background: #e5e7eb !important; color: #6b7280 !impor
   .mr-doc .rpt-dept-comments > .mr-label { break-after: avoid; page-break-after: avoid; }
   .mr-doc .rpt-dept-comments { break-inside: avoid; page-break-inside: avoid; }
   .mr-doc .rpt-dept-acc .rpt-dept-v, .mr-doc .rpt-dept-acc .mr-label { white-space: nowrap; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Reports v3 — premium document skin (2026-11-04, owner: "professional nahi")
+   One look for every printed document (customer, company, hold, pending,
+   Report Center, trial certificate): the real SHANTAZ logo centred, the
+   legal name in spaced serif capitals over a thin brand-red rule, a quiet
+   contact line; a title block with a document-control panel; section heads
+   with a red numeral; light tables (hairlines, faint zebra, tabular figures);
+   muted status chips that still read in black and white. Visual only.
+   ═══════════════════════════════════════════════════════════════════════ */
+.mr-doc, .rpt-lh, .rpt-titleblock, .report-area {
+  --rpt-ink: #15171c; --rpt-mute: #5d6470; --rpt-faint: #8b919b; --rpt-rule: #e3e5e9; --rpt-zebra: #f8f8f6;
+  --rpt-red: #b3141f; --rpt-green: #2f6a1f; --rpt-amber: #8a5a00; --rpt-panel: #f6f6f3;
+  --rpt-serif: 'Source Serif 4', 'Source Serif Pro', Georgia, 'Times New Roman', serif;
+}
+.mr-doc { --mr-ink: var(--rpt-ink); --mr-mute: var(--rpt-mute); --mr-rule: var(--rpt-rule); --mr-rule-strong: var(--rpt-ink);
+  --mr-red: var(--rpt-red); --mr-green: var(--rpt-green); --mr-amber: var(--rpt-amber); font-feature-settings: "tnum" 1; }
+
+/* Letterhead */
+.rpt-lh { text-align: center; padding: 2px 0 14px; border-bottom: 1px solid var(--rpt-rule); }
+.rpt-lh .rpt-lh-logo, .mr-doc .rpt-lh .rpt-lh-logo { display: block; margin: 0 auto 10px; width: 200px; height: auto; max-width: 60%; max-height: none; object-fit: contain; border: 0; }
+.rpt-lh-name { font-family: var(--rpt-serif); font-weight: 600; font-size: 19px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--rpt-ink); line-height: 1.2; }
+.rpt-lh-rule { width: 64px; height: 0; border-top: 1.5px solid var(--rpt-red); margin: 8px auto 7px; }
+.rpt-lh-line { font-size: 10.5px; line-height: 1.6; color: var(--rpt-mute); letter-spacing: 0.02em; }
+
+/* Title block + document-control panel */
+.rpt-titleblock { margin-top: 18px; padding-bottom: 12px; border-bottom: 1.5px solid var(--rpt-ink); align-items: flex-end; }
+.rpt-doctitle { font-family: var(--rpt-serif); font-size: 21px !important; font-weight: 600 !important; letter-spacing: 0.005em; color: var(--rpt-ink); line-height: 1.2; }
+.rpt-docsub { font-size: 10px; color: var(--rpt-red); letter-spacing: 0.14em; font-weight: 600; margin-top: 4px; order: -1; }
+.rpt-titleblock > .min-w-0 { display: flex; flex-direction: column; }
+.rpt-titleblock > .min-w-0 > .rpt-docsub { order: -1; margin: 0 0 4px; }
+.rpt-docmeta { background: var(--rpt-panel); border: 1px solid var(--rpt-rule); border-left: 2px solid var(--rpt-red); padding: 6px 12px; text-align: left; font-size: 11px; line-height: 1.7; color: var(--rpt-ink); }
+.rpt-meta-k { display: inline-block; min-width: 40px; color: var(--rpt-faint); font-size: 9px; text-transform: uppercase; letter-spacing: 0.12em; }
+
+/* Machine identity + key numbers */
+.mr-doc .mr-identity { margin-top: 18px; }
+.mr-doc .mr-machine { font-family: var(--rpt-serif); font-weight: 600; letter-spacing: 0; }
+.mr-doc .mr-label { color: var(--rpt-faint); font-size: 9.5px; letter-spacing: 0.08em; }
+.mr-doc .mr-fact { font-weight: 600; }
+.mr-doc .rpt-photo, .mr-doc .rpt-photo.rpt-photo-sm { border: 1px solid var(--rpt-rule); border-radius: 4px; background: #fff; overflow: hidden; }
+.mr-doc .mr-stamp { border: 1px solid currentColor; border-radius: 999px; padding: 4px 14px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em; }
+.mr-doc .mr-stamp.is-done { color: var(--rpt-green); background: #f1f6ee; }
+.mr-doc .mr-stamp.is-progress { color: var(--rpt-amber); background: #fbf6ec; }
+.mr-doc .mr-summary { border: 1px solid var(--rpt-rule); border-radius: 4px; background: var(--rpt-panel); padding: 10px 0; }
+.mr-doc .mr-sum { padding: 0 14px; border-left-color: var(--rpt-rule); }
+.mr-doc .mr-sum:first-child { padding-left: 14px; }
+.mr-doc .mr-sum-v { font-family: var(--rpt-serif); font-weight: 600; font-size: 20px; color: var(--rpt-ink); }
+.mr-doc .mr-sum .mr-label { margin-top: 2px; }
+
+/* Section heads: red numeral, serif title, hairline */
+.mr-doc .mr-sec { margin-top: 28px; }
+.mr-doc .mr-h { font-family: var(--rpt-serif); font-size: 15px; font-weight: 600; color: var(--rpt-ink); gap: 10px; padding-bottom: 6px; margin-bottom: 8px; border-bottom: 1px solid var(--rpt-rule); }
+.mr-doc .mr-num { font-family: var(--rpt-serif); color: var(--rpt-red); font-size: 13px; font-weight: 600; letter-spacing: 0.04em; }
+.mr-doc .mr-count, .mr-doc .mr-count-strong { font-family: Inter, Arial, sans-serif; font-size: 10.5px; color: var(--rpt-mute); font-weight: 500; }
+
+/* Tables: header rule, hairlines, faint zebra */
+.mr-doc .mr-table { border-top: 0; }
+.mr-doc .mr-th { color: var(--rpt-mute); letter-spacing: 0.09em; font-size: 9px; font-weight: 700; border-bottom: 1px solid var(--rpt-ink); }
+.mr-doc .mr-tr { border-bottom-color: var(--rpt-rule); padding-left: 6px; padding-right: 6px; }
+.mr-doc .mr-table > .mr-tr:not(.mr-th):nth-child(odd), .mr-doc .mr-table > .mr-hop:nth-child(odd) { background: var(--rpt-zebra); }
+
+/* Badges (checks): muted, outlined, readable in black and white */
+.mr-doc .rpt-badges { display: flex; flex-wrap: wrap; gap: 3px; margin-bottom: 2px; }
+.mr-doc .rpt-badge { display: inline-block; border: 1px solid currentColor; border-radius: 3px; padding: 0 5px; font-size: 10px; font-weight: 600; line-height: 1.5; white-space: nowrap; }
+.mr-doc .rpt-badge.is-ok { color: var(--rpt-green); }
+.mr-doc .rpt-badge.is-warn { color: var(--rpt-amber); }
+.mr-doc .rpt-badge.is-no { color: var(--rpt-red); font-weight: 700; }
+.mr-doc .rpt-badge.is-no::before { content: "✗ "; }
+.mr-doc .rpt-badge.is-ok::before { content: "✓ "; }
+
+/* Department records and checklists */
+.mr-doc .rpt-dept { border-top: 1px solid var(--rpt-rule); }
+.mr-doc .rpt-dept-name { font-family: var(--rpt-serif); font-weight: 600; }
+.mr-doc .rpt-dept-state { letter-spacing: 0.1em; }
+
+/* Signatures in neat boxes */
+.mr-doc .rpt-sigbox { display: flex; align-items: center; justify-content: center; border: 1px solid var(--rpt-rule); border-radius: 3px; background: #fff; padding: 2px 4px; min-height: 34px; }
+.mr-doc .rpt-sigbox.mr-sig { border-bottom: 1px solid var(--rpt-rule); }
+.mr-doc .mr-sign-line { border-bottom-color: var(--rpt-ink); }
+
+/* Closing note */
+.mr-doc .mr-footnote { border-top: 1px solid var(--rpt-rule); color: var(--rpt-faint); letter-spacing: 0.02em; }
+.mr-doc .mr-footnote::after { content: " This is a computer-generated document."; }
+
+@media print {
+  .mr-doc, .rpt-rc-head { font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; color: var(--rpt-ink);
+    --mr-red: var(--rpt-red); --mr-green: var(--rpt-green); --mr-amber: var(--rpt-amber); --mr-rule: var(--rpt-rule); }
+  .rpt-lh { padding: 0 0 4mm; border-bottom: 0.5pt solid #cfd2d7; }
+  .rpt-lh .rpt-lh-logo, .mr-doc .rpt-lh .rpt-lh-logo { width: 50mm; height: auto; max-width: 50mm; max-height: none; margin: 0 auto 3mm; }
+  .rpt-lh-name { font-size: 14.5pt; letter-spacing: 0.17em; }
+  .rpt-lh-rule { width: 18mm; border-top-width: 0.9pt; margin: 2.2mm auto 2mm; }
+  .rpt-lh-line { font-size: 7.6pt; color: #5d6470; }
+  .rpt-titleblock { margin-top: 5mm; padding-bottom: 3mm; border-bottom: 1pt solid #15171c; }
+  .rpt-doctitle { font-size: 16pt !important; }
+  .rpt-docsub { font-size: 7pt; }
+  .rpt-docmeta { font-size: 8pt; padding: 1.6mm 3mm; border-width: 0.5pt; border-left-width: 1.5pt; }
+  .rpt-meta-k { font-size: 6.4pt; }
+  .mr-doc .mr-identity { margin-top: 5mm; }
+  .mr-doc .mr-machine { font-size: 15pt; }
+  .mr-doc .mr-label, .mr-doc .mr-th { font-size: 6.6pt; }
+  .mr-doc .mr-stamp { font-size: 7.4pt; padding: 1.2mm 3.6mm; border-width: 0.8pt; }
+  .mr-doc .mr-summary { border-width: 0.5pt; padding: 2.4mm 0; margin-top: 4mm; }
+  .mr-doc .mr-sum { border-left-width: 0.5pt; padding: 0 3.5mm; }
+  .mr-doc .mr-sum-v { font-size: 14pt; }
+  .mr-doc .mr-sec { margin-top: 7mm; }
+  .mr-doc .mr-h { font-size: 11.5pt; padding-bottom: 1.6mm; margin-bottom: 2mm; border-bottom-width: 0.5pt; }
+  .mr-doc .mr-num { font-family: var(--rpt-serif); font-size: 10pt; color: var(--rpt-red); }
+  .mr-doc .mr-th { border-bottom-width: 0.8pt; letter-spacing: 0.09em; color: #4a505a; }
+  .mr-doc .mr-tr { padding: 1.6mm 1.6mm; border-bottom-width: 0.4pt; }
+  .mr-doc .rpt-badge { font-size: 7pt; border-width: 0.6pt; padding: 0 1.2mm; }
+  .mr-doc .rpt-sigbox { border-width: 0.5pt; min-height: 10mm; }
+  .mr-doc .mr-footnote { font-size: 7pt; }
+}
+
+/* Reports v3.1 (2026-11-04) — one clean sans (Inter) for every heading so the
+   look never falls back to a Times-style serif; no section numerals; no
+   typewriter digits; figures stay tabular. Visual only. */
+.mr-doc, .rpt-lh, .rpt-titleblock, .report-area { --rpt-serif: 'Inter', 'Helvetica Neue', Arial, sans-serif; }
+.mr-doc .mr-num { display: none !important; }
+.mr-doc .mr-mono, .mr-doc .mr-serial { font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif !important; font-size: 1em; letter-spacing: 0.01em; font-variant-numeric: tabular-nums; }
+.rpt-lh-name { font-weight: 700; letter-spacing: 0.2em; }
+.rpt-doctitle, .mr-doc .mr-machine { font-weight: 700 !important; letter-spacing: -0.012em; }
+.mr-doc .mr-h { font-weight: 700; letter-spacing: -0.005em; }
+.mr-doc .mr-sum-v { font-weight: 700; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.mr-doc .rpt-dept-name { font-weight: 700; }
+.mr-doc .mr-muted:only-child { color: var(--rpt-faint); }
+/* Status words print as quiet outlined badges (readable in black and white). */
+.mr-doc .rpt-status { border: 1px solid currentColor; border-radius: 3px; padding: 0 6px; font-size: 9.5px; font-weight: 700; letter-spacing: 0.06em; line-height: 1.6; background: #fff; }
+.mr-doc .rpt-status.mr-green { background: #f1f6ee; }
+.mr-doc .rpt-status.mr-amber { background: #fbf6ec; }
+.mr-doc .rpt-status.mr-red { background: #fbefef; }
+@media print { .mr-doc .rpt-status { font-size: 6.6pt; border-width: 0.6pt; padding: 0 1.4mm; } }
+/* Report Center on paper: same quiet skin as the machine reports. */
+@media print {
+  .rpt-lh .rpt-lh-rule { border-top: 0.9pt solid #b3141f !important; }
+  .report-area .rpt-table-wrap { border: 0 !important; background: none !important; }
+  .report-area .rpt-table-wrap > div:first-child { border-bottom: 0 !important; padding: 0 0 1.6mm !important; font-size: 10pt !important; font-weight: 700 !important; color: #15171c !important; }
+  .report-area table tbody tr:nth-child(even) td { background: #f8f8f6 !important; }
+  .report-area table th { background: #fff !important; color: #4a505a !important; letter-spacing: 0.09em; }
+  .report-area table tr { border-color: #e3e5e9 !important; }
+  .report-area .rpt-wide td:empty { display: none !important; }
+  .report-area .rpt-wide td:empty::after { content: none !important; }
+  .report-area .kpi-tile { border: 0.5pt solid #e3e5e9 !important; background: #f6f6f3 !important; }
+  .report-area .kpi-tile .text-\[26px\] { color: #15171c !important; letter-spacing: -0.01em; }
+  .report-area, .report-area td { font-variant-numeric: tabular-nums; }
+  .report-area .rpt-lh .rpt-lh-rule { border-color: #b3141f !important; }
+  .report-area .kpi-tile * { background: transparent !important; }
+  .report-area .rpt-wide tbody tr:nth-child(even) td { background: transparent !important; }
+  .report-area .rpt-wide tbody tr:nth-child(even) { background: #f8f8f6 !important; }
+  .report-area .rpt-docmeta { background: #f6f6f3 !important; border-color: #e3e5e9 !important; border-left-color: #b3141f !important; }
+  .report-area .rpt-docmeta * { background: transparent !important; }
+}
+/* Small-caps labels on paper only: on screen the words keep their own case
+   (copy/paste and screen readers read "Ready for dispatch", not "READY ..."). */
+@media print {
+  .rpt-docsub, .mr-doc .mr-label, .mr-doc .mr-stamp, .mr-doc .mr-th, .mr-doc .rpt-status { text-transform: uppercase; }
 }

@@ -82,7 +82,7 @@ ok("History activity list draws a slice, the rest on scroll", Number(await p.loc
   ok("History Reset clears the search box and brings every row back", (await box.inputValue()) === "" && Number(await p.locator("[data-more-rows]").first().getAttribute("data-more-rows").catch(() => 0)) > 4000);
 }
 // 4. other page switches stay inside the budget
-for (const [l, re] of [["Inward", "^Inward"], ["Machine Tracker", "Machine Tracker"], ["Dashboard", "👋"]]) {
+for (const [l, re] of [["Inward", "^Inward"], ["Machine Tracker", "Machine Tracker"], ["Dashboard", "^Good (morning|afternoon|evening)"]]) {
   const t = await tapPage(l, re); ok(`${l} opens within ${BUDGET_PAGE_MS} ms`, t < BUDGET_PAGE_MS, `${t.toFixed(0)} ms`); await p.waitForTimeout(300);
   if (l === "Inward") {
     ok("Inward log draws a slice of the 2,000 entries", Number(await p.locator("[data-more-rows]").first().getAttribute("data-more-rows").catch(() => 0)) > 1500);

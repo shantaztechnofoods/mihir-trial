@@ -21,8 +21,10 @@ import { useAuth } from "./auth/AuthContext.jsx";
 // the dept roster in the Finish & Transfer worker picker.
 import { fetchDeptRoster, updateUserDepartments } from "./auth/authStore.js";
 import LoginPage from "./pages/LoginPage.jsx";
+import { celebrate } from "./utils/worldMotion.js";
+import ShantazLogoSVG from "./components/ShantazLogoSVG.jsx";
 import BrandLogo from "./components/BrandLogo.jsx";
-import { LeadIcon, LeadLabel } from "./components/LeadIcon.jsx";
+import { LeadIcon, LeadLabel, Glyph } from "./components/LeadIcon.jsx";
 // 2026-11-04 (fix/perf-1) — admin-only pages load on first open (smaller first bundle).
 const UserManagementPage = React.lazy(() => importWithReload(() => import("./pages/UserManagementPage.jsx")));
 const RoleManagementPage = React.lazy(() => importWithReload(() => import("./pages/RoleManagementPage.jsx")));
@@ -60,7 +62,7 @@ import {
   DEPARTMENT_SEQUENCE, DEFAULT_DEPT_DURATIONS, DEFAULT_ACCEPT_TIMEOUT_MINUTES,
   readDeptWorkflowSettings, writeDeptWorkflowSettings, setWorkCalendar, isClosedDay, localDateKey,
   nextDepartment, computeElapsedMinutes, computeOverrun, isHoldOverdue, heldMinutes, RACK_RELEASE_HOPS, isRackReleaseHop,
-  formatDuration, canAcceptHandover, canFinishTransfer, canConfigureDept, workerIdsOf,
+  formatDuration, canAcceptHandover, canFinishTransfer, canStartAssembly, canConfigureDept, workerIdsOf,
   senderUndoState, formatUndoCountdown,
 } from "./utils/handoverLogic.js";
 // Phase B
@@ -101,6 +103,7 @@ import { importWithReload } from "./utils/lazyImport.js";
 import { useProgressiveCount } from "./components/useProgressiveCount.js";
 import MoreRowsNote from "./components/MoreRowsNote.jsx";
 import DebouncedSearchInput from "./components/DebouncedSearchInput.jsx";
+import { BRAND_LOGO_DATA_URI } from "./utils/brandLogo.js";
 
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
@@ -486,7 +489,7 @@ const statusConfig = {
 const StatusBadge = ({ status }) => {
   const cfg = statusConfig[status] || statusConfig.safe;
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold"
+    <span className="wu-status inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold" data-status={status}
           style={{ letterSpacing: "0.05em", ...cfg.style }}>
       {cfg.dot && <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: cfg.dot }} />}
       {cfg.label}
@@ -578,6 +581,7 @@ function Sidebar({ activePage, setActivePage, collapsed, setCollapsed, badges = 
               const initial = name[0]?.toUpperCase() || "S";
               return (
                 <div className="sb-brand mb-3">
+                  <ShantazLogoSVG tone="dark" className="sb-logo-wide" />
                   <BrandLogo logo={settings.logo} size={64} rounded={14} />
                   <div className="min-w-0">
                     <div className="text-[13px] font-extrabold leading-none tracking-widest truncate sb-logo-name">{line1}</div>
@@ -774,7 +778,7 @@ function MetricCard({ label, value, delta, deltaUp, icon, barPct, barColor, valu
         {icon && (
           <div className="w-9 h-9 rounded-xl flex items-center justify-center text-base flex-shrink-0 -mt-0.5 -mr-0.5"
                style={{ background: color + "14", color }}>
-            {icon}
+            <Glyph e={icon} size={18} />
           </div>
         )}
       </div>
@@ -952,10 +956,10 @@ function DashboardPage({ items = {}, pos = [], vendorList = [], machineLog = [],
 
   // Same reasoning as the navigation: these nine tiles are the first thing
   // anyone sees, and emoji rendered in nine different device fonts is what made
-  // the dashboard look assembled rather than designed. Stroked icons take each
-  // tile's own colour instead of fighting it.
+  // the dashboard look assembled rather than designed. Stroked icons, all in
+  // one quiet ink; meaning is a status dot + word, never a coloured number.
   const kpis = [
-    { label: "Total SKUs",        value: totalSKUs,                                              Icon: Boxes,        color: "#2E50D6", nav: "inventory",  sub: `${safeItems.length} safe` },
+    { label: "Total SKUs",        value: totalSKUs,                                              Icon: Boxes,        color: "#2E50D6", nav: "inventory",  sub: `${safeItems.length} safe`,        alert: false },
     { label: "Critical Stock",    value: criticalN,                                              Icon: AlertOctagon, color: "#b91c1c", nav: "inventory",  sub: `${warningItems.length} warning`,  alert: criticalN > 0 },
     { label: "Pending POs",       value: pendingPOs.length,                                      Icon: AlertTriangle,color: "#b45309", nav: "pipeline",   sub: "awaiting approval",               alert: pendingPOs.length > 0 },
     { label: "Open PO Value",     value: fmtVal(openPOValue),                                    Icon: Wallet,       color: "#15803d", nav: "pipeline",   sub: `${openPOs.length} open` },
@@ -968,7 +972,7 @@ function DashboardPage({ items = {}, pos = [], vendorList = [], machineLog = [],
 
   const EmptyState = ({ icon, title, sub, action, actionLabel }) => (
     <div className="empty-state py-10">
-      <div className="empty-state-icon text-4xl">{icon}</div>
+      <div className="empty-state-icon text-4xl"><Glyph e={icon} size={30} /></div>
       <div className="empty-state-title">{title}</div>
       <div className="empty-state-desc">{sub}</div>
       {action && actionLabel && (
@@ -986,7 +990,7 @@ function DashboardPage({ items = {}, pos = [], vendorList = [], machineLog = [],
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <Topbar title={`${greeting} 👋`} subtitle={`${settings.companyName || "Shantaz Technofoods"} — real-time overview`}>
+      <Topbar title={greeting} subtitle={`${settings.companyName || "Shantaz Technofoods"} — real-time overview`}>
         {settings.whatsappAlerts && <Btn variant="wa" size="sm"><LeadIcon e="📱" />WhatsApp Alert</Btn>}
         {settings.emailAlerts    && <Btn variant="mail" size="sm"><LeadIcon e="✉️" />Send Report</Btn>}
         {canOpen("pipeline") && <Btn variant="primary" size="sm" onClick={() => onNavigate?.("pipeline")}>+ New PO</Btn>}
@@ -994,42 +998,30 @@ function DashboardPage({ items = {}, pos = [], vendorList = [], machineLog = [],
 
       <div className="p-6 space-y-6">
 
-        {/* ── Hero Stats (top 3 large) ── */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {kpis.slice(0, 3).map((kpi) => (
+        {/* ── KPI tiles: ONE anatomy for all nine (icon · status, number, label, sub).
+             The number is always ink; meaning is a dot + one word, never a coloured number. ── */}
+        {(() => {
+          const tile = (kpi, big) => (
             <button key={kpi.label} onClick={() => canOpen(kpi.nav) && onNavigate?.(kpi.nav)} aria-disabled={!canOpen(kpi.nav) || undefined}
-              className="hero-tile group" style={{ "--tile": kpi.color, cursor: canOpen(kpi.nav) ? undefined : "default" }}>
-              <div className="hero-tile-icon" style={{ background: kpi.color + "14", color: kpi.color }}>
-                <kpi.Icon size={21} strokeWidth={2} aria-hidden="true" />
+              className={`dash-tile group${big ? " dash-tile--lg" : ""}`} style={{ cursor: canOpen(kpi.nav) ? undefined : "default" }}>
+              <div className="dash-tile-head">
+                <kpi.Icon size={big ? 18 : 16} strokeWidth={2} aria-hidden="true" className="dash-tile-icon" />
+                {"alert" in kpi && (
+                  <span className={`dash-tile-status${kpi.alert ? " is-bad" : ""}`}>{kpi.alert ? "Action" : "On track"}</span>
+                )}
               </div>
-              <div className="hero-tile-body">
-                <CountUpValue value={kpi.value} className="hero-tile-value" style={{ color: kpi.alert ? kpi.color : "var(--text-strong)" }} />
-                <div className="hero-tile-label">{kpi.label}</div>
-                <div className="hero-tile-sub">{kpi.sub}</div>
-              </div>
-              <span className="hero-tile-trend" style={{
-                background: kpi.alert ? "rgba(220,38,38,0.08)" : "rgba(5,150,105,0.08)",
-                color: kpi.alert ? "#b91c1c" : "#047857",
-              }}>{kpi.alert ? "Action" : "On track"}</span>
+              <CountUpValue value={kpi.value} className="dash-tile-value" />
+              <div className="dash-tile-label">{kpi.label}</div>
+              <div className="dash-tile-sub">{kpi.sub}</div>
             </button>
-          ))}
-        </div>
-
-        {/* ── Secondary KPI Cards ── */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          {kpis.slice(3).map((kpi) => (
-            <button key={kpi.label} onClick={() => canOpen(kpi.nav) && onNavigate?.(kpi.nav)} aria-disabled={!canOpen(kpi.nav) || undefined}
-              className="kpi-tile group" style={{ cursor: canOpen(kpi.nav) ? undefined : "default" }}>
-              <div className="flex items-center justify-between mb-2">
-                <span style={{ color: kpi.color }}><kpi.Icon size={17} strokeWidth={2} aria-hidden="true" /></span>
-                {kpi.alert && <span className="w-1.5 h-1.5 rounded-full" style={{ background: kpi.color }} />}
-              </div>
-              <div className="text-[22px] font-extrabold tabular-nums leading-none tracking-[-0.02em]" style={{ color: kpi.alert ? kpi.color : "var(--text-strong)" }}>{kpi.value}</div>
-              <div className="text-[11px] font-semibold mt-2 leading-tight" style={{ color: "var(--text-muted)" }}>{kpi.label}</div>
-              <div className="text-[10px] mt-1 truncate" style={{ color: "var(--text-dim)" }}>{kpi.sub}</div>
-            </button>
-          ))}
-        </div>
+          );
+          return (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">{kpis.slice(0, 3).map((k) => tile(k, true))}</div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">{kpis.slice(3).map((k) => tile(k, false))}</div>
+            </>
+          );
+        })()}
 
         {/* ── Production overview (live data) ── */}
         <div className="section-card overflow-hidden">
@@ -1049,16 +1041,19 @@ function DashboardPage({ items = {}, pos = [], vendorList = [], machineLog = [],
             {/* Alerts row */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               {[
-                { label: "Delayed machines", n: production.delayed.length, color: "#b91c1c", bg: "rgba(239,68,68,0.08)", nav: "machines", hint: "Past the department target" },
-                { label: "On Hold", n: production.onHold.length + production.manualHold, color: "#4338ca", bg: "rgba(99,102,241,0.10)", nav: "machines", hint: "Acceptance overdue / put on hold" },
-                { label: "Awaiting acceptance", n: production.awaiting, color: "#b45309", bg: "rgba(217,119,6,0.10)", nav: "machines", hint: production.onRack > 0 ? `Not yet accepted · ${production.onRack} on rack` : "Transferred, not yet accepted" },
-                { label: "Open pending jobs", n: production.openJobs.length, color: "#0e7490", bg: "rgba(14,116,144,0.10)", nav: "machines", hint: "Must close before Ready" },
+                { label: "Delayed machines", n: production.delayed.length, Icon: Clock, tone: "bad", nav: "machines", hint: "Past the department target" },
+                { label: "On Hold", n: production.onHold.length + production.manualHold, Icon: AlertCircle, tone: "bad", nav: "machines", hint: "Acceptance overdue / put on hold" },
+                { label: "Awaiting acceptance", n: production.awaiting, Icon: Hourglass, tone: "warn", nav: "machines", hint: production.onRack > 0 ? `Not yet accepted · ${production.onRack} on rack` : "Transferred, not yet accepted" },
+                { label: "Open pending jobs", n: production.openJobs.length, Icon: ClipboardList, tone: "warn", nav: "machines", hint: "Must close before Ready" },
               ].map((a) => (
-                <button key={a.label} onClick={() => onNavigate?.(a.nav)} className="text-left rounded-xl px-3.5 py-3 transition-colors"
-                        style={{ background: a.n > 0 ? a.bg : "rgba(17,24,39,0.03)", border: `1px solid ${a.n > 0 ? a.color + "40" : "rgba(17,24,39,0.06)"}` }}>
-                  <div className="text-[22px] font-extrabold tabular-nums leading-none" style={{ color: a.n > 0 ? a.color : "var(--text-strong)" }}>{a.n}</div>
-                  <div className="text-[11px] font-semibold mt-1.5" style={{ color: "var(--text-muted)" }}>{a.label}</div>
-                  <div className="text-[10px] mt-0.5" style={{ color: "var(--text-dim)" }}>{a.hint}</div>
+                <button key={a.label} onClick={() => onNavigate?.(a.nav)} className="dash-tile dash-tile--sm" data-on={a.n > 0 || undefined}>
+                  <div className="dash-tile-head">
+                    <a.Icon size={16} strokeWidth={2} aria-hidden="true" className="dash-tile-icon" />
+                    {a.n > 0 && <span className={`dash-tile-dot is-${a.tone}`} aria-hidden="true" />}
+                  </div>
+                  <CountUpValue value={a.n} className="dash-tile-value" />
+                  <div className="dash-tile-label">{a.label}</div>
+                  <div className="dash-tile-sub">{a.hint}</div>
                 </button>
               ))}
             </div>
@@ -1070,9 +1065,9 @@ function DashboardPage({ items = {}, pos = [], vendorList = [], machineLog = [],
                 <div className="text-[10px] font-semibold mb-1.5" style={{ color: "var(--text-dim)" }}>Machines by current stage</div>
                 <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
                   {Object.entries(production.byStage).map(([st, n]) => (
-                    <div key={st} className="rounded-lg px-2.5 py-2 text-center" style={{ background: n > 0 ? (STAGE_COLORS[st] || "#6b7280") + "14" : "rgba(17,24,39,0.03)", border: `1px solid ${n > 0 ? (STAGE_COLORS[st] || "#6b7280") + "40" : "rgba(17,24,39,0.06)"}` }}>
-                      <div className="text-[18px] font-extrabold tabular-nums leading-none" style={{ color: n > 0 ? (STAGE_COLORS[st] || "#374151") : "var(--text-dim)" }}>{n}</div>
-                      <div className="text-[10px] font-semibold mt-1 leading-tight" style={{ color: "var(--text-muted)" }}>{st === "BOM Issued" ? "Issued" : st}</div>
+                    <div key={st} className="dash-stage" data-zero={n > 0 ? undefined : ""}>
+                      <CountUpValue value={n} className="dash-stage-value" />
+                      <div className="dash-stage-label">{st === "BOM Issued" ? "Issued" : st}</div>
                     </div>
                   ))}
                 </div>
@@ -1086,7 +1081,7 @@ function DashboardPage({ items = {}, pos = [], vendorList = [], machineLog = [],
                   const cfg = (m.deptDurations && m.deptDurations[dept]) || (readDeptWorkflowSettings(settings).dept_durations || {})[dept];
                   const t = computeOverrun(m.departmentEnteredAt, (cfg && cfg.minutes) || 0, Date.now());
                   return (
-                    <div key={m.id} className="flex items-center gap-3 px-3 py-2 rounded-lg" style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.2)" }}>
+                    <div key={m.id} className="wu-delayrow flex items-center gap-3 px-3 py-2 rounded-lg" style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.2)" }}>
                       <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: "#dc2626" }} />
                       <div className="min-w-0 flex-1">
                         <span className="text-[11px] font-bold" style={{ color: "var(--text-strong)" }}>{m.bomLabel || m.bomKey}</span>
@@ -1580,7 +1575,7 @@ function ItemDetailModal({ item, category, onClose, onDelete, onUpdateStock, onE
                 {item.designFile && (
                   <a href={item.designFile} target="_blank" rel="noreferrer" title={item.designName || "Open design"}
                      className="text-[10px] font-bold text-violet-300 bg-violet-500/10 border border-violet-500/30 px-2 py-0.5 rounded-full hover:bg-violet-500/20 transition-all">
-                    📐 View Design
+                    <LeadIcon e="📐" />View Design
                   </a>
                 )}
               </div>
@@ -1706,10 +1701,10 @@ function ItemDetailModal({ item, category, onClose, onDelete, onUpdateStock, onE
                           </div>
                           {v && (
                             <div className="text-[9px] text-slate-500 flex flex-wrap gap-2 mt-0.5">
-                              {v.contactPerson && <span>👤 {v.contactPerson}</span>}
-                              {v.phone && <span>📞 {v.phone}</span>}
-                              {v.leadDays ? <span>🕐 {v.leadDays}d lead</span> : null}
-                              {v.paymentTerms && <span>💳 {v.paymentTerms}</span>}
+                              {v.contactPerson && <span><LeadIcon e="👤" />{v.contactPerson}</span>}
+                              {v.phone && <span><LeadIcon e="📞" />{v.phone}</span>}
+                              {v.leadDays ? <span><LeadIcon e="🕐" />{v.leadDays}d lead</span> : null}
+                              {v.paymentTerms && <span><LeadIcon e="💳" />{v.paymentTerms}</span>}
                             </div>
                           )}
                         </div>
@@ -2616,7 +2611,7 @@ function AddItemModal({ machines, onSave, onClose, initialValues = null, vendorL
           <button type="button" onClick={() => setShowAdvanced((v) => !v)}
                   className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-[12px] font-bold text-slate-700 transition-all"
                   style={{ background: "rgba(17,24,39,0.03)", border: "1px solid rgba(17,24,39,0.12)" }}>
-            <span>⚙️ Purchase / Vendor / Media details {showAdvanced ? "" : "(optional)"}</span>
+            <span><LeadIcon e="⚙️" />Purchase / Vendor / Media details {showAdvanced ? "" : "(optional)"}</span>
             <span className="text-[10px]">{showAdvanced ? "▲ Hide" : "▼ Show"}</span>
           </button>
 
@@ -2729,8 +2724,8 @@ function AddItemModal({ machines, onSave, onClose, initialValues = null, vendorL
                             <div className="text-xs font-semibold text-slate-900 truncate">{v.name}</div>
                             {(v.contactPerson || v.leadDays) && (
                               <div className="text-[9px] text-slate-500 flex gap-2 mt-0.5">
-                                {v.contactPerson && <span>👤 {v.contactPerson}</span>}
-                                {v.leadDays ? <span>🕐 {v.leadDays}d lead</span> : null}
+                                {v.contactPerson && <span><LeadIcon e="👤" />{v.contactPerson}</span>}
+                                {v.leadDays ? <span><LeadIcon e="🕐" />{v.leadDays}d lead</span> : null}
                               </div>
                             )}
                           </div>
@@ -2770,9 +2765,9 @@ function AddItemModal({ machines, onSave, onClose, initialValues = null, vendorL
                         <div className="text-xs font-semibold text-slate-900 truncate">{link.vendorName}</div>
                         {v && (
                           <div className="text-[9px] text-slate-500 flex gap-2 mt-0.5">
-                            {v.contactPerson && <span>👤 {v.contactPerson}</span>}
-                            {v.phone && <span>📞 {v.phone}</span>}
-                            {v.leadDays ? <span>🕐 {v.leadDays}d</span> : null}
+                            {v.contactPerson && <span><LeadIcon e="👤" />{v.contactPerson}</span>}
+                            {v.phone && <span><LeadIcon e="📞" />{v.phone}</span>}
+                            {v.leadDays ? <span><LeadIcon e="🕐" />{v.leadDays}d</span> : null}
                           </div>
                         )}
                       </div>
@@ -2781,9 +2776,9 @@ function AddItemModal({ machines, onSave, onClose, initialValues = null, vendorL
                         onChange={(e) => changeRole(link.vendorId, e.target.value)}
                         className="text-[10px] font-bold rounded-lg px-2 py-1 outline-none border flex-shrink-0"
                         style={{ background: `${rc}14`, color: rc, borderColor: `${rc}40`, fontFamily: "'Inter',system-ui,sans-serif" }}>
-                        <option value="Preferred">⭐ Preferred</option>
-                        <option value="Approved">✅ Approved</option>
-                        <option value="Backup">🔘 Backup</option>
+                        <option value="Preferred">Preferred</option>
+                        <option value="Approved">Approved</option>
+                        <option value="Backup">Backup</option>
                       </select>
                       <button onClick={() => removeVendorLink(link.vendorId)}
                               className="w-5 h-5 flex-shrink-0 flex items-center justify-center rounded text-slate-600 hover:text-red-400 hover:bg-red-500/10 transition-all text-xs">
@@ -2863,7 +2858,7 @@ function AddItemModal({ machines, onSave, onClose, initialValues = null, vendorL
                     {designFile && !designBusy && <button onClick={() => { setDesignFile(""); setDesignName(""); }}
                             className="text-[10px] font-bold px-2.5 py-1 rounded-lg border border-red-500/20 text-red-400 hover:bg-red-500/10 transition-all">Remove</button>}
                   </div>
-                  {designName && <div className="text-[9px] text-slate-500 mt-1 truncate" title={designName}>📎 {designName}</div>}
+                  {designName && <div className="text-[9px] text-slate-500 mt-1 truncate" title={designName}><LeadIcon e="📎" />{designName}</div>}
                   <div className="text-[9px] text-slate-600 mt-0.5">PNG/JPG/PDF, up to {MAX_MB} MB · stored in Supabase Storage</div>
                 </div>
               </div>
@@ -2871,7 +2866,7 @@ function AddItemModal({ machines, onSave, onClose, initialValues = null, vendorL
             {mediaErr && (
               <div className="mt-2 px-3 py-2 rounded-lg text-[11px] text-red-300 break-words"
                    style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)" }}>
-                ⚠️ {mediaErr}
+                <LeadIcon e="⚠️" />{mediaErr}
               </div>
             )}
           </div>
@@ -2902,7 +2897,7 @@ function AddItemModal({ machines, onSave, onClose, initialValues = null, vendorL
                       e.currentTarget.style.boxShadow = "0 0 12px rgba(46, 80, 214,0.45), 0 2px 8px rgba(17,24,39,0.08)";
                       e.currentTarget.style.borderColor = "rgba(38, 64, 176,0.5)";
                     }}>
-              {isEdit ? "💾 Save Changes" : "💾 Save Item"}
+              <LeadLabel text={isEdit ? "💾 Save Changes" : "💾 Save Item"} />
             </button>
           </div>
         </div>
@@ -3654,7 +3649,7 @@ function InventoryPage({ items, setItems, handleUpdateStock, pos = [], inwardLog
               <button onClick={() => handleConfirmDelete(deleteModal.category, deleteModal.item.code)}
                       className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-lg px-4 py-1.5 text-white border transition-all"
                       style={{ background: "#b91c1c", borderColor: "rgba(239,68,68,0.5)", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
-                🗑️ Delete
+                <LeadIcon e="🗑️" />Delete
               </button>
             </div>
           </div>
@@ -3686,7 +3681,7 @@ function InventoryPage({ items, setItems, handleUpdateStock, pos = [], inwardLog
         {canDo("inventory","add") && (
           <button onClick={() => setShowImport(true)}
                   className="text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-900 hover:border-slate-300 transition-all flex items-center gap-1.5">
-            ⬆ Import Items
+            <LeadIcon e="⬆" />Import Items
           </button>
         )}
         {canDo("inventory","delete") && (
@@ -3694,7 +3689,7 @@ function InventoryPage({ items, setItems, handleUpdateStock, pos = [], inwardLog
                   title="Delete demo items and BOMs together"
                   className="text-xs font-bold px-3 py-1.5 rounded-lg border transition-all flex items-center gap-1.5"
                   style={{ borderColor: "rgba(239,68,68,0.35)", color: "#dc2626" }}>
-            🧹 Clear Demo Data
+            <LeadIcon e="🧹" />Clear Demo Data
           </button>
         )}
         {canDo("inventory","add") && <Btn variant="primary" size="sm" onClick={() => setShowModal(true)}>+ Add Item</Btn>}
@@ -3737,7 +3732,7 @@ function InventoryPage({ items, setItems, handleUpdateStock, pos = [], inwardLog
             </button>
           );
           return (
-            <div className="rounded-xl"
+            <div className="wu-attn rounded-xl"
                  style={{ background: "rgba(239,68,68,0.04)", border: "1px solid rgba(239,68,68,0.18)" }}>
               {/* Header row — clickable, ~60px tall. Always visible. */}
               <button
@@ -3754,7 +3749,7 @@ function InventoryPage({ items, setItems, handleUpdateStock, pos = [], inwardLog
                     {/* Preview chips are labels, not buttons: they sit inside the
                         header toggle and a <button> may not contain a <button>. */}
                     {alerts.slice(0, 10).map((i) => (
-                      <span key={i.code} className="text-[10px] font-bold font-mono px-2 py-0.5 rounded-lg flex-shrink-0"
+                      <span key={i.code} className="wu-attn-chip text-[10px] font-bold font-mono px-2 py-0.5 rounded-lg flex-shrink-0" data-status={i.status}
                             style={{ background: i.status === "critical" ? "rgba(220,38,38,0.08)" : "rgba(217,119,6,0.08)", border: i.status === "critical" ? "1px solid rgba(220,38,38,0.22)" : "1px solid rgba(217,119,6,0.22)", color: i.status === "critical" ? "#dc2626" : "#b45309" }}>
                         {i.code} · {i.stock} {i.unit}
                       </span>
@@ -3808,7 +3803,7 @@ function InventoryPage({ items, setItems, handleUpdateStock, pos = [], inwardLog
           </select>
 
           <div className="relative ml-auto">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 text-[11px] pointer-events-none">🔍</span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 text-[11px] pointer-events-none"><Glyph e="🔍" size={13} /></span>
             <input ref={searchRef} value={search} onChange={(e) => setSearch(e.target.value)}
                    placeholder="Search code, name, vendor, location..."
                    className="bg-slate-50 border border-slate-200 rounded-lg pl-7 pr-3 py-1.5 text-xs placeholder-slate-400 outline-none focus:border-blue-500/40 w-72 transition-all"
@@ -3855,13 +3850,13 @@ function InventoryPage({ items, setItems, handleUpdateStock, pos = [], inwardLog
                   return (
                     <tr key={`${item.category}-${item.code}`}
                         onClick={() => setSelectedItem({ item: { ...item }, category: item.category })}
-                        className={`border-b border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors ${isCrit ? "bg-red-500/[0.025]" : ""} ${lastAddedCode === item.code ? "bg-blue-500/[0.08]" : ""}`}>
+                        className={`wu-imrow border-b border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors ${isCrit ? "bg-red-500/[0.025]" : ""} ${lastAddedCode === item.code ? "bg-blue-500/[0.08]" : ""}`}>
                       <td className="px-4 py-4 text-xs font-mono font-bold text-blue-600 whitespace-nowrap">{item.code}</td>
                       <td className="px-4 py-4 text-xs font-semibold max-w-[160px]" style={{ color: "var(--text-strong)" }}>
                         <div className="truncate">{item.name}</div>
                       </td>
                       <td className="px-4 py-4">
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md whitespace-nowrap"
+                        <span className="wu-cat text-[10px] font-bold px-2 py-0.5 rounded-md whitespace-nowrap"
                               style={{ background: `${catColor}14`, color: catColor, border: `1px solid ${catColor}28` }}>
                           {item.category}
                         </span>
@@ -3893,24 +3888,24 @@ function InventoryPage({ items, setItems, handleUpdateStock, pos = [], inwardLog
                           {canDo("inventory","adjust") && (
                             <button onClick={() => setQuickAdjust({ item: { ...item }, category: item.category, mode: "add" })}
                                     title="Add Stock"
-                                    className="w-6 h-6 rounded flex items-center justify-center text-xs font-black text-green-700 hover:text-green-900 transition-all"
+                                    className="wu-rowbtn w-6 h-6 rounded flex items-center justify-center text-xs font-black text-green-700 hover:text-green-900 transition-all"
                                     style={{ background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.22)" }}>＋</button>
                           )}
                           {canDo("inventory","adjust") && (
                             <button onClick={() => setQuickAdjust({ item: { ...item }, category: item.category, mode: "remove" })}
                                     title="Remove Stock"
-                                    className="w-6 h-6 rounded flex items-center justify-center text-xs font-black text-amber-700 hover:text-amber-900 transition-all"
+                                    className="wu-rowbtn w-6 h-6 rounded flex items-center justify-center text-xs font-black text-amber-700 hover:text-amber-900 transition-all"
                                     style={{ background: "rgba(217, 119, 6,0.1)", border: "1px solid rgba(217, 119, 6,0.22)" }}>－</button>
                           )}
                           {canDo("inventory","edit") && (
                             <button onClick={() => setEditingItem({ item: { ...item }, category: item.category })}
                                     title="Edit"
-                                    className="w-6 h-6 rounded flex items-center justify-center text-[11px] text-slate-500 hover:text-slate-900 transition-all"
-                                    style={{ background: "rgba(17,24,39,0.04)", border: "1px solid rgba(17,24,39,0.10)" }}>✏</button>
+                                    className="wu-rowbtn w-6 h-6 rounded flex items-center justify-center text-[11px] text-slate-500 hover:text-slate-900 transition-all"
+                                    style={{ background: "rgba(17,24,39,0.04)", border: "1px solid rgba(17,24,39,0.10)" }}><Glyph e="✏" size={13} /></button>
                           )}
                           {item.status !== "safe" && (
-                            <span className="text-[9px] font-black text-red-700 px-1.5 py-0.5 rounded whitespace-nowrap"
-                                  style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)" }}>🚨</span>
+                            <span className="wu-rowflag text-[9px] font-black text-red-700 px-1.5 py-0.5 rounded whitespace-nowrap"
+                                  style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)" }}><Glyph e="🚨" size={13} /></span>
                           )}
                         </div>
                       </td>
@@ -4258,7 +4253,7 @@ function POModal({ initialPO, vendorList, items, onSave, onClose, prefill = null
                           {isSelected && <span className="ml-auto text-[8px] font-black text-blue-700">✓ SELECTED</span>}
                         </div>
                         <div className="text-[11px] font-bold text-slate-900 truncate max-w-[130px] mb-1" title={v.name}>{v.name}</div>
-                        {v.contactPerson && <div className="text-[9px] text-slate-500 mb-1">👤 {v.contactPerson}</div>}
+                        {v.contactPerson && <div className="text-[9px] text-slate-500 mb-1"><LeadIcon e="👤" />{v.contactPerson}</div>}
                         <div className="text-[9px] text-slate-400 font-mono font-bold">
                           {v.lastRate ? `₹${v.lastRate.toLocaleString("en-IN")} / unit` : <span className="text-slate-600">No rate history</span>}
                         </div>
@@ -4414,7 +4409,7 @@ function POModal({ initialPO, vendorList, items, onSave, onClose, prefill = null
                    style={{ background: "rgba(34,197,94,0.05)", border: "1px solid rgba(34,197,94,0.25)" }}>
                 <div className="flex items-center justify-between mb-2">
                   <div>
-                    <div className="text-[11px] font-bold text-emerald-300">📦 Low Stock for {form.vendor}</div>
+                    <div className="text-[11px] font-bold text-emerald-300"><LeadIcon e="📦" />Low Stock for {form.vendor}</div>
                     <div className="text-[10px] text-slate-500 mt-0.5">{lowItems.length} preferred low-stock item{lowItems.length !== 1 ? "s" : ""} · tap to add to PO</div>
                   </div>
                   <button onClick={addAllLowStockItems}
@@ -4499,7 +4494,7 @@ function POModal({ initialPO, vendorList, items, onSave, onClose, prefill = null
               );
             })()}
 
-            {addErr && <div className="text-[10px] text-red-600 mb-2">⚠ {addErr}</div>}
+            {addErr && <div className="text-[10px] text-red-600 mb-2"><LeadIcon e="⚠" />{addErr}</div>}
 
             {form.lineItems.length > 0 ? (
               <div className="rounded-xl overflow-hidden border border-slate-200">
@@ -4611,12 +4606,12 @@ function POModal({ initialPO, vendorList, items, onSave, onClose, prefill = null
             <Btn variant="ghost" size="sm" onClick={onClose}>Cancel</Btn>
             <button onClick={() => handleSave("draft")}
                     className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-lg px-3 py-1.5 text-slate-500 border border-slate-200 bg-slate-50 hover:bg-slate-100 transition-all">
-              💾 Save Draft
+              <LeadIcon e="💾" />Save Draft
             </button>
             <button onClick={() => handleSave("pending")}
                     className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-lg px-3 py-1.5 text-white border transition-all"
                     style={{ background: "#2640B0", borderColor: "rgba(38, 64, 176,0.5)", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
-              📤 Submit for Approval
+              <LeadIcon e="📤" />Submit for Approval
             </button>
           </div>
         </div>
@@ -4787,7 +4782,7 @@ function PODetailModal({ po, onClose, onApprove, onMarkOrdered, onMarkReceived, 
             <button onClick={() => { setConfirmReceive(true); setConfirmDelete(false); }}
                     className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-lg px-3 py-1.5 text-slate-900 border transition-all"
                     style={{ background: "#15803d", borderColor: "rgba(34,197,94,0.5)", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
-              ✅ Mark Received
+              <LeadIcon e="✅" />Mark Received
             </button>
           )}
         </div>
@@ -4907,7 +4902,7 @@ function PurchasePage({ pos, vendorList, items, onCreatePO, onUpdatePO, onReceiv
               ))}
             </div>
             <input value={search} onChange={(e) => setSearch(e.target.value)}
-              placeholder="🔍 Search PO / vendor..."
+              placeholder="Search PO / vendor..."
               className="ml-auto bg-slate-50 border border-white/10 rounded-lg px-3 py-1.5 text-xs placeholder-slate-400 outline-none focus:border-blue-500/40 w-52" />
           </div>
 
@@ -5247,9 +5242,9 @@ function VendorModal({ initialVendor, onSave, onClose, existingNames = [] }) {
             <div>
               <ILabel text="Vendor Priority" />
               <select value={form.priority} onChange={upd("priority")} className={inpCls(false)} style={selStyle}>
-                <option value="Preferred">⭐ Preferred</option>
-                <option value="Approved">✅ Approved</option>
-                <option value="Backup">🔘 Backup</option>
+                <option value="Preferred">Preferred</option>
+                <option value="Approved">Approved</option>
+                <option value="Backup">Backup</option>
               </select>
             </div>
             <div>
@@ -5391,7 +5386,7 @@ function VendorsPage({ vendorList, pos, items, onAddVendor, onEditVendor, onDele
       {toast && (
         <div className="fixed bottom-6 right-6 z-[60] flex items-center gap-3 px-5 py-3.5 rounded-2xl"
              style={{ background: "var(--surface-raised)", border: "1px solid rgba(46, 80, 214,0.45)", boxShadow: "0 20px 60px rgba(17,24,39,0.14)", animation: "slideUp 0.3s ease both" }}>
-          <span className="text-lg">🏭</span>
+          <span className="text-lg"><Glyph e="🏭" size={18} /></span>
           <div className="text-xs font-black text-slate-900">{toast}</div>
           <button onClick={() => setToast(null)} className="ml-2 text-slate-600 hover:text-slate-500 text-xs">✕</button>
         </div>
@@ -5499,7 +5494,7 @@ function VendorsPage({ vendorList, pos, items, onAddVendor, onEditVendor, onDele
         {canDo("vendors","add") && (
           <button onClick={() => setShowImport(true)}
                   className="text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-900 hover:border-slate-300 transition-all flex items-center gap-1.5">
-            ⬆ Import
+            <LeadIcon e="⬆" />Import
           </button>
         )}
         {canDo("vendors","add") && <Btn variant="primary" size="sm" onClick={() => { setEditingVendor(null); setShowModal(true); }}>+ Add Vendor</Btn>}
@@ -5529,8 +5524,8 @@ function VendorsPage({ vendorList, pos, items, onAddVendor, onEditVendor, onDele
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1 min-w-0 mr-3">
                       <div className="text-[14px] font-bold text-[#111827] truncate leading-tight mb-0.5">{v.name}</div>
-                      <div className="text-[11px] text-slate-500">📍 {v.location || "—"}{v.years != null ? ` · ${v.years} yr${v.years !== 1 ? "s" : ""}` : ""}</div>
-                      {v.contactPerson && <div className="text-[10px] text-slate-400 mt-0.5">👤 {v.contactPerson}</div>}
+                      <div className="text-[11px] text-slate-500"><LeadIcon e="📍" />{v.location || "—"}{v.years != null ? ` · ${v.years} yr${v.years !== 1 ? "s" : ""}` : ""}</div>
+                      {v.contactPerson && <div className="text-[10px] text-slate-400 mt-0.5"><LeadIcon e="👤" />{v.contactPerson}</div>}
                     </div>
                     <div className="flex flex-col items-end gap-1 shrink-0">
                       <StatusBadge status={v.status} />
@@ -5578,9 +5573,9 @@ function VendorsPage({ vendorList, pos, items, onAddVendor, onEditVendor, onDele
                   {/* Action buttons */}
                   <div className="flex gap-1.5 pt-2.5 border-t border-slate-100" onClick={(e) => e.stopPropagation()}>
                     <Btn variant="wa"    size="xs" onClick={() => { const r = openVendorWhatsApp(v); if (!r.ok) showToast(waErrorToast(r.error)); }}><LeadIcon e="📱" />WA</Btn>
-                    <Btn variant="mail"  size="xs">✉️</Btn>
-                    {canDo("vendors","edit")   && <Btn variant="ghost" size="xs" onClick={() => { setEditingVendor(v); setShowModal(true); }}>✏️</Btn>}
-                    {canDo("vendors","delete") && <Btn variant="red"   size="xs" onClick={() => setConfirmDelete(v)}>🗑</Btn>}
+                    <Btn variant="mail"  size="xs"><Glyph e="✉️" size={14} /></Btn>
+                    {canDo("vendors","edit")   && <Btn variant="ghost" size="xs" onClick={() => { setEditingVendor(v); setShowModal(true); }}><Glyph e="✏️" size={14} /></Btn>}
+                    {canDo("vendors","delete") && <Btn variant="red"   size="xs" onClick={() => setConfirmDelete(v)}><Glyph e="🗑" size={14} /></Btn>}
                   </div>
                 </div>
               </div>
@@ -5664,11 +5659,11 @@ function VendorsPage({ vendorList, pos, items, onAddVendor, onEditVendor, onDele
                 {/* Contact */}
                 <div className="space-y-1.5">
                   <div className="text-[10px] font-medium text-slate-500 uppercase tracking-[0.08em]">Contact</div>
-                  {v.contactPerson && <div className="text-[11px] text-slate-500">👤 {v.contactPerson}</div>}
-                  <div className="text-[11px] text-slate-500">📞 {v.phone}</div>
-                  <div className="text-[11px] text-slate-500">✉️ {v.email}</div>
+                  {v.contactPerson && <div className="text-[11px] text-slate-500"><LeadIcon e="👤" />{v.contactPerson}</div>}
+                  <div className="text-[11px] text-slate-500"><LeadIcon e="📞" />{v.phone}</div>
+                  <div className="text-[11px] text-slate-500"><LeadIcon e="✉️" />{v.email}</div>
                   {v.gst     && <div className="text-[11px] text-slate-500">GST: <span className="font-mono text-slate-600">{v.gst}</span></div>}
-                  {v.address && <div className="text-[11px] text-slate-500">📍 {v.address}</div>}
+                  {v.address && <div className="text-[11px] text-slate-500"><LeadIcon e="📍" />{v.address}</div>}
                 </div>
 
                 {/* Terms */}
@@ -6118,7 +6113,7 @@ function AnalyticsPage({ items, pos, vendorList, settings = SETTINGS_DEFAULTS })
               )}</ChartSlot>
             ) : (
               <div className="h-[220px] flex flex-col items-center justify-center gap-1 text-center">
-                <div className="text-2xl" style={{ opacity: 0.45 }}>🏭</div>
+                <div className="text-2xl" style={{ opacity: 0.45 }}><Glyph e="🏭" size={26} /></div>
                 <div className="text-xs font-semibold" style={{ color: "var(--text-muted)" }}>No PO data yet</div>
               </div>
             )}
@@ -8336,7 +8331,7 @@ const Section = ({ icon, title, children }) => (
   <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
     <div className="flex items-center gap-3 px-6 py-4 border-b border-slate-200"
          style={{ background: "rgba(17,24,39,0.03)" }}>
-      <span className="text-base">{icon}</span>
+      <span className="text-base"><Glyph e={icon} size={17} /></span>
       <span className="text-[14px] font-bold text-slate-900">{title}</span>
     </div>
     <div className="px-6 py-5">{children}</div>
@@ -8414,7 +8409,7 @@ function OrgGroup({ id, icon, title, hint, badge = null, defaultOpen = true, chi
   return (
     <section data-org-group={id} className="org-group" data-open={open ? "1" : "0"}>
       <button type="button" className="org-group-head" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
-        <span className="org-group-icon" aria-hidden="true">{icon}</span>
+        <span className="org-group-icon" aria-hidden="true"><Glyph e={icon} size={18} /></span>
         <span className="org-group-text">
           <span className="org-group-title">{title}</span>
           {hint && <span className="org-group-hint">{hint}</span>}
@@ -8697,7 +8692,7 @@ function ChecklistAdminPanel({ templates = [], canConfig = false, onCreate, onUp
               </button>
             )}
           </div>
-          {err && <div className="text-[11px] font-semibold text-red-300">⚠ {err}</div>}
+          {err && <div className="text-[11px] font-semibold text-red-300"><LeadIcon e="⚠" />{err}</div>}
         </div>
       )}
     </Section>
@@ -8779,7 +8774,7 @@ function DeptEmployeesRow({ dept, assigned, notAssigned, canConfig, onSaveUserDe
           </button>
         </div>
       )}
-      {err && <div className="text-[10px] text-red-600 mt-1">⚠ {err}</div>}
+      {err && <div className="text-[10px] text-red-600 mt-1"><LeadIcon e="⚠" />{err}</div>}
     </div>
   );
 }
@@ -8852,7 +8847,7 @@ function EmployeeMembersPanel({ members = [], canConfig = false, onSave }) {
       {!editing && err && (
         <div className="text-[11px] mb-3 px-3 py-2 rounded-lg"
              style={{ background: "rgba(239,68,68,0.08)", color: "#b91c1c", border: "1px solid rgba(239,68,68,0.3)" }}>
-          ⚠ {err}
+          <LeadIcon e="⚠" />{err}
         </div>
       )}
       <div className="flex items-center justify-between mb-3">
@@ -8910,7 +8905,7 @@ function EmployeeMembersPanel({ members = [], canConfig = false, onSave }) {
           {err && (
             <div className="text-[11px] px-3 py-2 rounded-lg"
                  style={{ background: "rgba(239,68,68,0.08)", color: "#b91c1c", border: "1px solid rgba(239,68,68,0.3)" }}>
-              ⚠ {err}
+              <LeadIcon e="⚠" />{err}
             </div>
           )}
           <div className="flex gap-2">
@@ -9169,7 +9164,7 @@ function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, onSave, i
         <button onClick={() => handleSave()}
                 className="inline-flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-xl transition-all duration-200"
                 style={{ background: saved ? "rgba(22,163,74,0.12)" : "#2640B0", color: saved ? "#15803d" : "#fff", border: saved ? "1px solid rgba(22,163,74,0.35)" : "1px solid rgba(38, 64, 176,0.45)", boxShadow: saved ? "none" : "0 0 12px rgba(46, 80, 214,0.3)" }}>
-          {saved ? "✅ Saved!" : "💾 Save Changes"}
+          <LeadLabel text={saved ? "✅ Saved!" : "💾 Save Changes"} />
         </button>
       </Topbar>
 
@@ -9754,7 +9749,7 @@ function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, onSave, i
                 </div>
                 <button onClick={handleExportExcel}
                         className="flex-shrink-0 text-[12px] font-bold px-4 py-2 rounded-xl border transition-all text-green-400 hover:bg-green-500/10 border-green-500/20 hover:border-green-500/40">
-                  ⬇ Export Excel
+                  <LeadIcon e="⬇" />Export Excel
                 </button>
               </div>
             </div>
@@ -10164,7 +10159,7 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
     <div className="flex items-center justify-between mb-3">
       <div className="flex items-center gap-2">
         <div className="w-1 h-5 rounded-full" style={{ background: color }} />
-        <span className="text-[12px] font-semibold text-slate-900">{icon} {title}</span>
+        <span className="text-[12px] font-semibold text-slate-900"><LeadLabel text={`${icon} ${title}`} /></span>
       </div>
       <span className="text-[11px] font-semibold text-slate-900 px-2 py-0.5 rounded-full" style={{ background: color+"22", border:`1px solid ${color}44` }}>{count}</span>
     </div>
@@ -10176,7 +10171,7 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
   const ViewBtn = ({ po }) => (
     <button onClick={() => setViewPO(po)}
             className="flex-1 text-[9px] font-bold py-1 rounded-lg text-slate-400 border border-slate-200 bg-slate-50 hover:text-slate-900 hover:bg-slate-100 transition-all">
-      📄 View PO
+      <LeadIcon e="📄" />View PO
     </button>
   );
   const card = "rounded-xl p-3.5 border transition-all hover:scale-[1.005]";
@@ -10224,7 +10219,7 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
           <button onClick={openVendorWizard}
                   className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-lg px-3 py-1.5 text-slate-900 border transition-all"
                   style={{ background: "#15803d", borderColor: "rgba(34,197,94,0.5)", color: "#ffffff" }}>
-            📦 Create Vendor PO
+            <LeadIcon e="📦" />Create Vendor PO
           </button>
         )}
         {canDo("pipeline","create") && (
@@ -10309,10 +10304,10 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
                       return (
                         <div className="mb-1.5">
                           {links.length === 1 ? (
-                            <div className="text-[9px] text-slate-500 truncate">🏭 {links[0].vendorName}</div>
+                            <div className="text-[9px] text-slate-500 truncate"><LeadIcon e="🏭" />{links[0].vendorName}</div>
                           ) : (
                             <div className="flex flex-wrap items-center gap-1 mb-0.5">
-                              <span className="text-[9px] text-slate-600">🏭</span>
+                              <span className="text-[9px] text-slate-600"><Glyph e="🏭" size={11} /></span>
                               {links.slice(0, 2).map((l, i) => (
                                 <span key={i} className="text-[8px] font-bold px-1.5 py-0.5 rounded-full truncate max-w-[80px]"
                                       style={{ color: roleCol(l.role), background: `${roleCol(l.role)}14`, border: `1px solid ${roleCol(l.role)}28` }}>
@@ -10365,9 +10360,9 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
                   </div>
                   <div className="text-[11px] font-bold text-slate-900 truncate mb-0.5">{po.vendor}</div>
                   <div className="text-[9px] text-slate-500 mb-0.5">₹{(po.amount||0).toLocaleString("en-IN")} · {po.lineItems?.length||0} items · {po.date}</div>
-                  {po.priority && <div className={`text-[9px] font-bold mb-2 ${po.priority==="urgent"?"text-red-400":po.priority==="high"?"text-amber-700":"text-slate-600"}`}>⚡ {po.priority.toUpperCase()}</div>}
+                  {po.priority && <div className={`text-[9px] font-bold mb-2 ${po.priority==="urgent"?"text-red-400":po.priority==="high"?"text-amber-700":"text-slate-600"}`}><LeadIcon e="⚡" />{po.priority.toUpperCase()}</div>}
                   {po.notes && <div className="text-[9px] text-slate-500 mb-2 truncate italic">"{po.notes}"</div>}
-                  {po.rejectReason && <div className="text-[9px] text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-2 py-1.5 mb-2">❌ {po.rejectReason}</div>}
+                  {po.rejectReason && <div className="text-[9px] text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-2 py-1.5 mb-2"><LeadIcon e="❌" />{po.rejectReason}</div>}
                   <div className="flex gap-1 mb-1.5">
                     {canDo("pipeline","approve") && (
                       <button onClick={() => onUpdatePO(po.id, { status:"approved", rejectReason:null })}
@@ -10407,7 +10402,7 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
                     {canDo("pipeline","ordered") && (
                       <button onClick={() => { setMoModal(po); setEta(""); setEtaCustom(""); }}
                               className="w-full text-[10px] font-bold py-1.5 rounded-lg text-slate-900 border border-blue-500/40 bg-blue-600/20 hover:bg-blue-600/30 transition-all mb-1.5">
-                        📋 Confirm Order + ETA
+                        <LeadIcon e="📋" />Confirm Order + ETA
                       </button>
                     )}
                     <ViewBtn po={po} />
@@ -10470,7 +10465,7 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
                       {canDo("pipeline","receive") && (
                         <button onClick={() => handleReceive(f.poId)}
                                 className="flex-1 text-[9px] font-bold py-1.5 rounded-lg text-green-400 border border-green-500/30 bg-green-500/10 hover:bg-green-500/20 transition-all">
-                          📦 Mark Received
+                          <LeadIcon e="📦" />Mark Received
                         </button>
                       )}
                       {po && <ViewBtn po={po} />}
@@ -10638,7 +10633,7 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
                   <button onClick={() => sendWA(viewPO)} className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg text-green-400 border border-green-500/30 bg-green-500/10 hover:bg-green-500/20 transition-all"><LeadIcon e="💬" />WhatsApp</button>
                   <button onClick={() => generatePOPdf(viewPO, vnd, settings)}
                           className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg text-amber-700 border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 transition-all">
-                    📄 PDF
+                    <LeadIcon e="📄" />PDF
                   </button>
                   <button onClick={() => setViewPO(null)} className="w-7 h-7 rounded-lg bg-slate-50 hover:bg-red-500/20 hover:text-red-400 text-slate-500 transition-all flex items-center justify-center text-sm font-bold ml-0.5">✕</button>
                 </div>
@@ -10667,8 +10662,8 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
                 <div className="p-3.5 rounded-xl" style={{ background:"rgba(17,24,39,0.03)", border:"1px solid rgba(17,24,39,0.08)" }}>
                   <div className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.12em] mb-2">Vendor</div>
                   <div className="text-[13px] font-black text-slate-900 mb-2">{viewPO.vendor}</div>
-                  {vnd?.contactPerson && <div className="flex items-center gap-1.5 text-[10.5px] text-slate-400 mb-1">👤 {vnd.contactPerson}</div>}
-                  {vnd?.phone && <div className="flex items-center gap-1.5 text-[10.5px] text-slate-400 mb-1">📱 {vnd.phone}</div>}
+                  {vnd?.contactPerson && <div className="flex items-center gap-1.5 text-[10.5px] text-slate-400 mb-1"><LeadIcon e="👤" />{vnd.contactPerson}</div>}
+                  {vnd?.phone && <div className="flex items-center gap-1.5 text-[10.5px] text-slate-400 mb-1"><LeadIcon e="📱" />{vnd.phone}</div>}
                   {vnd?.gst && <div className="text-[10px] font-mono text-slate-500 mb-1">GSTIN: {vnd.gst}</div>}
                   {vnd?.address && <div className="text-[10px] text-slate-500 leading-relaxed">{vnd.address}</div>}
                   {!vnd && <div className="text-[10px] text-slate-600 italic">Vendor details not on file</div>}
@@ -10804,7 +10799,7 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
                 <button onClick={() => { setMoModal(viewPO); setViewPO(null); setEta(""); setEtaCustom(""); }}
                         className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-lg px-3 py-1.5 text-white border transition-all"
                         style={{ background:"#2640B0", borderColor:"rgba(38, 64, 176,0.5)", color: "#ffffff" }}>
-                  📋 Confirm Order + ETA
+                  <LeadIcon e="📋" />Confirm Order + ETA
                 </button>
               )}
               {["ordered","overdue"].includes(viewPO.status) && (() => {
@@ -10813,7 +10808,7 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
                   <button onClick={() => { setFuModal(fu); setViewPO(null); setFuFreq(1); setFuCustom(""); }}
                           className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-lg px-3 py-1.5 text-white border transition-all"
                           style={{ background:"#6d28d9", borderColor:"rgba(167,139,250,0.5)", color: "#ffffff" }}>
-                    🔔 Follow-Up Done
+                    <LeadIcon e="🔔" />Follow-Up Done
                   </button>
                 ) : null;
               })()}
@@ -10821,7 +10816,7 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
                 <button onClick={() => { handleReceive(viewPO.id); setViewPO(null); }}
                         className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-lg px-3 py-1.5 text-slate-900 border transition-all"
                         style={{ background:"#15803d", borderColor:"rgba(34,197,94,0.5)", color: "#ffffff" }}>
-                  📦 Mark Received
+                  <LeadIcon e="📦" />Mark Received
                 </button>
               )}
               {viewPO.status === "received" && isSuperAdmin && onReverseReceive && (
@@ -10837,7 +10832,7 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
                         className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-lg px-3 py-1.5 text-red-400 border transition-all"
                         style={{ background:"rgba(239,68,68,0.1)", borderColor:"rgba(239,68,68,0.35)" }}
                         title="Super Admin only: delete test/incorrect record">
-                  🗑️ Delete Record
+                  <LeadIcon e="🗑️" />Delete Record
                 </button>
               )}
             </div>
@@ -10861,7 +10856,7 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
             </div>
             <div className="px-3 py-2.5 rounded-lg text-[10.5px] text-amber-300 leading-relaxed"
                  style={{ background:"rgba(245,158,11,0.08)", border:"1px solid rgba(245,158,11,0.25)" }}>
-              ⚠️ This will subtract the received quantities from inventory and revert the PO status. Action will be logged in audit history.
+              <LeadIcon e="⚠️" />This will subtract the received quantities from inventory and revert the PO status. Action will be logged in audit history.
             </div>
             <div>
               <div className="text-[10px] font-medium text-slate-500 uppercase tracking-[0.08em] mb-1.5">Reason <span className="text-red-600">*</span></div>
@@ -10929,7 +10924,7 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
               </div>
               <button onClick={()=>setEta("custom")}
                       className={`w-full py-2 rounded-lg text-xs font-bold border transition-all mb-2 ${eta==="custom"?"bg-purple-500/20 text-purple-400 border-purple-500/40":"bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100"}`}>
-                📅 Custom Date
+                <LeadIcon e="📅" />Custom Date
               </button>
               {eta==="custom" && <input type="date" value={etaCustom} onChange={e=>setEtaCustom(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-900 outline-none modal-input" />}
               {!eta && <div className="text-[10px] text-amber-700 mt-1">Select an ETA to confirm</div>}
@@ -10939,7 +10934,7 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
               <button onClick={handleConfirm} disabled={!eta||(eta==="custom"&&!etaCustom)}
                       className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-lg px-4 py-1.5 text-white border transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                       style={{ background:"#2640B0", borderColor:"rgba(38, 64, 176,0.5)", color: "#ffffff" }}>
-                ✅ Confirm & Start Follow-Up
+                <LeadIcon e="✅" />Confirm & Start Follow-Up
               </button>
             </div>
           </div>
@@ -10966,7 +10961,7 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
               </div>
               <button onClick={()=>setFuFreq("custom")}
                       className={`w-full py-2 rounded-lg text-xs font-bold border transition-all mb-2 ${fuFreq==="custom"?"bg-purple-500/20 text-purple-400 border-purple-500/40":"bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100"}`}>
-                📅 Custom Date
+                <LeadIcon e="📅" />Custom Date
               </button>
               {fuFreq==="custom" && <input type="date" value={fuCustom} onChange={e=>setFuCustom(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-900 outline-none modal-input" />}
             </div>
@@ -11043,7 +11038,7 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
                   onClick={() => { openCreatePO(item, parsedQty); setQtyModal(null); }}
                   className="flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-semibold rounded-lg px-3 py-1.5 text-white border transition-all disabled:opacity-40"
                   style={{ background: "linear-gradient(135deg,#2E50D6,#2640B0)", borderColor: "rgba(38, 64, 176,0.5)" }}>
-                  📋 Create PO →
+                  <LeadIcon e="📋" />Create PO →
                 </button>
               </div>
             </div>
@@ -11118,7 +11113,7 @@ function InwardPage({ items, handleUpdateStock, vendorList, onInwardComplete, on
       {toast && (
         <div className="fixed bottom-6 right-6 z-[60] flex items-center gap-3 px-5 py-3.5 rounded-2xl"
              style={{ background: "var(--surface-raised)", border: "1px solid rgba(34,197,94,0.45)", boxShadow: "0 20px 60px rgba(17,24,39,0.14)", animation: "slideUp 0.3s ease both" }}>
-          <span className="text-lg">📥</span>
+          <span className="text-lg"><Glyph e="📥" size={18} /></span>
           <div>
             <div className="text-xs font-black text-slate-900">+{toast.qty} {toast.unit} — {toast.item}</div>
             <div className="text-[10px] text-slate-500 mt-0.5">From: {toast.vendor}</div>
@@ -11142,7 +11137,7 @@ function InwardPage({ items, handleUpdateStock, vendorList, onInwardComplete, on
         {/* ── Entry Form ── */}
         <div className="section-card p-6" style={{ animation: "slideUp 0.4s ease both" }}>
           <div className="flex items-center gap-2.5 mb-5">
-            <div className="sec-icon" style={{ background: "rgba(5,150,105,0.1)", color: "#059669" }}>📥</div>
+            <div className="sec-icon" style={{ background: "rgba(5,150,105,0.1)", color: "#059669" }}><Glyph e="📥" size={16} /></div>
             <h2 className="text-[14px] font-bold" style={{ color: "var(--text-strong)" }}>New Inward Entry</h2>
             <span className="sp-pill sp-pill-green">GRN</span>
           </div>
@@ -11260,7 +11255,7 @@ function InwardPage({ items, handleUpdateStock, vendorList, onInwardComplete, on
               <button onClick={handleSubmit} disabled={submitting}
                       className="inline-flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-bold text-slate-900 border transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                       style={{ background: "#15803d", borderColor: "rgba(34,197,94,0.5)", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
-                {submitting ? "⏳ Submitting…" : "📥 Submit Inward"}
+                <LeadLabel text={submitting ? "⏳ Submitting…" : "📥 Submit Inward"} />
               </button>
             )}
           </div>
@@ -11415,7 +11410,7 @@ function BomPhotoField({ value, onChange }) {
   };
   return (
     <div data-bom-photo-field className="rounded-xl p-4" style={{ background: "rgba(17,24,39,0.03)", border: "1px solid rgba(17,24,39,0.08)" }}>
-      <div className="text-[11px] font-bold text-slate-900">📷 Machine photo</div>
+      <div className="text-[11px] font-bold text-slate-900"><LeadIcon e="📷" />Machine photo</div>
       <div className="text-[10px] text-slate-500 mt-0.5 mb-3">Shown on every machine card of this model so workers recognise it. PNG or JPG.</div>
       <div className="flex items-center gap-4 flex-wrap">
         <div className="w-32 h-32 sm:w-40 sm:h-40 rounded-xl overflow-hidden flex items-center justify-center flex-shrink-0"
@@ -11438,7 +11433,7 @@ function BomPhotoField({ value, onChange }) {
           )}
         </div>
       </div>
-      {err && <div className="text-[10px] text-red-500 font-bold mt-2">⚠ {err}</div>}
+      {err && <div className="text-[10px] text-red-500 font-bold mt-2"><LeadIcon e="⚠" />{err}</div>}
     </div>
   );
 }
@@ -11734,7 +11729,7 @@ function BomChecklistSlots({
             <div className="px-5 py-3 border-b border-slate-200 flex items-start justify-between flex-shrink-0"
                  style={{ background: "linear-gradient(90deg,rgba(46, 80, 214,0.14),rgba(38, 64, 176,0.06))" }}>
               <div>
-                <div className="text-sm font-black text-slate-900">📋 Checklist · {editing.dept}</div>
+                <div className="text-sm font-black text-slate-900"><LeadIcon e="📋" />Checklist · {editing.dept}</div>
                 <div className="text-[11px] text-slate-400 mt-0.5">{CHECKLIST_STAGES.find((s) => s.key === editing.stage).long}</div>
                 <div className="text-[10px] text-slate-500 mt-0.5">{CHECKLIST_STAGES.find((s) => s.key === editing.stage).hint}</div>
               </div>
@@ -11818,7 +11813,7 @@ function BomChecklistSlots({
               {editErr && (
                 <div className="text-[11px] font-bold px-3 py-2 rounded-md"
                      style={{ background: "rgba(239,68,68,0.08)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.3)" }}>
-                  ⚠ {editErr}
+                  <LeadIcon e="⚠" />{editErr}
                 </div>
               )}
             </div>
@@ -12869,11 +12864,11 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
           {(() => {
             const cs = bomCostSummary(bomCostLines(sourceItems, findInv, receivedPoRates(pos), units));
             return (
-              <button onClick={() => setShowCostPanel((v) => !v)} title="Component rates and BOM cost"
+              <button data-bom-cost onClick={() => setShowCostPanel((v) => !v)} title="Component rates and BOM cost"
                       className="text-[11px] font-bold px-3 py-1.5 rounded-lg border transition-all"
                       style={showCostPanel ? { background: "rgba(21,128,61,0.10)", color: "#15803d", borderColor: "rgba(21,128,61,0.35)" }
                                            : { background: "var(--surface-card)", color: cs.complete ? "#15803d" : "#b91c1c", borderColor: "var(--border-rim)" }}>
-                💰 {formatINR(cs.knownTotal)}{cs.complete ? "" : ` · ${cs.missingRate + cs.missingItem} missing`}
+                <LeadIcon e="💰" />{formatINR(cs.knownTotal)}{cs.complete ? "" : ` · ${cs.missingRate + cs.missingItem} missing`}
               </button>
             );
           })()}
@@ -12896,7 +12891,7 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
         {!editMode && (
           <div className="flex items-center gap-2 px-4 sm:px-6 pb-4 flex-wrap">
             <div className="relative flex-1 min-w-[180px]">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 text-xs">🔍</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 text-xs"><Glyph e="🔍" size={14} /></span>
               <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search items, codes..."
                      className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-7 pr-3 py-1.5 text-xs text-slate-700 placeholder-slate-400 outline-none focus:border-blue-500/30" />
             </div>
@@ -12922,7 +12917,7 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
           /* ── Edit Mode — full width, unchanged ── */
           <div className="flex-1 overflow-y-auto"><div className="org-bom-edit p-4 sm:p-6 space-y-4 max-w-3xl">
             <div className="text-[10px] font-bold text-amber-700 bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-3">
-              ✏️ Edit Mode — Modify items, quantities, then Save BOM to apply changes permanently.
+              <LeadIcon e="✏️" />Edit Mode — Modify items, quantities, then Save BOM to apply changes permanently.
             </div>
 
             {/* 2026-11-03 — Edit BOM organised into numbered steps. Same
@@ -12934,7 +12929,7 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
             {/* Rename — BOM Key + Machine Model Name */}
             <div className="rounded-xl p-4" style={{ background: "rgba(139,92,246,0.05)", border: "1px solid rgba(139,92,246,0.22)" }}>
               <div className="flex items-center gap-2 mb-3">
-                <span className="text-base">✏️</span>
+                <span className="text-base"><Glyph e="✏️" size={15} /></span>
                 <div className="text-[11px] font-bold text-slate-900">BOM Identity</div>
                 <span className="text-[9px] text-purple-300 px-1.5 py-0.5 rounded-full" style={{ background: "rgba(139,92,246,0.15)" }}>Rename safe</span>
               </div>
@@ -12955,7 +12950,7 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
               <div className="text-[10px] text-slate-500 mt-2">
                 Renaming updates Machine Tracker, Outward log and Pending entries to match. Existing audit history is preserved.
               </div>
-              {renameErr && <div className="text-[10px] text-red-400 mt-2">⚠ {renameErr}</div>}
+              {renameErr && <div className="text-[10px] text-red-400 mt-2"><LeadIcon e="⚠" />{renameErr}</div>}
             </div>
 
             {/* Production rack — fixed floor racks only (2026-10-30). */}
@@ -13095,7 +13090,7 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
                                       color:      pts.length ? "#b45309" : "#64748b",
                                       border:     `1px solid ${pts.length ? "rgba(217,119,6,0.3)" : "rgba(17,24,39,0.12)"}`,
                                     }}>
-                              ✅ {pts.length || "+"}
+                              <LeadIcon e="✅" />{pts.length || "+"}
                             </button>
                           );
                         })()}
@@ -13144,7 +13139,7 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
                           style={{ background: "#2640B0", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>Add</button>
                 </div>
               </div>
-              {addErr && <div className="text-[10px] text-red-400 mt-2">⚠ {addErr}</div>}
+              {addErr && <div className="text-[10px] text-red-400 mt-2"><LeadIcon e="⚠" />{addErr}</div>}
             </div>
               </div>
             </OrgStep>
@@ -13157,7 +13152,7 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
             <div data-org-durations>
               <div className="text-[11px] font-bold text-slate-500 mb-2">Department Durations <span className="font-medium">· days + hours</span></div>
               <DeptDurationFields value={editDurations} onChange={(v) => { setEditDurations(v); setEditDurErr(""); }} />
-              {editDurErr && <div className="text-[10px] text-red-500 font-bold mt-2">⚠ {editDurErr}</div>}
+              {editDurErr && <div className="text-[10px] text-red-500 font-bold mt-2"><LeadIcon e="⚠" />{editDurErr}</div>}
             </div>
             </OrgStep>
 
@@ -13245,10 +13240,10 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
             </OrgStep>
 
             {editValidationErr && (
-              <div className="text-[11px] font-semibold rounded-xl px-4 py-2.5" style={{ background: "rgba(185,28,28,0.08)", color: "#b91c1c", border: "1px solid rgba(185,28,28,0.25)" }}>⚠ {editValidationErr}</div>
+              <div className="text-[11px] font-semibold rounded-xl px-4 py-2.5" style={{ background: "rgba(185,28,28,0.08)", color: "#b91c1c", border: "1px solid rgba(185,28,28,0.25)" }}><LeadIcon e="⚠" />{editValidationErr}</div>
             )}
             {(() => { const w = validateBomLines(editItems, findInv).warnings; return w.length ? (
-              <div className="text-[10px] rounded-xl px-4 py-2" style={{ background: "rgba(180,83,9,0.08)", color: "#b45309", border: "1px solid rgba(180,83,9,0.25)" }}>{w.map((x, i) => <div key={i}>⚠ {x}</div>)}</div>
+              <div className="text-[10px] rounded-xl px-4 py-2" style={{ background: "rgba(180,83,9,0.08)", color: "#b45309", border: "1px solid rgba(180,83,9,0.25)" }}>{w.map((x, i) => <div key={i}><LeadIcon e="⚠" />{x}</div>)}</div>
             ) : null; })()}
             <div className="org-edit-footer">
               <button onClick={() => { setEditMode(false); resetEditState(); }}
@@ -13353,11 +13348,11 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
               <span className="text-slate-400">Issuing <span className="font-black text-green-400">{totalIssuing}</span> units</span>
               {totalPending > 0 && (
                 <><span className="text-slate-700">·</span>
-                <span className="font-bold text-amber-700">⚠ {totalPending} units pending</span></>
+                <span className="font-bold text-amber-700"><LeadIcon e="⚠" />{totalPending} units pending</span></>
               )}
               {hasOverIssue && (
                 <><span className="text-slate-700">·</span>
-                <span className="font-bold" style={{color:"#b45309"}}>⚠ {totalOverIssue} over-issued</span></>
+                <span className="font-bold" style={{color:"#b45309"}}><LeadIcon e="⚠" />{totalOverIssue} over-issued</span></>
               )}
               {missingN > 0 && (
                 <><span className="text-slate-700">·</span>
@@ -13380,7 +13375,7 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
                       disabled={!canSubmit}
                       className="text-xs font-black px-6 py-2.5 rounded-xl border transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                       style={{ background: canSubmit ? "#2640B0" : "#9ca3af", color: "#ffffff", boxShadow: canSubmit ? "0 1px 2px rgba(17,24,39,0.14)" : "none", borderColor: "transparent" }}>
-                📤 Issue Stock
+                <LeadIcon e="📤" />Issue Stock
               </button>
             ) : (
               <div className="flex items-center gap-2">
@@ -13588,7 +13583,7 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
               {criticalErr && (
                 <div className="text-[11px] font-bold px-3 py-2 rounded-md whitespace-pre-line"
                      style={{ background: "rgba(239,68,68,0.08)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.3)" }}>
-                  ⚠ {criticalErr}
+                  <LeadIcon e="⚠" />{criticalErr}
                 </div>
               )}
             </div>
@@ -13670,7 +13665,7 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
             {destError && (
               <div className="mx-5 mt-4 px-3 py-2 rounded-lg text-[11px] font-semibold"
                    style={{ background: "rgba(239,68,68,0.08)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.3)" }}>
-                ⚠ {destError}
+                <LeadIcon e="⚠" />{destError}
               </div>
             )}
             <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -13733,7 +13728,7 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
                  style={{ background: "linear-gradient(90deg,rgba(46, 80, 214,0.14),rgba(38, 64, 176,0.06))" }}>
               <div>
                 <div className="text-sm font-black text-slate-900 flex items-center gap-2">
-                  ⏱️ Department Durations
+                  <LeadIcon e="⏱️" />Department Durations
                 </div>
                 <div className="text-[11px] text-slate-400 mt-0.5">
                   {bomKey}{serialNo ? ` · S/N ${serialNo}` : ""} · lock-in deadlines for this machine
@@ -13786,7 +13781,7 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
               {durationErr && (
                 <div className="text-[11px] font-bold px-3 py-2 rounded-md"
                      style={{ background: "rgba(239,68,68,0.08)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.3)" }}>
-                  ⚠ {durationErr}
+                  <LeadIcon e="⚠" />{durationErr}
                 </div>
               )}
             </div>
@@ -14404,7 +14399,7 @@ function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, onCreateB
                           }}
                         className="inline-flex items-center gap-1.5 text-[11px] font-bold rounded-lg px-4 py-1.5 text-white border transition-all"
                         style={{ background: "#b91c1c", borderColor: "rgba(239,68,68,0.5)", color: "#ffffff" }}>
-                  🗑 Delete BOM
+                  <LeadIcon e="🗑" />Delete BOM
                 </button>
               )}
             </div>
@@ -14458,7 +14453,7 @@ function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, onCreateB
                         }}
                       className="inline-flex items-center gap-1.5 text-[11px] font-bold rounded-lg px-4 py-1.5 text-white border transition-all"
                       style={{ background: "#b91c1c", borderColor: "rgba(239,68,68,0.5)", color: "#ffffff" }}>
-                🗑 Remove
+                <LeadIcon e="🗑" />Remove
               </button>
             </div>
           </div>
@@ -14588,7 +14583,7 @@ function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, onCreateB
                                         color:      (ci.checkPoints || []).length ? "#b45309" : "#64748b",
                                         border:     `1px solid ${(ci.checkPoints || []).length ? "rgba(217,119,6,0.3)" : "rgba(17,24,39,0.12)"}`,
                                       }}>
-                                ✅ {(ci.checkPoints || []).length || "+"}
+                                <LeadIcon e="✅" />{(ci.checkPoints || []).length || "+"}
                               </button>
                             </div>
                           </div>
@@ -14674,7 +14669,7 @@ function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, onCreateB
               {createErr && (
                 <div className="px-3 py-2 rounded-lg text-[11px] text-red-300"
                      style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)" }}>
-                  ⚠ {createErr}
+                  <LeadIcon e="⚠" />{createErr}
                 </div>
               )}
             </div>
@@ -14759,7 +14754,7 @@ function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, onCreateB
                             </button>
                             <button onClick={() => { setActionsKey(null); setOpenBOM(bomKey); }}
                                     className="w-full text-left px-3 py-2 text-[11px] font-bold text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-all flex items-center gap-2">
-                              <span>✏️</span>Edit BOM
+                              <span><Glyph e="✏️" size={14} /></span>Edit BOM
                             </button>
                             {onDuplicateBOM && canDo("outward","bom") && (
                               <button onClick={() => {
@@ -14796,7 +14791,7 @@ function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, onCreateB
                                         setConfirmDeleteBOM({ key: bomKey, label: bom.label, info });
                                       }}
                                       className="w-full text-left px-3 py-2 text-[11px] font-bold text-red-400 hover:bg-red-500/10 transition-all flex items-center gap-2 border-t border-slate-200">
-                                <span>🗑</span>Delete BOM
+                                <span><Glyph e="🗑" size={14} /></span>Delete BOM
                               </button>
                             )}
                           </div>
@@ -14975,7 +14970,7 @@ function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, onCreateB
           {manualError && (
             <div className="mt-3 p-3 rounded-xl text-[10px] text-red-400 font-bold"
                  style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.3)" }}>
-              ⚠ {manualError}
+              <LeadIcon e="⚠" />{manualError}
             </div>
           )}
 
@@ -15029,7 +15024,7 @@ function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, onCreateB
                             <span title={title}
                                   className="ml-2 text-[9px] font-bold px-1.5 py-0.5 rounded-full"
                                   style={{ background: "rgba(217, 119, 6,0.1)", color: "#B45309", border: "1px solid rgba(217, 119, 6,0.3)" }}>
-                              🔒 {crit.length} critical
+                              <LeadIcon e="🔒" />{crit.length} critical
                             </span>
                           );
                         })()}
@@ -15219,7 +15214,7 @@ function AtoZMachineReport({
         <div className="min-w-0">
           <div className="mr-label">Machine</div>
           <div className="mr-machine">{machine.bomLabel || bom.label || machine.bomKey}</div>
-          <div className="mr-mono mr-serial">Model {machine.bomKey} · Serial no. {machine.serialNo || "—"}</div>
+          <div className="mr-mono mr-serial">Model {machine.bomKey}{machine.serialNo ? ` · Serial no. ${machine.serialNo}` : ""}</div>
         </div>
         <div data-report-status className={`mr-stamp ${isReady ? "is-done" : "is-progress"}`}>
           {isReady ? "Ready for dispatch" : `In production · ${displayStageOf(machine) || machine.stage}`}
@@ -15232,8 +15227,8 @@ function AtoZMachineReport({
           ["Build time", buildDays ? `${buildDays} day${buildDays === 1 ? "" : "s"}` : ""],
           ["Rack", machine.rackSlot ? slotLabel(machine.rackSlot) : (rackCapacityFor(machine.bomKey, bom) > 0 ? "Left the rack" : "Direct production")],
           ["BOM issue ref", machine.issueId ? String(machine.issueId) : "", true],
-        ].map(([k, v, mono]) => (
-          <div key={k} className="min-w-0"><div className="mr-label">{k}</div><div className={`mr-fact ${mono ? "mr-mono" : ""}`}>{v || "—"}</div></div>
+        ].filter(([, v]) => v).map(([k, v, mono]) => (
+          <div key={k} className="min-w-0"><div className="mr-label">{k}</div><div className={`mr-fact ${mono ? "mr-mono" : ""}`}>{v}</div></div>
         ))}
       </div>
       {/* D4 — summary row */}
@@ -15244,7 +15239,7 @@ function AtoZMachineReport({
           { k: "Signatures", v: sigRows.length, attr: { "data-report-sig-count": "" } },
           { k: "Open issues", v: openJobs.length, red: openJobs.length > 0 },
           { k: "Resolved issues", v: resolvedJobs.length },
-          { k: "Average rating", v: sum.average !== null ? rate(sum.average) : "—" },
+          { k: "Average rating", v: sum.average !== null ? rate(sum.average) : "Not rated" },
         ].map((g) => (
           <div key={g.k} className={`mr-sum ${g.red ? "is-red" : ""}`}><div className="mr-sum-v" {...(g.attr || {})}>{g.v}</div><div className="mr-label">{g.k}</div></div>
         ))}
@@ -15295,7 +15290,7 @@ function AtoZMachineReport({
                   : r.status === "unconfirmed" ? <span className="mr-red">Not confirmed</span>
                   : <span className="mr-muted">No confirmation recorded</span>}
               </div>
-              <div className="mr-td" data-l="Issued / verified"><div><div>{fmtDT(r.when) || "—"}{r.by ? <span> · {r.by}</span> : null}</div><div className="mr-label">{r.via}</div></div></div>
+              <div className="mr-td" data-l="Issued / verified"><div><div>{fmtDT(r.when) || ""}{r.by ? <span> · {r.by}</span> : null}</div><div className="mr-label">{r.via}</div></div></div>
             </div>
           ))}
         </div>
@@ -15319,7 +15314,7 @@ function AtoZMachineReport({
       </div>
       {machineHandovers.length === 0 ? <p className="mr-empty">No hand-overs recorded yet. The machine is at {machine.stage}.</p> : (
         <div className="mr-table">
-          {/* 2026-11-04 — signatures moved to the one signature register (section 07). */}
+          {/* 2026-11-04 — signatures moved to the one signature register. */}
           <div className="mr-tr mr-th" style={{ gridTemplateColumns: "1.25fr 1.05fr 1.4fr 1.15fr 1.25fr 1fr" }}>
             <div>Hand-over</div><div>Handed over</div><div>Accepted</div><div>Time / target</div>
             <div>{show.showEmployees !== false ? "Team (lead in bold)" : ""}</div><div>{show.showChecklists !== false ? "Checks" : ""}</div>
@@ -15342,28 +15337,28 @@ function AtoZMachineReport({
                     </div>
                     {show.showRatings !== false && rating && <div className="mr-label">Rating {rate(rating.rating)}</div>}
                   </div></div>
-                  <div className="mr-td" data-l="Handed over"><div><div>{fmtDT(h.sentAt) || "—"}</div>{userName(h.sentBy) && <div className="mr-label">by {userName(h.sentBy)}</div>}</div></div>
+                  <div className="mr-td" data-l="Handed over"><div><div>{fmtDT(h.sentAt) || ""}</div>{userName(h.sentBy) && <div className="mr-label">by {userName(h.sentBy)}</div>}</div></div>
                   <div className="mr-td" data-l="Accepted"><div>
-                    <div>{h.acceptedAt ? fmtDT(h.acceptedAt) : h.status === "pending" ? "Waiting" : "—"}</div>
+                    <div>{h.acceptedAt ? fmtDT(h.acceptedAt) : h.status === "pending" ? "Waiting" : ""}</div>
                     {(h.acceptedByName || userName(h.acceptedBy)) && <div className="mr-label" data-report-accepted-by>by {h.acceptedByName || userName(h.acceptedBy)}</div>}
                     {h.acceptedAt && h.acceptedInDepartment && h.acceptedInDepartment !== h.toDepartment && <div className="mr-label">into {h.acceptedInDepartment}</div>}
                     {show.showEmployees !== false && Array.isArray(h.acceptedByTeamSnapshot) && h.acceptedByTeamSnapshot.length > 0 && (
-                      <div className="mr-label" data-report-accept-team>team: {h.acceptedByTeamSnapshot.map((x) => (x && (x.fullName || x.username || x.name)) || "").filter((n) => n && n !== (h.acceptedByName || userName(h.acceptedBy))).join(", ") || "—"}</div>
+                      <div className="mr-label" data-report-accept-team>team: {h.acceptedByTeamSnapshot.map((x) => (x && (x.fullName || x.username || x.name)) || "").filter((n) => n && n !== (h.acceptedByName || userName(h.acceptedBy))).join(", ") || "none named"}</div>
                     )}
                     <div className="mr-label">Accept window {dur(h.acceptTimeoutMinutes)}</div>
                     {h.status === "accepted" && !(h.acceptedSignatureSvg || h.mainEmployeeSignatureSvg) && <div className="mr-label">Signed on file (earlier record)</div>}
                   </div></div>
                   <div className="mr-td" data-l="Time / target"><div>
-                    <div className={`rpt-nowrap ${over ? "mr-red" : ""}`}>{!h.actualDurationMinutes && !h.expectedDurationMinutes ? "—" : `${dur(h.actualDurationMinutes)} of ${dur(h.expectedDurationMinutes)}`}</div>
+                    <div className={`rpt-nowrap ${over ? "mr-red" : ""}`}>{!h.actualDurationMinutes && !h.expectedDurationMinutes ? "" : `${dur(h.actualDurationMinutes)} of ${dur(h.expectedDurationMinutes)}`}</div>
                     {over && <div className="mr-red mr-small">Over by {dur(h.overrunMinutes)}</div>}
                   </div></div>
                   <div className="mr-td" data-l="Team">{show.showEmployees !== false && (ordered.length
                     ? <div>{ordered.map((uid) => <div key={uid} className={uid === lead ? "font-bold" : ""} title={uid === lead ? "Lead / main employee" : undefined}>{nameFromSnap(uid, h.workedBySnapshot)}</div>)}</div>
-                    : <span className="mr-muted">—</span>)}</div>
+                    : null)}</div>
                   <div className="mr-td" data-l="Checks">{show.showChecklists !== false && (hopResp.length ? <div>{hopResp.map((cr) => {
                       const ans = cr.answers || []; const done = ans.filter((a) => a.checked).length; const miss = ans.length - done;
-                      return <div key={cr.id}>{({ before_dispatch: "Dispatch", before_receive: "Receive", during_work: "During work" })[cr.stage] || "Checklist"} {done}/{ans.length}{miss ? <span className="mr-red"> · {miss} not done</span> : null}</div>;
-                    })}<div className="mr-label">Full answers: Appendix A</div></div> : <span className="mr-muted">—</span>)}</div>
+                      return <div key={cr.id} className="rpt-badges"><span className={`rpt-badge ${miss ? "is-warn" : "is-ok"}`}>{({ before_dispatch: "Dispatch", before_receive: "Receive", during_work: "During work" })[cr.stage] || "Checklist"} {done} of {ans.length}</span>{miss ? <span className="rpt-badge is-no">{miss} open</span> : null}</div>;
+                    })}<div className="mr-label">Full answers: Appendix A</div></div> : null)}</div>
                 </div>
                 {/* The delay reason is printed once, in "Holds and late reasons" below. */}
                 {raised.length > 0 && (
@@ -15374,7 +15369,7 @@ function AtoZMachineReport({
               </div>
             );
           })}
-          {machineHandovers.some((h) => h.acceptedSignatureSvg || h.mainEmployeeSignatureSvg) && <p className="mr-label rpt-table-note">Hand-over and acceptance signatures, with name, department and date, are in the signature register (section 07).</p>}
+          {machineHandovers.some((h) => h.acceptedSignatureSvg || h.mainEmployeeSignatureSvg) && <p className="mr-label rpt-table-note">Hand-over and acceptance signatures, with name, department and date, are in the signature register at the end of this report.</p>}
         </div>
       )}
       {/* 2026-11-03 — holds and late reasons for this machine (read-only). */}
@@ -15394,9 +15389,9 @@ function AtoZMachineReport({
                   <div key={r.key} className="mr-tr" style={{ gridTemplateColumns: "1.3fr 1.3fr 0.9fr 2.4fr 1.1fr" }}>
                     <div className="mr-td" data-l="What"><span className={r.open ? "mr-red font-semibold" : "mr-amber font-semibold"}>{r.label}{r.open ? " · open" : ""}</span></div>
                     <div className="mr-td" data-l="Where / when"><div><div>{r.to ? `${r.from} → ${r.to}` : r.from}</div><div className="mr-label">{fmtDT(r.startAt)}</div></div></div>
-                    <div className="mr-td md:text-right" data-l="Length">{r.minutes != null ? dur(r.minutes) : "—"}</div>
+                    <div className="mr-td md:text-right" data-l="Length">{r.minutes != null ? dur(r.minutes) : ""}</div>
                     <div className="mr-td" data-l="Reason">{r.reason || <span className="mr-muted">No reason given</span>}</div>
-                    <div className="mr-td" data-l="Who">{r.by || "—"}{r.releasedBy ? <div className="mr-label">released by {r.releasedBy}</div> : null}</div>
+                    <div className="mr-td" data-l="Who">{r.by || ""}{r.releasedBy ? <div className="mr-label">released by {r.releasedBy}</div> : null}</div>
                   </div>
                 ))}
                 {late.map((h) => (
@@ -15405,7 +15400,7 @@ function AtoZMachineReport({
                     <div className="mr-td" data-l="Where / when"><div><div>{h.fromDepartment}</div><div className="mr-label">{fmtDT(h.sentAt)}</div></div></div>
                     <div className="mr-td md:text-right" data-l="Length">{dur(h.overrunMinutes)}</div>
                     <div className="mr-td" data-l="Reason">{h.overrunNarration}</div>
-                    <div className="mr-td" data-l="Who">{userName(h.sentBy) || "—"}</div>
+                    <div className="mr-td" data-l="Who">{userName(h.sentBy) || ""}</div>
                   </div>
                 ))}
               </div>
@@ -15454,7 +15449,7 @@ function AtoZMachineReport({
               {(p.itemCode || p.itemName) && <div className="mr-label">Part {p.itemCode ? <span className="mr-mono">{p.itemCode}</span> : null}{p.itemName ? ` ${p.itemName}` : ""}{p.qty != null ? ` × ${p.qty}` : ""}{(Number(p.receivedQty) || 0) > 0 ? ` · ${p.receivedQty} received` : ""}{p.partSerialNo ? <> · part S/N <span className="mr-mono">{p.partSerialNo}</span></> : null}</div>}
               <div className="mr-label">{src}{hop ? ` · at ${hop.fromDepartment} → ${hop.toDepartment} hand-over` : ""}</div>
             </div></div>
-            <div className="mr-td" data-l="Raised"><div><div>{p.raisedInDepartment || "—"}</div><div className="mr-label">{fmtDT(p.raisedAt)}</div></div></div>
+            <div className="mr-td" data-l="Raised"><div><div>{p.raisedInDepartment || ""}</div><div className="mr-label">{fmtDT(p.raisedAt)}</div></div></div>
             <div className="mr-td" data-l="Assigned to">{p.assignedDepartment || "Unassigned"}</div>
           </div>
           <div className="mr-issue-history"><JobHistory item={p} users={allUsers} compact reportDates /></div>
@@ -15494,9 +15489,9 @@ function AtoZMachineReport({
           <div className="mr-tr mr-th" style={{ gridTemplateColumns: "1.1fr 1.1fr 4fr" }}><div>Date</div><div>Stage</div><div>Note</div></div>
           {(machine.history || []).map((h, i) => (
             <div key={i} className="mr-tr" style={{ gridTemplateColumns: "1.1fr 1.1fr 4fr" }}>
-              <div className="mr-td" data-l="Date">{fmtD(h.date) || h.date || "—"}</div>
+              <div className="mr-td" data-l="Date">{fmtD(h.date) || h.date || ""}</div>
               <div className="mr-td font-semibold" data-l="Stage">{h.stage}</div>
-              <div className="mr-td" data-l="Note">{h.note || "—"}</div>
+              <div className="mr-td" data-l="Note">{h.note || ""}</div>
             </div>
           ))}
         </div>
@@ -15517,8 +15512,8 @@ function AtoZMachineReport({
           {fileAttach.map((a) => (
             <div key={a.id} className="mr-tr" style={{ gridTemplateColumns: "3fr 1.5fr 1.2fr" }}>
               <div className="mr-td" data-l="File"><div><div>{a.caption || a.name || a.fileName || a.kind || "attachment"}</div><div className="mr-label">{a.caption && (a.fileName || a.name) ? `${a.fileName || a.name} · ` : ""}{a.kind === "image" ? "Photo" : a.kind === "video" ? "Video" : a.kind === "pdf" ? "PDF" : a.kind || "File"}{a.isCustomerVisible ? " · shown to customer" : " · internal"}</div></div></div>
-              <div className="mr-td" data-l="Department">{a.department || "—"}</div>
-              <div className="mr-td" data-l="Added">{fmtDT(a.createdAt || a.uploadedAt) || "—"}{userName(a.uploadedBy) ? <div className="mr-label">by {userName(a.uploadedBy)}</div> : null}</div>
+              <div className="mr-td" data-l="Department">{a.department || ""}</div>
+              <div className="mr-td" data-l="Added">{fmtDT(a.createdAt || a.uploadedAt) || ""}{userName(a.uploadedBy) ? <div className="mr-label">by {userName(a.uploadedBy)}</div> : null}</div>
             </div>
           ))}
         </div>
@@ -15529,7 +15524,7 @@ function AtoZMachineReport({
           {voiceAttach.map((a) => (
             <div key={`v-${a.id}`} className="mr-check-row rpt-voice-row" data-report-voice-note>
               <span className="rpt-voice-play">{isVoiceAttachment(a) ? <VoicePlayButton attachment={a} /> : <span className="mr-muted">♪</span>}</span>
-              <div className="min-w-0">{a.caption || a.fileName || a.name || "Voice note"}<span className="mr-label"> · {a.department || "—"} · {fmtDT(a.uploadedAt || a.createdAt)}{userName(a.uploadedBy) ? ` · ${userName(a.uploadedBy)}` : ""}</span></div>
+              <div className="min-w-0">{a.caption || a.fileName || a.name || "Voice note"}<span className="mr-label"> · {a.department || ""} · {fmtDT(a.uploadedAt || a.createdAt)}{userName(a.uploadedBy) ? ` · ${userName(a.uploadedBy)}` : ""}</span></div>
             </div>
           ))}
         </div>
@@ -15580,8 +15575,8 @@ function AtoZMachineReport({
       return (
         <div key={cr.id} className="mr-check mr-avoid" data-report-appendix-checklist={cr.stage || ""}>
           <div className="mr-check-head">
-            <div className="font-semibold">{cr.department || "—"} · {STAGE_LABEL[cr.stage] || cr.stage || "Checklist"}{hop ? <span className="mr-label"> · {hop.fromDepartment} → {hop.toDepartment}</span> : null}</div>
-            <div className="mr-label">{cr.templateName || "—"} v{cr.templateVersion || 1}{cr.submittedAt ? ` · ${fmtDT(cr.submittedAt)}` : ""}{userName(cr.submittedBy) ? ` · ${userName(cr.submittedBy)}` : ""} · <span className={done < ans.length ? "mr-red" : "mr-green"}>{done}/{ans.length} done</span></div>
+            <div className="font-semibold">{cr.department || ""} · {STAGE_LABEL[cr.stage] || cr.stage || "Checklist"}{hop ? <span className="mr-label"> · {hop.fromDepartment} → {hop.toDepartment}</span> : null}</div>
+            <div className="mr-label">{cr.templateName || ""} v{cr.templateVersion || 1}{cr.submittedAt ? ` · ${fmtDT(cr.submittedAt)}` : ""}{userName(cr.submittedBy) ? ` · ${userName(cr.submittedBy)}` : ""} · <span className={done < ans.length ? "mr-red" : "mr-green"}>{done} of {ans.length} done</span></div>
           </div>
           {ans.map((a, i) => (
             <div key={i} className="mr-check-row">
@@ -15607,7 +15602,7 @@ function AtoZMachineReport({
 
   return (
     <div className="mr-doc" data-machine-report>
-      <RptPageStyle page="machine-report" head={`${company.name || RPT_LEGAL_NAME} · Machine production report`} refText={reportRef} foot="Machine production report · internal" />
+      <RptPageStyle page="machine-report" head={`${company.name || RPT_LEGAL_NAME} · Machine production report`} refText={reportRef} foot="Computer-generated report · Confidential, internal use only" />
       {/* D8 — the print frame (on paper the running head is a page margin box, from page 2 on). */}
       <table className="mr-frame">
         <thead><tr><td><div className="mr-runhead"><span>{company.name || RPT_LEGAL_NAME} · Machine production report</span><span className="mr-mono">{reportRef}</span></div></td></tr></thead>
@@ -15660,12 +15655,23 @@ const rptDur = (min) => {
 // Settings → Company name (active company), then the legacy settings name,
 // then the registered name below. The certificate's company box reads the same.
 const RPT_LEGAL_NAME = "SHANTA G TECHNOFOODS LLP";
+// 2026-11-04 (reports v3) — the old brand-style names ("Shantaz Technofoods",
+// "... Pvt Ltd") are not the legal name: they print as the registered name.
+// Placeholder / sample contact values (form hints, test seeds) never print.
+// The letterhead always carries the owner's real vector logo.
+const RPT_OLD_NAME = /^\s*shantaz\s*techno\s*foods\b/i;
+const RPT_SAMPLE = [/ABCDE1234/i, /AABCS1234/i, /@company\.com$/i, /\.example$/i, /^www\.company\.com$/i, /^factory \/ office address$/i, /^\+91 98765 43210$/];
+const rptClean = (v) => { const t = String(v == null ? "" : v).trim(); return t && !RPT_SAMPLE.some((re) => re.test(t)) ? t : ""; };
 const rptCompany = (settings) => {
   let c = {};
   try { c = getActiveCompany(settings) || {}; } catch { c = {}; }
-  const name = String(c.name || "").trim() || String((settings && settings.companyName) || "").trim() || RPT_LEGAL_NAME;
-  return { ...c, name };
+  const pick = (k, legacy) => rptClean(c[k]) || rptClean(settings && settings[legacy || k]);
+  let name = String(c.name || "").trim() || String((settings && settings.companyName) || "").trim();
+  if (!name || RPT_OLD_NAME.test(name)) name = RPT_LEGAL_NAME;
+  return { ...c, name, logo: BRAND_LOGO_DATA_URI, gst: pick("gst"), address: pick("address"), phone: pick("phone"), email: pick("email"), website: rptClean(c.website) };
 };
+// One contact line for every letterhead: GSTIN · phone · e-mail · website.
+const rptContactLine = (co = {}) => [co.gst ? `GSTIN ${co.gst}` : "", co.phone ? `Tel ${co.phone}` : "", co.email || "", co.website || ""].filter(Boolean).join("   ·   ");
 
 // ── Letterhead, title block and page furniture shared by every report ──────
 // 2026-11-04 — letterhead style: the logo centred and larger, the company name
@@ -15675,14 +15681,15 @@ const rptCompany = (settings) => {
 // page numbers (and, from page 2 on, a short running head).
 function RptLetterhead({ company = {}, showLogo = true, line = "" }) {
   const name = company.name || RPT_LEGAL_NAME;
-  const contact = [company.gst ? `GSTIN ${company.gst}` : "", company.phone ? `Phone ${company.phone}` : "", company.email || "", company.website || ""].filter(Boolean);
+  const contact = rptContactLine({ gst: company.gst, phone: company.phone, email: company.email, website: company.website });
   return (
     <div className="rpt-lh" data-report-letterhead>
-      {showLogo && company.logo && <img src={company.logo} alt="" className="mr-logo rpt-lh-logo" />}
+      {showLogo && <img src={company.logo || BRAND_LOGO_DATA_URI} alt="SHANTAZ" className="mr-logo rpt-lh-logo" />}
       <div className="rpt-lh-name">{name}</div>
+      <div className="rpt-lh-rule" aria-hidden="true" />
       {line && <div className="rpt-lh-line">{line}</div>}
       {company.address && <div className="rpt-lh-line">{company.address}</div>}
-      {contact.length > 0 && <div className="rpt-lh-line">{contact.join("  ·  ")}</div>}
+      {contact && <div className="rpt-lh-line">{contact}</div>}
     </div>
   );
 }
@@ -15707,7 +15714,8 @@ function RptPageStyle({ page, head = "", refText = "", foot = "" }) {
   const css = `@page ${page} { size: A4 portrait; margin: 16mm 14mm 17mm 14mm;
     @top-left { content: ${rptCssStr(head)}; font: 7.5pt Inter, Arial, sans-serif; color: #6b6b6b; vertical-align: bottom; padding-bottom: 3mm; }
     @top-right { content: ${rptCssStr(refText)}; font: 7.5pt Inter, Arial, sans-serif; color: #6b6b6b; vertical-align: bottom; padding-bottom: 3mm; }
-    @bottom-left { content: ${rptCssStr(foot)}; font: 7.5pt Inter, Arial, sans-serif; color: #6b6b6b; vertical-align: top; padding-top: 3mm; }
+    @bottom-left { content: ${rptCssStr(foot)}; font: 7pt Inter, Arial, sans-serif; color: #6b6b6b; vertical-align: top; padding-top: 3mm; }
+    @bottom-center { content: ${rptCssStr(refText)}; font: 7pt Inter, Arial, sans-serif; color: #6b6b6b; vertical-align: top; padding-top: 3mm; }
     @bottom-right { content: "Page " counter(page) " of " counter(pages); font: 7.5pt Inter, Arial, sans-serif; color: #6b6b6b; vertical-align: top; padding-top: 3mm; } }
   @page ${page}:first { @top-left { content: none; } @top-right { content: none; } }`;
   return <style>{css}</style>;
@@ -15723,9 +15731,9 @@ function RptSignatureRegister({ rows = [] }) {
         return (
           <div key={r.k} className="mr-tr" data-report-sig-row={r.k} style={{ gridTemplateColumns: "1.7fr 1.3fr 1fr 1.25fr 128px" }}>
             <div className="mr-td" data-l="Signed for">{r.role}</div>
-            <div className="mr-td font-semibold" data-l="Name">{r.name || "—"}</div>
-            <div className="mr-td" data-l="Department">{r.dept || "—"}</div>
-            <div className="mr-td" data-l="Date">{rptFmtDT(r.when) || "—"}</div>
+            <div className="mr-td font-semibold" data-l="Name">{r.name || ""}</div>
+            <div className="mr-td" data-l="Department">{r.dept || ""}</div>
+            <div className="mr-td" data-l="Date">{rptFmtDT(r.when) || ""}</div>
             <div className="mr-td" data-l="Signature">{r.accept ? <div data-report-accept-signature>{box}</div> : box}</div>
           </div>
         );
@@ -15949,20 +15957,20 @@ const rptPointJob = (label, jobs = [], status = "resolved") => (jobs || []).some
 const rptPointFixed = (label, jobs = []) => rptPointJob(label, jobs, "resolved");
 function RptDeptRecord({ r, customer = false, comments = [], users = [], certNo = "", jobs = [] }) {
   const stateText = r.state === "done" ? "Completed" : r.state === "current" ? "In progress" : "Not started";
-  const timeText = r.actual || r.target ? `${rptDur(r.actual)}${r.target ? ` · target ${rptDur(r.target)}` : ""}` : "—";
+  const timeText = r.actual || r.target ? `${rptDur(r.actual)}${r.target ? ` · target ${rptDur(r.target)}` : ""}` : "";
   const facts = [
-    ["In", rptFmtDT(r.inAt) || "—"],
-    ["Out", r.dept === "Ready" ? (r.state === "done" ? "Released" : "—") : (rptFmtDT(r.outAt) || "—")],
-    ...(customer ? [] : [["Time taken", r.dept === "Ready" ? "—" : timeText, r.over > 0]]),
+    ["In", rptFmtDT(r.inAt) || ""],
+    ["Out", r.dept === "Ready" ? (r.state === "done" ? "Released" : "") : (rptFmtDT(r.outAt) || "")],
+    ...(customer ? [] : [["Time taken", r.dept === "Ready" ? "" : timeText, r.over > 0]]),
   ];
   const sig = r.accepted && r.accepted.sig ? svgDataUri(r.accepted.sig) : "";
   return (
     <div className={`rpt-dept is-${r.state}`} data-report-dept={r.dept}>
       <div className="rpt-dept-head">
         <div className="rpt-dept-name">{r.dept === "Ready" ? "Final inspection · Ready" : r.dept}</div>
-        <span className={`rpt-dept-state ${r.state === "done" ? "mr-green" : r.state === "current" ? "mr-amber" : "mr-muted"}`}>{stateText}</span>
+        <span className={`rpt-dept-state rpt-badge rpt-status ${r.state === "done" ? "mr-green" : r.state === "current" ? "mr-amber" : "mr-muted"}`}>{stateText}</span>
       </div>
-      <div className="rpt-dept-scope">{RPT_DEPT_SCOPE[r.dept]}{r.dept === "Trial" && certNo ? ` See section ${certNo}.` : ""}</div>
+      <div className="rpt-dept-scope">{RPT_DEPT_SCOPE[r.dept]}{r.dept === "Trial" && certNo ? " See the trial certificate below." : ""}</div>
       <div className={`rpt-dept-grid${customer ? " is-3" : ""}`}>
         {facts.map(([k, v, red]) => (
           <div key={k} className="min-w-0"><div className="mr-label">{k}</div><div className={`rpt-dept-v rpt-nowrap ${red ? "mr-red" : ""}`}>{v}</div></div>
@@ -15971,14 +15979,14 @@ function RptDeptRecord({ r, customer = false, comments = [], users = [], certNo 
           <div className="mr-label">Accepted by</div>
           {r.accepted ? (
             <div className="rpt-dept-accrow">
-              <div className="min-w-0"><div className="rpt-dept-v">{r.accepted.name || "—"}</div><div className="mr-label">{rptFmtDT(r.accepted.at)}</div></div>
+              <div className="min-w-0"><div className="rpt-dept-v">{r.accepted.name || ""}</div><div className="mr-label">{rptFmtDT(r.accepted.at)}</div></div>
               {sig ? <div className="rpt-sigbox rpt-sigbox-sm"><img src={sig} alt={`Signature: ${r.accepted.name || r.dept}`} /></div> : null}
             </div>
-          ) : <div className="rpt-dept-v mr-muted">{r.dept === "Assembly" ? "Started from BOM issue" : "—"}</div>}
+          ) : <div className="rpt-dept-v mr-muted">{r.dept === "Assembly" ? "Started from BOM issue" : ""}</div>}
         </div>
       </div>
       {!customer && r.handedOver && (
-        <div className="mr-label rpt-dept-line">Handed over by <b>{r.handedOver.name || "—"}</b>{r.handedOver.team.length ? ` · team ${r.handedOver.team.join(", ")}` : ""}{r.rating ? ` · rating ${Number(r.rating.rating).toFixed(1)} / 5` : ""}</div>
+        <div className="mr-label rpt-dept-line">Handed over by <b>{r.handedOver.name || ""}</b>{r.handedOver.team.length ? ` · team ${r.handedOver.team.join(", ")}` : ""}{r.rating ? ` · rating ${Number(r.rating.rating).toFixed(1)} / 5` : ""}</div>
       )}
       {r.notes.length > 0 && <div className="mr-label rpt-dept-line">{r.notes.map((h) => h.note).join(" · ")}</div>}
       <div className="rpt-dept-checks" data-report-quality>
@@ -16034,7 +16042,7 @@ function ReportSheet({ kind, settings = {}, title, subtitle = "", refText = "", 
   const internal = kind !== "customer";
   return (
     <div className={`mr-doc rpt-doc rpt-${kind}`} data-report-kind={kind}>
-      <RptPageStyle page={page} head={`${company.name || RPT_LEGAL_NAME} · ${title}`} refText={refText} foot={internal ? `${title} · internal` : title} />
+      <RptPageStyle page={page} head={`${company.name || RPT_LEGAL_NAME} · ${title}`} refText={refText} foot={internal ? "Computer-generated report · Confidential, internal use only" : "Computer-generated report"} />
       <table className="mr-frame">
         <thead><tr><td><div className="mr-runhead"><span>{company.name || RPT_LEGAL_NAME} · {title}</span><span className="mr-mono">{refText}</span></div></td></tr></thead>
         <tbody><tr><td>
@@ -16104,9 +16112,9 @@ function CustomerMachineReport({ machineId, machineLog = [], bomDefs = {}, hando
           <div className="mr-label">Machine</div>
           <div className="mr-machine">{machine.bomLabel || bom.label || machine.bomKey}</div>
           <div className="mr-facts rpt-facts-3">
-            {[["Model", machine.bomKey], ["Serial no.", machine.serialNo || "—", true], ["Build started", rptFmtD(machine.createdDate) || "—"],
-              ["Ready on", rptFmtD(machine.completedDate) || "In production"], ["Build time", buildDays ? `${buildDays} day${buildDays === 1 ? "" : "s"}` : "—"],
-              ["Trial", cert ? "Passed · certificate below" : "Scheduled"]].map(([k, v, mono]) => (
+            {[["Model", machine.bomKey], ["Serial no.", machine.serialNo || "", true], ["Build started", rptFmtD(machine.createdDate) || ""],
+              ["Ready on", rptFmtD(machine.completedDate) || "In production"], ["Build time", buildDays ? `${buildDays} day${buildDays === 1 ? "" : "s"}` : ""],
+              ["Trial", cert ? "Passed · certificate below" : "Scheduled"]].filter(([, v]) => v).map(([k, v, mono]) => (
               <div key={k} className="min-w-0"><div className="mr-label">{k}</div><div className={`mr-fact ${mono ? "mr-mono" : ""}`}>{v}</div></div>
             ))}
           </div>
@@ -16115,7 +16123,7 @@ function CustomerMachineReport({ machineId, machineLog = [], bomDefs = {}, hando
       </div>
       <div className="mr-summary rpt-summary-4" data-report-glance>
         {[{ k: "Stages completed", v: `${records.filter((r) => r.state === "done").length} of ${records.length}` },
-          { k: "Check points OK", v: points ? `${passed} of ${points}` : "—" },
+          { k: "Check points OK", v: points ? `${passed} of ${points}` : "None" },
           { k: "Critical items", v: critical.length },
           { k: "Finishing work done", v: commentGroups.reduce((s, g) => s + g.rows.length, 0) }]
           .map((g) => <div key={g.k} className="mr-sum"><div className="mr-sum-v">{g.v}</div><div className="mr-label">{g.k}</div></div>)}
@@ -16140,7 +16148,7 @@ function CustomerMachineReport({ machineId, machineLog = [], bomDefs = {}, hando
               <div key={`${c.code}-${i}`} className="mr-tr" data-report-critical-row={c.code} style={{ gridTemplateColumns: "2.4fr 0.6fr 3fr 1.3fr" }}>
                 <div className="mr-td" data-l="Component"><div><div className="font-semibold">{c.name || c.code}</div><div className="mr-label mr-mono">{c.code}</div></div></div>
                 <div className="mr-td mr-mono md:text-right" data-l="Qty">{c.qty}</div>
-                <div className="mr-td" data-l="Serial numbers">{c.serials.length ? <div><span className="mr-mono">{c.serials.join(", ")}</span>{c.status === "serial_partial" ? <div className="mr-amber mr-small">{c.serials.length} of {c.qty} serials recorded</div> : null}</div> : c.status === "verified" ? "Checked · no serial number" : c.status === "not_issued" ? <span className="mr-amber">To be fitted</span> : <span className="mr-muted">—</span>}</div>
+                <div className="mr-td" data-l="Serial numbers">{c.serials.length ? <div><span className="mr-mono">{c.serials.join(", ")}</span>{c.status === "serial_partial" ? <div className="mr-amber mr-small">{c.serials.length} of {c.qty} serials recorded</div> : null}</div> : c.status === "verified" ? "Checked · no serial number" : c.status === "not_issued" ? <span className="mr-amber">To be fitted</span> : null}</div>
                 <div className="mr-td" data-l="Verified">{c.status === "serial" || c.status === "verified" ? <span className="mr-green">✓ {rptFmtD(c.when) || "Yes"}</span> : <span className="mr-muted">Pending</span>}</div>
               </div>
             ))}
@@ -16155,7 +16163,7 @@ function CustomerMachineReport({ machineId, machineLog = [], bomDefs = {}, hando
               <div key={a.id} className="mr-tr" style={{ gridTemplateColumns: "3fr 1fr 1.2fr" }}>
                 <div className="mr-td" data-l="Document">{a.caption || a.fileName || a.name || "Document"}</div>
                 <div className="mr-td" data-l="Type">{a.kind === "image" ? "Photo" : a.kind === "video" ? "Video" : "Document"}</div>
-                <div className="mr-td" data-l="Date">{rptFmtD(a.uploadedAt || a.createdAt) || "—"}</div>
+                <div className="mr-td" data-l="Date">{rptFmtD(a.uploadedAt || a.createdAt) || ""}</div>
               </div>
             ))}
           </div>
@@ -16166,7 +16174,7 @@ function CustomerMachineReport({ machineId, machineLog = [], bomDefs = {}, hando
               : <p className="mr-empty">The machine is run under load at Trial; its certificate is added here when the trial is complete.</p>}
       </RptSec>
       <RptSec n="05" title="Final sign-off" cls="rpt-signoff-sec" attr={{ "data-report-customer-signoff": "" }}>
-        <p className="mr-small" style={{ marginBottom: 14 }}>We certify that the machine described above, serial no. <b className="mr-mono">{machine.serialNo || "—"}</b>, was built to its approved bill of materials, inspected at every stage{critical.length ? ", with its critical components recorded," : ""} and {cert ? "run on trial before release" : "will be run on trial before release"}.</p>
+        <p className="mr-small" style={{ marginBottom: 14 }}>We certify that the machine described above, serial no. <b className="mr-mono">{machine.serialNo || ""}</b>, was built to its approved bill of materials, inspected at every stage{critical.length ? ", with its critical components recorded," : ""} and {cert ? "run on trial before release" : "will be run on trial before release"}.</p>
         {/* 2026-11-04 — the Trial signatures already captured print here with
             name, department and date; only the lines still to sign stay blank. */}
         <RptSignatureRegister rows={certSigs} />
@@ -16191,7 +16199,7 @@ function OnHoldReport({ period = "this_month", machineLog = [], handovers = [], 
   const totalMin = rows.reduce((s, r) => s + (r.minutes || 0), 0);
   const group = (keyOf) => {
     const g = {};
-    rows.forEach((r) => { const k = keyOf(r) || "—"; g[k] = g[k] || { k, n: 0, min: 0, machines: new Set() }; g[k].n++; g[k].min += r.minutes || 0; g[k].machines.add(r.machineId); });
+    rows.forEach((r) => { const k = keyOf(r) || "Not stated"; g[k] = g[k] || { k, n: 0, min: 0, machines: new Set() }; g[k].n++; g[k].min += r.minutes || 0; g[k].machines.add(r.machineId); });
     return Object.values(g).sort((a, b) => b.n - a.n || b.min - a.min);
   };
   const byDept = group((r) => r.kind === "manual" ? r.from : r.to);
@@ -16201,7 +16209,7 @@ function OnHoldReport({ period = "this_month", machineLog = [], handovers = [], 
   return (
     <ReportSheet kind="hold" settings={settings} title="On hold report" subtitle={periodText} refText={`HOLD-${new Date(now).toISOString().slice(0, 7)}`} generatedBy={generatedBy}>
       <div className="mr-summary rpt-summary-4" data-report-glance>
-        {[{ k: "Machines held", v: machines.size }, { k: "Hold events", v: rows.length }, { k: "Still on hold", v: rows.filter((r) => r.open).length, red: rows.some((r) => r.open) }, { k: "Total time held", v: rows.length ? rptDur(totalMin) : "—" }]
+        {[{ k: "Machines held", v: machines.size }, { k: "Hold events", v: rows.length }, { k: "Still on hold", v: rows.filter((r) => r.open).length, red: rows.some((r) => r.open) }, { k: "Total time held", v: rows.length ? rptDur(totalMin) : "None" }]
           .map((g) => <div key={g.k} className={`mr-sum ${g.red ? "is-red" : ""}`}><div className="mr-sum-v">{g.v}</div><div className="mr-label">{g.k}</div></div>)}
       </div>
       <RptSec n="01" title="Holds in this period" count={rows.length} attr={{ "data-report-hold-list": "" }}>
@@ -16210,12 +16218,12 @@ function OnHoldReport({ period = "this_month", machineLog = [], handovers = [], 
             <div className="mr-tr mr-th" style={{ gridTemplateColumns: "1.3fr 1.3fr 1.55fr 0.9fr 1.85fr 1.1fr" }}><div>Machine</div><div>Where</div><div>Since</div><div className="text-right">How long</div><div>Reason</div><div>Who</div></div>
             {rows.map((r) => (
               <div key={r.key} className="mr-tr" data-report-hold-row={r.kind} style={{ gridTemplateColumns: "1.3fr 1.3fr 1.55fr 0.9fr 1.85fr 1.1fr" }}>
-                <div className="mr-td" data-l="Machine"><div><div className="font-semibold">{r.bomKey}</div><div className="mr-label mr-mono">{r.serialNo || "—"}</div></div></div>
-                <div className="mr-td" data-l="Where"><div><div>{r.to ? `${r.from} → ${r.to}` : r.from || "—"}</div><div className={`mr-label ${r.open ? "mr-red" : ""}`}>{r.label}{r.open ? " · open" : ""}</div></div></div>
-                <div className="mr-td" data-l="Since"><div><div className="rpt-nowrap">{rptFmtDT(r.startAt) || "—"}</div>{r.endAt ? <div className="mr-label rpt-nowrap">to {rptFmtDT(r.endAt)}</div> : null}</div></div>
-                <div className={`mr-td md:text-right ${r.open ? "mr-red font-semibold" : ""}`} data-l="How long">{r.minutes != null ? rptDur(r.minutes) : "—"}</div>
+                <div className="mr-td" data-l="Machine"><div><div className="font-semibold">{r.bomKey}</div><div className="mr-label mr-mono">{r.serialNo || ""}</div></div></div>
+                <div className="mr-td" data-l="Where"><div><div>{r.to ? `${r.from} → ${r.to}` : r.from || ""}</div><div className={`mr-label ${r.open ? "mr-red" : ""}`}>{r.label}{r.open ? " · open" : ""}</div></div></div>
+                <div className="mr-td" data-l="Since"><div><div className="rpt-nowrap">{rptFmtDT(r.startAt) || ""}</div>{r.endAt ? <div className="mr-label rpt-nowrap">to {rptFmtDT(r.endAt)}</div> : null}</div></div>
+                <div className={`mr-td md:text-right ${r.open ? "mr-red font-semibold" : ""}`} data-l="How long">{r.minutes != null ? rptDur(r.minutes) : ""}</div>
                 <div className="mr-td" data-l="Reason">{r.reason || <span className="mr-muted">{r.kind === "overdue" ? "Waiting for the next department" : "No reason given"}</span>}</div>
-                <div className="mr-td" data-l="Who"><div><div>{r.by || "—"}</div>{r.releasedBy ? <div className="mr-label">released by {r.releasedBy}</div> : null}</div></div>
+                <div className="mr-td" data-l="Who"><div><div>{r.by || ""}</div>{r.releasedBy ? <div className="mr-label">released by {r.releasedBy}</div> : null}</div></div>
               </div>
             ))}
           </div>
@@ -16255,7 +16263,7 @@ function PendingJobsReport({ includeDone = false, dept = "", machineLog = [], pe
   const order = (d) => { const i = DEPARTMENT_SEQUENCE.indexOf(d); return i < 0 ? 99 : i; };
   const depts = [...new Set(list.map((p) => p.assignedDepartment || "Unassigned"))].sort((a, b) => order(a) - order(b) || a.localeCompare(b));
   const counts = list.reduce((c, p) => { const s = pendingItemStage(p); c[s] = (c[s] || 0) + 1; return c; }, {});
-  const age = (p) => { const t = rptMs(p.raisedAt); if (t == null) return "—"; const end = p.status === "resolved" ? (rptMs(p.resolvedAt) || now) : now; return rptDur(Math.max(0, (end - t) / 60000)); };
+  const age = (p) => { const t = rptMs(p.raisedAt); if (t == null) return ""; const end = p.status === "resolved" ? (rptMs(p.resolvedAt) || now) : now; return rptDur(Math.max(0, (end - t) / 60000)); };
   const critOpen = list.filter((p) => p.critical && pendingItemIsOpen(p)).length;
   return (
     <ReportSheet kind="pending" settings={settings} title="Pending jobs report" subtitle={`${includeDone ? "Open and completed" : "Open"} jobs${dept ? ` · ${dept}` : " · all departments"}`} refText={`PJ-${new Date(now).toISOString().slice(0, 10)}`} generatedBy={generatedBy}>
@@ -16275,13 +16283,13 @@ function PendingJobsReport({ includeDone = false, dept = "", machineLog = [], pe
                 const isPart = !!(p.itemCode || p.itemName || p.qty != null);
                 return (
                   <div key={p.id} className="mr-tr" data-report-pending-row={st} style={{ gridTemplateColumns: "1.3fr 2.4fr 0.8fr 1.4fr 0.9fr" }}>
-                    <div className="mr-td" data-l="Machine"><div><div className="font-semibold">{m.bomKey || p.bomKey || "—"}</div><div className="mr-label mr-mono">{m.serialNo || p.serialNo || ""}</div></div></div>
+                    <div className="mr-td" data-l="Machine"><div><div className="font-semibold">{m.bomKey || p.bomKey || ""}</div><div className="mr-label mr-mono">{m.serialNo || p.serialNo || ""}</div></div></div>
                     <div className="mr-td" data-l="Part / work"><div>
                       <div>{p.critical ? <span className="mr-tag">Critical</span> : null}{p.itemName || p.description}</div>
-                      <div className="mr-label">{isPart ? "Part" : "Work"}{p.itemCode ? <> · <span className="mr-mono">{p.itemCode}</span></> : null}{p.itemName && p.description && p.description !== p.itemName ? ` · ${p.description}` : ""} · raised in {p.raisedInDepartment || "—"}, {rptFmtD(p.raisedAt)}</div>
+                      <div className="mr-label">{isPart ? "Part" : "Work"}{p.itemCode ? <> · <span className="mr-mono">{p.itemCode}</span></> : null}{p.itemName && p.description && p.description !== p.itemName ? ` · ${p.description}` : ""} · raised in {p.raisedInDepartment || ""}, {rptFmtD(p.raisedAt)}</div>
                     </div></div>
-                    <div className="mr-td md:text-right mr-mono" data-l="Qty">{p.qty != null ? <div><div>{p.qty}</div>{(Number(p.receivedQty) || 0) > 0 && <div className="mr-label">{p.receivedQty} recd</div>}</div> : "—"}</div>
-                    <div className="mr-td" data-l="Status"><div><div className={`${cls} font-semibold`}>{lbl}</div>{st === "completed" && <div className="mr-label">{rptFmtD(p.resolvedAt)}{rptUserName(allUsers, p.resolvedBy) ? ` · ${rptUserName(allUsers, p.resolvedBy)}` : ""}</div>}</div></div>
+                    <div className="mr-td md:text-right mr-mono" data-l="Qty">{p.qty != null ? <div><div>{p.qty}</div>{(Number(p.receivedQty) || 0) > 0 && <div className="mr-label">{p.receivedQty} recd</div>}</div> : ""}</div>
+                    <div className="mr-td" data-l="Status"><div><span className={`rpt-badge rpt-status ${cls}`}>{lbl}</span>{st === "completed" && <div className="mr-label">{rptFmtD(p.resolvedAt)}{rptUserName(allUsers, p.resolvedBy) ? ` · ${rptUserName(allUsers, p.resolvedBy)}` : ""}</div>}</div></div>
                     <div className="mr-td md:text-right" data-l="Age">{age(p)}</div>
                   </div>
                 );
@@ -16682,7 +16690,7 @@ function ReportCenterPage({
             title, date range and print date once. Not on the Machine journey
             tab: that report carries its own letterhead (it printed twice, with
             an empty first page). */}
-        {tab !== "machine" && <RptPageStyle page="rc-report" head={`${rptCompany(settings).name || RPT_LEGAL_NAME} · ${(tabs.find((t) => t.id === tab) || {}).label || ""} ${String(T("Report")).toLowerCase()}`} foot={`${(tabs.find((t) => t.id === tab) || {}).label || ""} ${String(T("Report")).toLowerCase()}`} />}
+        {tab !== "machine" && <RptPageStyle page="rc-report" head={`${rptCompany(settings).name || RPT_LEGAL_NAME} · ${(tabs.find((t) => t.id === tab) || {}).label || ""} ${String(T("Report")).toLowerCase()}`} foot={tab === "customer" ? "Computer-generated report" : "Computer-generated report · Confidential, internal use only"} />}
         {tab !== "machine" && (
           <div className="hidden print:block rpt-doc rpt-rc-head" data-report-center-head>
             <RptLetterhead company={rptCompany(settings)} showLogo={rc.showLogo !== false} line={rc.companyLine || ""} />
@@ -17052,7 +17060,7 @@ function ReportTable({ title, rows, t = (k) => k, users = [] }) {
             {rows.map((r, i) => (
               <tr key={i} className="border-t border-slate-200">
                 {columns.map((c) => (
-                  <td key={c} data-l={rptColLabel(t(c))} data-col={c} className={`px-3 py-1.5 text-slate-500 whitespace-nowrap${/^(Serial|Machine)$/.test(c) ? " rpt-nowrap" : ""}`}>{cellText(r[c], c)}</td>
+                  <td key={c} data-l={rptColLabel(t(c))} data-col={c} className={`px-3 py-1.5 text-slate-500 whitespace-nowrap${/^(Serial|Machine)$/.test(c) ? " rpt-nowrap" : ""}`}>{((x) => (x === "—" ? "" : x))(cellText(r[c], c))}</td>
                 ))}
               </tr>
             ))}
@@ -17187,7 +17195,7 @@ function SignaturePad({ onSave, onCancel, initialSvg = "", light = false }) {
           </button>
         )}
         <button type="button" onClick={save}
-                className="text-[11px] font-black text-white px-4 py-1.5 rounded-lg transition-all"
+                className="wu-sig-save text-[11px] font-black text-white px-4 py-1.5 rounded-lg transition-all"
                 style={{ background: "#2640B0", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
           Save Signature
         </button>
@@ -17577,6 +17585,34 @@ const TC_SHEET_CSS = [
   ".tc-form.tc-form input::placeholder,.tc-form.tc-form textarea::placeholder{color:#6b7280 !important}",
   ".tc-form.tc-form input:focus-visible,.tc-form.tc-form textarea:focus-visible{outline:none !important;box-shadow:0 0 0 3px #e2e8f0 !important;border-color:#334155 !important}",
   ".tc-form.tc-form input[type=date]::-webkit-calendar-picker-indicator{filter:none !important;opacity:.7;cursor:pointer}",
+  // 2026-11-04 (reports v3) — premium certificate skin: serif title and legal
+  // name, thin brand-red rules, hairline tables, a faint logo watermark and a
+  // quality seal on the stand-alone print. Layout and content are unchanged.
+  ".tc-sheet{font-family:Inter,'Helvetica Neue',Arial,sans-serif;color:#15171c;-webkit-print-color-adjust:exact;print-color-adjust:exact}",
+  ".tc-sheet>*:not(.tc-foot):not(.tc-seal){position:relative;z-index:1}",
+  ".tc-has-lh::before{content:'';position:absolute;inset:0;z-index:0;pointer-events:none;background:url(\"" + BRAND_LOGO_DATA_URI.replace(/"/g, "%22") + "\") center 58%/150mm auto no-repeat;opacity:.045}",
+  ".tc-lh{border-bottom:.5pt solid #cfd2d7;padding-bottom:3mm;margin-bottom:4mm}",
+  ".tc-lh-logo{width:46mm;height:auto;max-width:46mm;margin:0 auto 2.4mm}",
+  ".tc-lh-name{font-family:Inter,'Helvetica Neue',Arial,sans-serif;font-weight:600;font-size:15px;letter-spacing:.17em}",
+  ".tc-lh-rule{width:18mm;border-top:.9pt solid #b3141f;margin:1.8mm auto 1.6mm}",
+  ".tc-lh-line{color:#5d6470;font-size:8.6px;letter-spacing:.02em}",
+  ".tc-title{font-family:Inter,'Helvetica Neue',Arial,sans-serif;font-weight:600;letter-spacing:.24em;color:#15171c}",
+  ".tc-rule{border-top:.9pt solid #b3141f;width:24mm;margin:0 auto 4mm}",
+  ".tc-field-label{color:#5d6470;letter-spacing:.08em}",
+  ".tc-field-value{border-bottom:.6pt solid #15171c}",
+  ".tc-sec{background:none;border:0;border-bottom:.9pt solid #15171c;padding:0 0 .8mm;margin-top:3.6mm;margin-bottom:0;font-family:Inter,'Helvetica Neue',Arial,sans-serif;font-size:11px;letter-spacing:.14em;color:#15171c}",
+  ".tc-sec::before{content:'';display:inline-block;width:1.6mm;height:1.6mm;background:#b3141f;margin-right:2mm;vertical-align:.25mm}",
+  ".tc-sheet th,.tc-sheet td{border:0;border-bottom:.5pt solid #dcdfe4}",
+  ".tc-sheet th{background:#f6f6f3;color:#4a505a;font-size:8.6px;letter-spacing:.09em}",
+  ".tc-sheet tbody tr:nth-child(even) td{background:rgba(246,246,243,.6)}",
+  ".tc-note{border:0;border-bottom:.5pt solid #dcdfe4}",
+  ".tc-sigimg{border-bottom:.6pt solid #15171c}",
+  ".tc-sigcap{font-size:9px;letter-spacing:.1em;color:#15171c}",
+  ".tc-foot{border-top:.5pt solid #dcdfe4;color:#8b919b;font-size:8px;letter-spacing:.02em}",
+  ".tc-seal{position:absolute;top:9mm;right:12mm;width:25mm;height:25mm;z-index:2;color:#b3141f;opacity:.85}",
+  ".tc-seal svg{display:block;width:100%;height:100%}",
+  ".tc-has-lh .tc-sigbox{border:.5pt solid #dcdfe4;border-radius:1.2mm;padding:2mm 3mm 2.2mm;background:#fff}",
+  ".tc-has-lh .tc-foot{bottom:7mm}",
 ].join("\n");
 
 const tcGetFrq = (d, f) => (d && d[f]) || "";
@@ -17675,6 +17711,26 @@ function TcSheetSig({ title, name, sig, showName = true, date = "" }) {
   );
 }
 
+// 2026-11-04 (reports v3) — a printed quality seal (decoration only; it is
+// not a signature): double ring, "QUALITY CONTROL · TRIAL CERTIFIED" around.
+function TcSeal() {
+  return (
+    <div className="tc-seal" aria-hidden="true">
+      <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <defs><path id="tc-seal-arc" d="M50,50 m-36,0 a36,36 0 1,1 72,0 a36,36 0 1,1 -72,0" /></defs>
+        <circle cx="50" cy="50" r="47" fill="none" stroke="currentColor" strokeWidth="1.6" />
+        <circle cx="50" cy="50" r="43.5" fill="none" stroke="currentColor" strokeWidth="0.6" />
+        <circle cx="50" cy="50" r="28" fill="none" stroke="currentColor" strokeWidth="0.6" />
+        <text fill="currentColor" fontFamily="Inter, Arial, sans-serif" fontSize="7.4" fontWeight="700" letterSpacing="2.1">
+          <textPath href="#tc-seal-arc" startOffset="0">QUALITY CONTROL · TRIAL CERTIFIED ·</textPath>
+        </text>
+        <text x="50" y="47" textAnchor="middle" fill="currentColor" fontFamily="Georgia, serif" fontSize="13" fontWeight="700">✓</text>
+        <text x="50" y="59" textAnchor="middle" fill="currentColor" fontFamily="Inter, Arial, sans-serif" fontSize="6.2" fontWeight="700" letterSpacing="1">SHANTAZ</text>
+      </svg>
+    </div>
+  );
+}
+
 // The printable A4 certificate. Pure render: no hooks, no state.
 // 2026-11-04 — `embedded`: inside a machine report, which already names the
 // machine, carries the letterhead and lists every signature with name,
@@ -17722,11 +17778,13 @@ function TrialCertificateSheet({ machine, cert, remarks = "", embedded = false, 
     <div className={`tc-sheet${embedded ? " tc-embedded" : ""}${!embedded && company ? " tc-has-lh" : ""}`}>
       {!embedded && company && (
         <div className="tc-lh">
-          {company.logo && <img src={company.logo} alt="" className="tc-lh-logo" />}
+          <img src={company.logo || BRAND_LOGO_DATA_URI} alt="SHANTAZ" className="tc-lh-logo" />
           <div className="tc-lh-name">{company.name || RPT_LEGAL_NAME}</div>
-          {[company.address, [company.gst ? `GSTIN ${company.gst}` : "", company.phone ? `Phone ${company.phone}` : "", company.email || ""].filter(Boolean).join("  ·  ")].filter(Boolean).map((l, i) => <div key={i} className="tc-lh-line">{l}</div>)}
+          <div className="tc-lh-rule" aria-hidden="true" />
+          {[company.address, rptContactLine(company)].filter(Boolean).map((l, i) => <div key={i} className="tc-lh-line">{l}</div>)}
         </div>
       )}
+      {!embedded && company && <TcSeal />}
       {!embedded && <div className="tc-title">MACHINE TRIAL CERTIFICATE</div>}
       {!embedded && <div className="tc-rule" />}
 
@@ -17835,7 +17893,7 @@ function TrialCertificateSheet({ machine, cert, remarks = "", embedded = false, 
 
       {!embedded && (
         <div className="tc-foot">
-          <span>SHANTAZ ERP · Machine Trial Certificate</span>
+          <span>Machine Trial Certificate · computer-generated document</span>
           <span>{machine.bomKey}{machine.serialNo ? " · S/N " + machine.serialNo : ""}</span>
         </div>
       )}
@@ -17860,6 +17918,7 @@ function printTrialCertificate(machine, cert, remarks = "", company = null) {
     "<!DOCTYPE html><html><head><meta charset='utf-8'/>" +
     "<meta name='viewport' content='width=device-width,initial-scale=1'/>" +
     "<title>" + tcEsc(title) + "</title>" +
+    "<link rel='stylesheet' href='https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap'/>" +
     "<style>" + TC_SHEET_CSS +
       "@page{size:A4 portrait;margin:0}" +
       "html,body{margin:0;padding:0;background:#fff}" +
@@ -17997,7 +18056,7 @@ function TrialCertificateModal({ machine, nowTick, workflow, busy, onClose, onSu
     }
     return (
       <button type="button" onClick={() => setOpen(true)} className={TC_BTN_GHOST + " !py-1.5"}>
-        ✍ Draw signature
+        <LeadIcon e="✍" />Draw signature
       </button>
     );
   };
@@ -18131,7 +18190,7 @@ function TrialCertificateModal({ machine, nowTick, workflow, busy, onClose, onSu
       {isOverrun && (
         <section className="rounded-xl border border-amber-300 bg-amber-50 p-4 md:p-5">
           <div className="text-[12px] font-bold text-amber-900 mb-2">
-            ⚠ Overrun by {formatDuration(overrunMinutes)} — explanation required
+            <LeadIcon e="⚠" />Overrun by {formatDuration(overrunMinutes)} — explanation required
           </div>
           <textarea value={narration} onChange={(e) => setNarration(e.target.value)} rows={2}
                     placeholder="Briefly explain why the Trial took longer than expected…"
@@ -18165,7 +18224,7 @@ function TrialCertificateModal({ machine, nowTick, workflow, busy, onClose, onSu
 
       {formError && (
         <div className="rounded-lg border border-red-300 bg-red-50 px-4 py-2.5 text-[12px] font-semibold text-red-700">
-          ⚠ {formError}
+          <LeadIcon e="⚠" />{formError}
         </div>
       )}
     </>
@@ -18227,7 +18286,7 @@ function TrialCertificateModal({ machine, nowTick, workflow, busy, onClose, onSu
               ← Back to Edit
             </button>
             <button type="button" onClick={() => printTrialCertificate(machine, cert, narration.trim(), company)} className={TC_BTN_GHOST}>
-              🖨 Print / Save as PDF
+              <LeadIcon e="🖨" />Print / Save as PDF
             </button>
             <div className="ml-auto flex flex-wrap items-center gap-3">
               {incomplete.length > 0 && (
@@ -18270,7 +18329,7 @@ function TrialCertificatePrintModal({ machine, onClose, company = null }) {
             </div>
           </div>
           <button type="button" onClick={() => printTrialCertificate(machine, cert, "", company)} className={TC_BTN_PRIMARY} style={{ color: "#fff" }}>
-            🖨 Print / Save as PDF
+            <LeadIcon e="🖨" />Print / Save as PDF
           </button>
           <button type="button" aria-label="Close" onClick={onClose}
                   className="text-slate-600 hover:text-slate-900 text-xl leading-none px-1 transition-colors">✕</button>
@@ -18543,7 +18602,7 @@ const saveFailed = (where, err) => {
 function ModalX({ onClose, disabled = false, label = "Close" }) {
   return (
     <button type="button" aria-label={label} title={label} data-modal-close onClick={onClose} disabled={disabled}
-            className="absolute top-2.5 right-2.5 z-10 w-9 h-9 rounded-full flex items-center justify-center text-[15px] font-black transition-colors disabled:opacity-40"
+            className="modal-x absolute top-2.5 right-2.5 z-10 w-10 h-10 rounded-full flex items-center justify-center text-[15px] font-black transition-colors disabled:opacity-40"
             style={{ background: "rgba(17,24,39,0.07)", color: "var(--text-dim)" }}>✕</button>
   );
 }
@@ -18747,7 +18806,7 @@ function PendingJobRows({ rows, onChange, inventory = [], accent = "#b45309", ad
           </div>
         ))}
         <button type="button" disabled={disabled} onClick={() => onChange([...list, emptyPendingJob()])}
-                className={`${allowComment ? "text-[13px] px-4" : "text-[11px] px-3 py-1.5"} font-bold rounded-lg border transition-all disabled:opacity-50`}
+                className={`wu-addrow ${allowComment ? "text-[13px] px-4" : "text-[11px] px-3 py-1.5"} font-bold rounded-lg border transition-all disabled:opacity-50`}
                 style={{ background: `${accent}14`, border: `1px solid ${accent}66`, color: accent, ...(allowComment ? { minHeight: 44 } : {}) }}>
           {addLabel}
         </button>
@@ -18984,21 +19043,20 @@ function StaffMyDashboard({ departments = [], handovers = [], deptRatings = [], 
          onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="w-full sm:max-w-3xl h-full sm:h-auto sm:max-h-[92vh] flex flex-col sm:rounded-2xl overflow-hidden"
            style={{ background: "var(--surface-raised, #f8fafc)", boxShadow: "0 24px 70px rgba(17,24,39,0.3)" }}>
-        <div className="flex items-center gap-3 px-4 sm:px-6 py-3 flex-shrink-0" style={{ background: "#2640B0", color: "#fff" }}>
+        <div className="wu-md-head flex items-center gap-3 px-4 sm:px-6 py-3 flex-shrink-0">
           <div className="flex-1 min-w-0">
-            <div className="text-[20px] sm:text-[22px] font-black leading-tight">📊 My Dashboard</div>
-            <div className="text-[14px] font-bold opacity-90 truncate">{departments.join(", ")}</div>
+            <div className="wu-md-title"><LeadIcon e="📊" />My Dashboard</div>
+            <div className="wu-md-sub truncate">{departments.join(", ")}</div>
           </div>
           <button type="button" data-my-dashboard-close aria-label="Close My Dashboard" onClick={onClose}
-                  className="min-w-[52px] min-h-[52px] px-3 rounded-xl text-[18px] font-black flex items-center justify-center gap-1.5"
-                  style={{ background: "rgba(255,255,255,0.18)", color: "#fff" }}>
+                  className="wu-md-close min-w-[52px] min-h-[52px] px-3 rounded-xl flex items-center justify-center gap-1.5">
             ✕ <span className="text-[15px]">Close</span>
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-3 sm:space-y-4">
+        <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-3 sm:space-y-4 wu-stagger">
           {/* 1. Stars */}
           <div data-my-dash-stars className="rounded-2xl p-4 sm:p-5 text-center" style={card}>
-            <div className="text-[15px] font-black uppercase tracking-[0.06em]" style={{ color: "var(--text-dim)" }}>⭐ Stars</div>
+            <div className="wu-md-h"><LeadIcon e="⭐" />Stars</div>
             <div className="text-[40px] sm:text-[48px] leading-none mt-2 tracking-[0.04em]" aria-label={avg === null ? "No stars yet" : `${avg} out of 5 stars`}>
               <span style={{ color: "#f59e0b" }}>{"★".repeat(full)}</span><span style={{ color: "#d1d5db" }}>{"★".repeat(5 - full)}</span>
             </div>
@@ -19011,15 +19069,15 @@ function StaffMyDashboard({ departments = [], handovers = [], deptRatings = [], 
           <div data-my-dash-finished className="grid grid-cols-2 gap-3 sm:gap-4">
             {[["This week", thisWeek, "week"], ["This month", thisMonth, "month"]].map(([label, n, k]) => (
               <div key={k} data-my-dash-count={k} className="rounded-2xl p-4 text-center" style={card}>
-                <div className="text-[15px] font-black" style={{ color: "var(--text-dim)" }}>✅ {label}</div>
-                <div className="text-[48px] sm:text-[56px] font-black leading-none mt-2 tabular-nums" style={{ color: "#15803d" }}>{n}</div>
+                <div className="text-[15px] font-black" style={{ color: "var(--text-dim)" }}><LeadIcon e="✅" />{label}</div>
+                <div className="wu-md-num mt-2 tabular-nums">{n}</div>
                 <div className="text-[14px] font-bold mt-1" style={{ color: "var(--text-dim)" }}>machine{n === 1 ? "" : "s"} done</div>
               </div>
             ))}
           </div>
           {/* 2. Time per machine */}
           <div data-my-dash-times className="rounded-2xl p-4 sm:p-5" style={card}>
-            <div className="text-[15px] font-black uppercase tracking-[0.06em] mb-3" style={{ color: "var(--text-dim)" }}>⏱ Time per machine</div>
+            <div className="wu-md-h mb-3"><LeadIcon e="⏱" />Time per machine</div>
             {done.length === 0 && <div className="text-[16px] font-bold py-2" style={{ color: "var(--text-dim)" }}>No machine finished yet.</div>}
             <div className="flex flex-col gap-2">
               {done.map((h) => {
@@ -19028,19 +19086,17 @@ function StaffMyDashboard({ departments = [], handovers = [], deptRatings = [], 
                 const target = Number(h.expectedDurationMinutes) || 0;
                 const late = (Number(h.overrunMinutes) || 0) > 0 || (target > 0 && actual > target);
                 return (
-                  <div key={h.id} data-my-dash-row={h.id} className="flex items-center gap-3 rounded-xl px-3 py-2.5 min-h-[56px]"
-                       style={{ background: late ? "rgba(239,68,68,0.06)" : "rgba(21,128,61,0.06)", border: `1px solid ${late ? "rgba(239,68,68,0.3)" : "rgba(21,128,61,0.25)"}` }}>
+                  <div key={h.id} data-my-dash-row={h.id} className="wu-md-row flex items-center gap-3 rounded-xl px-3 py-2.5 min-h-[56px]">
                     <div className="flex-1 min-w-0">
                       <div className="text-[16px] font-black truncate" style={{ color: "var(--text-strong)" }}>{(m && m.bomLabel) || h.bomKey || (m && m.bomKey) || "Machine"}</div>
                       <div className="text-[14px] font-bold" style={{ color: "var(--text-dim)" }}>
                         {(h.serialNo || (m && m.serialNo)) ? `S/N ${h.serialNo || m.serialNo}` : ""}{departments.length > 1 ? ` · ${h.fromDepartment}` : ""}
                       </div>
                       <div className="text-[16px] font-black tabular-nums mt-0.5" style={{ color: "var(--text-strong)" }}>
-                        ⏱ {formatDuration(actual)}{target ? <span className="font-bold" style={{ color: "var(--text-dim)" }}> / {formatDuration(target)}</span> : null}
+                        <LeadIcon e="⏱" />{formatDuration(actual)}{target ? <span className="font-bold" style={{ color: "var(--text-dim)" }}> / {formatDuration(target)}</span> : null}
                       </div>
                     </div>
-                    <span data-my-dash-badge={late ? "late" : "ontime"} className="flex-shrink-0 text-[15px] font-black px-3 py-2 rounded-full text-white"
-                          style={{ background: late ? "#dc2626" : "#15803d" }}>
+                    <span data-my-dash-badge={late ? "late" : "ontime"} className={`wu-md-pill flex-shrink-0 ${late ? "is-bad" : "is-ok"}`}>
                       {late ? "✗ Late" : "✓ On time"}
                     </span>
                   </div>
@@ -19422,6 +19478,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
         return;
       }
       setTrialCertModal(null);
+      celebrate("Sent");   // world UI: success moment (visual only)
       showToast(
         `${machine.bomKey} → Ready`,
         "Trial Certificate saved. Awaiting Ready acceptance."
@@ -19490,6 +19547,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
         return;
       }
       setFinishModal(null);
+      celebrate("Sent");   // world UI: success moment (visual only)
       const backToRack = !!machine.rackSlot && fromDepartment === "Assembly" && isRackReleaseHop(fromDepartment, toDepartment);
       showToast(backToRack ? `${machine.bomKey}${machine.serialNo ? ` — ${machine.serialNo}` : ""} · Assembled · Ready` : `${machine.bomKey} → ${toDepartment}`,
         backToRack ? `Back on ${slotLabel(machine.rackSlot)} — an admin sends it to ${toDepartment} from the Rack View` : (overrunMinutes > 0 ? `Awaiting accept · Overrun ${formatDuration(overrunMinutes)}` : "Awaiting accept"));
@@ -19594,6 +19652,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
       return;
     }
     setAcceptModal(null);
+    celebrate(handover.toDepartment === "Ready" ? "Ready" : "Accepted");   // world UI: success moment (visual only)
     showToast(`Accepted into ${handover.toDepartment}`,
       `${handover.bomKey}${handover.serialNo ? ` · S/N ${handover.serialNo}` : ""}${pendingItemsToRaise.length ? ` · ${pendingItemsToRaise.length} pending item${pendingItemsToRaise.length === 1 ? "" : "s"} raised` : ""}`);
   };
@@ -19635,6 +19694,11 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
   // and calls the SAME handler as the admin tracker — nothing is duplicated.
   const staffMode  = !isAdminUser;
   const isProdHead = staffMode && (currentUser?.role === "Production Head" || (canDo("machines", "release") && !isFloorLogin));
+  // 2026-11-04 (owner) — the Assembly head presses "Assemble" himself, so an
+  // Assembly floor login also gets the Production Rack View (Fill / Send /
+  // Remove stay behind their own permissions there).
+  const canStartAsm = canStartAssembly(canDo, myDepartments);
+  const isAssemblyFloor = staffMode && !isProdHead && canStartAsm;
   // 2026-11-03 — staff "My Dashboard" panel (read-only; see StaffMyDashboard).
   const [myDashOpen, setMyDashOpen] = useState(false);
   const canReleaseFromRack = canDo("machines", "release") || isAdminUser;
@@ -19943,7 +20007,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                 <button data-needs-net type="button" onClick={() => setJobAction({ item: p, action: "receive", notes: "", busy: false, error: "" })}
                                         className="text-[10.5px] font-bold px-2.5 py-1 rounded-lg border transition-all"
                                         style={{ background: "rgba(37,99,235,0.08)", border: "1px solid rgba(37,99,235,0.35)", color: "#1d4ed8" }}>
-                                  📦 Part received
+                                  <LeadLabel text="📦 Part received" />
                                 </button>
                               )}
                               {canAct && onResolvePendingItem && p.status === "open" && !pendingItemIsPart(p) && (
@@ -19978,7 +20042,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
     const block = (key, title, icon, tone, arr, empty) => (
       <section data-jobs-section={key} className="space-y-2">
         <div className="flex items-center gap-2">
-          <span className="text-[12.5px] font-black" style={{ color: tone }}>{icon} {title}</span>
+          <span className="text-[12.5px] font-black" style={{ color: tone }}><LeadLabel text={`${icon} ${title}`} /></span>
           <span data-jobs-count={key} className="text-[10.5px] font-black px-2 py-0.5 rounded-full" style={{ background: `${tone}1a`, color: tone }}>{arr.length}</span>
         </div>
         {arr.length === 0
@@ -20302,9 +20366,10 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
 
       {/* Arrival alert banner (staff only) — tap to go to that machine's card. */}
       {staffMode && arrival && (
-        <div className="arrival-banner" role="alert" data-arrival-banner>
+        <div className="arrival-banner" role="alert" data-arrival-banner
+             data-arrival-tone={arrival.deadline ? (String(arrival.text).startsWith("⏰") ? "bad" : "wait") : "ok"}>
           <button type="button" className="arrival-banner-main" onClick={openArrival} data-arrival-open>
-            {arrival.text}
+            <LeadLabel text={arrival.text} />
           </button>
           <button type="button" className="arrival-banner-close" aria-label="Close" onClick={() => setArrival(null)}>✕</button>
         </div>
@@ -20319,7 +20384,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
         <div className="fixed bottom-6 right-6 z-[60] flex items-center gap-3 px-5 py-3.5 rounded-2xl"
              style={{ background: `var(--surface-raised)`, border: `2px solid ${borderColor}`, boxShadow: `0 20px 60px rgba(17,24,39,0.14)`, animation: "slideUp 0.3s ease both" }}>
           <div className="w-8 h-8 rounded-full flex items-center justify-center text-base flex-shrink-0" style={{ background: bg }}>
-            {icon}
+            <Glyph e={icon} size={16} />
           </div>
           <div>
             <div className="text-xs font-bold text-slate-900">{toast.text}</div>
@@ -20339,7 +20404,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                   className="h-9 px-3 rounded-lg text-[12px] font-black flex items-center gap-1.5"
                   style={{ background: "rgba(46, 80, 214,0.10)", color: "#2640B0", border: "1px solid rgba(46, 80, 214,0.35)" }}
                   title="Customer, company, on hold and pending jobs reports">
-            📄 Reports
+            <LeadIcon e="📄" />Reports
           </button>
         )}
         {/* Departments Called, behind a bell. Same count and same scope as the
@@ -20367,11 +20432,11 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
             deadlines, HOLD rules, checklist templates, signature + password
             policy. Hidden from non-admin operators. */}
         {canConfigureDept(canDo) && (
-          <button onClick={() => onNavigate("machines_settings")}
+          <button data-mt-settings onClick={() => onNavigate("machines_settings")}
                   title="Open Machine Tracker settings (deadlines, HOLD rules, checklists, employees)"
                   className="h-9 px-3 rounded-lg text-[12px] font-black inline-flex items-center gap-1.5 transition-all"
                   style={{ background: "rgba(46, 80, 214,0.1)", border: "1px solid rgba(46, 80, 214,0.35)", color: "#2640B0" }}>
-            ⚙️ Settings
+            <LeadLabel text="⚙️ Settings" />
           </button>
         )}
       </Topbar>
@@ -20381,7 +20446,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
         {/* Search: type a machine name or serial number, the list shows it. */}
         {!staffMode && (
           <div className="relative" data-mt-search>
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[18px] pointer-events-none">🔍</span>
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[18px] pointer-events-none"><Glyph e="🔍" size={18} /></span>
             <input type="search" value={searchQ} data-mt-search-input
                    onChange={(e) => {
                      const v = e.target.value; setSearchQ(v); if (v.trim()) setMtTab("production");
@@ -20409,7 +20474,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
             <div className="mt-today flex items-center gap-2 flex-wrap" data-mt-today>
               <span className="text-[16px] font-black mr-1" style={{ color: "var(--text-strong)" }}>Today:</span>
               {parts.length === 0 && (
-                <span className="text-[16px] font-black" style={{ color: "#15803d" }} data-mt-today-ok>✅ All machines on time</span>
+                <span className="text-[16px] font-black" style={{ color: "#15803d" }} data-mt-today-ok><LeadIcon e="✅" />All machines on time</span>
               )}
               {isClosedDay(nowTick) && (
                 <span data-mt-closed-day className="min-h-[36px] px-3 rounded-full text-[13px] font-bold inline-flex items-center gap-1.5"
@@ -20427,7 +20492,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                           }}
                           className="min-h-[44px] px-4 rounded-full text-[15px] font-bold inline-flex items-center gap-1.5 transition-all active:scale-[0.97]"
                           style={{ background: x.bg, color: x.color, border: `${isOn ? 2 : 1}px solid ${isOn ? x.color : x.bd}` }}>
-                    <span aria-hidden="true">{x.icon}</span>
+                    <Glyph e={x.icon} />
                     <span className="tabular-nums">{x.n}</span> {x.word}
                   </button>
                 );
@@ -20463,7 +20528,8 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
             signatures and checklists are untouched. No machine history,
             ratings or reports: those stay admin-only. */}
         {staffMode && (() => {
-          const btn = "min-h-[48px] w-full sm:w-auto px-5 rounded-xl text-[15px] font-black transition-all active:scale-[0.98]";
+          // World UI (2026-11-04): one button anatomy, tone by meaning (classes in world-ui.css).
+          const btn = "min-h-[48px] w-full sm:w-auto text-[15px] wu-btn";
           const canAccept  = canAcceptHandover(canDo) && !!onAcceptHandover;
           const canFinish  = canFinishTransfer(canDo) && !!onFinishTransfer;
           const canJobs    = canFinishTransfer(canDo);
@@ -20480,19 +20546,39 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
           const myJobs     = (pendingHandoverItems || []).filter((p) => pendingItemIsOpen(p) && myDepartments.includes(p.assignedDepartment));
           const awaitingRelease = startedAll.filter((m) => { const h = machineHandover(m); return !!(h && isAwaitingRelease(h)); });
           const Section = ({ title, count, hint, children }) => (
-            <div className="section-card no-lift p-4 sm:p-5" data-staff-section={title}>
-              <div className="flex items-baseline gap-2 flex-wrap mb-3">
-                <h2 className="text-[16px] font-black" style={{ color: "var(--text-strong)" }}>{title}</h2>
-                <span className="text-[14px] font-black tabular-nums" style={{ color: count ? "#2640B0" : "var(--text-dim)" }}>({count})</span>
-                {hint && <span className="text-[12px]" style={{ color: "var(--text-dim)" }}>{hint}</span>}
+            <div className="wu-section" data-staff-section={title}>
+              <div className="wu-section-head">
+                <h2 className="wu-section-title">{title}</h2>
+                <span className={`wu-count${count ? " is-on" : ""}`} aria-label={`${count} machines`}>{count}</span>
+                {hint && <span className="wu-section-hint">{hint}</span>}
               </div>
               {children}
             </div>
           );
-          const Empty = ({ text }) => <div className="text-[14px] py-3" style={{ color: "var(--text-dim)" }}>{text}</div>;
-          const Card  = ({ children, tone }) => (
-            <div className="mt-card no-lift p-4 flex flex-col gap-3" style={tone ? { borderColor: tone } : undefined}>{children}</div>
+          // Empty state: a small line drawing + one line saying what happens next.
+          const Empty = ({ text }) => (
+            <div className="wu-empty">
+              <svg viewBox="0 0 64 48" width="56" height="42" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round">
+                <path d="M8 18l24-10 24 10-24 10z" /><path d="M8 18v16l24 10 24-10V18" /><path d="M32 28v16" />
+              </svg>
+              <span>{text}</span>
+            </div>
           );
+          const Card  = ({ children, tone }) => (
+            <div className="mt-card no-lift wu-card" data-tone={tone || undefined}>{children}</div>
+          );
+          // Where the machine is on the line (display only — read from its stage).
+          const LINE = ["Assembly", "Mechanical", "Electrical", "Trial", "Ready"];
+          const stageLine = (stage) => {
+            const at = LINE.indexOf(stage);
+            if (at < 0) return null;
+            return (
+              <div className="wu-line" data-wu-stages aria-label={`Stage: ${stage}`}>
+                {LINE.map((d, i) => <span key={d} className={i < at ? "is-done" : i === at ? "is-now" : ""} title={d} />)}
+                <em>Step {at + 1} of {LINE.length}</em>
+              </div>
+            );
+          };
           // 2026-11-03 — "▶ 🎤 2": the machine has voice notes; tap plays the latest.
           const voiceBadge = (m) => {
             const vs = m ? voiceNotesFor(attachments, m.id) : [];
@@ -20505,37 +20591,46 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
           // Release button for the same permission.
           const canHoldM = !!onSetMachineHold && (isAdminUser || canFinishTransfer(canDo) || canDo("machines", "updateStage"));
           const holdBadge = (m) => (m && m.holdActive) ? (
-            <div data-staff-hold-badge={m.id} className="text-[13px] font-black mt-1.5 px-2.5 py-1.5 rounded-lg break-words"
-                 style={{ background: "rgba(239,68,68,0.12)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.45)" }}>
-              🛑 ON HOLD{m.holdReason ? ` · ${m.holdReason}` : ""}
+            <div data-staff-hold-badge={m.id} className="wu-hold-badge">
+              <LeadIcon e="⏸" />ON HOLD{m.holdReason ? ` · ${m.holdReason}` : ""}
             </div>
           ) : null;
           const holdBtn = (m) => (canHoldM && m) ? (
-            <button data-needs-net type="button" className={btn}
+            <button data-needs-net type="button" className={`${btn} ${m.holdActive ? "wu-soft-ok" : "wu-soft"}`}
                     {...(m.holdActive ? { "data-staff-release-hold": m.id } : { "data-staff-hold": m.id })}
-                    onClick={() => setHoldModal({ machine: m, release: !!m.holdActive, reason: "", busy: false, error: "" })}
-                    style={m.holdActive ? { background: "rgba(21,128,61,0.10)", border: "1px solid rgba(21,128,61,0.4)", color: "#15803d" }
-                                        : { background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.35)", color: "#b91c1c" }}>
-              {m.holdActive ? "▶ Release ON HOLD" : "⏸ ON HOLD"}
+                    onClick={() => setHoldModal({ machine: m, release: !!m.holdActive, reason: "", busy: false, error: "" })}>
+              <LeadLabel text={m.holdActive ? "▶ Release ON HOLD" : "⏸ ON HOLD"} />
             </button>
           ) : null;
           const heldNote = (m, what) => (
-            <div data-staff-held={m.id} className="min-h-[48px] flex items-center text-[14px] font-bold" style={{ color: "#dc2626" }}>
-              🛑 On hold — release the hold to {what}
+            <div data-staff-held={m.id} className="wu-held">
+              <LeadIcon e="⏸" />On hold — release the hold to {what}
             </div>
           );
           // Migration 061 — the BOM's machine photo (64px) at the left of the
           // card's title block, so workers recognise the machine at a glance.
+          // World UI: picture first on every card; a machine without a BOM photo
+          // gets a quiet machine tile so all cards line up the same way.
           const withPhoto  = (m, h, body) => {
             const url = (bomDefs || {})[(m && m.bomKey) || (h && h.bomKey)]?.photoUrl;
-            if (!url) return body;
             return (
-              <div className="flex items-start gap-3">
-                <BomPhotoThumb url={url} size={64} />
+              <div className="wu-card-top">
+                <BomPhotoThumb url={url} size={64} className="wu-photo"
+                               fallback={<span className="wu-photo wu-photo-ph" aria-hidden="true"><Wrench size={24} strokeWidth={1.7} /></span>} />
                 <div className="min-w-0 flex-1">{body}</div>
               </div>
             );
           };
+          // Route: Rack → Accept → Work → Send, with counts. Tap a step to jump to it.
+          const route = [
+            { key: "rack",   label: "Rack",   n: rackForMe.length,  sec: "On the rack for you" },
+            { key: "accept", label: "Accept", n: toAccept.length,   sec: "To accept" },
+            { key: "work",   label: "Work",   n: myWorking.length,  sec: "In your department" },
+            { key: "send",   label: "Send",   n: sentOn.length,     sec: "Sent on" },
+          ];
+          const canActOn = { rack: canTakeFromRack && canAccept, accept: canAccept, work: true };
+          const nowStep = (route.find((r) => r.key !== "send" && r.n > 0 && canActOn[r.key]) || route.find((r) => r.n > 0) || route[3]).key;
+          const goStep = (sec) => { try { document.querySelector(`[data-staff-section='${sec}']`)?.scrollIntoView({ behavior: "smooth", block: "start" }); } catch { /* ignore */ } };
           // No department: say so and show nothing else. A Store Manager still
           // keeps the BOM section above when the role may issue a BOM.
           if (!isProdHead && !hasDepartments) {
@@ -20550,33 +20645,47 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
             );
           }
           return (
-            <div className="space-y-4" data-staff-dashboard>
-              {/* My Dashboard — opens the read-only scorecard for my departments */}
-              {!isProdHead && hasDepartments && (
-                <button type="button" data-my-dashboard-open onClick={() => setMyDashOpen(true)}
-                        className="w-full min-h-[64px] px-5 rounded-2xl text-[20px] font-black text-white flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
-                        style={{ background: "#2640B0", boxShadow: "0 8px 24px rgba(38,64,176,0.25)" }}>
-                  📊 My Dashboard
-                </button>
-              )}
-              {/* Header */}
-              <div className="flex items-baseline gap-2 flex-wrap px-1">
-                <span className="text-[12px] font-bold uppercase tracking-[0.08em]" style={{ color: "var(--text-dim)" }}>
-                  {isProdHead ? "Production Head" : `Your department${myDepartments.length === 1 ? "" : "s"}:`}
-                </span>
-                <span className="text-[18px] font-black" style={{ color: "var(--text-strong)" }}>
-                  {isProdHead ? "Rack release" : myDepartments.join(", ")}
-                </span>
-                {currentUser?.fullName && <span className="text-[12px] ml-auto" style={{ color: "var(--text-dim)" }}>{currentUser.fullName}</span>}
-                {!isProdHead && (
-                  <button type="button" data-arrival-toggle aria-pressed={arrivalOn} onClick={toggleArrival}
-                          aria-label={arrivalOn ? "Arrival alert on — tap to turn off" : "Arrival alert off — tap to turn on"}
-                          title={arrivalOn ? "Alert sound ON" : "Alert sound OFF"}
-                          className={`${currentUser?.fullName ? "" : "ml-auto "}min-w-[44px] h-[44px] px-3 rounded-xl text-[15px] font-black inline-flex items-center justify-center gap-1 transition-all active:scale-[0.97]`}
-                          style={arrivalOn
-                            ? { background: "rgba(21,128,61,0.10)", color: "#15803d", border: "1px solid rgba(21,128,61,0.35)" }
-                            : { background: "var(--surface-card)", color: "var(--text-dim)", border: "1px solid var(--border-subtle)" }}>
-                    {arrivalOn ? "🔔 On" : "🔕 Off"}
+            <div className="wu-staff" data-staff-dashboard>
+              {/* World UI header: who I am, the route with counts, My Dashboard. */}
+              <div className="wu-staff-hero" data-staff-hero>
+                <div className="wu-hero-row">
+                  <div className="min-w-0 flex-1">
+                    <span className="wu-hero-k">
+                      {isProdHead ? "Production Head" : `Your department${myDepartments.length === 1 ? "" : "s"}:`}
+                    </span>
+                    <span className="wu-hero-dept">
+                      {isProdHead ? "Rack release" : myDepartments.join(", ")}
+                    </span>
+                    {currentUser?.fullName && <span className="wu-hero-name">{currentUser.fullName}</span>}
+                  </div>
+                  {!isProdHead && (
+                    <button type="button" data-arrival-toggle aria-pressed={arrivalOn} onClick={toggleArrival}
+                            aria-label={arrivalOn ? "Arrival alert on — tap to turn off" : "Arrival alert off — tap to turn on"}
+                            title={arrivalOn ? "Alert sound ON" : "Alert sound OFF"}
+                            className={`wu-alert${arrivalOn ? " is-on" : ""}`}>
+                      <LeadLabel text={arrivalOn ? "🔔 On" : "🔕 Off"} />
+                    </button>
+                  )}
+                </div>
+                {!isProdHead && hasDepartments && (
+                  <nav className="wu-route" aria-label="Your work, step by step" data-staff-route>
+                    {route.map((r, i) => (
+                      <React.Fragment key={r.key}>
+                        {i > 0 && <span className="wu-route-sep" aria-hidden="true" />}
+                        <button type="button" data-staff-route-step={r.key} onClick={() => goStep(r.sec)}
+                                className={`wu-step${r.key === nowStep ? " is-now" : ""}${r.n ? " has" : ""}`}
+                                aria-current={r.key === nowStep ? "step" : undefined}>
+                          <span className="wu-step-n tabular-nums">{r.n}</span>
+                          <span className="wu-step-l">{r.label}</span>
+                        </button>
+                      </React.Fragment>
+                    ))}
+                  </nav>
+                )}
+                {/* My Dashboard — opens the read-only scorecard for my departments */}
+                {!isProdHead && hasDepartments && (
+                  <button type="button" data-my-dashboard-open onClick={() => setMyDashOpen(true)} className="wu-mydash">
+                    <LeadIcon e="📊" />My Dashboard
                   </button>
                 )}
               </div>
@@ -20591,8 +20700,8 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                       return (
                         <Card key={m.id}>
                           {withPhoto(m, h, <div>
-                            <div className="text-[17px] font-black" style={{ color: "var(--text-strong)" }}>{titleOf(m, h)}</div>
-                            <div className="text-[13px] mt-0.5" style={{ color: "var(--text-dim)" }}>
+                            <div className="wu-title">{titleOf(m, h)}</div>
+                            <div className="wu-meta">
                               {m.bomLabel || ""}{m.rackSlot ? ` · ${slotLabel(m.rackSlot)}` : " · on the rack"} · to {h.toDepartment}
                             </div>
                           </div>)}
@@ -20600,7 +20709,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                               (details panel / crate face — same handler, same
                               gate). This opens that machine's rack panel. */}
                           {canReleaseFromRack && onReleaseHandover && (
-                            <button type="button" data-staff-release={h.id} className={btn} style={{ background: "#4338ca", color: "#fff" }}
+                            <button type="button" data-staff-release={h.id} className={`${btn} wu-rack`}
                                     onClick={() => {
                                       if (m.rackSlot) { setRackPanel(m.rackSlot); return; }
                                       try { document.querySelector(".rack-shelf")?.scrollIntoView({ behavior: "smooth", block: "start" }); } catch {}
@@ -20622,16 +20731,16 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                     {rackForMe.map((h) => {
                       const m = machineOf(h);
                       return (
-                        <Card key={h.id} tone="rgba(67,56,202,0.45)">
+                        <Card key={h.id} tone="rack">
                           {withPhoto(m, h, <div>
-                            <div className="text-[17px] font-black" style={{ color: "var(--text-strong)" }}>{titleOf(m, h)}</div>
-                            <div className="text-[13px] mt-0.5" style={{ color: "var(--text-dim)" }}>
-                              {m?.bomLabel ? `${m.bomLabel} · ` : ""}{m?.rackSlot ? slotLabel(m.rackSlot) : "on the rack"} → {h.toDepartment}
+                            <div className="wu-title">{titleOf(m, h)}</div>
+                            <div className="wu-meta">
+                              {m?.bomLabel ? `${m.bomLabel} · ` : ""}<span className="whitespace-nowrap">{m?.rackSlot ? `Rack ${slotLabel(m.rackSlot)}` : "on the rack"}</span>
                             </div>
                             {holdBadge(m)}
                           </div>)}
                           {m && m.holdActive ? heldNote(m, "take it") : canTakeFromRack && canAccept ? (
-                            <button data-needs-net type="button" data-staff-take={h.id} className={btn} style={{ background: "#4338ca", color: "#fff" }}
+                            <button data-needs-net type="button" data-staff-take={h.id} className={`${btn} wu-rack`}
                                     disabled={!!acceptModal || rackTakeBusy === h.id}
                                     onClick={async () => {
                                       if (acceptModal || rackTakeBusy) return;
@@ -20641,10 +20750,10 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                       if (!r || r.success === false) { showToast("Could not take", r?.error || "", "urgent"); return; }
                                       openAcceptModal({ ...h, ...(r.handover || {}), releasedAt: (r.handover && r.handover.releasedAt) || new Date().toISOString() });
                                     }}>
-                              {rackTakeBusy === h.id ? "⏳ Please wait…" : "📥 Take from Rack"}
+                              <LeadLabel text={rackTakeBusy === h.id ? "⏳ Please wait…" : "📥 Take from Rack"} />
                             </button>
                           ) : (
-                            <div className="text-[13px] font-bold" style={{ color: "#4338ca" }}>Waiting for your head to take it</div>
+                            <div className="wu-note wu-note-rack">Waiting for your head to take it</div>
                           )}
                           {m && m.holdActive && holdBtn(m)}
                         </Card>
@@ -20664,20 +20773,21 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                       const late = isHoldOverdue(h.sentAt, h.acceptTimeoutMinutes, nowTick);
                       const waited = h.sentAt ? formatDuration(Math.max(0, Math.floor((nowTick - Date.parse(h.sentAt)) / 60000))) : "";
                       return (
-                        <Card key={h.id} tone={late ? "rgba(239,68,68,0.5)" : "rgba(217,119,6,0.45)"}>
+                        <Card key={h.id} tone={late ? "bad" : "wait"}>
                           {withPhoto(m, h, <div>
-                            <div className="text-[17px] font-black" style={{ color: "var(--text-strong)" }}>{titleOf(m, h)}</div>
-                            <div className="text-[13px] mt-0.5" style={{ color: "var(--text-dim)" }}>
-                              {m?.bomLabel ? `${m.bomLabel} · ` : ""}from {h.fromDepartment} → {h.toDepartment}{waited ? ` · waiting ${waited}` : ""}
+                            <div className="wu-title">{titleOf(m, h)}</div>
+                            <div className="wu-meta">
+                              {m?.bomLabel ? `${m.bomLabel} · ` : ""}from {h.fromDepartment}{waited ? ` · waiting ${waited}` : ""}
                             </div>
-                            {late && <div className="text-[13px] font-black mt-1" style={{ color: "#dc2626" }}><LeadIcon e="🚦" />ON HOLD — accept deadline passed</div>}
+                            {stageLine(h.toDepartment)}
+                            {late && <div className="wu-note wu-note-bad"><LeadIcon e="🚦" />ON HOLD — accept deadline passed</div>}
                             {holdBadge(m)}
                             {voiceBadge(m) && <div className="mt-2">{voiceBadge(m)}</div>}
                           </div>)}
                           {canAccept && m && m.holdActive && heldNote(m, "accept it")}
                           {m && m.holdActive && holdBtn(m)}
                           {canAccept && !(m && m.holdActive) && (
-                            <button data-needs-net type="button" data-staff-accept={h.id} className={btn} style={{ background: "#15803d", color: "#fff" }}
+                            <button data-needs-net type="button" data-staff-accept={h.id} className={`${btn} wu-ok wu-main`}
                                     disabled={!!acceptModal} onClick={() => { if (!acceptModal) openAcceptModal(h); }}>
                               ✓ Accept into {h.toDepartment}
                             </button>
@@ -20703,53 +20813,48 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                       return (
                         <Card key={m.id}>
                           {withPhoto(m, null, <div>
-                            <div className="text-[17px] font-black" style={{ color: "var(--text-strong)" }}>{titleOf(m)}</div>
-                            <div className="text-[13px] mt-0.5" style={{ color: "var(--text-dim)" }}>{m.bomLabel || ""}{m.bomLabel ? " · " : ""}in {dept}</div>
+                            <div className="wu-title">{titleOf(m)}</div>
+                            <div className="wu-meta">{m.bomLabel || ""}{m.bomLabel ? " · " : ""}in {dept}</div>
+                            {stageLine(dept)}
                             <div className="flex items-center gap-2 flex-wrap mt-2">
                               {t && (
-                                <span className="text-[13px] font-bold px-2.5 py-1 rounded-full" data-staff-timer={m.id} data-timer-level={level}
-                                      title={`⏱ ${formatDuration(t.actualMinutes)}${target ? ` / ${formatDuration(target)}` : ""}`}
-                                      style={t.isOverrun ? { background: "rgba(239,68,68,0.1)", color: "#b91c1c", border: "1px solid rgba(239,68,68,0.35)" }
-                                           : level === 80 ? { background: "rgba(217,119,6,0.12)", color: "#b45309", border: "1px solid rgba(217,119,6,0.45)" }
-                                           : { background: "rgba(21,128,61,0.08)", color: "#15803d", border: "1px solid rgba(21,128,61,0.3)" }}>
-                                  {t.isOverrun ? `⏰ Late by ${formatDuration(t.overrunMinutes)}`
+                                <span className={`wu-timer ${t.isOverrun ? "is-bad" : level === 80 ? "is-wait" : "is-ok"}`} data-staff-timer={m.id} data-timer-level={level}
+                                      title={`⏱ ${formatDuration(t.actualMinutes)}${target ? ` / ${formatDuration(target)}` : ""}`}>
+                                  <LeadLabel text={t.isOverrun ? `⏰ Late by ${formatDuration(t.overrunMinutes)}`
                                     : level === 80 ? `⏳ ${formatDuration(leftMinutes)} left`
-                                    : `⏱ ${formatDuration(t.actualMinutes)}${target ? ` / ${formatDuration(target)}` : ""}`}
+                                    : `⏱ ${formatDuration(t.actualMinutes)}${target ? ` / ${formatDuration(target)}` : ""}`} />
                                 </span>
                               )}
                               {jobs.length > 0 && (
-                                <button type="button" data-staff-jobs={m.id} onClick={() => setJobsDrawer(m.id)}
-                                        className="min-h-[44px] text-[14px] font-black px-3 rounded-xl"
-                                        style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.35)", color: "#b91c1c" }}>
-                                  ⚠ {jobs.length} open job{jobs.length === 1 ? "" : "s"}
+                                <button type="button" data-staff-jobs={m.id} onClick={() => setJobsDrawer(m.id)} className="wu-chip wu-chip-bad">
+                                  <LeadIcon e="⚠" />{jobs.length} open job{jobs.length === 1 ? "" : "s"}
                                 </button>
                               )}
                               {voiceBadge(m)}
                             </div>
                             {holdBadge(m)}
                           </div>)}
-                          <div className="flex flex-col sm:flex-row gap-2 sm:flex-wrap">
+                          <div className="wu-actions">
                             {during && (
-                              <button type="button" data-staff-during={m.id} className={btn} style={{ background: "#2640B0", color: "#fff" }} onClick={() => openDuringWorkModal(m)}>
-                                📋 During-Work Checks
+                              <button type="button" data-staff-during={m.id} className={`${btn} wu-soft`} onClick={() => openDuringWorkModal(m)}>
+                                <LeadIcon e="📋" />During-Work Checks
                               </button>
                             )}
                             {canReport && (
-                              <button type="button" data-staff-issue={m.id} className={btn}
-                                      style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.4)", color: "#dc2626" }}
+                              <button type="button" data-staff-issue={m.id} className={`${btn} wu-soft-bad`}
                                       onClick={() => { setRaiseModal({ machine: m }); setRaiseText(""); setRaiseDept(""); setRaiseErr(""); setRaisePart(emptyPendingJob()); }}>
                                 Report Issue
                               </button>
                             )}
                             {m.trialCertificate && canFinish && onUpdateTrialCertificate && (
-                              <button type="button" className={btn} style={{ background: "rgba(217,119,6,0.10)", border: "1px solid rgba(217,119,6,0.4)", color: "#b45309" }}
+                              <button type="button" className={`${btn} wu-soft`}
                                       onClick={() => setTrialCertModal({ machine: m, editOnly: true })}>
-                                ✎ Certificate
+                                <LeadIcon e="✎" />Certificate
                               </button>
                             )}
                             {next && canFinish && m.holdActive && heldNote(m, "finish it")}
                             {next && canFinish && !m.holdActive && (
-                              <button data-needs-net type="button" data-staff-finish={m.id} className={btn} style={{ background: "#15803d", color: "#fff" }} onClick={() => openFinishModal(m)}>
+                              <button data-needs-net type="button" data-staff-finish={m.id} className={`${btn} wu-ok wu-main`} onClick={() => openFinishModal(m)}>
                                 ✓ Finish → {next}
                               </button>
                             )}
@@ -20770,8 +20875,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                       // 2026-11-03 — Sender Undo: the button shows itself only for the
                       // sender, within 5 min, while not yet accepted (senderUndoState).
                       return (
-                      <div key={m.id} data-sent-on={m.id} className="text-[14px] px-3 py-2 rounded-xl flex flex-col sm:flex-row sm:items-center gap-2"
-                           style={{ background: "rgba(17,24,39,0.03)", color: "var(--text-strong)" }}>
+                      <div key={m.id} data-sent-on={m.id} className="wu-sent">
                         <div className="flex-1 min-w-0">
                           <span className="font-black">{titleOf(m, h)}</span> <span style={{ color: "var(--text-dim)" }}>→ {h.toDepartment} · awaiting accept</span>
                         </div>
@@ -20793,10 +20897,10 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                       const m = (machineLog || []).find((x) => String(x.id) === String(p.machineId)) || null;
                       const stage = pendingItemStage(p);
                       return (
-                        <div key={p.id} className="mt-card no-lift p-3.5 flex flex-col gap-2.5" data-staff-job={p.id}>
+                        <div key={p.id} className="mt-card no-lift wu-card wu-job" data-staff-job={p.id}>
                           <div>
-                            <div className="text-[14px] font-black" style={{ color: "var(--text-strong)" }}>{p.description}</div>
-                            <div className="text-[13px] mt-0.5" style={{ color: "var(--text-dim)" }}>
+                            <div className="wu-title wu-title-sm">{p.description}</div>
+                            <div className="wu-meta">
                               {m ? `${m.bomKey}${m.serialNo ? ` · S/N ${m.serialNo}` : ""}` : "Machine"}
                               {(p.itemCode || p.itemName) ? ` · part ${p.itemCode || p.itemName}${p.qty != null ? ` × ${p.qty}` : ""}` : ""}
                               {p.critical ? " · CRITICAL" : ""}
@@ -20805,15 +20909,15 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                             </div>
                           </div>
                           {canJobs && (
-                            <div className="flex flex-col sm:flex-row gap-2">
+                            <div className="wu-actions">
                               {onReceivePendingItem && pendingItemIsPart(p) && canReceiveJob(p) && !p.receivedAt && (
-                                <button data-needs-net type="button" className={btn} style={{ background: "rgba(37,99,235,0.08)", border: "1px solid rgba(37,99,235,0.4)", color: "#1d4ed8" }}
+                                <button data-needs-net type="button" className={`${btn} wu-soft`}
                                         onClick={() => setJobAction({ item: p, action: "receive", notes: "", busy: false, error: "" })}>
-                                  📦 Part received
+                                  <LeadLabel text="📦 Part received" />
                                 </button>
                               )}
                               {onResolvePendingItem && !pendingItemIsPart(p) && (
-                                <button data-needs-net type="button" className={btn} style={{ background: "#15803d", color: "#fff" }}
+                                <button data-needs-net type="button" className={`${btn} wu-ok`}
                                         onClick={() => setJobAction({ item: p, action: "complete", notes: "", busy: false, error: "" })}>
                                   ✓ Work completed
                                 </button>
@@ -20887,7 +20991,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
               {overdueHandovers.length > 0 && (
                 <span className="text-[11px] font-black px-3 py-1 rounded-full"
                       style={{ background: "rgba(239,68,68,0.2)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.5)" }}>
-                  🚦 {overdueHandovers.length} ON HOLD
+                  <LeadIcon e="🚦" />{overdueHandovers.length} ON HOLD
                 </span>
               )}
             </div>
@@ -21334,8 +21438,9 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
         {/* ── Production Rack View ──
             Machines waiting on the rack to be started. Starting a build is the
             first working department's job, so a floor login elsewhere in the
-            line has no use for this and it is hidden from them. */}
-        {(staffMode ? isProdHead : mtTab === "production") && (
+            line has no use for this and it is hidden from them. Staff see it
+            as Production Head or as the Assembly floor login (2026-11-04). */}
+        {(staffMode ? (isProdHead || isAssemblyFloor) : mtTab === "production") && (
         <div>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2.5">
@@ -21462,7 +21567,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                         width, not measured progress. What is
                                         measured is the time on the bench. */}
                                     <div className="text-[9.5px] font-bold" style={{ color: st.fg }}>
-                                      ⏱ {inAssemblyFor || "just started"} on the bench
+                                      <LeadIcon e="⏱" />{inAssemblyFor || "just started"} on the bench
                                     </div>
                                   </div>
                                 )}
@@ -21573,8 +21678,8 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
               } });
             };
             const assembleLabel = sl.status === "assembling" ? "Mark Assembled" : "Assemble";
-            const assembleOk = (sl.status === "set" && pend.length === 0 && crate.state !== "pending" && canDo("machines", "updateStage")) || (sl.status === "assembling" && !!m && !m.pendingHandoverId && canFinishTransfer(canDo));
-            const assembleWhy = sl.status === "set" ? (pend.length ? "Waiting for material" : crate.state === "pending" ? `Fill the ${rKey} crate first` : !canDo("machines", "updateStage") ? "Needs Machines → Update Stage permission" : "") : sl.status === "assembling" ? (!canFinishTransfer(canDo) ? "Needs Machines → Finish & Transfer permission" : "A transfer is already in progress") : sl.status === "assembled" ? "Already assembled" : "Fill the rack first";
+            const assembleOk = (sl.status === "set" && pend.length === 0 && crate.state !== "pending" && canStartAsm) || (sl.status === "assembling" && !!m && !m.pendingHandoverId && canFinishTransfer(canDo));
+            const assembleWhy = sl.status === "set" ? (pend.length ? "Waiting for material" : crate.state === "pending" ? `Fill the ${rKey} crate first` : !canStartAsm ? "Only the Assembly department can start assembly" : "") : sl.status === "assembling" ? (!canFinishTransfer(canDo) ? "Needs Machines → Finish & Transfer permission" : "A transfer is already in progress") : sl.status === "assembled" ? "Already assembled" : "Fill the rack first";
             // 2026-10-31 — no separate Production Manager login yet: an Admin
             // sends the assembled machine to Mechanical from the rack.
             const canSendFromRack = canDo("machines", "release") || isAdminUser;
@@ -21609,7 +21714,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                     </div>
                     {notIssued.length > 0 && (
                       <div data-not-issued-list className="mx-4 sm:mx-5 mt-3 rounded-lg px-3 py-2.5" style={{ background: "rgba(217,119,6,0.07)", border: "1px solid rgba(217,119,6,0.3)" }}>
-                        <div className="text-[12px] font-black mb-1.5" style={{ color: "#b45309" }}>⏳ {notIssued.length} part{notIssued.length === 1 ? "" : "s"} not issued — pending for {m.serialNo || m.bomKey}</div>
+                        <div className="text-[12px] font-black mb-1.5" style={{ color: "#b45309" }}><LeadIcon e="⏳" />{notIssued.length} part{notIssued.length === 1 ? "" : "s"} not issued — pending for {m.serialNo || m.bomKey}</div>
                         <ul className="space-y-1">
                           {notIssued.map((p2) => (
                             <li key={p2.id} data-pending-item={p2.itemCode || p2.id} className="text-[11.5px] leading-snug flex items-start justify-between gap-2 flex-wrap">
@@ -21770,7 +21875,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                               onClick={() => { setRackPanel(null); setRemoveRackConfirm({ machineId: m.id, serialNo: m.serialNo, bomKey: m.bomKey }); }}
                               className="w-full rounded-lg px-3 py-2 text-[11.5px] font-bold"
                               style={{ color: "#b91c1c", border: "1px solid rgba(185,28,28,0.3)", background: "rgba(185,28,28,0.04)" }}>
-                        🗑 Remove From Rack — return both crates' stock
+                        <LeadIcon e="🗑" />Remove From Rack — return both crates' stock
                       </button>
                     )}
                   </div>
@@ -21783,7 +21888,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
               loud rather than silently dropped from view. */}
           {physicalFamilies.filter((f) => f.overflow > 0).map((f) => (
             <div key={f.id} className="mt-2 text-[10.5px] font-semibold" style={{ color: "#b45309" }}>
-              ⚠ {f.overflow} more {f.label} machine{f.overflow === 1 ? "" : "s"} than the M-{f.label} / R-{f.label} racks hold: {f.overflowMachines.map((m) => m.serialNo || m.bomKey).join(", ")} — use Fill on an empty slot to place one.
+              <LeadIcon e="⚠" />{f.overflow} more {f.label} machine{f.overflow === 1 ? "" : "s"} than the M-{f.label} / R-{f.label} racks hold: {f.overflowMachines.map((m) => m.serialNo || m.bomKey).join(", ")} — use Fill on an empty slot to place one.
             </div>
           ))}
 
@@ -21834,7 +21939,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                           <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full"
                                 title={`${rackShortCount} machine(s) on this rack are still waiting for components`}
                                 style={{ background: "rgba(217,119,6,0.16)", color: "#b45309", border: "1px solid rgba(217,119,6,0.35)" }}>
-                            ⚠ {rackShortCount} incomplete
+                            <LeadIcon e="⚠" />{rackShortCount} incomplete
                           </span>
                         )}
                         <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
@@ -21997,7 +22102,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                             <span className="text-[9px] font-bold px-2 py-0.5 rounded-full"
                                   title={arrivedItems.map((a) => `${a.itemName || a.itemCode}${a.qty ? ` ×${a.qty}` : ""}`).join(", ")}
                                   style={{ background: "rgba(21,128,61,0.10)", color: "#15803d", border: "1px solid rgba(21,128,61,0.35)" }}>
-                              📦 Material arrived ({arrivedItems.length})
+                              <LeadIcon e="📦" />Material arrived ({arrivedItems.length})
                             </span>
                           )}
                         </div>
@@ -22019,7 +22124,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                             <div className="flex items-center gap-1.5 flex-wrap mt-1 text-[10px]">
                               <span className="font-bold px-2 py-0.5 rounded-full" title={`Working time in ${dept} · target ${formatDuration(target)}${due && !t.isOverrun ? ` · due ${dueTxt}` : ""}`}
                                     style={t.isOverrun ? { background: "rgba(239,68,68,0.1)", color: "#b91c1c", border: "1px solid rgba(239,68,68,0.35)" } : { background: "rgba(21,128,61,0.08)", color: "#15803d", border: "1px solid rgba(21,128,61,0.3)" }}>
-                                ⏱ {formatDuration(t.actualMinutes)} / {formatDuration(target)}
+                                <LeadIcon e="⏱" />{formatDuration(t.actualMinutes)} / {formatDuration(target)}
                                 {t.isOverrun ? ` · DELAYED ${formatDuration(t.overrunMinutes)}` : ""}
                               </span>
                               {/* 2026-11-03 — said once, next to the Today line; kept here (hidden) as the per-card hook. */}
@@ -22132,7 +22237,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                 className="text-[11px] font-black text-white px-3 py-1.5 rounded-lg transition-all"
                                 style={{ background: "#2640B0", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}
                                 title="During-Work Checks">
-                          📋 During-Work Checks
+                          <LeadIcon e="📋" />During-Work Checks
                         </button>
                       )}
                       {/* Phase 1 — report a fault to the department responsible.
@@ -22170,18 +22275,16 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                         machine.holdActive ? (
                           <button data-needs-net type="button" data-card-release-hold={machine.id}
                                   onClick={() => setHoldModal({ machine, release: true, reason: "", busy: false, error: "" })}
-                                  className="text-[11px] font-black px-3 py-1.5 rounded-lg border transition-all"
-                                  style={{ background: "rgba(21,128,61,0.10)", border: "1px solid rgba(21,128,61,0.4)", color: "#15803d" }}
+                                  className="wu-cardbtn wu-cardbtn-ok"
                                   title="Release this machine from ON HOLD">
-                            ▶ Release ON HOLD
+                            <LeadIcon e="▶" />Release ON HOLD
                           </button>
                         ) : (
                           <button data-needs-net type="button" data-card-hold={machine.id}
                                   onClick={() => setHoldModal({ machine, release: false, reason: "", busy: false, error: "" })}
-                                  className="text-[11px] font-black px-3 py-1.5 rounded-lg border transition-all"
-                                  style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.4)", color: "#b91c1c" }}
+                                  className="wu-cardbtn wu-cardbtn-bad"
                                   title="Put this machine ON HOLD (a reason is required)">
-                            ⏸ ON HOLD
+                            <LeadIcon e="⏸" />ON HOLD
                           </button>
                         )
                       )}
@@ -22190,8 +22293,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
       {currentUser?.role === "super_admin" && onDeleteMachine && machine.stage !== "BOM Issued" && (
         <button type="button" data-card-delete={machine.id}
                 onClick={() => setDeleteModal({ machine, reason: "", busy: false, error: "" })}
-                className="text-[11px] font-black px-3 py-1.5 rounded-lg border transition-all"
-                style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.4)", color: "#b91c1c" }}
+                className="wu-cardbtn wu-cardbtn-bad"
                 title="Delete this machine (Super Admin only)">
           <Trash2 size={13} className="inline -mt-0.5 mr-1" aria-hidden="true" />Delete
         </button>
@@ -22245,12 +22347,12 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                             {machineOverdue ? (
                               <span className="text-[10px] font-black px-2 py-1 rounded-lg"
                                     style={{ background: "rgba(239,68,68,0.15)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.45)" }}>
-                                🚦 ON HOLD
+                                <LeadIcon e="🚦" />ON HOLD
                               </span>
                             ) : (
                               <span className="text-[10px] font-black px-2 py-1 rounded-lg"
                                     style={{ background: "rgba(217, 119, 6,0.12)", color: "#B45309", border: "1px solid rgba(217, 119, 6,0.35)" }}>
-                                ⏳ Awaiting accept{h ? ` · ${h.toDepartment}` : ""}
+                                <LeadIcon e="⏳" />Awaiting accept{h ? ` · ${h.toDepartment}` : ""}
                               </span>
                             )}
                             {cardCanAccept && (
@@ -22299,7 +22401,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                 className="text-[10px] font-bold px-2 py-1.5 rounded-lg border transition-all"
                                 style={{ background: "rgba(217,119,6,0.10)", border: "1px solid rgba(217,119,6,0.35)", color: "#b45309" }}
                                 title="Complete or correct the Trial Certificate">
-                          ✎ Certificate
+                          <LeadIcon e="✎" />Certificate
                         </button>
                       )}
                       {isComplete && machine.trialCertificate && (
@@ -22307,7 +22409,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                 className="text-[10px] font-bold text-slate-900 px-2 py-1.5 rounded-lg border transition-all"
                                 style={{ background: "rgba(6,182,212,0.12)", border: "1px solid rgba(6,182,212,0.35)", color: "#0e7490" }}
                                 title="View Trial Certificate">
-                          📋 Certificate
+                          <LeadIcon e="📋" />Certificate
                         </button>
                       )}
                       {isComplete && isAdminUser && (
@@ -22611,7 +22713,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                           <button data-needs-net onClick={() => setJobAction({ item: p, action: "receive", notes: "", busy: false, error: "" })}
                                                   className="text-[10px] font-bold px-2 py-0.5 rounded border"
                                                   style={{ color: "#1d4ed8", borderColor: "rgba(37,99,235,0.4)", background: "rgba(37,99,235,0.08)" }}>
-                                            📦 Part received
+                                            <LeadLabel text="📦 Part received" />
                                           </button>
                                         )}
                                         {canFinishTransfer(canDo) && onResolvePendingItem && !pendingItemIsPart(p) && (
@@ -22967,7 +23069,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
               {holdModal.release ? (
                 <p className="text-[11px] text-slate-600 mb-3">On hold since {m.holdAt ? new Date(m.holdAt).toLocaleString() : "—"}: {m.holdReason || "no reason recorded"}. Releasing lets the machine be finished, transferred and accepted again.</p>
               ) : (
-                <p className="text-[11px] text-slate-600 mb-3">While on hold the machine cannot be transferred or accepted. Pending jobs, receiving and the checklist keep working. The hold, who set it and the reason stay in the history.</p>
+                <p className="text-[13px] text-slate-600 mb-3">Machine stops here until released.</p>
               )}
               <label className="block text-[11px] font-bold text-slate-600 mb-1">{holdModal.release ? "Note (optional)" : <>Reason <span className="text-red-500">*</span></>}</label>
               <textarea data-hold-reason rows={2} value={holdModal.reason} disabled={holdModal.busy} autoFocus
@@ -22979,7 +23081,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
               <div className="flex gap-2 mt-4">
                 <button type="button" onClick={() => setHoldModal(null)} disabled={holdModal.busy} className="flex-1 h-11 rounded-lg text-[13px] font-bold text-slate-600 border transition-all disabled:opacity-40" style={{ borderColor: "rgba(17,24,39,0.12)" }}>Cancel</button>
                 <button data-needs-net type="button" data-hold-confirm onClick={submit} disabled={holdModal.busy} className="flex-[2] min-h-[48px] rounded-xl text-[14px] font-black text-white transition-all disabled:opacity-50" style={{ background: holdModal.release ? "#15803d" : "#dc2626", color: "#ffffff" }}>
-                  {holdModal.busy ? "Saving…" : holdModal.release ? "▶ Release ON HOLD" : "⏸ Put ON HOLD"}
+                  <LeadLabel text={holdModal.busy ? "Saving…" : holdModal.release ? "▶ Release ON HOLD" : "⏸ Put ON HOLD"} />
                 </button>
               </div>
             </div>
@@ -23108,7 +23210,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
             <div role="dialog" aria-label={`Pending jobs for ${m?.serialNo || m?.bomKey || "machine"}`} data-jobs-drawer className="rack-panel h-full w-full max-w-[640px] flex flex-col" style={{ background: "var(--surface-card)", boxShadow: "-20px 0 60px rgba(17,24,39,0.25)" }}>
               <div className="px-4 sm:px-5 py-4 flex items-center justify-between gap-3" style={{ background: "#b91c1c", color: "#fff" }}>
                 <div>
-                  <div className="text-[17px] font-black">⏳ Pending Jobs · {m?.bomKey || "Machine"}{m?.serialNo ? ` · S/N ${m.serialNo}` : ""}</div>
+                  <div className="text-[17px] font-black"><LeadIcon e="⏳" />Pending Jobs · {m?.bomKey || "Machine"}{m?.serialNo ? ` · S/N ${m.serialNo}` : ""}</div>
                   <div className="text-[11px] opacity-90">{openPartsN} part{openPartsN === 1 ? "" : "s"} · {open.length - openPartsN} work pending · {done.length} completed · now in {m?.status === "completed" ? "Ready" : (m?.currentDepartment || m?.stage || "—")}</div>
                 </div>
                 <button type="button" aria-label="Close" onClick={() => setJobsDrawer(null)} className="w-9 h-9 rounded-lg text-[18px] font-black" style={{ background: "rgba(255,255,255,0.18)", color: "#fff" }}>✕</button>
@@ -23409,7 +23511,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
               )}
               <input value={raisePart.itemCode} disabled={raiseBusy} list={inventoryFlat.length ? "raise-part-codes" : undefined}
                      onChange={(e) => { const code = e.target.value; const hit = inventoryFlat.find((it) => it.code.toLowerCase() === code.trim().toLowerCase()); setRaisePart((p) => ({ ...p, itemCode: code, itemName: hit ? hit.name : p.itemName })); }}
-                     placeholder="Part / item code" className="min-w-0 w-full rounded-lg px-2.5 py-2 text-[12px] text-slate-800 outline-none font-mono"
+                     placeholder="Part / item code" className="min-w-0 w-full rounded-lg px-2.5 py-2 text-[12px] text-slate-800 outline-none"
                      style={{ background: "var(--surface-elevated)", border: "1px solid rgba(17,24,39,0.12)" }} />
               <input type="number" min="0" step="any" value={raisePart.qty} disabled={raiseBusy}
                      onChange={(e) => setRaisePart((p) => ({ ...p, qty: e.target.value }))}
@@ -23435,7 +23537,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
             </select>
 
             <p className="text-[11px] text-slate-500 mt-3">
-              The machine stays in {here}. The issue is tracked until it is fixed — it never blocks Finish &amp; Transfer.
+              Tracked until fixed — it never blocks Finish &amp; Transfer.
             </p>
 
             {raiseErr && (
@@ -23451,9 +23553,9 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                       style={{ borderColor: "rgba(17,24,39,0.12)" }}>
                 Cancel
               </button>
-              <button type="button" onClick={submit} disabled={raiseBusy}
+              <button type="button" onClick={submit} disabled={raiseBusy} data-raise-send
                       className="flex-[2] min-h-[48px] rounded-xl text-[14px] font-black text-slate-900 transition-all disabled:opacity-50"
-                      style={{ background: "#dc2626", color: "#ffffff" }}>
+                      style={{ background: "#2E50D6", color: "#ffffff" }}>
                 {raiseBusy ? "Sending…" : (raiseDept ? `Call ${raiseDept}` : "Send")}
               </button>
             </div>
@@ -23490,7 +23592,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                 </div>
                 {famBoms.filter((b) => !b.valid).map((b) => (
                   <div key={b.key} className="text-[10px] mt-0.5 font-semibold" style={{ color: "#b45309" }}>
-                    ⚠ {b.key} also maps to these racks but {b.components === 0 ? "has no components" : `${b.missing} of ${b.components} components are not in the Item Master`} — do not use it for rack builds.
+                    <LeadIcon e="⚠" />{b.key} also maps to these racks but {b.components === 0 ? "has no components" : `${b.missing} of ${b.components} components are not in the Item Master`} — do not use it for rack builds.
                   </div>
                 ))}
               </div>
@@ -23539,7 +23641,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                         className="text-[10px] font-bold px-2.5 py-1.5 rounded-md" style={{ background: "var(--surface-card)", color: f.color, border: `1px solid ${f.color}55` }}>Reserve slot & open BOM →</button>
               </div>
             )}
-            {fillErr && <div className="text-[11px] font-semibold" style={{ color: "#b91c1c" }}>⚠ {fillErr}</div>}
+            {fillErr && <div className="text-[11px] font-semibold" style={{ color: "#b91c1c" }}><LeadIcon e="⚠" />{fillErr}</div>}
           </div>
         </div>
         );
@@ -23592,7 +23694,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                         {stillPending.length > 0 && (
                           <span className="text-[9px] font-black px-1.5 py-0.5 rounded flex-shrink-0"
                                 style={{ background: "rgba(217,119,6,0.14)", color: "#b45309", border: "1px solid rgba(217,119,6,0.3)" }}>
-                            ⚠ {stillPending.length} pending
+                            <LeadIcon e="⚠" />{stillPending.length} pending
                           </span>
                         )}
                         <span className="text-[9px] text-slate-500 flex-shrink-0">Issued {m.createdDate}</span>
@@ -23703,7 +23805,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                         }}
                       className="inline-flex items-center gap-1.5 text-[11px] font-bold rounded-lg px-4 py-1.5 text-white border transition-all"
                       style={{ background: "#b91c1c", borderColor: "rgba(239,68,68,0.5)", color: "#ffffff" }}>
-                🗑 Remove
+                <LeadIcon e="🗑" />Remove
               </button>
             </div>
           </div>
@@ -23734,6 +23836,21 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
               <div className="px-6 py-5 border-b border-slate-100 flex-shrink-0 bg-white">
                 <div className="text-sm font-black text-slate-900">{rackReturn ? "Finish Assembly · Return to Rack" : "Finish & Transfer"}</div>
                 <div className="text-[11px] text-slate-500 mt-0.5">{machine.bomKey}{machine.serialNo ? ` · S/N ${machine.serialNo}` : ""}{rackReturn ? ` · back to ${slotLabel(machine.rackSlot)}` : ""}</div>
+                {(() => {
+                  // World UI: required steps done so far (display only).
+                  const steps = [
+                    ...(isOverrun ? [!!narration.trim()] : []),
+                    ...(finishModal.template && Array.isArray(finishModal.answers) && finishModal.answers.length ? [validateChecklistAnswers(finishModal.answers).ok] : []),
+                    !pendingItemsProblem(finishModal.owedItems),
+                  ];
+                  const done = steps.filter(Boolean).length;
+                  return (
+                    <div className="wu-progress" data-wu-progress aria-label={`${done} of ${steps.length} steps done`}>
+                      <div className="wu-progress-track"><i style={{ transform: `scaleX(${done / steps.length})` }} /></div>
+                      <span>{done} of {steps.length} done</span>
+                    </div>
+                  );
+                })()}
               </div>
               <div className="p-5 space-y-4 flex-1 overflow-y-auto">
                 <div className="grid grid-cols-2 gap-3">
@@ -23762,9 +23879,9 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                 </div>
                 {isOverrun && (
                   <div data-transfer-delay className="rounded-xl">
-                    <label className="text-[11px] font-bold text-red-600 block mb-1.5">
+                    <label className="text-[13px] font-bold text-slate-700 block mb-1.5">
                       Delay reason (required)
-                      <span className="text-red-500 ml-0.5">*</span>
+                      <span className="text-slate-500 ml-0.5">*</span>
                     </label>
                     {(() => {
                       const delayBox = (
@@ -23831,7 +23948,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                   Cancel
                 </button>
                 <span onClick={() => { if ((!transferBusy && isOverrun && !narration.trim())) flagField("[data-transfer-delay]"); }}>
-                <button data-needs-net onClick={submitFinishTransfer} disabled={transferBusy || (isOverrun && !narration.trim())}
+                <button data-needs-net onClick={submitFinishTransfer} data-finish-confirm disabled={transferBusy || (isOverrun && !narration.trim())}
                         className="text-[12px] font-bold text-slate-900 bg-amber-600 hover:bg-amber-700 px-5 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed" style={{ color: "#fff", pointerEvents: (!transferBusy && isOverrun && !narration.trim()) ? "none" : undefined }}>
                   {transferBusy ? "⏳ Please wait…" : rackReturn ? `✓ Assembled · Return to ${slotLabel(machine.rackSlot)}` : `Finish & Transfer → ${toDepartment}`}
                 </button>
@@ -23902,12 +24019,26 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                style={{ background: "rgba(17,24,39,0.45)", backdropFilter: "blur(10px)" }}
                onClick={(e) => e.target === e.currentTarget && !busy && setAcceptModal(null)}>
             <div className="relative w-full max-w-md rounded-2xl overflow-hidden flex flex-col"
-                 style={{ background: "var(--surface-elevated)", border: "1px solid rgba(34,197,94,0.4)", boxShadow: "0 40px 80px rgba(17,24,39,0.22)", maxHeight: "90vh" }}>
+                 style={{ background: "var(--surface-elevated)", border: "1px solid rgba(14,23,38,0.10)", boxShadow: "0 40px 80px rgba(17,24,39,0.22)", maxHeight: "90vh" }}>
               <ModalX onClose={() => setAcceptModal(null)} disabled={!!busy} />
-              <div className="px-6 py-5 border-b border-slate-200 flex-shrink-0"
-                   style={{ background: "linear-gradient(90deg,rgba(34,197,94,0.10),rgba(22,163,74,0.05))" }}>
+              <div className="px-6 py-5 border-b border-slate-200 flex-shrink-0 bg-white" data-sheet-head>
                 <div className="text-sm font-black text-slate-900">Accept into {handover.toDepartment}</div>
                 <div className="text-[11px] text-slate-400 mt-0.5">{handover.bomKey}{handover.serialNo ? ` · S/N ${handover.serialNo}` : ""}</div>
+                {(() => {
+                  // World UI: how far along the required steps are (display only).
+                  const steps = [
+                    ...(acceptDeptEmps.length > 0 ? [selectedTeam.filter(Boolean).length > 0] : []),
+                    !!sigSvg,
+                    ...(hasChecklist ? [validateChecklistAnswers(acceptModal.checklistAnswers || []).ok] : []),
+                  ];
+                  const done = steps.filter(Boolean).length;
+                  return (
+                    <div className="wu-progress" data-wu-progress aria-label={`${done} of ${steps.length} steps done`}>
+                      <div className="wu-progress-track"><i style={{ transform: `scaleX(${steps.length ? done / steps.length : 1})` }} /></div>
+                      <span>{done} of {steps.length} done</span>
+                    </div>
+                  );
+                })()}
               </div>
               <div className="p-5 space-y-4 flex-1 overflow-y-auto">
                 {handover.overrunNarration && (
@@ -23919,7 +24050,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                 {isHoldOverdue(handover.sentAt, handover.acceptTimeoutMinutes, nowTick) && (
                   <div className="rounded-lg px-3 py-2.5" style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.35)" }}>
                     <div className="text-[10px] font-bold uppercase tracking-wide mb-1" style={{ color: "#b91c1c" }}>
-                      🚦 On hold · {formatDuration(heldMinutes(handover.sentAt, handover.acceptTimeoutMinutes, nowTick))} past the acceptance window
+                      <LeadIcon e="🚦" />On hold · {formatDuration(heldMinutes(handover.sentAt, handover.acceptTimeoutMinutes, nowTick))} past the acceptance window
                     </div>
                     <label className="text-[11px] font-bold text-slate-700 block mb-1">Reason for late acceptance <span className="text-red-500">*</span></label>
                     <div className="grid grid-cols-2 gap-2 mb-2" data-late-reasons>
@@ -23930,7 +24061,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                   onClick={() => setField({ holdPick: label, holdReason: label === "Other" ? "" : label, error: "" })}
                                   className={`rounded-xl text-[13px] font-bold flex items-center justify-center gap-1.5 px-2 transition-all ${on ? "accept-pop" : ""}`}
                                   style={{ minHeight: 48, background: on ? "#dc2626" : "#fff", color: on ? "#fff" : "#7f1d1d", border: `2px solid ${on ? "#dc2626" : "rgba(239,68,68,0.35)"}` }}>
-                            <span style={{ fontSize: 17 }}>{icon}</span>{label}
+                            <span style={{ fontSize: 17 }}><Glyph e={icon} size={17} /></span>{label}
                           </button>
                         );
                       })}
@@ -23961,14 +24092,13 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-[12px] text-slate-900 placeholder-slate-500 outline-none focus:border-green-500/60" />
                       </div>
                     ) : (
-                      <div className="rounded-lg px-3 py-2.5" style={{ background: "rgba(34,197,94,0.07)", border: "1px solid rgba(34,197,94,0.3)" }}>
-                        <div className="text-[11px] font-bold text-emerald-200">
-                          Accepting as <span className="text-slate-900">{currentUser?.fullName || currentUser?.username || "you"}</span>
-                        </div>
+                      <div className="wu-as" data-accept-as>
+                        <User size={16} aria-hidden="true" />
+                        <span>Accepting as <b>{currentUser?.fullName || currentUser?.username || "you"}</b></span>
                       </div>
                     )}
                     {acceptDeptEmps.length > 0 && (
-                      <div data-accept-people className="accept-step rounded-xl px-3 py-3" style={{ background: "rgba(99,102,241,0.05)", border: `2px solid ${selectedTeam.length ? "rgba(34,197,94,0.45)" : "rgba(99,102,241,0.3)"}` }}>
+                      <div data-accept-people className="accept-step rounded-xl px-3 py-3" style={{ background: "#fff", border: "1px solid rgba(14,23,38,0.12)" }}>
                         {stepHead(1, "Receiving employees", selectedTeam.length > 0)}
                         <label className="text-[12px] font-bold text-slate-700 block mb-1">Main person</label>
                         <select data-accept-main value={mainName} disabled={busy}
@@ -24001,7 +24131,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                       </div>
                     )}
                     {/* 2026-11-02 — mandatory Digital Signature for every acceptance */}
-                    <div data-accept-signature className="accept-step rounded-xl px-3 py-3" style={{ background: "rgba(17,24,39,0.02)", border: `1px solid ${sigSvg ? "rgba(34,197,94,0.4)" : "rgba(17,24,39,0.15)"}` }}>
+                    <div data-accept-signature className="accept-step rounded-xl px-3 py-3" style={{ background: "#fff", border: "1px solid rgba(14,23,38,0.12)" }}>
                       {stepHead(acceptDeptEmps.length > 0 ? 2 : 1, "Sign here (Digital signature)", !!sigSvg)}
                       {sigSvg ? (
                         <div>
@@ -24035,10 +24165,10 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                         follow the same "unchecked needs remark" rule as
                         Finish & Transfer. */}
                     {acceptModal.checklistTemplate && (acceptModal.checklistAnswers || []).length > 0 && (
-                      <div data-accept-checklist className="accept-step rounded-xl px-3 py-3" style={{ background: "rgba(46, 80, 214,0.05)", border: "1px solid rgba(46, 80, 214,0.3)" }}>
+                      <div data-accept-checklist className="accept-step rounded-xl px-3 py-3" style={{ background: "#fff", border: "1px solid rgba(14,23,38,0.12)" }}>
                         {stepHead(stepBase + 1, "Check before accepting", false)}
                         <div className="text-[12px] font-semibold text-slate-600 mb-1">
-                          📋 {acceptModal.checklistTemplate.name || "After Acceptance Checklist"}
+                          <LeadIcon e="📋" />{acceptModal.checklistTemplate.name || "After Acceptance Checklist"}
                         </div>
                         <ChecklistBulkBar
                           answers={acceptModal.checklistAnswers}
@@ -24055,7 +24185,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                     )}
 
                     {/* Phase B — raise new pending items at this transfer */}
-                    <div data-accept-pending className="accept-step rounded-xl px-3 py-3" style={{ background: "rgba(17,24,39,0.03)", border: "1px solid rgba(17,24,39,0.10)" }}>
+                    <div data-accept-pending className="accept-step rounded-xl px-3 py-3" style={{ background: "#fff", border: "1px solid rgba(14,23,38,0.12)" }}>
                       {stepHead(stepBase + 1 + (hasChecklist ? 1 : 0), `Anything still pending from ${handover.fromDepartment}?`, false)}
                       <PendingJobRows rows={acceptModal.pendingItemsToRaise || []} inventory={inventoryFlat} disabled={acceptModal.busy}
                                       accent="#dc2626" addLabel="+ Add Pending Item" mode="item" allowComment
@@ -24068,7 +24198,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                 {error && error !== acceptModal.errorField && (
                   <div className="rounded-lg px-3 py-2 text-[11px] font-semibold"
                        style={{ background: "rgba(239,68,68,0.08)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.3)" }}>
-                    ⚠ {error}
+                    <LeadIcon e="⚠" />{error}
                   </div>
                 )}
               </div>
@@ -24129,7 +24259,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                 {error && (
                   <div className="rounded-lg px-3 py-2 text-[11px] font-semibold"
                        style={{ background: "rgba(239,68,68,0.08)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.3)" }}>
-                    ⚠ {error}
+                    <LeadIcon e="⚠" />{error}
                   </div>
                 )}
               </div>
@@ -24186,7 +24316,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                 {error && (
                   <div data-start-chk-error className="rounded-lg px-3 py-2 text-[12px] font-semibold"
                        style={{ background: "rgba(239,68,68,0.08)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.3)" }}>
-                    ⚠ {error}
+                    <LeadIcon e="⚠" />{error}
                   </div>
                 )}
               </div>
@@ -24664,7 +24794,7 @@ function PendingPage({ pendingLog, onClearPending, onFulfillPending, onFulfillGr
                 {cf.err && (
                   <div className="text-[11px] font-bold px-3 py-2 rounded-md"
                        style={{ background: "rgba(239,68,68,0.08)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.3)" }}>
-                    ⚠ {cf.err}
+                    <LeadIcon e="⚠" />{cf.err}
                   </div>
                 )}
               </div>
@@ -24788,7 +24918,7 @@ function PendingPage({ pendingLog, onClearPending, onFulfillPending, onFulfillGr
                             {machine && (
                               <span className="text-[9px] font-bold px-2 py-0.5 rounded-full"
                                     style={{ background: stageColor + "18", color: stageColor, border: `1px solid ${stageColor}35` }}>
-                                🔧 {machine.stage}
+                                <LeadIcon e="🔧" />{machine.stage}
                               </span>
                             )}
                           </div>
@@ -24942,29 +25072,33 @@ function hrExportExcel(rows, cols, filename) {
 function hrExportPDF(title, rows, cols, company = {}) {
   const esc = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]);
   const cell = (v) => {
-    if (v == null || v === "") return "—";
+    if (v == null || v === "") return "";
     if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}(T[\d:.]+(Z|[+-]\d{2}:?\d{2})?)?$/.test(v.trim())) return esc(rptFmtDT(v.trim()));
     return esc(v);
   };
   const co = company || {};
   const name = co.name || RPT_LEGAL_NAME;
-  const contact = [co.gst ? `GSTIN ${co.gst}` : "", co.phone ? `Phone ${co.phone}` : "", co.email || "", co.website || ""].filter(Boolean).join("  ·  ");
+  const contact = rptContactLine(co);
+  const logo = co.logo || BRAND_LOGO_DATA_URI;
   const hdr  = cols.map((c) => `<th>${esc(c.label)}</th>`).join("");
   const body = rows.map((r) => `<tr>${cols.map((c) => `<td>${cell(r[c.key])}</td>`).join("")}</tr>`).join("");
   const generated = rptFmtDT(new Date());
   const w = window.open("", "_blank");
   if (!w) { alert("Pop-up blocked. Allow pop-ups for this site to print or save the report."); return; }
   w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/><title>${esc(title)} — ${esc(rptFmtD(new Date()))}</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"/>
     <style>
     *{box-sizing:border-box}
     body{font-family:Inter,'Segoe UI',Arial,sans-serif;font-size:10.5px;color:#111;margin:24px;font-variant-numeric:tabular-nums}
-    .lh{text-align:center;padding-bottom:10px;border-bottom:2.5px double #8a8a8a}
-    .lh img{display:block;margin:0 auto 6px;height:56px;width:auto;max-width:220px;object-fit:contain}
-    .lh .n{font-size:17px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
-    .lh .l{font-size:9.5px;color:#555;margin-top:2px}
-    .tb{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin:14px 0 10px}
-    h2{font-size:15px;font-weight:700;margin:0}
-    .meta{font-size:9.5px;color:#555;text-align:right}
+    .lh{text-align:center;padding-bottom:4mm;border-bottom:.5pt solid #cfd2d7;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .lh img{display:block;margin:0 auto 3mm;width:48mm;height:auto}
+    .lh .n{font-family:Inter,'Helvetica Neue',Arial,sans-serif;font-size:14.5pt;font-weight:600;letter-spacing:.17em;text-transform:uppercase;color:#15171c}
+    .lh .r{width:18mm;border-top:.9pt solid #b3141f;margin:2.2mm auto 2mm}
+    .lh .l{font-size:7.6pt;color:#5d6470;letter-spacing:.02em;margin-top:.6mm}
+    .tb{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin:5mm 0 4mm;padding-bottom:3mm;border-bottom:1pt solid #15171c}
+    h2{font-family:Inter,'Helvetica Neue',Arial,sans-serif;font-size:16pt;font-weight:600;margin:0}
+    .meta{font-size:8pt;color:#15171c;background:#f6f6f3;border:.5pt solid #e3e5e9;border-left:1.5pt solid #b3141f;padding:1.6mm 3mm}
+    tbody tr:nth-child(even) td{background:#f8f8f6}
     table{border-collapse:collapse;width:100%}
     thead{display:table-header-group}
     th{text-align:left;font-size:9px;font-weight:700;color:#333;text-transform:uppercase;letter-spacing:.04em;padding:6px 8px;border-top:1.2px solid #111;border-bottom:.75px solid #111}
@@ -24977,10 +25111,10 @@ function hrExportPDF(title, rows, cols, company = {}) {
       @bottom-right{content:"Page " counter(page) " of " counter(pages);font:8px Inter,Arial,sans-serif;color:#666}}
     @media print{.print-btn{display:none}body{margin:0}}</style></head><body>
     <button class="print-btn" onclick="window.print()">Print / Save as PDF</button>
-    <div class="lh">${co.logo ? `<img src="${esc(co.logo)}" alt=""/>` : ""}<div class="n">${esc(name)}</div>${co.address ? `<div class="l">${esc(co.address)}</div>` : ""}${contact ? `<div class="l">${esc(contact)}</div>` : ""}</div>
+    <div class="lh"><img src="${esc(logo)}" alt="SHANTAZ"/><div class="n">${esc(name)}</div><div class="r"></div>${co.address ? `<div class="l">${esc(co.address)}</div>` : ""}${contact ? `<div class="l">${esc(contact)}</div>` : ""}</div>
     <div class="tb"><h2>${esc(title)}</h2><div class="meta">${rows.length} record${rows.length === 1 ? "" : "s"}</div></div>
     <table><thead><tr>${hdr}</tr></thead><tbody>${body}</tbody></table>
-    <div class="foot">Generated from ERP records on ${esc(generated)}.</div>
+    <div class="foot">Generated from ERP records on ${esc(generated)}. This is a computer-generated document · Confidential, internal use only.</div>
   </body></html>`);
   w.document.close();
 }
@@ -24990,7 +25124,7 @@ const HRFilterBar = React.memo(function HRFilterBar({ search, setSearch, dateFro
   return (
     <div className="flex flex-wrap items-center gap-2 px-6 py-3" style={{ background: "rgba(17,24,39,0.03)", borderBottom: "1px solid rgba(17,24,39,0.04)" }}>
       <div className="relative">
-        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs">🔍</span>
+        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs"><Glyph e="🔍" size={13} /></span>
         <DebouncedSearchInput value={search} onChange={setSearch} placeholder="Global search…"
           className="bg-slate-50 border border-slate-200 rounded-lg pl-7 pr-3 py-1.5 text-xs text-slate-700 placeholder-slate-400 outline-none focus:border-blue-500/40 w-52" />
       </div>
@@ -25370,7 +25504,7 @@ function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, machine
           <button key={t.id} onClick={() => setTab(t.id)}
             className="flex items-center gap-1.5 px-3.5 py-2 text-[11px] font-semibold rounded-t-lg transition-all relative"
             style={tab===t.id ? { color:"#2E50D6", background:"rgba(46, 80, 214,0.07)", borderBottom:"2px solid #2E50D6" } : { color:"#475569" }}>
-            <span>{t.icon}</span>{t.label}
+            <span><Glyph e={t.icon} size={14} /></span>{t.label}
           </button>
         ))}
       </div>
@@ -25712,7 +25846,7 @@ function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, machine
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <div className="text-sm font-black text-slate-900">{v.vendor}</div>
-                          {vd.phone && <div className="text-[10px] text-slate-500 mt-0.5">📞 {vd.phone}</div>}
+                          {vd.phone && <div className="text-[10px] text-slate-500 mt-0.5"><LeadIcon e="📞" />{vd.phone}</div>}
                           {vd.email && <div className="text-[10px] text-slate-500">✉ {vd.email}</div>}
                           {vd.category && <div className="text-[10px] text-slate-600 mt-1">{vd.category}</div>}
                         </div>
@@ -25876,7 +26010,7 @@ function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, machine
               }}
                 className="px-4 py-2.5 rounded-xl text-xs font-bold text-white transition-all hover:scale-[1.02] active:scale-[0.98]"
                 style={{ background: "#2640B0", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
-                📥 Download Report
+                <LeadIcon e="📥" />Download Report
               </button>
             </div>
 
@@ -25890,7 +26024,7 @@ function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, machine
               ].map((k) => (
                 <div key={k.label} className="rounded-xl p-4" style={CARD_STYLE}>
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="text-lg">{k.icon}</span>
+                    <span className="text-lg"><Glyph e={k.icon} size={18} /></span>
                     <span className="text-[10px] text-slate-500">{k.label}</span>
                   </div>
                   <div className="text-xl font-black" style={{color:k.color}}>{k.value}</div>
@@ -26133,7 +26267,7 @@ const ROLE_CONFIG = {
 function EmptyState({ icon = "📭", title = "Nothing here yet", desc = "", action = null }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 px-6 text-center select-none">
-      <div className="text-5xl mb-4" style={{ opacity: 0.45 }}>{icon}</div>
+      <div className="text-5xl mb-4" style={{ opacity: 0.45 }}><Glyph e={icon} size={34} /></div>
       <div className="text-sm font-semibold mb-1.5" style={{ color: "var(--text-strong)" }}>{title}</div>
       {desc && <div className="text-xs max-w-xs leading-relaxed" style={{ color: "var(--text-dim)" }}>{desc}</div>}
       {action && <div className="mt-5">{action}</div>}
@@ -26276,7 +26410,7 @@ function GlobalSearch({ items, pos, vendorList, machineLog, onClose, onNavigate 
 
         {/* Input */}
         <div className="flex items-center gap-3 px-4 py-3.5" style={{ borderBottom: "1px solid var(--border-subtle)" }}>
-          <span className="text-slate-500 text-base flex-shrink-0">🔍</span>
+          <span className="text-slate-500 text-base flex-shrink-0"><Glyph e="🔍" size={16} /></span>
           <input ref={inputRef} value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={handleKeyDown}
             placeholder="Search items, POs, vendors, machines, serial numbers…"
             className="flex-1 bg-transparent text-sm placeholder-slate-400 outline-none" />
@@ -26387,7 +26521,7 @@ function ReadyMachinesPopup({ items = [], bomDefs = {}, onOk, onView }) {
         <div className="rp-head">
           <div className="rp-seal" aria-hidden="true"><CircleCheckBig size={26} strokeWidth={2.2} /></div>
           <div className="min-w-0">
-            <h2 id="rp-title" className="rp-title" data-ready-title>🎉 {n} machine{n === 1 ? " is" : "s are"} Ready</h2>
+            <h2 id="rp-title" className="rp-title" data-ready-title><LeadIcon e="🎉" />{n} machine{n === 1 ? " is" : "s are"} Ready</h2>
             <p className="rp-sub">Finished since you last looked</p>
           </div>
         </div>
@@ -27181,12 +27315,19 @@ export default function App() {
   }
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--surface-base)", color: "var(--text)", fontFamily: "Inter, system-ui, sans-serif" }}>
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 rounded-full animate-spin" style={{ border: "3px solid rgba(38, 64, 176,0.15)", borderTopColor: "#2640B0" }} />
-          <div style={{ fontSize: 11, color: "#64748b", letterSpacing: 1.4, textTransform: "uppercase", fontWeight: 700 }}>
-            Restoring session{supabaseMode ? "" : ""}…
+      // World UI: the shape of the app while the session is restored (no spinner).
+      <div className="wu-boot" role="status" aria-live="polite">
+        <div className="wu-boot-side" aria-hidden="true">
+          <div className="wu-sk" style={{ height: 44, width: 44, borderRadius: 12 }} />
+          {[70, 55, 62, 48, 66, 52].map((w, i) => <div key={i} className="wu-sk" style={{ width: `${w}%` }} />)}
+        </div>
+        <div className="wu-boot-main">
+          <div className="wu-sk" style={{ height: 22, width: 180 }} aria-hidden="true" />
+          <div className="wu-boot-note">Restoring session{supabaseMode ? "" : ""}…</div>
+          <div className="wu-boot-row" aria-hidden="true">
+            {[0, 1, 2].map((i) => <div key={i} className="wu-sk" style={{ height: 96, borderRadius: 16 }} />)}
           </div>
+          <div className="wu-sk" style={{ height: 220, borderRadius: 16 }} aria-hidden="true" />
         </div>
       </div>
     );
@@ -28783,7 +28924,7 @@ export default function App() {
   // selected and promotes ONLY those from "BOM Issued" (rack) → "Assembly" (active build).
   // The machine now leaves the rack and appears in the Machine Tracker.
   const handleStartProduction = (machineIds) => {
-    if (!authCanDo("machines", "updateStage")) return { success: false, error: "You do not have permission to start assembly (Machines → Update Stage)." };
+    if (!canStartAssembly(authCanDo, Array.isArray(currentUser?.departments) ? currentUser.departments.filter(Boolean) : [])) return { success: false, error: "Only the Assembly department (or an admin) can start assembly." };
     const idArr  = Array.isArray(machineIds) ? machineIds : [machineIds];
     const idSet  = new Set(idArr);
     const targets = machineLog.filter((m) => idSet.has(m.id) && m.stage === "BOM Issued");
