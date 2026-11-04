@@ -99,7 +99,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-04-reports-pro";
+const APP_BUILD = "2026-11-04-rc-fix";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -15595,6 +15595,14 @@ function ReportSheet({ kind, settings = {}, title, subtitle = "", refText = "", 
     </div>
   );
 }
+// Stages a customer sees as completed (the Customer machine report's build journey).
+const CUSTOMER_STAGES = ["Assembly", "Mechanical", "Electrical", "Trial", "Ready"];
+const customerStagesDone = (machine) => {
+  if (!machine) return [];
+  if (machine.status === "completed") return CUSTOMER_STAGES.slice();
+  const curIdx = CUSTOMER_STAGES.indexOf(machine.currentDepartment || machine.stage);
+  return curIdx > 0 ? CUSTOMER_STAGES.slice(0, curIdx) : [];
+};
 const RptSec = ({ n, title, count, extra, children, cls = "", attr = {} }) => (
   <section className={`mr-sec ${cls}`} {...attr}>
     <h3 className="mr-h"><span className="mr-num">{n}</span>{title}{count != null && <span className="mr-count">{count}</span>}{extra}</h3>
@@ -16050,10 +16058,11 @@ function ReportCenterPage({
       OverrunMin: h.overrunMinutes || 0,
       Narration: h.overrunNarration || "",
       SentAt: h.sentAt || "", AcceptedAt: h.acceptedAt || "",
-      SentBy: h.sentBy || "", AcceptedBy: h.acceptedBy || "",
+      // 2026-11-04 — the person who signed the acceptance, not the login account.
+      SentBy: h.sentBy || "", AcceptedBy: h.acceptedByName || rptUserName(allUsers, h.acceptedBy) || h.acceptedBy || "",
       Workers: workerNames,
       MainEmployee: nameOf(h.mainEmployeeId),
-      MainSigned: h.mainEmployeeSignatureSvg || h.mainEmployeeSignatureId ? "Y" : "",
+      MainSigned: h.mainEmployeeSignatureSvg || h.mainEmployeeSignatureId ? "Yes" : "No",
       Status: h.status, AcceptTimeoutMin: h.acceptTimeoutMinutes || 0,
       Rating: rating?.rating ?? "", RatingOverrideReason: rating?.overrideReason || "",
       PendingRaised: relatedPending.length,
@@ -16066,12 +16075,14 @@ function ReportCenterPage({
   const customerRows = filteredMachines.map((m) => {
     const machineAtt = (attachments || []).filter((a) => a.machineId === m.id && a.isCustomerVisible);
     const machineHos = filteredHandovers.filter((h) => h.machineId === m.id);
-    const stagesCompleted = DEPARTMENT_SEQUENCE.filter((s) => (m.history || []).some((h) => h.stage === s));
+    // 2026-11-04 — same rule as the Customer machine report's build journey:
+    // every stage before the current one is done; a Ready machine has done all.
+    const stagesCompleted = customerStagesDone(m);
     const trialAttachments = machineAtt.filter((a) => a.kind === "trial_report" || /trial/i.test(a.fileName || ""));
     return {
       Machine: m.bomKey, Serial: m.serialNo || "",
       Model: m.bomLabel || m.bomKey,
-      StagesCompleted: stagesCompleted.join(" → "),
+      StagesCompleted: stagesCompleted.length ? stagesCompleted.join(", ") : "None yet",
       CurrentStage: m.stage,
       CompletedOn: m.completedDate || "",
       StagesHandedOver: machineHos.filter((h) => h.status === "accepted").length,
@@ -16547,7 +16558,7 @@ function ReportTable({ title, rows, t = (k) => k, users = [] }) {
             {rows.map((r, i) => (
               <tr key={i} className="border-t border-slate-200">
                 {columns.map((c) => (
-                  <td key={c} data-l={rptColLabel(t(c))} className="px-3 py-1.5 text-slate-500 whitespace-nowrap">{cellText(r[c], c)}</td>
+                  <td key={c} data-l={rptColLabel(t(c))} data-col={c} className={`px-3 py-1.5 text-slate-500 whitespace-nowrap${/^(Serial|Machine)$/.test(c) ? " rpt-nowrap" : ""}`}>{cellText(r[c], c)}</td>
                 ))}
               </tr>
             ))}
