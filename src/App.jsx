@@ -399,6 +399,17 @@ const approvals = [
 
 // Business rule: stock <= min is low-stock (NOT stock < min).
 // Items exactly at minimum must surface in Low Stock Alerts, Order Pipeline, and Create PO.
+// Store quantities can be fractional (Kg, Meter, Ltrs — the stock / qty
+// columns are numeric and BOM lines already allow 0.5). parseInt silently
+// turned "2.5" into 2 and refused "0.5". Positive number rounded to 4
+// decimals, or NaN when the text is not a usable quantity.
+const parseStoreQty = (v) => {
+  const t = String(v ?? "").trim();
+  const n = Number(t);
+  return t !== "" && Number.isFinite(n) && n > 0 ? Math.round(n * 10000) / 10000 : NaN;
+};
+const roundQty = (n) => Math.round((Number(n) || 0) * 10000) / 10000;
+
 const recomputeStatus = (stock, min) =>
   stock <= 0                            ? "critical"
   : stock <= min && stock / min < 0.15 ? "critical"
@@ -1378,17 +1389,19 @@ function QuickStockModal({ item, mode, onConfirm, onClose }) {
 
   const isAdd = mode === "add";
 
+  const parsedN  = parseStoreQty(qty);
+  // Removing more than is on hand used to clamp to 0 silently and log the
+  // full (wrong) amount — refuse it instead.
+  const overRemove = !isAdd && parsedN > item.stock;
   const newStock = (() => {
-    const n = parseInt(qty, 10);
-    if (!n || isNaN(n) || n <= 0) return null;
-    return Math.max(0, item.stock + (isAdd ? n : -n));
+    if (!(parsedN > 0) || overRemove) return null;
+    return roundQty(Math.max(0, item.stock + (isAdd ? parsedN : -parsedN)));
   })();
   const previewStatus = newStock !== null ? recomputeStatus(newStock, item.min) : null;
 
   const confirm = () => {
-    const n = parseInt(qty, 10);
-    if (!n || isNaN(n) || n <= 0) return;
-    onConfirm(isAdd ? n : -n);
+    if (!(parsedN > 0) || overRemove) return;
+    onConfirm(isAdd ? parsedN : -parsedN);
     onClose();
   };
 
@@ -1446,12 +1459,13 @@ function QuickStockModal({ item, mode, onConfirm, onClose }) {
                  style={{ color: "#2640B0" }}>
               Quantity
             </div>
-            <input ref={inputRef} type="number" min="1" value={qty}
+            <input ref={inputRef} type="number" min="0" step="any" value={qty}
                    onChange={(e) => setQty(e.target.value)}
                    onKeyDown={(e) => e.key === "Enter" && confirm()}
                    placeholder="Enter quantity"
                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold placeholder-slate-400 outline-none leading-relaxed modal-input"
                    style={{ fontVariantNumeric: "tabular-nums", fontFamily: "'Inter','SF Pro Text',system-ui,sans-serif" }} />
+            {overRemove && <div data-qs-err className="text-[10px] text-red-600 mt-1.5">Only {item.stock} {item.unit} in stock — cannot remove {parsedN}.</div>}
           </div>
 
           {/* Live preview */}
@@ -1509,9 +1523,11 @@ function ItemDetailModal({ item, category, onClose, onDelete, onUpdateStock, onE
   const lastUpdated = history.length > 0 ? history[0].date : fmtDate(new Date());
   const invValue    = item.lastPurchaseRate ? (item.stock * item.lastPurchaseRate) : 0;
 
+  const adjustParsed = parseStoreQty(adjustQty);
+  const adjustOver   = adjustMode === "remove" && adjustParsed > item.stock;
   const handleAdjust = () => {
-    const qty = parseInt(adjustQty, 10);
-    if (!qty || isNaN(qty) || qty <= 0) return;
+    const qty = adjustParsed;
+    if (!(qty > 0) || adjustOver) return;
     onUpdateStock(adjustMode === "add" ? qty : -qty);
     setAdjustMode(null);
     setAdjustQty("");
@@ -1704,7 +1720,7 @@ function ItemDetailModal({ item, category, onClose, onDelete, onUpdateStock, onE
                 {adjustMode === "add" ? "Add Stock" : "Remove Stock"}
               </div>
               <div className="flex gap-2">
-                <input type="number" min="1" value={adjustQty} autoFocus
+                <input type="number" min="0" step="any" value={adjustQty} autoFocus
                        onChange={e => setAdjustQty(e.target.value)}
                        onKeyDown={e => e.key === "Enter" && handleAdjust()}
                        placeholder="Enter quantity"
@@ -1720,6 +1736,7 @@ function ItemDetailModal({ item, category, onClose, onDelete, onUpdateStock, onE
                   Cancel
                 </button>
               </div>
+              {adjustOver && <div data-adjust-err className="text-[10px] text-red-600 mt-2">Only {item.stock} {item.unit} in stock — cannot remove {adjustParsed}.</div>}
             </div>
           )}
 
@@ -2164,7 +2181,7 @@ function ItemDetailModal({ item, category, onClose, onDelete, onUpdateStock, onE
 
 // ─── ADD ITEM MODAL ───────────────────────────────────────────────────────────
 
-function AddItemModal({ machines, onSave, onClose, initialValues = null, vendorList = [] }) {
+function AddItemModal({ machines, onSave, onClose, initialValues = null, vendorList = [], existingCodes = [] }) {
   const isEdit = Boolean(initialValues);
   useEffect(() => {
     const h = (e) => { if (e.key === "Escape") onClose(); };
@@ -2312,8 +2329,17 @@ function AddItemModal({ machines, onSave, onClose, initialValues = null, vendorL
     const e = {};
     if (!form.name.trim())                               e.name  = "Item name is required";
     if (!form.code.trim())                               e.code  = "Item code is required";
+    // Item codes are unique. Local mode saved a second item with the same
+    // code; Supabase answered with a raw "duplicate key" alert after Save.
+    else {
+      const c = form.code.trim().toUpperCase();
+      const own = isEdit ? String(initialValues.code || "").toUpperCase() : null;
+      if (c !== own && existingCodes.includes(c)) e.code = `Code ${c} is already used by another item`;
+    }
     if (form.stock === "" || isNaN(Number(form.stock)))  e.stock = "Enter a valid number";
+    else if (!isEdit && Number(form.stock) < 0)          e.stock = "Stock cannot be negative";
     if (form.min   === "" || isNaN(Number(form.min)))    e.min   = "Enter a valid number";
+    else if (Number(form.min) < 0)                       e.min   = "Minimum cannot be negative";
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -3300,6 +3326,9 @@ function InventoryPage({ items, setItems, handleUpdateStock, pos = [], inwardLog
   }, [attentionOpen]);
 
   const machines = useMemo(() => Object.keys(items), [items]);
+  // Every code in use (archived rows included — the code stays taken), for the
+  // Add / Edit item duplicate-code check.
+  const allCodes = useMemo(() => Object.values(items).flatMap((arr) => (arr || []).map((i) => String(i.code || "").toUpperCase())), [items]);
   // Flatten + filter archived in a single useMemo so we don't reallocate the
   // array on every keystroke in the search box. With 1000+ items the unmemoised
   // version reflowed all four downstream metric calcs and the sort/filter on
@@ -3405,7 +3434,9 @@ function InventoryPage({ items, setItems, handleUpdateStock, pos = [], inwardLog
       const itemWithHistory = { ...newItem, history: [{ date: fmtDate(new Date()), event: "Opening", change: 0, qty: newItem.stock }] };
       setItems((prev) => ({ ...prev, [machine]: [...(prev[machine] || []), itemWithHistory] }));
     }
-    onLogAudit({
+    // onCreateItem (handleCreateItemRow) writes its own "item_created" audit
+    // row — logging here as well put every new item in the Audit Trail twice.
+    if (!onCreateItem) onLogAudit({
       type: "inventory_add", module: "Inventory",
       action: `Item Added: ${newItem.name} (${newItem.code})`,
       ref: newItem.code, itemCode: newItem.code, itemName: newItem.name,
@@ -3435,7 +3466,8 @@ function InventoryPage({ items, setItems, handleUpdateStock, pos = [], inwardLog
     } else {
       setItems(prev => ({ ...prev, [category]: prev[category].filter(i => i.code !== code) }));
     }
-    onLogAudit({ type: "inventory_delete", module: "Inventory", action: `Item Deleted: ${item.name}`, ref: code, itemCode: code, details: { name: item.name, category } });
+    // onDeleteItem (handleDeleteItemRow) already logs "item_deleted".
+    if (!onDeleteItem) onLogAudit({ type: "inventory_delete", module: "Inventory", action: `Item Deleted: ${item.name}`, ref: code, itemCode: code, details: { name: item.name, category } });
     setDeleteModal(null);
   };
 
@@ -3461,7 +3493,8 @@ function InventoryPage({ items, setItems, handleUpdateStock, pos = [], inwardLog
         return next;
       });
     }
-    onLogAudit({
+    // onUpdateItem (handleUpdateItemRow) already logs "item_updated".
+    if (!onUpdateItem) onLogAudit({
       type: "inventory_edit", module: "Inventory",
       action: `Item Updated: ${updatedItem.name} (${updatedItem.code})`,
       ref: updatedItem.code, itemCode: updatedItem.code, itemName: updatedItem.name,
@@ -3487,7 +3520,7 @@ function InventoryPage({ items, setItems, handleUpdateStock, pos = [], inwardLog
 
   return (
     <div className="flex-1 overflow-y-auto">
-      {showModal && <AddItemModal machines={machines} onSave={handleAddItem} onClose={() => setShowModal(false)} vendorList={vendorList} />}
+      {showModal && <AddItemModal machines={machines} onSave={handleAddItem} onClose={() => setShowModal(false)} vendorList={vendorList} existingCodes={allCodes} />}
       {showClearDemo && (
         <ClearDemoDataModal
           items={items}
@@ -3537,7 +3570,7 @@ function InventoryPage({ items, setItems, handleUpdateStock, pos = [], inwardLog
       )}
       {editingItem && canDo("inventory","edit") && (
         <AddItemModal machines={machines} onSave={handleSaveEdit} onClose={() => setEditingItem(null)}
-                      initialValues={{ ...editingItem.item, machine: editingItem.category }} vendorList={vendorList} />
+                      initialValues={{ ...editingItem.item, machine: editingItem.category }} vendorList={vendorList} existingCodes={allCodes} />
       )}
       {quickAdjust && (
         <QuickStockModal item={quickAdjust.item} mode={quickAdjust.mode}
@@ -3610,7 +3643,13 @@ function InventoryPage({ items, setItems, handleUpdateStock, pos = [], inwardLog
       )}
 
       <Topbar title="Item Master" subtitle="Unified inventory across all categories">
-        <Btn variant="ghost" size="sm"><LeadIcon e="⬇️" />Export</Btn>
+        <Btn variant="ghost" size="sm" onClick={() => {
+          // Was a dead button. Exports what the table shows (filters + sort applied).
+          if (!sorted.length) { alert("Nothing to export for current filters."); return; }
+          const ws = XLSX.utils.json_to_sheet(sorted.map((i) => ({ Code: i.code, Name: i.name, Category: i.category, Unit: i.unit, Stock: i.stock, Min: i.min, "Rate ₹": i.lastPurchaseRate || 0, Status: i.status, Critical: i.isCritical ? "Yes" : "", Vendor: i.vendor || "", Location: i.location || "" })));
+          const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Items");
+          XLSX.writeFile(wb, `item-master-${new Date().toISOString().slice(0, 10)}.xlsx`);
+        }}><LeadIcon e="⬇️" />Export</Btn>
         {canDo("inventory","add") && (
           <button onClick={() => setShowImport(true)}
                   className="text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-900 hover:border-slate-300 transition-all flex items-center gap-1.5">
@@ -10865,8 +10904,8 @@ function InwardPage({ items, handleUpdateStock, vendorList, onInwardComplete, on
     list.map((item) => ({ ...item, category: cat }))
   );
   const selectedItem = allFlatItems.find((i) => i.code === selectedCode);
-  const parsedQty    = parseInt(qty, 10);
-  const newStock     = selectedItem && parsedQty > 0 ? selectedItem.stock + parsedQty : null;
+  const parsedQty    = parseStoreQty(qty);
+  const newStock     = selectedItem && parsedQty > 0 ? roundQty(selectedItem.stock + parsedQty) : null;
 
   const inpCls = (err) =>
     `w-full bg-slate-50 border ${err ? "border-red-500/60" : "border-slate-200"} rounded-xl px-4 py-2.5 text-xs text-slate-900 placeholder-slate-500 outline-none modal-input`;
@@ -10881,10 +10920,10 @@ function InwardPage({ items, handleUpdateStock, vendorList, onInwardComplete, on
 
   const handleSubmit = async () => {
     if (submitting) return;                 // duplicate-inward guard
-    const n = parseInt(qty, 10);
+    const n = parseStoreQty(qty);
     const e = {};
     if (!selectedCode)             e.item = "Select an item";
-    if (!n || n <= 0 || isNaN(n)) e.qty  = "Enter a valid quantity";
+    if (!(n > 0))                  e.qty  = "Enter a valid quantity";
     setErrors(e);
     if (Object.keys(e).length > 0) return;
 
@@ -10922,7 +10961,13 @@ function InwardPage({ items, handleUpdateStock, vendorList, onInwardComplete, on
       )}
 
       <Topbar title="Inward" subtitle="Goods receipt & stock addition">
-        <Btn variant="ghost" size="sm"><LeadIcon e="⬇️" />Export Log</Btn>
+        <Btn variant="ghost" size="sm" onClick={() => {
+          // Was a dead button.
+          if (!appInwardLog.length) { alert("No inward entries to export yet."); return; }
+          const ws = XLSX.utils.json_to_sheet(appInwardLog.map((e) => ({ Date: e.date, Code: e.code, Item: e.item, Qty: e.qty, Unit: e.unit, Vendor: e.vendor, Notes: e.notes, PO: e.fromPO || "" })));
+          const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Inward");
+          XLSX.writeFile(wb, `inward-log-${new Date().toISOString().slice(0, 10)}.xlsx`);
+        }}><LeadIcon e="⬇️" />Export Log</Btn>
       </Topbar>
 
       <div className="p-6 space-y-6">
@@ -10961,7 +11006,7 @@ function InwardPage({ items, handleUpdateStock, vendorList, onInwardComplete, on
             {/* Qty */}
             <div>
               <ILabel text="Quantity" req />
-              <input type="number" min="1" value={qty} onChange={(e) => setQty(e.target.value)}
+              <input type="number" min="0" step="any" value={qty} onChange={(e) => setQty(e.target.value)}
                      onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
                      placeholder="Enter quantity" className={inpCls(errors.qty)}
                      style={{ fontVariantNumeric: "tabular-nums", fontFamily: "'Inter',system-ui,sans-serif" }} />
@@ -10978,7 +11023,7 @@ function InwardPage({ items, handleUpdateStock, vendorList, onInwardComplete, on
 
           {/* Live preview */}
           {selectedItem && (() => {
-            const newS       = parsedQty > 0 ? selectedItem.stock + parsedQty : selectedItem.stock;
+            const newS       = parsedQty > 0 ? roundQty(selectedItem.stock + parsedQty) : selectedItem.stock;
             const newStatus  = recomputeStatus(newS, selectedItem.min);
             const statusUp   = newStatus === "safe" && selectedItem.status !== "safe";
             const fillPctNow = selectedItem.min > 0 ? Math.min(100, Math.round((selectedItem.stock / selectedItem.min) * 100)) : 0;
@@ -12038,12 +12083,12 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
     // showing the operator nothing on a BOM built earlier.
     const linePoints = Array.isArray(checkPoints) ? checkPoints
                      : (Array.isArray(inv?.checkPoints) ? inv.checkPoints : []);
-    const required = qty * units;
+    const required = roundQty(qty * units);
     const available = inv?.stock ?? 0;
     const maxIssue  = Math.min(required, available);
     const userQty   = issueQtys[code];
     const issueQty  = userQty !== undefined ? Math.max(0, Math.min(userQty, available)) : maxIssue;
-    const pendingQty = Math.max(0, required - issueQty);
+    const pendingQty = roundQty(Math.max(0, required - issueQty));
     const overQty    = Math.max(0, issueQty - required);
     const status    = available >= required ? "green" : available > 0 ? "orange" : "red";
     return { code, baseQty: qty, required, available, issueQty, pendingQty, overQty, status,
@@ -12202,8 +12247,8 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
                     away without anyone touching it, and `parseInt("") || 0`
                     turns an emptied field into a committed zero. Blurring means
                     scrolling scrolls and typing types. */}
-                <input type="number" min="0" max={item.available} value={item.issueQty}
-                       onChange={(e) => setIssueQtys((p) => ({ ...p, [item.code]: Math.min(item.available, Math.max(0, parseInt(e.target.value,10)||0)) }))}
+                <input type="number" min="0" step="any" max={item.available} value={item.issueQty}
+                       onChange={(e) => setIssueQtys((p) => ({ ...p, [item.code]: Math.min(item.available, Math.max(0, roundQty(parseFloat(e.target.value)||0))) }))}
                        onWheel={(e) => e.currentTarget.blur()}
                        disabled={!rowChecked}
                        className="w-full max-w-[58px] bg-slate-50 border rounded-lg px-2 py-1 text-xs text-slate-900 outline-none text-right modal-input disabled:opacity-30 transition-colors"
@@ -13885,9 +13930,9 @@ function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, onCreateB
 
   const handleManualSubmit = async () => {
     if (manualBusy) return;                 // duplicate production-issue guard
-    const n   = parseInt(manualQty, 10);
+    const n   = parseStoreQty(manualQty);
     const inv = findItem(manualCode);
-    if (!inv || !n || n <= 0) { setManualError("Select an item and enter a valid quantity."); return; }
+    if (!inv || !(n > 0))     { setManualError("Select an item and enter a valid quantity."); return; }
     if (inv.stock < n)        { setManualError(`Insufficient stock. Available: ${inv.stock} ${inv.unit}.`); return; }
     setManualError("");
     setManualBusy(true);
@@ -14680,10 +14725,12 @@ function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, onCreateB
               <div className="text-xs font-bold text-amber-700">{pendingLog.length} item{pendingLog.length !== 1 ? "s" : ""} moved to Pending Stock</div>
               <div className="text-[11px] text-slate-500 mt-0.5">Partially-issued BOM materials are tracked in the Pending Stock module.</div>
             </div>
+            {canDo("pending","clear") && (
             <button onClick={onClearPending}
                     className="text-[10px] font-bold text-slate-500 hover:text-red-400 transition-colors flex-shrink-0">
               Clear
             </button>
+            )}
           </div>
         )}
 
@@ -14707,7 +14754,7 @@ function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, onCreateB
             </div>
             <div>
               <OLabel text="Quantity" req />
-              <input type="number" min="1" value={manualQty} onChange={(e) => setManualQty(e.target.value)}
+              <input type="number" min="0" step="any" value={manualQty} onChange={(e) => setManualQty(e.target.value)}
                      onKeyDown={(e) => e.key === "Enter" && handleManualSubmit()}
                      placeholder="Enter quantity" className={inpCls}
                      style={{ fontVariantNumeric: "tabular-nums", fontFamily: "'Inter',system-ui,sans-serif" }} />
@@ -14723,9 +14770,9 @@ function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, onCreateB
           </div>
 
           {manualCode && (() => {
-            const inv = findItem(manualCode); const n = parseInt(manualQty, 10);
+            const inv = findItem(manualCode); const n = parseStoreQty(manualQty);
             if (!inv) return null;
-            const newS = n > 0 ? Math.max(0, inv.stock - n) : null;
+            const newS = n > 0 ? roundQty(Math.max(0, inv.stock - n)) : null;
             const sufficient = !n || inv.stock >= n;
             return (
               <div className="mt-4 p-4 rounded-xl grid grid-cols-3 gap-3"
@@ -23782,7 +23829,19 @@ function PendingPage({ pendingLog, onClearPending, onFulfillPending, onFulfillGr
     });
   };
   const openFulfillAll = () => {
-    const available = enriched.filter((e) => e.canIssue > 0);
+    // Each row's canIssue is worked out against the FULL live stock, so two
+    // machines short of the same part both saw it all as theirs: Issue All
+    // gave the same stock twice, stock floored at 0 and the second machine's
+    // shortfall vanished from Pending. Share each code's stock out in order.
+    const left = {};
+    const available = [];
+    enriched.forEach((e) => {
+      if (!(e.code in left)) left[e.code] = e.liveStock;
+      const can = roundQty(Math.min(e.pendingQty, left[e.code]));
+      if (!(can > 0)) return;
+      left[e.code] = roundQty(left[e.code] - can);
+      available.push(can === e.canIssue ? e : { ...e, canIssue: can, avail: can >= e.pendingQty ? "full" : "partial" });
+    });
     if (available.length === 0) return;
     setConfirmFulfill({
       mode: "all",
@@ -26643,8 +26702,8 @@ export default function App() {
       ...prev,
       [category]: prev[category].map((i) => {
         if (i.code !== code) return i;
-        const newStock = Math.max(0, i.stock + delta);
-        actualDelta    = newStock - i.stock;
+        const newStock = roundQty(Math.max(0, i.stock + delta));
+        actualDelta    = roundQty(newStock - i.stock);
         return {
           ...i,
           stock:   newStock,
@@ -26668,12 +26727,13 @@ export default function App() {
     // Only log when called as a standalone manual adjust (no eventType from a calling flow).
     // BOM/Inward/Outward/Receive flows pass an eventType and log their own audit entries.
     if (!eventType && before) {
-      const newStock = Math.max(0, before.stock + delta);
+      const newStock = roundQty(Math.max(0, before.stock + delta));
+      const applied  = roundQty(newStock - before.stock);   // what really moved (stock floors at 0)
       logAudit({
         type: "stock_adjust", module: "Inventory",
-        action: `Stock Adjusted: ${before.name} ${before.stock} → ${newStock} (${delta > 0 ? "+" : ""}${delta})`,
+        action: `Stock Adjusted: ${before.name} ${before.stock} → ${newStock} (${applied > 0 ? "+" : ""}${applied})`,
         ref: code, itemCode: code, itemName: before.name,
-        qty: delta,
+        qty: applied,
         oldValue: { stock: before.stock },
         newValue: { stock: newStock },
         details: { category, event },
@@ -27107,6 +27167,15 @@ export default function App() {
           affectedIds.forEach((id) => {
             notifyMachineComplete(id, newPendingLog.filter((p) => p.issueId === id));
           });
+          // The received stock went straight back out to these machines — record
+          // it, or the Audit Trail shows an inward with no trace of where it went.
+          logAudit({
+            type: "pending_fulfilled", module: "Pending",
+            action: `Auto-fulfilled on Inward: ${fulfillments[0].entry.name || code} × ${roundQty(totalToDeduct)}`,
+            ref: code, itemCode: code, itemName: fulfillments[0].entry.name || code,
+            qty: roundQty(totalToDeduct),
+            details: { auto: "inward", items: fulfillments.map(({ entry, canFulfill }) => `${entry.bomKey || ""}${entry.serialNo ? ` [${entry.serialNo}]` : ""}×${canFulfill}`) },
+          });
         }
       }
     }
@@ -27131,7 +27200,8 @@ export default function App() {
       type: "item_created", module: "Inventory",
       action: `Item Created: ${res.item.name} (${res.item.code}) in ${category}`,
       ref: res.item.code, itemCode: res.item.code, itemName: res.item.name,
-      details: { category, unit: res.item.unit, min: res.item.min, max: res.item.max, vendor: res.item.vendor || "" },
+      qty: Number(res.item.stock) || 0,
+      details: { category, unit: res.item.unit, openingStock: Number(res.item.stock) || 0, min: res.item.min, max: res.item.max, vendor: res.item.vendor || "", critical: !!res.item.isCritical },
     });
     // If itemsStore had to strip the media columns because migration 016 hasn't been
     // run, alert the operator — the previous silent retry was the root cause of the
@@ -27162,8 +27232,8 @@ export default function App() {
       type: "item_updated", module: "Inventory",
       action: `Item Updated: ${res.item.name} (${origCode}${codeChanged ? ` → ${res.item.code}` : ""}${categoryChanged ? ` · ${origCategory} → ${target}` : ""})`,
       ref: res.item.code, itemCode: res.item.code, itemName: res.item.name,
-      oldValue: before ? { code: origCode, category: origCategory, name: before.name, unit: before.unit, min: before.min, max: before.max, vendor: before.vendor || "" } : { code: origCode, category: origCategory },
-      newValue: { code: res.item.code, category: target, name: res.item.name, unit: res.item.unit, min: res.item.min, max: res.item.max, vendor: res.item.vendor || "" },
+      oldValue: before ? { code: origCode, category: origCategory, name: before.name, unit: before.unit, min: before.min, max: before.max, vendor: before.vendor || "", critical: !!before.isCritical } : { code: origCode, category: origCategory },
+      newValue: { code: res.item.code, category: target, name: res.item.name, unit: res.item.unit, min: res.item.min, max: res.item.max, vendor: res.item.vendor || "", critical: !!res.item.isCritical },
     });
     if (res.mediaStripped) {
       alert("⚠️ Item saved, but the photo / design file were NOT persisted because the items.photo / design_file columns don't exist in your Supabase yet.\n\nRun supabase/migrations/016_item_media.sql in your Supabase SQL Editor, then re-upload the media on this item.");
@@ -27739,9 +27809,16 @@ export default function App() {
     }
   };
   const handleClearPending  = () => {
+    // One tap wiped every machine's shortfall with no way back — and on the
+    // Outward page the button just says "Clear", which reads like "hide this
+    // banner". Both entry points now ask first.
+    const n = pendingLog.length;
+    if (n === 0) return;
+    if (!window.confirm(`Delete ALL ${n} pending stock line${n === 1 ? "" : "s"} for every machine?\n\nThis cannot be undone. The shortfalls will no longer be tracked.`)) return;
     setPendingLog([]);
     if (isSupabaseEnabled()) clearAllPending().then((r) => { if (!r.success) console.warn("[App] Pending clear Supabase failed:", r.error); });
-    logAudit({ type: "pending_cleared", module: "Pending", action: "All pending stock cleared", ref: "" });
+    logAudit({ type: "pending_cleared", module: "Pending", action: `All pending stock cleared (${n} line${n === 1 ? "" : "s"})`, ref: "",
+               details: { lines: pendingLog.map((p) => `${p.bomKey || ""}${p.serialNo ? ` [${p.serialNo}]` : ""} ${p.code}×${p.pendingQty}`) } });
   };
 
   // ── Machine Tracker handlers ──
@@ -29606,10 +29683,25 @@ export default function App() {
   // itemsToFulfill may carry a per-line `criticalInput` from the PendingPage
   // confirmation modal (migration 026); it's forwarded into the audit payload
   // so compliance queries can see which serials / checkboxes closed the row.
-  const handleFulfillGroup = (issueId, itemsToFulfill) => {
-    itemsToFulfill.forEach((e) =>
-      handleUpdateStock(e.category, e.code, -e.canIssue, `Fulfill: ${e.bomKey}`)
-    );
+  const handleFulfillGroup = async (issueId, itemsToFulfill) => {
+    // Same two guards as handleFulfillPending: never take more than is on
+    // hand (an over-issue floored stock at 0 while the pending row dropped by
+    // the full amount — the shortfall just disappeared), and only reduce the
+    // pending rows whose stock move actually went through.
+    const onHandLeft = {};
+    const clamped = (itemsToFulfill || []).map((e) => {
+      if (!(e.code in onHandLeft)) onHandLeft[e.code] = items[e.category]?.find((i) => i.code === e.code)?.stock ?? 0;
+      const can = roundQty(Math.max(0, Math.min(Number(e.canIssue) || 0, onHandLeft[e.code])));
+      onHandLeft[e.code] = roundQty(onHandLeft[e.code] - can);
+      return { ...e, canIssue: can };
+    }).filter((e) => e.canIssue > 0);
+    if (clamped.length === 0) { flashStockError("No stock on hand to issue"); return; }
+    const moves = await Promise.all(clamped.map((e) =>
+      Promise.resolve(handleUpdateStock(e.category, e.code, -e.canIssue, `Fulfill: ${e.bomKey}`))
+        .then((r) => ({ e, ok: !(r && r.success === false) }), () => ({ e, ok: false }))
+    ));
+    itemsToFulfill = moves.filter((m) => m.ok).map((m) => m.e);
+    if (itemsToFulfill.length === 0) return;
     const canMap = Object.fromEntries(itemsToFulfill.map((e) => [e.code, e.canIssue]));
     // 2b71bbc — functional-form setPendingLog + hoisted reducer so Fulfill All
     // on multiple groups stacks instead of overwriting earlier updates.
