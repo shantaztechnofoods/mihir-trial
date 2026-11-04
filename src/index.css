@@ -3809,6 +3809,8 @@ button.rack-btn:disabled { background: #e5e7eb !important; color: #6b7280 !impor
   .report-area .overflow-x-auto, .report-area .overflow-hidden { overflow: visible !important; }
   .report-area table { width: 100% !important; table-layout: auto; border-collapse: collapse; }
   .report-area table th, .report-area table td { white-space: normal !important; overflow-wrap: break-word; padding: 1.1mm 1.4mm !important; font-size: 7.2pt !important; }
+  /* Serial no. and machine code never break mid-code. */
+  .report-area table td.rpt-nowrap { white-space: nowrap !important; overflow-wrap: normal; }
   .report-area table th { text-transform: uppercase; letter-spacing: 0.04em; font-size: 6.6pt !important; border-bottom: 0.8pt solid #111 !important; }
   .report-area table tr { border-color: #d2d2d2 !important; }
   /* Very wide data tables (10+ columns): one labelled block per row, four

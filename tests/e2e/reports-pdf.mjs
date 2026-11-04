@@ -165,5 +165,29 @@ ok("Ready card has Customer report and Company report buttons", await p.locator(
 await p.locator('[data-card-customer-report="5"]').click(); await p.waitForTimeout(600);
 ok("card Customer report opens the customer report", await p.locator('[data-report-kind="customer"]').count() === 1);
 await close();
+
+// ── Report Center (2026-11-04): signer name, Main signed Yes/No, stages completed, serial nowrap ──
+await p.locator("[data-reports-menu]").click(); await p.waitForTimeout(300);
+await p.locator("[data-reports-chooser] [data-open-reports]").click(); await p.waitForTimeout(800);
+const rcTab = async (label) => { await p.locator("button[aria-pressed]", { hasText: label }).first().click(); await p.waitForTimeout(400); };
+const cellsFor = (serial) => p.evaluate((sn) => [...document.querySelectorAll(".report-area tbody tr, tbody tr")]
+  .filter((tr) => tr.querySelector('td[data-col="Serial"]')?.textContent.trim() === sn)
+  .map((tr) => Object.fromEntries([...tr.querySelectorAll("td[data-col]")].map((td) => [td.dataset.col, td.textContent.trim()]))), serial);
+await rcTab("Production");
+const prodRows = await cellsFor("SN-105");
+ok("Production: every handover row for SN-105 listed", prodRows.length >= 4, String(prodRows.length));
+ok("Production: Accepted by shows the signer (Mahesh Joshi), not the login account", prodRows.length && prodRows.every((r) => r.AcceptedBy === "Mahesh Joshi"), JSON.stringify(prodRows.map((r) => r.AcceptedBy)));
+ok("Production: Main signed prints Yes/No, never a bare Y", prodRows.length && prodRows.every((r) => r.MainSigned === "Yes"), JSON.stringify(prodRows.map((r) => r.MainSigned)));
+const allSigned = await p.evaluate(() => [...document.querySelectorAll('td[data-col="MainSigned"]')].map((td) => td.textContent.trim()));
+ok("Production: every Main signed cell is Yes or No", allSigned.length > 0 && allSigned.every((v) => v === "Yes" || v === "No"), JSON.stringify(allSigned));
+await rcTab("Customer");
+const custRows = await cellsFor("SN-105");
+ok("Customer: Stages completed filled for the Ready machine", custRows.length === 1 && custRows[0].StagesCompleted === "Assembly, Mechanical, Electrical, Trial, Ready", JSON.stringify(custRows));
+const stagesAll = await p.evaluate(() => [...document.querySelectorAll('td[data-col="StagesCompleted"]')].map((td) => td.textContent.trim()));
+ok("Customer: no empty Stages completed cell", stagesAll.length > 0 && stagesAll.every(Boolean), JSON.stringify(stagesAll));
+await p.emulateMedia({ media: "print" }); await p.waitForTimeout(200);
+const serialWrap = await p.evaluate(() => [...document.querySelectorAll('td[data-col="Serial"]')].map((td) => getComputedStyle(td).whiteSpace));
+ok("Customer: serial number does not wrap in print", serialWrap.length > 0 && serialWrap.every((w) => w === "nowrap"), JSON.stringify(serialWrap));
+await p.emulateMedia({ media: "screen" });
 ok("no page errors", errs.length === 0, errs.join(" | "));
 await done(b);
