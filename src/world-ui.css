@@ -631,8 +631,8 @@
 /* ═══ Login 3D framing: calmer scale, reflection fades out at the floor ═══ */
 @media screen {
   .lg-brand3d--full .lg-3d { transform: scale(.9); transform-origin: 50% 21%;
-    -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 27.5%, rgba(0, 0, 0, .3) 31%, transparent 40%);
-            mask-image: linear-gradient(to bottom, #000 0%, #000 27.5%, rgba(0, 0, 0, .3) 31%, transparent 40%); }
+    -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 27%, rgba(0, 0, 0, .18) 29.5%, transparent 34%);
+            mask-image: linear-gradient(to bottom, #000 0%, #000 27%, rgba(0, 0, 0, .18) 29.5%, transparent 34%); }
   .lg-floor { top: 28%; }
   @media (min-width: 1024px) {
     .lg-brand3d--full .lg-3d { transform: scale(.8); transform-origin: 33% 45%;
