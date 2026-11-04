@@ -27200,7 +27200,7 @@ export default function App() {
   // rack for me to take). Read-only, derived from the same `handovers` state
   // the Machine Tracker uses; a new hand-over has a new id, so it shows again.
   const myBellDepts = Array.isArray(currentUser?.departments) ? currentUser.departments.filter(Boolean) : [];
-  const waitingForMe = myBellDepts.length && canView("machines")
+  const waitingForMe = myBellDepts.length && canOpenPage("machines")
     ? (Array.isArray(handovers) ? handovers : []).filter((h) => h && h.status === "pending" && myBellDepts.includes(h.toDepartment))
     : [];
   const notifications = [
