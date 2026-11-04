@@ -101,7 +101,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-04-store-2";
+const APP_BUILD = "2026-11-04-purchase-3";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -3949,7 +3949,13 @@ function POModal({ initialPO, vendorList, items, onSave, onClose, prefill = null
       template:  initialPO.template  || poCfg.template,
       // ERP upgrade (migration 018) — fall back to today / 18% local for legacy POs.
       purchaseType: initialPO.purchaseType || DEFAULT_PURCHASE_TYPE_KEY,
-      poDate:       initialPO.poDate || initialPO.date || todayIso(),
+      // A legacy PO has only date = "4 Nov 2026"; the date picker needs
+      // yyyy-mm-dd or it shows an empty PO Date field.
+      poDate: (() => {
+        const v = initialPO.poDate || initialPO.date;
+        const d = parseDisplayDate(v);
+        return d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}` : (v || todayIso());
+      })(),
     };
     return {
       vendor:    prefill?.vendor || vendorList[0]?.name || "",
@@ -4135,7 +4141,10 @@ function POModal({ initialPO, vendorList, items, onSave, onClose, prefill = null
       amount: total,
       status,
       gstType: purchaseTypeMeta?.gstType || null,
-      date:    form.poDate || todayIso(),
+      // Same "4 Nov 2026" form every other PO date uses. Edit used to write the
+      // raw date-picker value ("2026-11-04") into po.date, so the edited PO's
+      // date showed in a different format and could not be parsed for sorting.
+      date:    isoToDisplayDate(form.poDate || todayIso()),
     });
   };
 
@@ -27331,6 +27340,19 @@ export default function App() {
         )
       )];
       affectedIds.forEach((issueId) => notifyMachineComplete(issueId, newPendingLog.filter((p) => p.issueId === issueId)));
+      // The received stock went straight out to these shortfalls — record it
+      // (same as Inward), or the Audit Trail shows a receipt with no trace of
+      // where the stock went.
+      Object.entries(lineDeductions).forEach(([code, { deduct, fMap }]) => {
+        const li = (po.lineItems || []).find((l) => l.code === code);
+        logAudit({
+          type: "pending_fulfilled", module: "Pending",
+          action: `Auto-fulfilled on PO receive ${id}: ${li?.name || code} × ${roundQty(deduct)}`,
+          ref: code, itemCode: code, itemName: li?.name || code,
+          qty: roundQty(deduct), vendor: po.vendor,
+          details: { auto: "po", po: id, items: [...fMap.entries()].map(([k, q]) => `${k}×${q}`) },
+        });
+      });
     }
 
     const newLog = [...(po.activityLog || []), { action: "Received", date: dateStr, note: "Stock updated automatically" }];
