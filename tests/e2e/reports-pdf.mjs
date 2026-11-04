@@ -101,11 +101,11 @@ ok("customer report shows the BOM machine photo", await p.locator("[data-report-
 ok("customer report shows model, serial and Ready status", doc.includes("SN-105") && doc.includes("M-10") && /Ready for dispatch/.test(doc));
 ok("customer report lists the customer-visible document only", doc.includes("Operating manual") && !doc.includes("INTERNAL weld photo") && !doc.includes("Noise at 1400 rpm"));
 // 2026-11-04 (reports v2) — the owner asked for who accepted each stage (name +
-// signature) and every checklist point with its remark on the customer copy;
-// the worker team, delay reasons, holds and ratings stay internal.
-ok("customer report names who accepted each stage and prints checklist remarks", doc.includes("Mahesh Joshi") && doc.includes("INTERNAL-REMARK"));
-const leak = doc.match(/Ramesh Patel|Suresh Rana|re-machined|Motor supplier|Trial bay busy|\bRating\b|ON HOLD|Over by/i);
-ok("customer report has no worker team, delays, holds or ratings", !leak, leak ? `found "${leak[0]}" near: ${doc.slice(Math.max(0, leak.index - 80), leak.index + 40).replace(/\n/g, " | ")}` : "");
+// signature) on the customer copy; workers' remarks, the worker team, delay
+// reasons, holds and ratings stay internal.
+ok("customer report names who accepted each stage", doc.includes("Mahesh Joshi"));
+const leak = doc.match(/Ramesh Patel|Suresh Rana|INTERNAL-REMARK|re-machined|Motor supplier|Trial bay busy|\bRating\b|ON HOLD|Over by|target/i);
+ok("customer report has no worker team, remarks, delays, time targets, holds or ratings", !leak, leak ? `found "${leak[0]}" near: ${doc.slice(Math.max(0, leak.index - 80), leak.index + 40).replace(/\n/g, " | ")}` : "");
 let sz = await sigBoxes();
 ok("customer report signatures are small (≤160×60)", sz.every((r) => r.w <= 160 && r.h <= 60), JSON.stringify(sz));
 await shoot("1-customer-report");

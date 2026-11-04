@@ -3935,3 +3935,6 @@ button.rack-btn:disabled { background: #e5e7eb !important; color: #6b7280 !impor
   .mr-doc .rpt-sigbox.rpt-sigbox-sm { width: 26mm; height: 9mm; }
   .mr-doc .rpt-sigbox.rpt-sigbox-sm img { max-height: 8.5mm; max-width: 26mm; }
 }
+/* Report Center → Comments: dates stay on one line (date, time). */
+.report-area [data-report-center-comments] td[data-col="RaisedAt"],
+.report-area [data-report-center-comments] td[data-col="CompletedAt"] { white-space: nowrap; }

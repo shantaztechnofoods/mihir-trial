@@ -15125,7 +15125,7 @@ function AtoZMachineReport({
                     {(h.acceptedByName || userName(h.acceptedBy)) && <div className="mr-label" data-report-accepted-by>by {h.acceptedByName || userName(h.acceptedBy)}</div>}
                     {h.acceptedAt && h.acceptedInDepartment && h.acceptedInDepartment !== h.toDepartment && <div className="mr-label">into {h.acceptedInDepartment}</div>}
                     {show.showEmployees !== false && Array.isArray(h.acceptedByTeamSnapshot) && h.acceptedByTeamSnapshot.length > 0 && (
-                      <div className="mr-label" data-report-accept-team>team: {h.acceptedByTeamSnapshot.map((x) => (x && (x.fullName || x.username || x.name)) || "").filter(Boolean).join(", ")}</div>
+                      <div className="mr-label" data-report-accept-team>team: {h.acceptedByTeamSnapshot.map((x) => (x && (x.fullName || x.username || x.name)) || "").filter((n) => n && n !== (h.acceptedByName || userName(h.acceptedBy))).join(", ") || "—"}</div>
                     )}
                     <div className="mr-label">Accept window {dur(h.acceptTimeoutMinutes)}</div>
                     {h.status === "accepted" && !(h.acceptedSignatureSvg || h.mainEmployeeSignatureSvg) && <div className="mr-label">Signed on file (earlier record)</div>}
@@ -15254,7 +15254,7 @@ function AtoZMachineReport({
           {parts.length > 0 && <Group title="Parts pending and received" list={parts} attr={{ "data-report-parts": "" }} />}
           {commentGroups.length > 0 && (
             <div data-report-comments>
-              {commentGroups.map((g) => <Group key={g.dept} title={`Comments · ${g.dept}`} list={g.rows} attr={{ "data-report-comments-dept": g.dept }} />)}
+              {commentGroups.map((g) => <Group key={g.dept} title={`Comments raised in ${g.dept}`} list={g.rows} attr={{ "data-report-comments-dept": g.dept }} />)}
             </div>
           )}
           {followUps.length > 0 && <Group title="Checklist follow-ups" list={followUps} attr={{ "data-report-followups": "" }} />}
@@ -15655,12 +15655,16 @@ function rptDeptRecords(machine, handovers = [], checklistResponses = [], rating
 // 💬 Comments: work rows raised per department (no part named), not the
 // automatic follow-ups an unticked checklist point creates.
 const rptIsComment = (p) => !!p && !pendingItemIsPart(p) && !/^Checklist not completed/.test(String(p.description || ""));
-function rptCommentGroups(pendingItems = [], { completedOnly = false } = {}) {
+// by "raised" (default): the department that raised it. by "done": the
+// department that completed it (else the one asked to do it) — the customer
+// copy files finished work under the stage that did it.
+function rptCommentGroups(pendingItems = [], { completedOnly = false, by = "raised" } = {}) {
+  const keyOf = (p) => (by === "done" ? (p.resolvedInDepartment || p.assignedDepartment || p.raisedInDepartment) : p.raisedInDepartment) || "Unassigned";
   const list = (pendingItems || []).filter(rptIsComment).filter((p) => !completedOnly || p.status === "resolved")
     .slice().sort((a, b) => String(a.raisedAt || "").localeCompare(String(b.raisedAt || "")));
   const order = (d) => { const i = RPT_STAGE_DEPTS.indexOf(d); return i < 0 ? 50 : i; };
-  const depts = [...new Set(list.map((p) => p.raisedInDepartment || "Unassigned"))].sort((a, b) => order(a) - order(b) || a.localeCompare(b));
-  return depts.map((d) => ({ dept: d, rows: list.filter((p) => (p.raisedInDepartment || "Unassigned") === d) }));
+  const depts = [...new Set(list.map(keyOf))].sort((a, b) => order(a) - order(b) || a.localeCompare(b));
+  return depts.map((d) => ({ dept: d, rows: list.filter((p) => keyOf(p) === d) }));
 }
 // Critical items fitted to one machine, with the serial numbers recorded and
 // who issued / verified them. Sources: the BOM Outward (outward_log items'
@@ -15707,13 +15711,17 @@ const rptCriticalSummary = (rows) => {
 
 // One department stage as a record block (customer and company reports).
 // `customer`: neutral wording; no delay reasons, ratings or internal team.
-function RptDeptRecord({ r, customer = false, comments = [], users = [], certNo = "" }) {
+// Customer copy: an unticked point never prints the worker's remark; it reads
+// "Fixed before dispatch" when its checklist follow-up job was completed.
+const rptPointFixed = (label, jobs = []) => (jobs || []).some((p) => p.status === "resolved"
+  && /^Checklist not completed/.test(String(p.description || "")) && String(p.description || "").includes(`: ${String(label || "").trim() || "item"}`));
+function RptDeptRecord({ r, customer = false, comments = [], users = [], certNo = "", jobs = [] }) {
   const stateText = r.state === "done" ? "Completed" : r.state === "current" ? "In progress" : "Not started";
   const timeText = r.actual || r.target ? `${rptDur(r.actual)}${r.target ? ` · target ${rptDur(r.target)}` : ""}` : "—";
   const facts = [
     ["In", rptFmtDT(r.inAt) || "—"],
     ["Out", r.dept === "Ready" ? (r.state === "done" ? "Released" : "—") : (rptFmtDT(r.outAt) || "—")],
-    ["Time taken", r.dept === "Ready" ? "—" : timeText, !customer && r.over > 0],
+    ...(customer ? [] : [["Time taken", r.dept === "Ready" ? "—" : timeText, r.over > 0]]),
   ];
   const sig = r.accepted && r.accepted.sig ? svgDataUri(r.accepted.sig) : "";
   return (
@@ -15743,7 +15751,9 @@ function RptDeptRecord({ r, customer = false, comments = [], users = [], certNo 
       {r.notes.length > 0 && <div className="mr-label rpt-dept-line">{r.notes.map((h) => h.note).join(" · ")}</div>}
       <div className="rpt-dept-checks" data-report-quality>
         {r.checks.length === 0 ? <div className="mr-label">{r.state === "pending" ? "Checklists are recorded when this stage is worked." : "No checklist was set for this stage."}</div> : r.checks.map((cr) => {
-          const ans = cr.answers || []; const done = ans.filter((a) => a.checked).length;
+          const ans = cr.answers || [];
+          const fixed = (a) => customer && !a.checked && rptPointFixed(a.label, jobs);
+          const done = ans.filter((a) => a.checked || fixed(a)).length;
           return (
             <div key={cr.id} className="rpt-cl" data-report-dept-checklist={cr.stage || ""}>
               <div className="rpt-cl-head">
@@ -15751,13 +15761,17 @@ function RptDeptRecord({ r, customer = false, comments = [], users = [], certNo 
                 <span className="mr-label"> · {cr.templateName || "Checklist"}{cr.submittedAt ? ` · ${rptFmtDT(cr.submittedAt)}` : ""}{!customer && rptUserName(users, cr.submittedBy) ? ` · ${rptUserName(users, cr.submittedBy)}` : ""}</span>
                 <span className={`rpt-cl-score ${done === ans.length ? "mr-green" : "mr-red"}`}>{done} of {ans.length} OK</span>
               </div>
-              {ans.map((a, i) => (
-                <div key={i} className="rpt-cl-row">
-                  <span className={`rpt-tick ${a.checked ? "is-ok" : "is-no"}`} aria-label={a.checked ? "OK" : "Not OK"}>{a.checked ? "✓" : "✗"}</span>
-                  <span className="min-w-0">{a.label}</span>
-                  <span className="mr-label min-w-0">{a.remark || ""}</span>
-                </div>
-              ))}
+              {ans.map((a, i) => {
+                const ok = a.checked || fixed(a);
+                const note = !customer ? (a.remark || "") : a.checked ? "OK" : ok ? "Fixed before dispatch" : "Follow-up in progress";
+                return (
+                  <div key={i} className="rpt-cl-row" data-report-point={a.checked ? "ok" : ok ? "fixed" : "open"}>
+                    <span className={`rpt-tick ${ok ? "is-ok" : "is-no"}`} aria-label={ok ? "OK" : "Not OK"}>{ok ? "✓" : "✗"}</span>
+                    <span className="min-w-0">{a.label}</span>
+                    <span className="mr-label min-w-0">{note}</span>
+                  </div>
+                );
+              })}
             </div>
           );
         })}
@@ -15836,7 +15850,7 @@ function CustomerMachineReport({ machineId, machineLog = [], bomDefs = {}, hando
   // remark. Neutral wording: no delay reasons, holds, ratings or worker team.
   const records = rptDeptRecords(machine, handovers, checklistResponses);
   const machinePending = (pendingHandoverItems || []).filter((p) => String(p.machineId) === String(machine.id));
-  const commentGroups = rptCommentGroups(machinePending, { completedOnly: true });
+  const commentGroups = rptCommentGroups(machinePending, { completedOnly: true, by: "done" });
   const commentsOf = (d) => ((commentGroups.find((g) => g.dept === d) || {}).rows || []);
   const otherComments = commentGroups.filter((g) => !RPT_STAGE_DEPTS.includes(g.dept)).flatMap((g) => g.rows);
   const critical = rptCriticalItems({ machine, outwardLog, auditLog, items, pendingItems: machinePending, allUsers });
@@ -15847,7 +15861,8 @@ function CustomerMachineReport({ machineId, machineLog = [], bomDefs = {}, hando
   const buildDays = (() => { const a = rptMs(machine.createdDate); const b = machine.completedDate ? rptMs(machine.completedDate) : null; return a != null && b != null && b >= a ? Math.max(1, Math.round((b - a) / 86400000)) : null; })();
   const certSigs = trialCertSignatureRows(machine, handovers);
   const companyName = rptCompany(settings).name || RPT_LEGAL_NAME;
-  const points = records.reduce((s, r) => s + r.points, 0), passed = records.reduce((s, r) => s + r.passed, 0);
+  const points = records.reduce((s, r) => s + r.points, 0);
+  const passed = records.reduce((s, r) => s + r.checks.flatMap((cr) => cr.answers || []).filter((a) => a.checked || rptPointFixed(a.label, machinePending)).length, 0);
   return (
     <ReportSheet kind="customer" settings={settings} title="Customer machine report" refText={ref} generatedBy={generatedBy}>
       {/* 2026-11-03 — no photo set: no empty grey box, the facts take the width. */}
@@ -15874,7 +15889,7 @@ function CustomerMachineReport({ machineId, machineLog = [], bomDefs = {}, hando
           .map((g) => <div key={g.k} className="mr-sum"><div className="mr-sum-v">{g.v}</div><div className="mr-label">{g.k}</div></div>)}
       </div>
       <RptSec n="01" title="Stage-by-stage record" count={`${records.length} stages`} attr={{ "data-report-journey": "" }}>
-        {records.map((r) => <RptDeptRecord key={r.dept} r={r} customer comments={commentsOf(r.dept)} users={allUsers} certNo="04" />)}
+        {records.map((r) => <RptDeptRecord key={r.dept} r={r} customer comments={commentsOf(r.dept)} users={allUsers} certNo="04" jobs={machinePending} />)}
         {otherComments.length > 0 && (
           <div className="rpt-dept-comments" data-report-dept-comments="Other">
             <div className="mr-label font-semibold">Other finishing work completed</div>
@@ -16080,7 +16095,7 @@ function ReportCenterPage({
     { id: "owner",      label: "Owner summary",   hint: "performance at a glance" },
     { id: "department", label: "Department-wise", hint: "per department" },
     { id: "stuck",      label: "Where it sticks", hint: "delays, holds, pending" },
-    { id: "comments",   label: "Comments",        hint: "department-wise, with completion" },
+    { id: "comments",   label: "Comments and work jobs", hint: "department-wise, with completion" },
     { id: "machine",    label: "Machine journey", hint: "BOM to Ready, one machine" },
     { id: "monthly",    label: "Monthly",         hint: "month by month" },
     { id: "customer",   label: "Customer",        hint: "progress PDF to send" },
@@ -16551,7 +16566,7 @@ function ReportCenterPage({
               <ReportKPI label={T("Total machines")} value={summary.total} color="#2E50D6" />
               <ReportKPI label={T("Active")} value={summary.active} color="#D97706" />
               <ReportKPI label={T("Completed")} value={summary.completed} color="#22c55e" />
-              <ReportKPI label={T("Avg rating")} value={summary.avgRating ?? "—"} color="#eab308" suffix={summary.avgRating ? "★" : ""} />
+              <ReportKPI label={T("Avg rating")} value={summary.avgRating ?? "—"} color="#eab308" suffix={summary.avgRating ? " / 5" : ""} />
               <ReportKPI label={T("Delayed handovers")} value={summary.delayedHandovers} color="#ef4444" />
               <ReportKPI label={T("Held handovers")} value={summary.heldHandovers} color="#ef4444" />
               <ReportKPI label={T("Open pending items")} value={summary.openPending} color="#D97706" />
@@ -16580,11 +16595,11 @@ function ReportCenterPage({
           const depts = [...new Set(commentRows.map((r) => r.Department))];
           return (
             <div className="space-y-5" data-report-center-comments>
-              <div className="text-[12px] text-slate-600 no-print">{commentRows.length} comment{commentRows.length === 1 ? "" : "s"} · {commentRows.filter((r) => r.Status === "Completed").length} completed · grouped by the department that raised them. Use From / To for the period.</div>
+              <div className="text-[12px] text-slate-600">{commentRows.length} comment{commentRows.length === 1 ? "" : "s"} and work jobs · {commentRows.filter((r) => r.Status === "Completed").length} completed · grouped by the department that raised them<span className="no-print"> · use From / To for the period</span>.</div>
               {depts.length === 0 && <ReportTable title={T("Comments")} rows={[]} t={T} users={allUsers} />}
               {depts.map((d) => {
                 const rows = commentRows.filter((r) => r.Department === d).map(({ Department, ...rest }) => rest);
-                return <div key={d} data-report-center-comments-dept={d}><ReportTable title={`${d} · comments`} rows={rows} t={T} users={allUsers} /></div>;
+                return <div key={d} data-report-center-comments-dept={d}><ReportTable title={`Comments raised in ${d}`} rows={rows} t={T} users={allUsers} /></div>;
               })}
             </div>
           );
@@ -16743,7 +16758,7 @@ function DepartmentScoreboard({ rows = [], openIssues = [], waitingNow = [] }) {
                     {issues || "—"}
                   </td>
                   <td className="px-3 py-2 text-[11px] text-right font-bold text-yellow-600" style={{ letterSpacing: "0.06em" }}>
-                    {r.avgRating === null ? "—" : `${formatRatingBadge(r.avgRating)} ${r.avgRating}`}
+                    {r.avgRating === null ? "—" : `${Number(r.avgRating).toFixed(1)} / 5`}
                   </td>
                 </tr>
               );

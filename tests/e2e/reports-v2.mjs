@@ -45,6 +45,7 @@ const v2 = () => {
   pj.push(
     { id: 31, machineId: 5, description: "Side cover not painted", assignedDepartment: "Mechanical", raisedInDepartment: "Mechanical", raisedBy: "super_admin_001", kind: "owed", status: "resolved", raisedAt: iso(6.5), resolvedAt: iso(6), resolvedBy: "super_admin_001", resolvedInDepartment: "Mechanical", resolutionNotes: "Painted and dried", receivedQty: 0, receipts: [] },
     { id: 32, machineId: 5, description: "Cable tie loose near motor", assignedDepartment: "Electrical", raisedInDepartment: "Electrical", raisedBy: "super_admin_001", kind: "owed", status: "resolved", raisedAt: iso(4.5), resolvedAt: iso(4.2), resolvedBy: "super_admin_001", resolvedInDepartment: "Electrical", resolutionNotes: "Re-tied with clamp", receivedQty: 0, receipts: [] },
+    { id: 34, machineId: 5, description: "Checklist not completed (Before Transfer): Panel gland sealed", assignedDepartment: "Electrical", raisedInDepartment: "Electrical", raisedBy: "super_admin_001", kind: "owed", status: "resolved", raisedAt: iso(4.1), resolvedAt: iso(3.9), resolvedBy: "super_admin_001", resolvedInDepartment: "Electrical", resolutionNotes: "Gland fitted", receivedQty: 0, receipts: [] },
     { id: 33, machineId: 5, description: "Warning label to be stuck", assignedDepartment: "Electrical", raisedInDepartment: "Electrical", raisedBy: "super_admin_001", kind: "owed", status: "open", raisedAt: iso(4.4), receivedQty: 0, receipts: [] },
   );
   S("erp_pending_handover_items", pj);
@@ -69,11 +70,14 @@ ok("customer: letterhead carries the legal name", (await p.locator("[data-report
 for (const d of ["Assembly", "Mechanical", "Electrical", "Trial", "Ready"])
   ok(`customer: department section ${d}`, await p.locator(`[data-report-dept="${d}"]`).count() === 1);
 const elec = await p.locator('[data-report-dept="Electrical"]').innerText();
-ok("customer: Electrical shows in/out, time vs target and who accepted", /In\b/.test(elec) && /target/.test(elec) && elec.includes("Mahesh Joshi"), elec.replace(/\n/g, " | ").slice(0, 300));
-ok("customer: Electrical shows its during-work and dispatch checklists with ✓ / ✗ and remark",
+ok("customer: Electrical shows in / out dates and who accepted, no time target", /In\b/.test(elec) && /Out\b/.test(elec) && !/target/.test(elec) && elec.includes("Mahesh Joshi"), elec.replace(/\n/g, " | ").slice(0, 300));
+ok("customer: Electrical shows its during-work and dispatch checklists",
   await p.locator('[data-report-dept="Electrical"] [data-report-dept-checklist="during_work"]').count() === 1
   && await p.locator('[data-report-dept="Electrical"] [data-report-dept-checklist="before_dispatch"]').count() === 1
-  && elec.includes("Panel gland sealed") && elec.includes("✗") && elec.includes("gland on order"));
+  && elec.includes("Panel gland sealed") && elec.includes("Earthing continuity"));
+ok("customer: an unticked point that was fixed reads Fixed before dispatch, never the worker's remark",
+  await p.locator('[data-report-dept="Electrical"] [data-report-point="fixed"]').count() === 1 && elec.includes("Fixed before dispatch") && !doc.includes("gland on order") && !doc.includes("INTERNAL-REMARK"));
+ok("customer: an unticked point still open reads Follow-up in progress", (await p.locator('[data-report-dept="Assembly"]').innerText()).includes("Follow-up in progress"));
 ok("customer: Mechanical before-receive checklist listed", (await p.locator('[data-report-dept="Mechanical"]').innerText()).includes("Frame received square"));
 ok("customer: Trial and Ready checklists listed", (await p.locator('[data-report-dept="Trial"]').innerText()).includes("Machine clean for trial") && (await p.locator('[data-report-dept="Ready"]').innerText()).includes("Name plate fixed"));
 ok("customer: acceptance signatures printed per department", await p.locator("[data-report-dept] [data-report-dept-accepted] img").count() >= 4);
@@ -84,6 +88,8 @@ ok("customer: critical summary line", /2 critical items, all serials recorded/.t
 ok("customer: completed comments under their departments",
   (await p.locator('[data-report-dept-comments="Mechanical"]').innerText()).includes("Side cover not painted")
   && (await p.locator('[data-report-dept-comments="Electrical"]').innerText()).includes("Cable tie loose near motor"));
+ok("customer: finished work is filed under the department that did it (Touch-up paint → Assembly)",
+  (await p.locator('[data-report-dept-comments="Assembly"]').innerText()).includes("Touch-up paint") && await p.locator('[data-report-dept-comments="Trial"]').count() === 0);
 ok("customer: open comment is not on the customer copy", !doc.includes("Warning label to be stuck"));
 ok("customer: no delay reasons, holds or ratings", !/re-machined|Motor supplier|Trial bay busy|\bRating\b|ON HOLD|Over by/i.test(doc));
 ok("customer: sign-off names the same company", (await p.locator("[data-report-customer-signoff]").innerText()).toUpperCase().includes(`FOR ${LEGAL}`));
@@ -97,6 +103,8 @@ ok("company: BOM photo beside the machine details", await p.locator("[data-repor
 const ccrit = await p.locator("[data-report-critical]").innerText();
 ok("company: critical serials and who issued them", ccrit.includes("MTR-A1001") && ccrit.includes("MTR-A1002") && ccrit.includes("Store Keeper"), ccrit.replace(/\n/g, " | ").slice(0, 300));
 ok("company: critical summary", /2 critical items, all serials recorded/.test(await p.locator("[data-report-critical-summary]").first().innerText()));
+ok("company: comment groups are titled by the department that raised them", (await p.locator('[data-report-comments-dept="Electrical"]').innerText()).includes("Comments raised in Electrical"));
+ok("company: checklist remark kept verbatim on the internal copy", doc.includes("gland on order") && /target/.test(doc));
 ok("company: comments grouped by department (Mechanical, Electrical)",
   await p.locator('[data-report-comments-dept="Mechanical"]').count() === 1 && await p.locator('[data-report-comments-dept="Electrical"]').count() === 1);
 const ce = await p.locator('[data-report-comments-dept="Electrical"]').innerText();
