@@ -3759,6 +3759,8 @@ button.rack-btn:disabled { background: #e5e7eb !important; color: #6b7280 !impor
   .mr-doc .rpt-signoff-sec .mr-sign-line { height: 22pt; }
   .mr-doc .rpt-signoff-sec .rpt-sigtable .mr-tr { padding: 2.5pt 0; }
   .mr-doc .rpt-signoff-sec > p { break-after: avoid; }
+  /* Customer report: the (compact) certificate stays on one page. */
+  .mr-doc.rpt-customer .mr-cert { break-inside: avoid; page-break-inside: avoid; }
   /* Letterhead and title block on paper */
   .rpt-lh { padding-bottom: 3.2mm; border-bottom: 0.6pt solid #8a8a8a; break-inside: avoid; }
   .rpt-lh .rpt-lh-logo, .mr-doc .rpt-lh .rpt-lh-logo { height: 17mm; max-width: 70mm; margin-bottom: 2mm; }
@@ -3786,7 +3788,8 @@ button.rack-btn:disabled { background: #e5e7eb !important; color: #6b7280 !impor
   .mr-doc .mr-step.is-done { border-top-color: #111; }
   .mr-doc .mr-step.is-current { border-top-color: var(--mr-amber); }
   .mr-doc .mr-step.is-pending { border-top-color: #cfcfcf; }
-  /* No app controls on paper. */
+  /* No app controls on paper (the hidden offline banner's shadow printed as a hairline above the logo). */
+  .offline-banner { display: none !important; }
   .mr-doc button, .mr-doc [data-voice-play], .mr-doc .rpt-voice-play { display: none !important; }
   .mr-doc .rpt-voice-row { grid-template-columns: minmax(0, 1fr); }
   /* Clean page breaks: rows, issues, signatures and checklist blocks never split;
@@ -3826,6 +3829,10 @@ button.rack-btn:disabled { background: #e5e7eb !important; color: #6b7280 !impor
   .report-area .rpt-wide td::before { content: attr(data-l); display: block; font-size: 6.4pt; color: #666 !important; text-transform: uppercase; letter-spacing: 0.04em; }
   .report-area .rpt-wide td:empty::after { content: "—"; color: #999; }
   .report-area .rounded-xl, .report-area .rounded-lg { border-radius: 2px !important; box-shadow: none !important; }
+  /* A table title never ends a page without its rows; an empty table box never splits. */
+  .report-area .rpt-table-wrap > div:first-child, .report-area .rpt-table-wrap thead { break-after: avoid; page-break-after: avoid; }
+  .report-area .rpt-table-wrap tbody tr:first-child { break-before: avoid; page-break-before: avoid; }
+  .report-area .rpt-table-empty { break-inside: avoid; page-break-inside: avoid; padding: 4mm 0 !important; }
   /* KPI tiles: flat ruled boxes on paper, no coloured dot. */
   .report-area .kpi-tile { box-shadow: none !important; border: 0.5pt solid #bdbdbd !important; border-radius: 2px !important; padding: 2.5mm 3mm !important; background: #fff !important; transform: none !important; }
   .report-area .kpi-tile > .flex:first-child { display: none !important; }

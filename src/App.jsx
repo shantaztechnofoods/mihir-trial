@@ -16021,9 +16021,10 @@ function ReportCenterPage({
       if (!uid) return "";
       if (Array.isArray(h.workedBySnapshot)) {
         const s = h.workedBySnapshot.find((x) => x && x.id === uid);
-        if (s && (s.fullName || s.username)) return s.fullName || s.username;
+        if (s && (s.fullName || s.username || s.name)) return s.fullName || s.username || s.name;
       }
-      return uid;
+      // 2026-11-04 — same fallback as the machine report: no raw "emp:" prefix.
+      return String(uid).startsWith("emp:") ? String(uid).slice(4) : uid;
     };
     const workerNames = Array.isArray(h.workedBy)
       ? h.workedBy.map(nameOf).filter(Boolean).join("; ")
@@ -16178,11 +16179,11 @@ function ReportCenterPage({
             title, date range and print date once. Not on the Machine journey
             tab: that report carries its own letterhead (it printed twice, with
             an empty first page). */}
-        {tab !== "machine" && <RptPageStyle page="rc-report" head={`${rptCompany(settings).name || "Shantaz Technofoods"} · ${(tabs.find((t) => t.id === tab) || {}).label || ""} ${T("Report")}`} foot={`${(tabs.find((t) => t.id === tab) || {}).label || ""} ${T("Report")}`} />}
+        {tab !== "machine" && <RptPageStyle page="rc-report" head={`${rptCompany(settings).name || "Shantaz Technofoods"} · ${(tabs.find((t) => t.id === tab) || {}).label || ""} ${String(T("Report")).toLowerCase()}`} foot={`${(tabs.find((t) => t.id === tab) || {}).label || ""} ${String(T("Report")).toLowerCase()}`} />}
         {tab !== "machine" && (
           <div className="hidden print:block rpt-doc rpt-rc-head" data-report-center-head>
             <RptLetterhead company={rptCompany(settings)} showLogo={rc.showLogo !== false} line={rc.companyLine || ""} />
-            <RptTitleBlock title={`${(tabs.find((t) => t.id === tab) || {}).label || ""} ${T("Report")}`}
+            <RptTitleBlock title={`${(tabs.find((t) => t.id === tab) || {}).label || ""} ${String(T("Report")).toLowerCase()}`}
                            sub={(dateFrom || dateTo) ? `${T("Date")}: ${dateFrom ? rptFmtD(dateFrom) : "…"} – ${dateTo ? rptFmtD(dateTo) : "…"}` : ""}
                            dateLabel={T("Printed on")} dateText={rptFmtD(new Date())} titleAttr={false} />
           </div>
@@ -16506,7 +16507,7 @@ const rptCellText = (v) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\
 function ReportTable({ title, rows, t = (k) => k, users = [] }) {
   if (!rows || rows.length === 0) {
     return (
-      <div className="rounded-xl py-14 text-center" style={{ background: "rgba(17,24,39,0.03)", border: "1px solid rgba(17,24,39,0.10)" }}>
+      <div className="rounded-xl py-14 text-center rpt-table-empty" style={{ background: "rgba(17,24,39,0.03)", border: "1px solid rgba(17,24,39,0.10)" }}>
         <div className="text-sm font-bold text-slate-400 mb-1">{title}</div>
         <div className="text-[11px] text-slate-600">No records match the current filters.</div>
       </div>
@@ -16514,10 +16515,12 @@ function ReportTable({ title, rows, t = (k) => k, users = [] }) {
   }
   const columns = Object.keys(rows[0]);
   const userById = new Map((users || []).map((u) => [String(u.id), u.fullName || u.username || ""]));
-  const cellText = (v) => (typeof v === "string" && userById.get(v) ? userById.get(v) : rptCellText(v));
-  // Wide data tables (10+ columns) print as one labelled block per row (print CSS), so every field stays readable on A4.
+  const cellText = (v, col) => (typeof v === "string" && userById.get(v) ? userById.get(v)
+    : /status$/i.test(col) && typeof v === "string" && /^[a-z]/.test(v) ? v.charAt(0).toUpperCase() + v.slice(1).replace(/_/g, " ")
+    : rptCellText(v));
+  // Very wide data tables (13+ columns) print as one labelled block per row (print CSS), so every field stays readable on A4.
   return (
-    <div className={`rounded-xl overflow-hidden rpt-table-wrap${columns.length > 9 ? " rpt-wide" : ""}`} style={{ background: "rgba(17,24,39,0.03)", border: "1px solid rgba(17,24,39,0.10)" }}>
+    <div className={`rounded-xl overflow-hidden rpt-table-wrap${columns.length > 12 ? " rpt-wide" : ""}`} style={{ background: "rgba(17,24,39,0.03)", border: "1px solid rgba(17,24,39,0.10)" }}>
       <div className="px-4 py-3 text-[11px] font-black text-slate-500 border-b border-slate-200">{title}  ·  {rows.length} row{rows.length === 1 ? "" : "s"}</div>
       <div className="overflow-x-auto">
         <table className="w-full text-[11px]">
@@ -16532,7 +16535,7 @@ function ReportTable({ title, rows, t = (k) => k, users = [] }) {
             {rows.map((r, i) => (
               <tr key={i} className="border-t border-slate-200">
                 {columns.map((c) => (
-                  <td key={c} data-l={rptColLabel(t(c))} className="px-3 py-1.5 text-slate-500 whitespace-nowrap">{cellText(r[c])}</td>
+                  <td key={c} data-l={rptColLabel(t(c))} className="px-3 py-1.5 text-slate-500 whitespace-nowrap">{cellText(r[c], c)}</td>
                 ))}
               </tr>
             ))}
@@ -17355,8 +17358,7 @@ function printTrialCertificate(machine, cert, remarks = "", company = null) {
     "<meta name='viewport' content='width=device-width,initial-scale=1'/>" +
     "<title>" + tcEsc(title) + "</title>" +
     "<style>" + TC_SHEET_CSS +
-      "@page{size:A4 portrait;margin:0 0 7mm 0;@bottom-center{content:'Page ' counter(page) ' of ' counter(pages);font:7.5pt Arial,Helvetica,sans-serif;color:#6b7280}}" +
-      ".tc-sheet{min-height:290mm}" +
+      "@page{size:A4 portrait;margin:0}" +
       "html,body{margin:0;padding:0;background:#fff}" +
       ".tc-toolbar{display:flex;justify-content:center;gap:10px;padding:12px;background:#f1f5f9;border-bottom:1px solid #cbd5e1;font:600 13px Arial,Helvetica,sans-serif}" +
       ".tc-toolbar button{padding:7px 18px;border:1px solid #334155;background:#fff;color:#0f172a;border-radius:6px;cursor:pointer;font:600 13px Arial,Helvetica,sans-serif}" +
