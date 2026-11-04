@@ -6,7 +6,7 @@ import {
   voiceCaption, isVoiceAttachment, voiceNotesFor, formatClock, micErrorMessage, fillVoiceText,
   clearVoiceText, appendTranscript, readVoiceLang,
   VOICE_TRANSCRIBE_FN, VOICE_TRANSCRIBE_MAX_BYTES, bytesToBase64, blobToBase64, readTranscribeResult,
-  transcribeVoiceBlob, fillTranscript,
+  transcribeVoiceBlob, fillTranscript, tidySpoken, appendSpoken, isAppleMobile, VOICE_WRITE_PROMPT,
 } from "../src/utils/voiceNote.js";
 
 test("max length is 60 seconds", () => assert.equal(VOICE_MAX_SECONDS, 60));
@@ -146,4 +146,36 @@ test("fillTranscript fills only an empty box (or our old placeholder)", () => {
   assert.equal(fillTranscript("   ", "x"), "x");
   assert.equal(fillTranscript(VOICE_FALLBACK_TEXT, "x"), "x");
   assert.equal(fillTranscript("typed by worker", "x"), "typed by worker");
+});
+
+// ── 2026-11-04: mic writes text only ──
+test("tidySpoken: fillers out, capitalised, ends with a stop; Hindi gets ।; no translation", () => {
+  assert.equal(tidySpoken("  um the belt is   loose uh "), "The belt is loose.");
+  assert.equal(tidySpoken("motor is hot ."), "Motor is hot.");
+  assert.equal(tidySpoken("बेल्ट ढीला है"), "बेल्ट ढीला है।");
+  assert.equal(tidySpoken("પટ્ટો ઢીલો છે"), "પટ્ટો ઢીલો છે.");
+  assert.equal(tidySpoken("is it ok?"), "Is it ok?");
+  assert.equal(tidySpoken("umbrella stand"), "Umbrella stand.");
+  assert.equal(tidySpoken("   "), "");
+  assert.equal(tidySpoken(null), "");
+});
+
+test("appendSpoken: appends with a space, fills empty, ignores empty words, drops old placeholder", () => {
+  assert.equal(appendSpoken("", "Belt is loose."), "Belt is loose.");
+  assert.equal(appendSpoken("Checked.  ", "Belt is loose."), "Checked. Belt is loose.");
+  assert.equal(appendSpoken("Checked.", "  "), "Checked.");
+  assert.equal(appendSpoken("🎤 Voice note", "Belt is loose."), "Belt is loose.");
+  assert.equal(appendSpoken(undefined, "x"), "x");
+});
+
+test("isAppleMobile: iPhone / iPad (incl. desktop-mode iPad) only", () => {
+  assert.equal(isAppleMobile({ userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)" }), true);
+  assert.equal(isAppleMobile({ userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)", maxTouchPoints: 5 }), true);
+  assert.equal(isAppleMobile({ userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)", maxTouchPoints: 0 }), false);
+  assert.equal(isAppleMobile({ userAgent: "Mozilla/5.0 (Linux; Android 14) Chrome/120" }), false);
+  assert.equal(isAppleMobile(null), false);
+});
+
+test("failure prompt is short", () => {
+  assert.equal(VOICE_WRITE_PROMPT, "Could not hear — please type");
 });

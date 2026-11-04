@@ -91,16 +91,15 @@ await r2.locator("[data-check-ok]").check(); await p.waitForTimeout(200);
 ok("ticking ✓ closes the reason and un-presses ✕", await r2.locator("[data-check-reason]").count() === 0 && await r2.locator("[data-check-no]").getAttribute("aria-pressed") === "false");
 await r2.locator("[data-check-no]").click(); await p.waitForTimeout(200);
 ok("tapping ✕ on a ticked point unticks it", !(await r2.locator("[data-check-ok]").isChecked()) && await r2.locator("[data-check-reason]").count() === 1);
-// voice → server transcription (auto language) fills the reason
+// voice → server transcription (auto language) writes TEXT into the reason (2026-11-04: no audio kept)
 await mic.click(); await p.waitForTimeout(500);
-ok("recording shows a red dot + timer + Stop in the same line", await r2.locator("[data-voice-live] .vn-dot").count() === 1 && /Recording…\s*0:0\d/.test(await r2.locator("[data-voice-live]").innerText()) && await r2.locator("[data-voice-stop]").count() === 1);
+ok("listening shows a red dot + timer + Stop in the same line", await r2.locator("[data-voice-live] .vn-dot").count() === 1 && /Listening…\s*0:0\d/.test(await r2.locator("[data-voice-live]").innerText()) && await r2.locator("[data-voice-stop]").count() === 1);
 const bar = await r2.locator("[data-voice-live]").boundingBox();
 ok("the recording bar stays one line (≤ 46px)", bar && bar.height <= 46.5, String(bar && bar.height));
 await r2.locator("[data-voice-stop]").click(); await p.waitForTimeout(900);
 ok("after Stop the words are written into the reason (Gujarati, no picker)", (await r2.locator("[data-check-reason] input").inputValue()) === "ફ્રેમ પર ઘસારો છે" && await p.evaluate(() => window.__calls) === 1);
-ok("audio still saved as a voice note", ((await ls(p, "erp_attachments")) || []).some((a) => /^audio\//.test(a.mimeType || "") && a.caption.startsWith("Accept checklist")));
-const saved = await r2.locator("[data-voice-player]").boundingBox();
-ok("saved player is one small line (≤ 44px)", saved && saved.height <= 44.5, String(saved && saved.height));
+ok("no audio saved and no player — text only", !((await ls(p, "erp_attachments")) || []).some((a) => /^audio\//.test(a.mimeType || "")) && await r2.locator("[data-voice-player], audio").count() === 0);
+ok("the 🎤 is back in the box for more words", await r2.locator("[data-voice-record]").count() === 1);
 if (SHOTS) { await r2.scrollIntoViewIfNeeded(); await p.screenshot({ path: `${SHOTS}/compact-checklist-reason-390x844.png` }); }
 
 // Mark all OK, untick one: no reason box yet; Confirm flags it and opens it
