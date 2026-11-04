@@ -15106,7 +15106,7 @@ function AtoZMachineReport({
       {machineHandovers.length === 0 ? <p className="mr-empty">No hand-overs recorded yet. The machine is at {machine.stage}.</p> : (
         <div className="mr-table">
           {/* 2026-11-04 — signatures moved to the one signature register (section 07). */}
-          <div className="mr-tr mr-th" style={{ gridTemplateColumns: "1.3fr 1.1fr 1.45fr 1fr 1.3fr 1fr" }}>
+          <div className="mr-tr mr-th" style={{ gridTemplateColumns: "1.25fr 1.05fr 1.4fr 1.15fr 1.25fr 1fr" }}>
             <div>Hand-over</div><div>Handed over</div><div>Accepted</div><div>Time / target</div>
             <div>{show.showEmployees !== false ? "Team (lead in bold)" : ""}</div><div>{show.showChecklists !== false ? "Checks" : ""}</div>
           </div>
@@ -15120,7 +15120,7 @@ function AtoZMachineReport({
             const over = (h.overrunMinutes || 0) > 0;
             return (
               <div key={h.id} className="mr-hop">
-                <div className="mr-tr" style={{ gridTemplateColumns: "1.3fr 1.1fr 1.45fr 1fr 1.3fr 1fr" }}>
+                <div className="mr-tr" style={{ gridTemplateColumns: "1.25fr 1.05fr 1.4fr 1.15fr 1.25fr 1fr" }}>
                   <div className="mr-td" data-l="Hand-over"><div>
                     <div className="font-semibold">{h.fromDepartment} → {h.toDepartment}</div>
                     <div className={h.status === "accepted" ? "mr-green mr-small" : h.status === "pending" ? "mr-amber mr-small" : "mr-muted mr-small"}>
@@ -15132,15 +15132,15 @@ function AtoZMachineReport({
                   <div className="mr-td" data-l="Accepted"><div>
                     <div>{h.acceptedAt ? fmtDT(h.acceptedAt) : h.status === "pending" ? "Waiting" : "—"}</div>
                     {(h.acceptedByName || userName(h.acceptedBy)) && <div className="mr-label" data-report-accepted-by>by {h.acceptedByName || userName(h.acceptedBy)}</div>}
-                    {h.acceptedAt && (h.acceptedInDepartment || h.toDepartment) && <div className="mr-label">into {h.acceptedInDepartment || h.toDepartment}</div>}
+                    {h.acceptedAt && h.acceptedInDepartment && h.acceptedInDepartment !== h.toDepartment && <div className="mr-label">into {h.acceptedInDepartment}</div>}
                     {show.showEmployees !== false && Array.isArray(h.acceptedByTeamSnapshot) && h.acceptedByTeamSnapshot.length > 0 && (
                       <div className="mr-label" data-report-accept-team>team: {h.acceptedByTeamSnapshot.map((x) => (x && (x.fullName || x.username || x.name)) || "").filter(Boolean).join(", ")}</div>
                     )}
                     <div className="mr-label">Accept window {dur(h.acceptTimeoutMinutes)}</div>
-                    {h.status === "accepted" && <div className="mr-label">{h.acceptedSignatureSvg || h.mainEmployeeSignatureSvg ? "Signed (section 07)" : "Signed on file (earlier record)"}</div>}
+                    {h.status === "accepted" && !(h.acceptedSignatureSvg || h.mainEmployeeSignatureSvg) && <div className="mr-label">Signed on file (earlier record)</div>}
                   </div></div>
                   <div className="mr-td" data-l="Time / target"><div>
-                    <div className={over ? "mr-red" : ""}>{!h.actualDurationMinutes && !h.expectedDurationMinutes ? "—" : `${dur(h.actualDurationMinutes)} of ${dur(h.expectedDurationMinutes)}`}</div>
+                    <div className={`rpt-nowrap ${over ? "mr-red" : ""}`}>{!h.actualDurationMinutes && !h.expectedDurationMinutes ? "—" : `${dur(h.actualDurationMinutes)} of ${dur(h.expectedDurationMinutes)}`}</div>
                     {over && <div className="mr-red mr-small">Over by {dur(h.overrunMinutes)}</div>}
                   </div></div>
                   <div className="mr-td" data-l="Team">{show.showEmployees !== false && (ordered.length
@@ -15160,6 +15160,7 @@ function AtoZMachineReport({
               </div>
             );
           })}
+          {machineHandovers.some((h) => h.acceptedSignatureSvg || h.mainEmployeeSignatureSvg) && <p className="mr-label rpt-table-note">Hand-over and acceptance signatures, with name, department and date, are in the signature register (section 07).</p>}
         </div>
       )}
       {/* 2026-11-03 — holds and late reasons for this machine (read-only). */}
@@ -15576,7 +15577,7 @@ function ReportSheet({ kind, settings = {}, title, subtitle = "", refText = "", 
             <RptTitleBlock title={title} sub={subtitle} refText={refText} dateText={rptFmtD(now)} />
           </div>
           {children}
-          <div className="mr-footnote" data-report-generated>Generated from ERP records on {issued}{generatedBy ? ` by ${generatedBy}` : ""}.</div>
+          <div className="mr-footnote" data-report-generated>Generated from ERP records on {issued}{generatedBy && internal ? ` by ${generatedBy}` : ""}.</div>
         </td></tr></tbody>
       </table>
     </div>
@@ -15663,11 +15664,7 @@ function CustomerMachineReport({ machineId, machineLog = [], bomDefs = {}, hando
           </div>
         )}
       </RptSec>
-      <RptSec n="03" title="Trial certificate" cls={cert ? "mr-cert-sec" : ""} attr={{ "data-report-trial": "" }}>
-        {cert ? <div className="mr-cert"><style>{TC_SHEET_CSS}</style><TrialCertificateSheet machine={machine} cert={cert} embedded /></div>
-              : <p className="mr-empty">The machine is run under load at Trial; its certificate is added here when the trial is complete.</p>}
-      </RptSec>
-      <RptSec n="04" title="Documents for you" count={docs.length} attr={{ "data-report-docs": "" }}>
+      <RptSec n="03" title="Documents for you" count={docs.length} attr={{ "data-report-docs": "" }}>
         {docs.length === 0 ? <p className="mr-empty">No documents shared yet.</p> : (
           <div className="mr-table">
             <div className="mr-tr mr-th" style={{ gridTemplateColumns: "3fr 1fr 1.2fr" }}><div>Document</div><div>Type</div><div>Date</div></div>
@@ -15681,7 +15678,11 @@ function CustomerMachineReport({ machineId, machineLog = [], bomDefs = {}, hando
           </div>
         )}
       </RptSec>
-      <RptSec n="05" title="Final sign-off" cls="mr-avoid" attr={{ "data-report-customer-signoff": "" }}>
+      <RptSec n="04" title="Trial certificate" cls={cert ? "mr-cert-sec" : ""} attr={{ "data-report-trial": "" }}>
+        {cert ? <div className="mr-cert"><style>{TC_SHEET_CSS}</style><TrialCertificateSheet machine={machine} cert={cert} embedded /></div>
+              : <p className="mr-empty">The machine is run under load at Trial; its certificate is added here when the trial is complete.</p>}
+      </RptSec>
+      <RptSec n="05" title="Final sign-off" cls="rpt-signoff-sec" attr={{ "data-report-customer-signoff": "" }}>
         <p className="mr-small" style={{ marginBottom: 14 }}>We certify that the machine described above, serial no. <b className="mr-mono">{machine.serialNo || "—"}</b>, was built to its approved bill of materials, inspected at every stage and {cert ? "run on trial before release" : "will be run on trial before release"}.</p>
         {/* 2026-11-04 — the Trial signatures already captured print here with
             name, department and date; only the lines still to sign stay blank. */}
@@ -15723,12 +15724,12 @@ function OnHoldReport({ period = "this_month", machineLog = [], handovers = [], 
       <RptSec n="01" title="Holds in this period" count={rows.length} attr={{ "data-report-hold-list": "" }}>
         {rows.length === 0 ? <p className="mr-empty">No machine went on hold in this period.</p> : (
           <div className="mr-table">
-            <div className="mr-tr mr-th" style={{ gridTemplateColumns: "1.5fr 1.3fr 1.2fr 0.9fr 2fr 1.1fr" }}><div>Machine</div><div>Where</div><div>Since</div><div className="text-right">How long</div><div>Reason</div><div>Who</div></div>
+            <div className="mr-tr mr-th" style={{ gridTemplateColumns: "1.3fr 1.3fr 1.55fr 0.9fr 1.85fr 1.1fr" }}><div>Machine</div><div>Where</div><div>Since</div><div className="text-right">How long</div><div>Reason</div><div>Who</div></div>
             {rows.map((r) => (
-              <div key={r.key} className="mr-tr" data-report-hold-row={r.kind} style={{ gridTemplateColumns: "1.5fr 1.3fr 1.2fr 0.9fr 2fr 1.1fr" }}>
+              <div key={r.key} className="mr-tr" data-report-hold-row={r.kind} style={{ gridTemplateColumns: "1.3fr 1.3fr 1.55fr 0.9fr 1.85fr 1.1fr" }}>
                 <div className="mr-td" data-l="Machine"><div><div className="font-semibold">{r.bomKey}</div><div className="mr-label mr-mono">{r.serialNo || "—"}</div></div></div>
                 <div className="mr-td" data-l="Where"><div><div>{r.to ? `${r.from} → ${r.to}` : r.from || "—"}</div><div className={`mr-label ${r.open ? "mr-red" : ""}`}>{r.label}{r.open ? " · open" : ""}</div></div></div>
-                <div className="mr-td" data-l="Since"><div><div>{rptFmtDT(r.startAt) || "—"}</div>{r.endAt ? <div className="mr-label">to {rptFmtDT(r.endAt)}</div> : null}</div></div>
+                <div className="mr-td" data-l="Since"><div><div className="rpt-nowrap">{rptFmtDT(r.startAt) || "—"}</div>{r.endAt ? <div className="mr-label rpt-nowrap">to {rptFmtDT(r.endAt)}</div> : null}</div></div>
                 <div className={`mr-td md:text-right ${r.open ? "mr-red font-semibold" : ""}`} data-l="How long">{r.minutes != null ? rptDur(r.minutes) : "—"}</div>
                 <div className="mr-td" data-l="Reason">{r.reason || <span className="mr-muted">{r.kind === "overdue" ? "Waiting for the next department" : "No reason given"}</span>}</div>
                 <div className="mr-td" data-l="Who"><div><div>{r.by || "—"}</div>{r.releasedBy ? <div className="mr-label">released by {r.releasedBy}</div> : null}</div></div>
@@ -16170,13 +16171,14 @@ function ReportCenterPage({
 
       <Topbar title="Report Center" subtitle={`Operational + customer reports · ${filteredMachines.length} machine${filteredMachines.length === 1 ? "" : "s"} in scope`} />
 
-      <div className="p-6 space-y-5 report-area">
+      <div className={`p-6 space-y-5 report-area${tab !== "machine" ? " rpt-rc-paged" : ""}`}>
         {/* Print header (2026-10-30): logo + company details from Settings → Company,
             the extra line and language from Settings → Report Settings.
             2026-11-04 — the shared letterhead (logo centred), then the report
             title, date range and print date once. Not on the Machine journey
             tab: that report carries its own letterhead (it printed twice, with
             an empty first page). */}
+        {tab !== "machine" && <RptPageStyle page="rc-report" head={`${rptCompany(settings).name || "Shantaz Technofoods"} · ${(tabs.find((t) => t.id === tab) || {}).label || ""} ${T("Report")}`} foot={`${(tabs.find((t) => t.id === tab) || {}).label || ""} ${T("Report")}`} />}
         {tab !== "machine" && (
           <div className="hidden print:block rpt-doc rpt-rc-head" data-report-center-head>
             <RptLetterhead company={rptCompany(settings)} showLogo={rc.showLogo !== false} line={rc.companyLine || ""} />
@@ -16269,7 +16271,7 @@ function ReportCenterPage({
         {/* Tab content */}
         {tab === "owner" && (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 no-print">
               {ownerRows.slice(0, 9).map((r) => (
                 <div key={r.Metric} className="rounded-xl p-3" style={{ background: "rgba(17,24,39,0.03)", border: "1px solid rgba(17,24,39,0.10)" }}>
                   <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">{r.Metric}</div>
@@ -16277,15 +16279,15 @@ function ReportCenterPage({
                 </div>
               ))}
             </div>
-            <ReportTable title="Owner summary & performance" rows={ownerRows} t={T} />
-            <ReportTable title="Department-wise performance" rows={departmentRows} t={T} />
+            <ReportTable title="Owner summary & performance" rows={ownerRows} t={T} users={allUsers} />
+            <ReportTable title="Department-wise performance" rows={departmentRows} t={T} users={allUsers} />
           </div>
         )}
         {tab === "department" && (
-          <ReportTable title="Department-wise performance" rows={departmentRows} t={T} />
+          <ReportTable title="Department-wise performance" rows={departmentRows} t={T} users={allUsers} />
         )}
         {tab === "monthly" && (
-          <ReportTable title="Monthly production" rows={monthlyRows} t={T} />
+          <ReportTable title="Monthly production" rows={monthlyRows} t={T} users={allUsers} />
         )}
         {tab === "factory" && (
           <div>
@@ -16311,10 +16313,10 @@ function ReportCenterPage({
               openIssues={filteredPending.filter((p) => p.status === "open")}
               waitingNow={filteredHandovers.filter((h) => h.status === "pending")}
             />
-            <ReportTable title={T("Took longer than allowed")} rows={delayRows} t={T} />
-            <ReportTable title={T("Accepted late — the next department left it waiting")} rows={holdRows} t={T} />
-            <ReportTable title={T("Issues raised and still open")} rows={pendingRows} t={T} />
-            <ReportTable title={T("Department ratings")} rows={ratingRows} t={T} />
+            <ReportTable title={T("Took longer than allowed")} rows={delayRows} t={T} users={allUsers} />
+            <ReportTable title={T("Accepted late — the next department left it waiting")} rows={holdRows} t={T} users={allUsers} />
+            <ReportTable title={T("Issues raised and still open")} rows={pendingRows} t={T} users={allUsers} />
+            <ReportTable title={T("Department ratings")} rows={ratingRows} t={T} users={allUsers} />
           </div>
         )}
 
@@ -16375,13 +16377,13 @@ function ReportCenterPage({
           );
         })()}
 
-        {tab === "factory" && <ReportTable title={T("Every handover, in full")} rows={factoryRows} t={T} />}
+        {tab === "factory" && <ReportTable title={T("Every handover, in full")} rows={factoryRows} t={T} users={allUsers} />}
         {tab === "customer" && (
           <>
             <div className="rounded-lg px-3 py-2 text-[11px] no-print" style={{ background: "rgba(34,197,94,0.06)", color: "#15803d", border: "1px solid rgba(34,197,94,0.25)" }}>
               Customer-safe output. HOLD reasons, employee names, ratings, narration, and internal remarks are intentionally not shown.
             </div>
-            <ReportTable title={T("Customer Progress Report")} rows={customerRows} t={T} />
+            <ReportTable title={T("Customer Progress Report")} rows={customerRows} t={T} users={allUsers} />
           </>
         )}
         {(rc.footerNote || rc.signatureImage) && (
@@ -16497,8 +16499,11 @@ function ReportKPI({ label, value, color = "#2E50D6", suffix = "" }) {
 
 // 2026-11-04 — ISO timestamps in report tables read as "04 Nov 2026, 09:32"
 // (the exported CSV / Excel keep the raw values).
+// "ExpectedMin" → "Expected min", "BOMLabel" → "BOM label" (keys already in words are kept).
+const rptColLabel = (k) => { const t = String(k || ""); if (/\s/.test(t)) return t; const w = t.replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2"); return w.split(" ").map((x, i) => (i === 0 || /^[A-Z0-9]{2,}$/.test(x) ? x : x.toLowerCase())).join(" "); };
 const rptCellText = (v) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(v) ? rptFmtDT(v) : String(v ?? ""));
-function ReportTable({ title, rows, t = (k) => k }) {
+// users (2026-11-04): a cell holding an ERP user id prints the person's name.
+function ReportTable({ title, rows, t = (k) => k, users = [] }) {
   if (!rows || rows.length === 0) {
     return (
       <div className="rounded-xl py-14 text-center" style={{ background: "rgba(17,24,39,0.03)", border: "1px solid rgba(17,24,39,0.10)" }}>
@@ -16508,15 +16513,18 @@ function ReportTable({ title, rows, t = (k) => k }) {
     );
   }
   const columns = Object.keys(rows[0]);
+  const userById = new Map((users || []).map((u) => [String(u.id), u.fullName || u.username || ""]));
+  const cellText = (v) => (typeof v === "string" && userById.get(v) ? userById.get(v) : rptCellText(v));
+  // Wide data tables (10+ columns) print as one labelled block per row (print CSS), so every field stays readable on A4.
   return (
-    <div className="rounded-xl overflow-hidden" style={{ background: "rgba(17,24,39,0.03)", border: "1px solid rgba(17,24,39,0.10)" }}>
+    <div className={`rounded-xl overflow-hidden rpt-table-wrap${columns.length > 9 ? " rpt-wide" : ""}`} style={{ background: "rgba(17,24,39,0.03)", border: "1px solid rgba(17,24,39,0.10)" }}>
       <div className="px-4 py-3 text-[11px] font-black text-slate-500 border-b border-slate-200">{title}  ·  {rows.length} row{rows.length === 1 ? "" : "s"}</div>
       <div className="overflow-x-auto">
         <table className="w-full text-[11px]">
           <thead>
             <tr>
               {columns.map((c) => (
-                <th key={c} className="text-left px-3 py-2 font-bold text-slate-500 bg-slate-50 whitespace-nowrap">{t(c)}</th>
+                <th key={c} className="text-left px-3 py-2 font-bold text-slate-500 bg-slate-50 whitespace-nowrap">{rptColLabel(t(c))}</th>
               ))}
             </tr>
           </thead>
@@ -16524,7 +16532,7 @@ function ReportTable({ title, rows, t = (k) => k }) {
             {rows.map((r, i) => (
               <tr key={i} className="border-t border-slate-200">
                 {columns.map((c) => (
-                  <td key={c} className="px-3 py-1.5 text-slate-500 whitespace-nowrap">{rptCellText(r[c])}</td>
+                  <td key={c} data-l={rptColLabel(t(c))} className="px-3 py-1.5 text-slate-500 whitespace-nowrap">{cellText(r[c])}</td>
                 ))}
               </tr>
             ))}
@@ -17058,6 +17066,7 @@ const TC_SHEET_CSS = [
   ".tc-head.tc-head-1{grid-template-columns:1fr 1fr}",
   ".tc-embedded .tc-sec:first-of-type{margin-top:2mm}",
   ".tc-signed-note{margin-top:2.5mm;font-size:10px;color:#374151}",
+  ".tc-sigdate{margin-top:.6mm;font-size:9.5px;color:#374151}",
   ".tc-form.tc-form input:not([type=checkbox]):not([type=radio]),.tc-form.tc-form textarea{background:#fff !important;color:#0f172a !important;border-color:#cbd5e1 !important}",
   ".tc-form.tc-form input::placeholder,.tc-form.tc-form textarea::placeholder{color:#6b7280 !important}",
   ".tc-form.tc-form input:focus-visible,.tc-form.tc-form textarea:focus-visible{outline:none !important;box-shadow:0 0 0 3px #e2e8f0 !important;border-color:#334155 !important}",
@@ -17148,13 +17157,14 @@ function TcSheetField({ label, value }) {
   );
 }
 
-function TcSheetSig({ title, name, sig, showName = true }) {
+function TcSheetSig({ title, name, sig, showName = true, date = "" }) {
   const src = tcSigSrc(sig);
   return (
     <div className="tc-sigbox">
       <div className="tc-sigimg">{src && <img src={src} alt="" />}</div>
       <div className="tc-sigcap">{title}</div>
       {showName && <div className="tc-signame">Name: <b>{name || ""}</b></div>}
+      {showName && date && src && <div className="tc-sigdate">Date: {date}</div>}
     </div>
   );
 }
@@ -17176,6 +17186,10 @@ function TrialCertificateSheet({ machine, cert, remarks = "", embedded = false, 
     ...TC_TIMING_FIELDS.map(([p, sf, label]) => ({ label, v: tcGetTim(bh, p, sf) })),
   ];
   const bhHalf = bhItems.length / 2;
+  // 2026-11-04 — inside a report, a block with nothing recorded is one line, not an empty grid.
+  const bhHas = bhItems.some((x) => String(x.v || "").trim() !== "");
+  const khHas = TC_SPEEDS.some(([sp]) => TC_FRQ_FIELDS.some(([f]) => String(tcGetFrq(kh[sp], f) || "").trim() !== "")
+    || TC_TIMING_FIELDS.some(([pp, sf]) => String(tcGetTim(kh[sp], pp, sf) || "").trim() !== ""));
   const bhPairs = Array.from({ length: bhHalf }, (_, i) => [bhItems[i], bhItems[i + bhHalf]]);
   const cpHalf = TRIAL_CHECKPOINTS.length / 2;
 
@@ -17224,6 +17238,7 @@ function TrialCertificateSheet({ machine, cert, remarks = "", embedded = false, 
       )}
 
       <div className="tc-sec">Parameter Set Value — Khakhra Mode</div>
+      {embedded && !khHas ? <div className="tc-note tc-muted">No values recorded.</div> : (
       <table>
         <colgroup><col style={{ width: "34%" }} /><col /><col /><col /></colgroup>
         <thead>
@@ -17247,8 +17262,10 @@ function TrialCertificateSheet({ machine, cert, remarks = "", embedded = false, 
           ))}
         </tbody>
       </table>
+      )}
 
       <div className="tc-sec">Bhakhri Mode</div>
+      {embedded && !bhHas ? <div className="tc-note tc-muted">No values recorded.</div> : (
       <table>
         <colgroup><col style={{ width: "30%" }} /><col style={{ width: "20%" }} /><col style={{ width: "30%" }} /><col style={{ width: "20%" }} /></colgroup>
         <thead><tr><th>Parameter</th><th className="tc-num">Value</th><th>Parameter</th><th className="tc-num">Value</th></tr></thead>
@@ -17261,6 +17278,7 @@ function TrialCertificateSheet({ machine, cert, remarks = "", embedded = false, 
           ))}
         </tbody>
       </table>
+      )}
 
       <div className="tc-sec">Check Points</div>
       <table>
@@ -17277,6 +17295,7 @@ function TrialCertificateSheet({ machine, cert, remarks = "", embedded = false, 
       </table>
 
       <div className="tc-sec">Electrical Load (AMP)</div>
+      {embedded && !(el.rPhase || el.yPhase || el.bPhase) ? <div className="tc-note tc-muted">No values recorded.</div> : (
       <table>
         <thead><tr><th className="tc-num">R Phase</th><th className="tc-num">Y Phase</th><th className="tc-num">B Phase</th></tr></thead>
         <tbody>
@@ -17287,6 +17306,7 @@ function TrialCertificateSheet({ machine, cert, remarks = "", embedded = false, 
           </tr>
         </tbody>
       </table>
+      )}
 
       <div className="tc-sec">Remarks</div>
       <div className="tc-note">
@@ -17301,8 +17321,8 @@ function TrialCertificateSheet({ machine, cert, remarks = "", embedded = false, 
         </div>
       ) : (
         <div className="tc-sigs">
-          <TcSheetSig title="Machine Set and Trial By" name={c.trialByName} sig={c.trialBySignature} />
-          <TcSheetSig title="Check By Service Engineer" name={c.checkByName} sig={c.checkBySignature} />
+          <TcSheetSig title="Machine Set and Trial By" name={c.trialByName} sig={c.trialBySignature} date={rptFmtD(c.updatedAt || c.trialDate)} />
+          <TcSheetSig title="Check By Service Engineer" name={c.checkByName} sig={c.checkBySignature} date={rptFmtD(c.updatedAt || c.trialDate)} />
           <TcSheetSig title="SHANTA G TECHNOFOODS LLP" showName={false} />
         </div>
       )}
@@ -17335,7 +17355,8 @@ function printTrialCertificate(machine, cert, remarks = "", company = null) {
     "<meta name='viewport' content='width=device-width,initial-scale=1'/>" +
     "<title>" + tcEsc(title) + "</title>" +
     "<style>" + TC_SHEET_CSS +
-      "@page{size:A4 portrait;margin:0}" +
+      "@page{size:A4 portrait;margin:0 0 7mm 0;@bottom-center{content:'Page ' counter(page) ' of ' counter(pages);font:7.5pt Arial,Helvetica,sans-serif;color:#6b7280}}" +
+      ".tc-sheet{min-height:290mm}" +
       "html,body{margin:0;padding:0;background:#fff}" +
       ".tc-toolbar{display:flex;justify-content:center;gap:10px;padding:12px;background:#f1f5f9;border-bottom:1px solid #cbd5e1;font:600 13px Arial,Helvetica,sans-serif}" +
       ".tc-toolbar button{padding:7px 18px;border:1px solid #334155;background:#fff;color:#0f172a;border-radius:6px;cursor:pointer;font:600 13px Arial,Helvetica,sans-serif}" +
@@ -17908,7 +17929,7 @@ function JobHistory({ item, users = [], compact = false, reportDates = false }) 
   return (
     <ol className={`${compact ? "mt-1" : "mt-1.5"} space-y-1`} aria-label="Job history">
       {entries.map((e, ei) => {
-        const meta = [nameOf(e.by) || e.byName || "", e.department, when(e.at)].filter(Boolean).join(" · ");
+        const meta = [nameOf(e.by) || e.byName || "", e.department, reportDates && e.kind === "reported" ? "" : when(e.at)].filter(Boolean).join(" · ");
         // Migration 054 — what a receipt verified and what was left after it.
         const rc = e.receipt || null;
         const v = rc && rc.verification ? rc.verification : null;

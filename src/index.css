@@ -3730,6 +3730,8 @@ button.rack-btn:disabled { background: #e5e7eb !important; color: #6b7280 !impor
 .mr-doc .rpt-sigbox.mr-sig { display: flex; padding-bottom: 0; }
 .mr-doc .rpt-sigbox.mr-sig img { height: auto; max-height: 38px; max-width: 120px; }
 .mr-doc .rpt-sigtable { margin-top: 2px; }
+.mr-doc .rpt-nowrap { white-space: nowrap; }
+.mr-doc .rpt-table-note { margin-top: 6px; }
 @media (max-width: 639.98px) {
   .mr-doc .rpt-facts-5 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .rpt-docmeta { text-align: left; }
@@ -3744,8 +3746,19 @@ button.rack-btn:disabled { background: #e5e7eb !important; color: #6b7280 !impor
     color: #111; font-size: 9.2pt; line-height: 1.42;
     font-feature-settings: "tnum" 1, "cv11" 1;
   }
-  /* The running head is a page margin box now (page 2 on); the in-flow copy would repeat page 1's letterhead. */
+  /* The running head is a page margin box now (page 2 on); the in-flow copy would repeat page 1's letterhead.
+     Its (empty) table header row is dropped too, so no hairline prints above the logo. */
   .mr-doc .mr-runhead { display: none !important; }
+  .mr-doc .mr-frame > thead { display: none !important; }
+  .mr-doc .mr-frame, .mr-doc .mr-frame > tbody > tr, .mr-doc .mr-frame > tbody > tr > td { border: 0 !important; }
+  /* Embedded trial certificate: a section heading stays with its table; remarks and the signed-by note stay together. */
+  .mr-doc .mr-cert .tc-note { break-inside: avoid; page-break-inside: avoid; }
+  .mr-doc .mr-cert .tc-signed-note { break-before: avoid; page-break-before: avoid; }
+  /* Customer sign-off may start under the documents; its rows still never split. */
+  .mr-doc .rpt-signoff-sec { margin-top: 10pt; }
+  .mr-doc .rpt-signoff-sec .mr-sign-line { height: 22pt; }
+  .mr-doc .rpt-signoff-sec .rpt-sigtable .mr-tr { padding: 2.5pt 0; }
+  .mr-doc .rpt-signoff-sec > p { break-after: avoid; }
   /* Letterhead and title block on paper */
   .rpt-lh { padding-bottom: 3.2mm; border-bottom: 0.6pt solid #8a8a8a; break-inside: avoid; }
   .rpt-lh .rpt-lh-logo, .mr-doc .rpt-lh .rpt-lh-logo { height: 17mm; max-width: 70mm; margin-bottom: 2mm; }
@@ -3802,8 +3815,21 @@ button.rack-btn:disabled { background: #e5e7eb !important; color: #6b7280 !impor
   .report-area table th, .report-area table td { white-space: normal !important; overflow-wrap: break-word; padding: 1.1mm 1.4mm !important; font-size: 7.2pt !important; }
   .report-area table th { text-transform: uppercase; letter-spacing: 0.04em; font-size: 6.6pt !important; border-bottom: 0.8pt solid #111 !important; }
   .report-area table tr { border-color: #d2d2d2 !important; }
-  /* Very wide data tables (10+ columns): fixed columns that wrap, so the last ones are never cut off. */
-  .report-area table:has(th:nth-child(10)) { table-layout: fixed; }
-  .report-area table:has(th:nth-child(10)) th, .report-area table:has(th:nth-child(10)) td { font-size: 5.8pt !important; padding: 0.8mm 0.6mm !important; overflow-wrap: anywhere; word-break: break-word; letter-spacing: 0; }
+  /* Very wide data tables (10+ columns): one labelled block per row, four
+     fields across, so every column prints whole and readable on portrait A4. */
+  .report-area .rpt-wide table, .report-area .rpt-wide tbody { display: block; width: 100% !important; }
+  .report-area .rpt-wide thead { display: none !important; }
+  .report-area .rpt-wide tbody tr { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1.2mm 4mm;
+    padding: 2.2mm 0 !important; border-top: 0 !important; border-bottom: 0.6pt solid #bdbdbd !important; break-inside: avoid; page-break-inside: avoid; }
+  .report-area .rpt-wide tbody tr:first-child { border-top: 1pt solid #111 !important; }
+  .report-area .rpt-wide td { display: block; padding: 0 !important; font-size: 8pt !important; overflow-wrap: break-word; }
+  .report-area .rpt-wide td::before { content: attr(data-l); display: block; font-size: 6.4pt; color: #666 !important; text-transform: uppercase; letter-spacing: 0.04em; }
+  .report-area .rpt-wide td:empty::after { content: "—"; color: #999; }
   .report-area .rounded-xl, .report-area .rounded-lg { border-radius: 2px !important; box-shadow: none !important; }
+  /* KPI tiles: flat ruled boxes on paper, no coloured dot. */
+  .report-area .kpi-tile { box-shadow: none !important; border: 0.5pt solid #bdbdbd !important; border-radius: 2px !important; padding: 2.5mm 3mm !important; background: #fff !important; transform: none !important; }
+  .report-area .kpi-tile > .flex:first-child { display: none !important; }
+  .report-area .kpi-tile .text-\[26px\] { font-size: 15pt !important; }
+  /* Report Center pages: page numbers and a running head from page 2 (RptPageStyle "rc-report"). */
+  .rpt-rc-paged { page: rc-report; }
 }
