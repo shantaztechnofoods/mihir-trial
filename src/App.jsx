@@ -60,7 +60,7 @@ import {
   DEPARTMENT_SEQUENCE, DEFAULT_DEPT_DURATIONS, DEFAULT_ACCEPT_TIMEOUT_MINUTES,
   readDeptWorkflowSettings, writeDeptWorkflowSettings, setWorkCalendar, isClosedDay, localDateKey,
   nextDepartment, computeElapsedMinutes, computeOverrun, isHoldOverdue, heldMinutes, RACK_RELEASE_HOPS, isRackReleaseHop,
-  formatDuration, canAcceptHandover, canFinishTransfer, canConfigureDept, workerIdsOf,
+  formatDuration, canAcceptHandover, canFinishTransfer, canStartAssembly, canConfigureDept, workerIdsOf,
   senderUndoState, formatUndoCountdown,
 } from "./utils/handoverLogic.js";
 // Phase B
@@ -19621,6 +19621,11 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
   // and calls the SAME handler as the admin tracker — nothing is duplicated.
   const staffMode  = !isAdminUser;
   const isProdHead = staffMode && (currentUser?.role === "Production Head" || (canDo("machines", "release") && !isFloorLogin));
+  // 2026-11-04 (owner) — the Assembly head presses "Assemble" himself, so an
+  // Assembly floor login also gets the Production Rack View (Fill / Send /
+  // Remove stay behind their own permissions there).
+  const canStartAsm = canStartAssembly(canDo, myDepartments);
+  const isAssemblyFloor = staffMode && !isProdHead && canStartAsm;
   // 2026-11-03 — staff "My Dashboard" panel (read-only; see StaffMyDashboard).
   const [myDashOpen, setMyDashOpen] = useState(false);
   const canReleaseFromRack = canDo("machines", "release") || isAdminUser;
@@ -21320,8 +21325,9 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
         {/* ── Production Rack View ──
             Machines waiting on the rack to be started. Starting a build is the
             first working department's job, so a floor login elsewhere in the
-            line has no use for this and it is hidden from them. */}
-        {(staffMode ? isProdHead : mtTab === "production") && (
+            line has no use for this and it is hidden from them. Staff see it
+            as Production Head or as the Assembly floor login (2026-11-04). */}
+        {(staffMode ? (isProdHead || isAssemblyFloor) : mtTab === "production") && (
         <div>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2.5">
@@ -21559,8 +21565,8 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
               } });
             };
             const assembleLabel = sl.status === "assembling" ? "Mark Assembled" : "Assemble";
-            const assembleOk = (sl.status === "set" && pend.length === 0 && crate.state !== "pending" && canDo("machines", "updateStage")) || (sl.status === "assembling" && !!m && !m.pendingHandoverId && canFinishTransfer(canDo));
-            const assembleWhy = sl.status === "set" ? (pend.length ? "Waiting for material" : crate.state === "pending" ? `Fill the ${rKey} crate first` : !canDo("machines", "updateStage") ? "Needs Machines → Update Stage permission" : "") : sl.status === "assembling" ? (!canFinishTransfer(canDo) ? "Needs Machines → Finish & Transfer permission" : "A transfer is already in progress") : sl.status === "assembled" ? "Already assembled" : "Fill the rack first";
+            const assembleOk = (sl.status === "set" && pend.length === 0 && crate.state !== "pending" && canStartAsm) || (sl.status === "assembling" && !!m && !m.pendingHandoverId && canFinishTransfer(canDo));
+            const assembleWhy = sl.status === "set" ? (pend.length ? "Waiting for material" : crate.state === "pending" ? `Fill the ${rKey} crate first` : !canStartAsm ? "Only the Assembly department can start assembly" : "") : sl.status === "assembling" ? (!canFinishTransfer(canDo) ? "Needs Machines → Finish & Transfer permission" : "A transfer is already in progress") : sl.status === "assembled" ? "Already assembled" : "Fill the rack first";
             // 2026-10-31 — no separate Production Manager login yet: an Admin
             // sends the assembled machine to Mechanical from the rack.
             const canSendFromRack = canDo("machines", "release") || isAdminUser;
@@ -28755,7 +28761,7 @@ export default function App() {
   // selected and promotes ONLY those from "BOM Issued" (rack) → "Assembly" (active build).
   // The machine now leaves the rack and appears in the Machine Tracker.
   const handleStartProduction = (machineIds) => {
-    if (!authCanDo("machines", "updateStage")) return { success: false, error: "You do not have permission to start assembly (Machines → Update Stage)." };
+    if (!canStartAssembly(authCanDo, Array.isArray(currentUser?.departments) ? currentUser.departments.filter(Boolean) : [])) return { success: false, error: "Only the Assembly department (or an admin) can start assembly." };
     const idArr  = Array.isArray(machineIds) ? machineIds : [machineIds];
     const idSet  = new Set(idArr);
     const targets = machineLog.filter((m) => idSet.has(m.id) && m.stage === "BOM Issued");

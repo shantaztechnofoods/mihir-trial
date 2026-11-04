@@ -193,7 +193,8 @@ test("App: independent M/R units, BOM Outward rack picker, remove, release scope
   assert.match(app, /Nothing was removed — the set is still on the rack\./);
   // release only for rack machines; permissions
   assert.match(app, /payload\.releaseRequired = !!machine\.rackSlot && RACK_RELEASE_HOPS\.some\(/);
-  assert.match(app, /const handleStartProduction = \(machineIds\) => \{\n    if \(!authCanDo\("machines", "updateStage"\)\)/);
+  // 2026-11-04 (owner): Assembly floor login may start assembly; admin via updateStage
+  assert.match(app, /const handleStartProduction = \(machineIds\) => \{\n    if \(!canStartAssembly\(authCanDo, Array\.isArray\(currentUser\?\.departments\) \? currentUser\.departments\.filter\(Boolean\) : \[\]\)\) return \{ success: false/);
   assert.match(app, /if \(!canFinishTransfer\(authCanDo\)\) return \{ success: false/);
   // Not issued with a reason does not block a rack
   assert.match(app, /const rackIncomplete = \(\) => enriched\.filter\(\(i\) => !skippedCodes\.has\(i\.code\) && \(!isItemChecked\(i\.code\) \|\| !i\.inv \|\| i\.pendingQty > 0 \|\| i\.issueQty < i\.required\)\);/);
