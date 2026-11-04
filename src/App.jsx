@@ -99,11 +99,12 @@ import { ChartSlot, loadCharts } from "./components/LazyCharts.jsx";
 import { importWithReload } from "./utils/lazyImport.js";
 import { useProgressiveCount } from "./components/useProgressiveCount.js";
 import MoreRowsNote from "./components/MoreRowsNote.jsx";
+import DebouncedSearchInput from "./components/DebouncedSearchInput.jsx";
 
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-04-perf-1";
+const APP_BUILD = "2026-11-04-perf-2";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -5479,7 +5480,7 @@ function VendorsPage({ vendorList, pos, items, onAddVendor, onEditVendor, onDele
       })()}
 
       <Topbar title="Vendor Management" subtitle={`${activeVendors.length} suppliers · ${activeVendors.filter((v) => v.status === "preferred").length} preferred`}>
-        <input ref={searchRef} value={search} onChange={(e) => setSearch(e.target.value)}
+        <DebouncedSearchInput ref={searchRef} value={search} onChange={setSearch}
                placeholder="Search vendors..." className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 outline-none w-44 focus:border-[#2E50D6]/40 focus:outline-none transition-colors" />
         {canDo("vendors","add") && (
           <button onClick={() => setShowImport(true)}
@@ -9766,7 +9767,7 @@ function POSearchCenter({
         <div className="grid grid-cols-1 md:grid-cols-6 gap-2.5">
           <div className="md:col-span-2">
             <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Search</div>
-            <input value={searchQ} onChange={(e) => { setSearchQ(e.target.value); setPage(0); }}
+            <DebouncedSearchInput value={searchQ} onChange={(v) => { setSearchQ(v); setPage(0); }}
                    placeholder="PO number, vendor, item code, item name…"
                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs placeholder-slate-400 outline-none focus:border-blue-500/40" />
           </div>
@@ -24897,12 +24898,13 @@ function hrExportPDF(title, rows, cols, company = {}) {
   w.document.close();
 }
 
-function HRFilterBar({ search, setSearch, dateFrom, setDateFrom, dateTo, setDateTo, vendorFilter, setVendorFilter, vendorList, itemFilter, setItemFilter, allItems, machineFilter, setMachineFilter, machineLog, serialFilter, setSerialFilter, showVendor=true, showItem=true, showMachine=false, showSerial=false, onReset }) {
+// 2026-11-04 (fix/perf-2) — memo: the bar (2,000+ <option>s) re-renders only when its own props change.
+const HRFilterBar = React.memo(function HRFilterBar({ search, setSearch, dateFrom, setDateFrom, dateTo, setDateTo, vendorFilter, setVendorFilter, vendorList, itemFilter, setItemFilter, allItems, machineFilter, setMachineFilter, machineLog, serialFilter, setSerialFilter, showVendor=true, showItem=true, showMachine=false, showSerial=false, onReset }) {
   return (
     <div className="flex flex-wrap items-center gap-2 px-6 py-3" style={{ background: "rgba(17,24,39,0.03)", borderBottom: "1px solid rgba(17,24,39,0.04)" }}>
       <div className="relative">
         <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs">🔍</span>
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Global search…"
+        <DebouncedSearchInput value={search} onChange={setSearch} placeholder="Global search…"
           className="bg-slate-50 border border-slate-200 rounded-lg pl-7 pr-3 py-1.5 text-xs text-slate-700 placeholder-slate-400 outline-none focus:border-blue-500/40 w-52" />
       </div>
       <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
@@ -24940,7 +24942,7 @@ function HRFilterBar({ search, setSearch, dateFrom, setDateFrom, dateTo, setDate
       )}
     </div>
   );
-}
+});
 
 function HRExportBar({ onCSV, onExcel, onPDF }) {
   return (
@@ -24998,10 +25000,10 @@ function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, machine
   const [machineFilter, setMachineFilter] = useState("");
   const [serialFilter,  setSerialFilter]  = useState("");
 
-  const allItems = Object.values(items).flat();
+  const allItems = useMemo(() => Object.values(items).flat(), [items]);
   const q = search.toLowerCase();
 
-  const resetFilters = () => { setSearch(""); setDateFrom(""); setDateTo(""); setVendorFilter(""); setItemFilter(""); setMachineFilter(""); setSerialFilter(""); };
+  const resetFilters = useCallback(() => { setSearch(""); setDateFrom(""); setDateTo(""); setVendorFilter(""); setItemFilter(""); setMachineFilter(""); setSerialFilter(""); }, []);
 
   const matchDate = (dateStr) => {
     if (!dateFrom && !dateTo) return true;
