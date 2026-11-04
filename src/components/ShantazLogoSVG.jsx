@@ -12,17 +12,20 @@ export default function ShantazLogoSVG({ tone = "light", shine = false, showTagl
   const L = shantazLogo();
   const uid = useId().replace(/:/g, "");
   const dark = tone === "dark";
-  const gearFill = dark ? "#9AA4B5" : BRAND.gear;
+  const gearFill = dark ? "#AEB7C6" : BRAND.gear;
   const tagFill = dark ? "#C3CCDB" : BRAND.ink;
   const b = L.box;
-  const h = showTagline ? b.h : L.tag.baseline - L.tag.size - b.y;
+  const h = showTagline ? b.h : L.tag.baseline - L.tag.size * 1.2 - b.y;
   // flat list of paths (a <clipPath> may only hold shapes, no groups)
   const parts = [
     { d: toPath(L.gear.outer), fill: gearFill },
-    { d: toPath(L.gear.ring), fill: gearFill },
-    ...L.wheat.flatMap((s) => [{ d: toPath(s.stem), fill: BRAND.green }, ...s.grains.map((g) => ({ d: toPath(g.pts), fill: g.tone ? BRAND.green2 : BRAND.green }))]),
+    ...L.wheat.flatMap((s) => [
+      { d: toPath(s.stem), fill: BRAND.green },
+      ...s.grains.filter((g) => g.awn).map((g) => ({ d: toPath(g.awn), fill: BRAND.green2 })),
+      ...s.grains.map((g) => ({ d: toPath(g.pts), fill: g.tone ? BRAND.green2 : BRAND.green })),
+    ]),
     ...L.word.map((l) => ({ d: partPath(l), fill: BRAND.red })),
-    ...L.reg.map((r) => ({ d: partPath(r), fill: BRAND.red })),
+    ...L.reg.map((r) => ({ d: partPath(r), fill: tagFill })),
     ...(showTagline ? L.tag.glyphs.map((g) => ({ d: g.d, fill: tagFill })) : []),
   ];
   const shapes = (fill) => parts.map((p, i) => <path key={i} d={p.d} fill={fill ? p.fill : undefined} fillRule="evenodd" />);
@@ -49,8 +52,8 @@ export default function ShantazLogoSVG({ tone = "light", shine = false, showTagl
           </defs>
           <g clipPath={`url(#sh-c-${uid})`}>
             <g transform={`skewX(-18) translate(${(b.h * 0.33).toFixed(1)} 0)`}>
-              <rect className="shantaz-logo__shine" x={b.x - 160} y={b.y} width="140" height={b.h} fill={`url(#sh-g-${uid})`}
-                    style={{ "--shx": `${(b.w + 320).toFixed(0)}px` }} />
+              <rect className="shantaz-logo__shine" x={b.x - 90} y={b.y} width="70" height={b.h} fill={`url(#sh-g-${uid})`}
+                    style={{ "--shx": `${(b.w + 180).toFixed(0)}px` }} />
             </g>
           </g>
         </>

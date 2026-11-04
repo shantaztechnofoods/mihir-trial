@@ -21,7 +21,7 @@ export { default as ShantazLogoSVG } from "./ShantazLogoSVG.jsx";
 // Renders on demand only (intro, sweep, tilt settling), pauses when the tab
 // is hidden, frees every GPU resource on unmount. Decorative (aria-hidden);
 // onFail() → LoginPage shows the 2D SVG logo.
-const U = 0.01;              // SVG unit → scene unit
+const U = 0.02;              // logo unit (px of the 500 px logo file) → scene unit
 const INTRO_END = 2.4;
 const SWEEP_EVERY = 7;
 const SWEEP_LEN = 1.1;
@@ -70,7 +70,7 @@ export default function LoginBrand3D({ onFail }) {
     room.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
 
     // ── materials ──
-    const gearMat = new MeshPhysicalMaterial({ color: 0x353a43, metalness: 0.9, roughness: 0.35, clearcoat: 0.5, clearcoatRoughness: 0.25, anisotropy: 0.6, transparent: true, opacity: 0 });
+    const gearMat = new MeshPhysicalMaterial({ color: 0x3a3f48, metalness: 0.9, roughness: 0.35, clearcoat: 0.5, clearcoatRoughness: 0.25, anisotropy: 0.6, transparent: true, opacity: 0 });
     const wheatA = new MeshPhysicalMaterial({ color: 0x2f6b1f, metalness: 0.1, roughness: 0.42, sheen: 1, sheenColor: new Color(0x9fe07c), sheenRoughness: 0.45, clearcoat: 0.3, clearcoatRoughness: 0.4 });
     const wheatB = wheatA.clone(); wheatB.color.set(0x3d8a2a);
     const redMat = new MeshPhysicalMaterial({ color: 0xe4002b, metalness: 0.6, roughness: 0.28, clearcoat: 1, clearcoatRoughness: 0.08 });
@@ -98,17 +98,18 @@ export default function LoginBrand3D({ onFail }) {
     const gp = [X(L.gear.center[0]), Y(L.gear.center[1])];
     const gear = new Group(); gear.position.set(gp[0], gp[1], 0); logo.add(gear);
     gear.add(new Mesh(extrude([toShape(L.gear.outer, [], gp)], 0.22, 0.022), gearMat));
-    gear.add(new Mesh(extrude([toShape(L.gear.ring, [], gp)], 0.16, 0.012), gearMat));
 
     // wheat (stalk pivot = its base; grain pivot = where it joins the stem)
     const stalks = [], grains = [];
     L.wheat.forEach((s, si) => {
       const bp = [X(s.base[0]), Y(s.base[1])];
-      const grp = new Group(); grp.position.set(bp[0], bp[1], 0.02 + si * 0.012); grp.scale.set(0.001, 0.001, 1);
+      const grp = new Group(); grp.position.set(bp[0], bp[1], 0.15 + si * 0.012); grp.scale.set(0.001, 0.001, 1);
       grp.add(new Mesh(extrude([toShape(s.stem, [], bp)], 0.05, 0.01, 2), wheatA));
       s.grains.forEach((g, k) => {
         const ap = [X(g.at[0]), Y(g.at[1])];
-        const m = new Mesh(extrude([toShape(g.pts, [], ap)], 0.06, 0.02, 3), g.tone ? wheatB : wheatA);
+        const shapes = [toShape(g.pts, [], ap)];
+        if (g.awn) shapes.push(toShape(g.awn, [], ap));
+        const m = new Mesh(extrude(shapes, 0.06, 0.016, 3), g.tone ? wheatB : wheatA);
         m.position.set(ap[0] - bp[0], ap[1] - bp[1], 0); m.scale.setScalar(0.001);
         grp.add(m); grains.push({ m, si, k });
       });
@@ -119,29 +120,30 @@ export default function LoginBrand3D({ onFail }) {
 
     // wordmark (pivot = letter bottom centre)
     const letters = L.word.map((l) => {
-      const p = [X(l.x + l.w / 2), Y(150)];
+      const p = [X(l.x + l.w / 2), Y(l.outer.reduce((m, q) => Math.max(m, q[1]), 0))];
       const mat = redMat.clone(); mat.transparent = true; mat.opacity = 0;
       const m = new Mesh(extrude([toShape(l.outer, l.holes, p)], 0.26, 0.03), mat);
       m.position.set(p[0], p[1], 0); logo.add(m);
       return { m, mat, x: p[0] };
     });
-    const wordL = letters[0].x - 0.35, wordR = letters[letters.length - 1].x + 0.35, wordY = Y(105);
+    const wordL = letters[0].x - 0.4, wordR = letters[letters.length - 1].x + 0.4, wordY = Y(L.word[1].top + 20);
 
     // ®
-    const rc = [X(L.reg[0].outer[0][0] - 8.6), Y(L.reg[0].outer[0][1])];
-    const reg = new Mesh(extrude(L.reg.map((r) => toShape(r.outer, r.holes, rc)), 0.07, 0.008, 2), redMat);
+    const rc = [X(L.reg[0].outer[0][0] - 6.8), Y(L.reg[0].outer[0][1])];
+    const regMat = tagMat.clone(); regMat.transparent = false; regMat.opacity = 1;
+    const reg = new Mesh(extrude(L.reg.map((r) => toShape(r.outer, r.holes, rc)), 0.05, 0.006, 2), regMat);
     reg.position.set(rc[0], rc[1], 0.02); reg.scale.setScalar(0.001); logo.add(reg);
 
     // tagline (Droid Serif subset), one mesh per letter so it can track in
     const font = new Font(L.tag.font);
     const tagMid = X((L.tag.x0 + L.tag.x1) / 2);
     const tag = L.tag.glyphs.map((g, i) => {
-      const geo = extrude(font.generateShapes(g.ch, L.tag.size * U), 0.025, 0, 1);
+      const geo = extrude(font.generateShapes(g.ch, L.tag.size * U), 0.03, 0, 1);
       const mat = tagMat.clone();
       const m = new Mesh(geo, mat); m.position.set(X(g.x), Y(g.y), 0); logo.add(m);
       return { m, mat, x: X(g.x), i };
     });
-    const floorY = Y(L.tag.baseline) - 0.12;
+    const floorY = Y(L.tag.baseline) - 0.1;
 
     // ── lights ──
     scene.add(new AmbientLight(0x9fb0d0, 0.25));

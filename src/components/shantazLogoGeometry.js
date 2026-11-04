@@ -54,9 +54,9 @@ function gearOutline() {
 
 // ── Wheat: tall stalk + two shorter ones leaning right ───────────────────
 const STALKS = [
-  { p0: [122, 304], p1: [127, 232], p2: [121, 163], pairs: 7, len: 10.5, wid: 4.2, awn: 11 }, // tall
-  { p0: [124, 304], p1: [131, 252], p2: [158, 207], pairs: 6, len: 8.6, wid: 3.6, awn: 9 },   // right
-  { p0: [123, 304], p1: [134, 268], p2: [139, 224], pairs: 5, len: 8.2, wid: 3.5, awn: 8 },   // middle
+  { p0: [122, 304], p1: [124, 232], p2: [119, 168], pairs: 7, len: 16, wid: 6.4, awn: 15 }, // tall
+  { p0: [124, 304], p1: [134, 250], p2: [157, 212], pairs: 6, len: 12.5, wid: 5.2, awn: 12 }, // right
+  { p0: [123, 304], p1: [136, 270], p2: [139, 236], pairs: 5, len: 12, wid: 5, awn: 11 },     // middle
 ];
 const qb = (p0, p1, p2, t) => {
   const u = 1 - t;
@@ -100,13 +100,13 @@ function stalk(def, index) {
   const grains = [];
   const { pairs } = def;
   for (let k = 0; k < pairs; k++) {
-    const t = 0.36 + (0.6 * k) / pairs;
+    const t = 0.3 + (0.64 * k) / pairs;
     const [x, y] = qb(def.p0, def.p1, def.p2, t);
     const [dx, dy] = qd(def.p0, def.p1, def.p2, t);
     const a = (Math.atan2(dy, dx) * 180) / Math.PI;
     const len = def.len * (1 - 0.18 * (k / pairs)), wid = def.wid * (1 - 0.15 * (k / pairs));
     [-1, 1].forEach((side) => {
-      const ga = a + side * 27;
+      const ga = a + side * 33;
       grains.push({ pts: grainPoly(x, y, ga, len, wid), awn: awnPoly(x, y, ga, len * 0.8, def.awn), at: [x, y], tone: (k + (side > 0 ? 1 : 0) + index) % 2 });
     });
   }
