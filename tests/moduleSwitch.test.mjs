@@ -55,7 +55,7 @@ test("parsing ignores junk and unknown ids", () => {
 
 test("App wiring: page-level gates use canOpenPage; embedded gates stay on canView", () => {
   assert.match(APP, /const canOpenPage = useCallback\(\(id\) => moduleOn\(id\) && typeof canView === "function" && canView\(id\)/);
-  assert.match(APP, /\{canOpenPage\(activePage\)\s*\n\s*\? \(pages\[activePage\]/, "page router");
+  assert.match(APP, /\{canOpenPage\(activePage\)\s*\n\s*\? <React\.Suspense[^\n]*\{pages\[activePage\]/, "page router");
   assert.match(APP, /canView=\{canOpenPage\}\s*\n\s*onSearchOpen/, "sidebar");
   assert.match(APP, /navItems\.filter\(\(item\) => canOpenPage\(item\.id\)\)\.length > 1/, "phone tab bar");
   assert.match(APP, /const firstAllowed = navItems\.find\(\(item\) => canOpenPage\(item\.id\)\)/, "redirect");
