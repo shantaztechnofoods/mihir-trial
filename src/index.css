@@ -3938,3 +3938,13 @@ button.rack-btn:disabled { background: #e5e7eb !important; color: #6b7280 !impor
 /* Report Center → Comments: dates stay on one line (date, time). */
 .report-area [data-report-center-comments] td[data-col="RaisedAt"],
 .report-area [data-report-center-comments] td[data-col="CompletedAt"] { white-space: nowrap; }
+/* Customer copy: In / Out / Accepted by (no time-vs-target column). */
+.mr-doc .rpt-dept-grid.is-3 { grid-template-columns: 1fr 1fr 2fr; }
+@media (max-width: 639.98px) { .mr-doc .rpt-dept-grid.is-3 { grid-template-columns: 1fr 1fr; } .mr-doc .rpt-dept-grid.is-3 > .rpt-dept-acc { grid-column: 1 / -1; } }
+@media print {
+  .report-area [data-report-center-comments] table td[data-col="RaisedAt"],
+  .report-area [data-report-center-comments] table td[data-col="CompletedAt"] { white-space: nowrap !important; }
+  .mr-doc .rpt-dept-comments > .mr-label { break-after: avoid; page-break-after: avoid; }
+  .mr-doc .rpt-dept-comments { break-inside: avoid; page-break-inside: avoid; }
+  .mr-doc .rpt-dept-acc .rpt-dept-v, .mr-doc .rpt-dept-acc .mr-label { white-space: nowrap; }
+}

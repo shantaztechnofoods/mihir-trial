@@ -15713,8 +15713,12 @@ const rptCriticalSummary = (rows) => {
 // `customer`: neutral wording; no delay reasons, ratings or internal team.
 // Customer copy: an unticked point never prints the worker's remark; it reads
 // "Fixed before dispatch" when its checklist follow-up job was completed.
-const rptPointFixed = (label, jobs = []) => (jobs || []).some((p) => p.status === "resolved"
-  && /^Checklist not completed/.test(String(p.description || "")) && String(p.description || "").includes(`: ${String(label || "").trim() || "item"}`));
+// The follow-up job for one point: "Checklist not completed (<stage>): <label>[ · Must do]" (exact label).
+const rptPointJob = (label, jobs = [], status = "resolved") => (jobs || []).some((p) => {
+  const m = /^Checklist not completed \([^)]*\): (.*?)(?: · Must do)?$/.exec(String(p.description || ""));
+  return m && m[1].trim() === (String(label || "").trim() || "item") && (status === "resolved" ? p.status === "resolved" : p.status !== "resolved");
+});
+const rptPointFixed = (label, jobs = []) => rptPointJob(label, jobs, "resolved");
 function RptDeptRecord({ r, customer = false, comments = [], users = [], certNo = "", jobs = [] }) {
   const stateText = r.state === "done" ? "Completed" : r.state === "current" ? "In progress" : "Not started";
   const timeText = r.actual || r.target ? `${rptDur(r.actual)}${r.target ? ` · target ${rptDur(r.target)}` : ""}` : "—";
@@ -15731,7 +15735,7 @@ function RptDeptRecord({ r, customer = false, comments = [], users = [], certNo 
         <span className={`rpt-dept-state ${r.state === "done" ? "mr-green" : r.state === "current" ? "mr-amber" : "mr-muted"}`}>{stateText}</span>
       </div>
       <div className="rpt-dept-scope">{RPT_DEPT_SCOPE[r.dept]}{r.dept === "Trial" && certNo ? ` See section ${certNo}.` : ""}</div>
-      <div className="rpt-dept-grid">
+      <div className={`rpt-dept-grid${customer ? " is-3" : ""}`}>
         {facts.map(([k, v, red]) => (
           <div key={k} className="min-w-0"><div className="mr-label">{k}</div><div className={`rpt-dept-v rpt-nowrap ${red ? "mr-red" : ""}`}>{v}</div></div>
         ))}
@@ -15763,7 +15767,7 @@ function RptDeptRecord({ r, customer = false, comments = [], users = [], certNo 
               </div>
               {ans.map((a, i) => {
                 const ok = a.checked || fixed(a);
-                const note = !customer ? (a.remark || "") : a.checked ? "OK" : ok ? "Fixed before dispatch" : "Follow-up in progress";
+                const note = !customer ? (a.remark || "") : a.checked ? "OK" : ok ? "Fixed before dispatch" : rptPointJob(a.label, jobs, "open") ? "Follow-up in progress" : "Not ticked";
                 return (
                   <div key={i} className="rpt-cl-row" data-report-point={a.checked ? "ok" : ok ? "fixed" : "open"}>
                     <span className={`rpt-tick ${ok ? "is-ok" : "is-no"}`} aria-label={ok ? "OK" : "Not OK"}>{ok ? "✓" : "✗"}</span>

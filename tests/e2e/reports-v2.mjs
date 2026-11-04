@@ -77,7 +77,7 @@ ok("customer: Electrical shows its during-work and dispatch checklists",
   && elec.includes("Panel gland sealed") && elec.includes("Earthing continuity"));
 ok("customer: an unticked point that was fixed reads Fixed before dispatch, never the worker's remark",
   await p.locator('[data-report-dept="Electrical"] [data-report-point="fixed"]').count() === 1 && elec.includes("Fixed before dispatch") && !doc.includes("gland on order") && !doc.includes("INTERNAL-REMARK"));
-ok("customer: an unticked point still open reads Follow-up in progress", (await p.locator('[data-report-dept="Assembly"]').innerText()).includes("Follow-up in progress"));
+ok("customer: an unticked point with no follow-up job reads Not ticked (no invented status)", (await p.locator('[data-report-dept="Assembly"]').innerText()).includes("Not ticked") && !doc.includes("Follow-up in progress"));
 ok("customer: Mechanical before-receive checklist listed", (await p.locator('[data-report-dept="Mechanical"]').innerText()).includes("Frame received square"));
 ok("customer: Trial and Ready checklists listed", (await p.locator('[data-report-dept="Trial"]').innerText()).includes("Machine clean for trial") && (await p.locator('[data-report-dept="Ready"]').innerText()).includes("Name plate fixed"));
 ok("customer: acceptance signatures printed per department", await p.locator("[data-report-dept] [data-report-dept-accepted] img").count() >= 4);
