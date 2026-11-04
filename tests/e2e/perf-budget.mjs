@@ -63,11 +63,21 @@ ok("search still finds items from the whole list", (await p.locator("tbody tr", 
 const tH = await tapPage("History & Reports", "History & Reports"); await p.waitForTimeout(400);
 ok(`History & Reports opens within ${BUDGET_PAGE_MS} ms`, tH < BUDGET_PAGE_MS, `${tH.toFixed(0)} ms`);
 ok("History activity list draws a slice, the rest on scroll", Number(await p.locator("[data-more-rows]").first().getAttribute("data-more-rows").catch(() => 0)) > 4000);
+// nothing hidden from Print: beforeprint draws every row (synchronously), afterprint goes back to the slice
+{
+  const printed = await p.evaluate(() => { window.dispatchEvent(new Event("beforeprint")); const r = { more: document.querySelectorAll("[data-more-rows]").length, text: document.body.innerText.includes("Action number 4999") && document.body.innerText.includes("Action number 0") }; window.dispatchEvent(new Event("afterprint")); return r; });
+  ok("Print (beforeprint) draws every History row — no slice left", printed.more === 0 && printed.text, JSON.stringify(printed));
+  await p.waitForTimeout(300);
+  ok("after printing the History list goes back to a slice", (await p.locator("[data-more-rows]").count()) > 0);
+}
 // 4. other page switches stay inside the budget
 for (const [l, re] of [["Inward", "^Inward"], ["Machine Tracker", "Machine Tracker"], ["Dashboard", "👋"]]) {
   const t = await tapPage(l, re); ok(`${l} opens within ${BUDGET_PAGE_MS} ms`, t < BUDGET_PAGE_MS, `${t.toFixed(0)} ms`); await p.waitForTimeout(300);
   if (l === "Inward") {
     ok("Inward log draws a slice of the 2,000 entries", Number(await p.locator("[data-more-rows]").first().getAttribute("data-more-rows").catch(() => 0)) > 1500);
+    // "Show all" draws every row so Ctrl+F finds anything
+    await p.locator("[data-more-rows] [data-show-all-rows]").first().click(); await p.waitForTimeout(500);
+    ok("Inward log 'Show all' draws all 2,000 entries", (await p.locator("[data-more-rows]").count()) === 0 && (await p.locator("tbody tr", { hasText: "Part 1999" }).count()) > 0);
     const [dl] = await Promise.all([p.waitForEvent("download", { timeout: 15000 }).catch(() => null), p.locator(".page-header button", { hasText: "Export" }).first().click()]);
     ok("Inward Export Log downloads an .xlsx (xlsx loaded on demand)", !!dl && /\.xlsx$/.test(dl.suggestedFilename()), dl ? dl.suggestedFilename() : "no download");
   }

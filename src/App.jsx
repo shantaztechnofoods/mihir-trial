@@ -97,6 +97,7 @@ import { getActiveCompany, normalizePOSettings, openPOPdf, PO_TEMPLATE_OPTIONS }
 import { ChartSlot, loadCharts } from "./components/LazyCharts.jsx";
 import { importWithReload } from "./utils/lazyImport.js";
 import { useProgressiveCount } from "./components/useProgressiveCount.js";
+import MoreRowsNote from "./components/MoreRowsNote.jsx";
 
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
@@ -3896,7 +3897,7 @@ function InventoryPage({ items, setItems, handleUpdateStock, pos = [], inwardLog
                 {masterRows.more > 0 && (
                   <tr ref={masterRows.sentinelRef} data-more-rows={masterRows.more}>
                     <td colSpan={11} className="px-4 py-3 text-center text-[11px]" style={{ color: "var(--text-muted)" }}>
-                      Loading {masterRows.more} more…
+                      <MoreRowsNote rows={masterRows} />
                     </td>
                   </tr>
                 )}
@@ -11182,7 +11183,7 @@ function InwardPage({ items, handleUpdateStock, vendorList, onInwardComplete, on
                     ))}
                     {inwardLogRows.more > 0 && (
                       <tr ref={inwardLogRows.sentinelRef} data-more-rows={inwardLogRows.more}>
-                        <td colSpan={6} className="px-4 py-3 text-center text-[11px] text-slate-500">Loading {inwardLogRows.more} more…</td>
+                        <td colSpan={6} className="px-4 py-3 text-center text-[11px] text-slate-500"><MoreRowsNote rows={inwardLogRows} /></td>
                       </tr>
                     )}
                   </tbody>
@@ -25292,7 +25293,7 @@ function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, machine
                     </div>
                   );
                 })}
-                {hpActivity.more > 0 && <div ref={hpActivity.sentinelRef} data-more-rows={hpActivity.more} className="px-4 py-3 text-center text-[11px] text-slate-500">Loading {hpActivity.more} more…</div>}
+                {hpActivity.more > 0 && <div ref={hpActivity.sentinelRef} data-more-rows={hpActivity.more} className="px-4 py-3 text-center text-[11px] text-slate-500"><MoreRowsNote rows={hpActivity} /></div>}
               </div>
             )}
           </div>
@@ -25457,7 +25458,7 @@ function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, machine
                     </div>
                   );
                 })}
-                {hpInv.more > 0 && <div ref={hpInv.sentinelRef} data-more-rows={hpInv.more} className="px-4 py-3 text-center text-[11px] text-slate-500">Loading {hpInv.more} more…</div>}
+                {hpInv.more > 0 && <div ref={hpInv.sentinelRef} data-more-rows={hpInv.more} className="px-4 py-3 text-center text-[11px] text-slate-500"><MoreRowsNote rows={hpInv} /></div>}
               </div>
             )}
           </div>
@@ -25497,7 +25498,7 @@ function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, machine
                         ))}
                       </tr>
                     ))}
-                    {hpStock.more > 0 && <tr ref={hpStock.sentinelRef} data-more-rows={hpStock.more}><td colSpan={99} className="px-3 py-3 text-center text-[11px] text-slate-500">Loading {hpStock.more} more…</td></tr>}
+                    {hpStock.more > 0 && <tr ref={hpStock.sentinelRef} data-more-rows={hpStock.more}><td colSpan={99} className="px-3 py-3 text-center text-[11px] text-slate-500"><MoreRowsNote rows={hpStock} /></td></tr>}
                   </tbody>
                 </table>
               </div>
