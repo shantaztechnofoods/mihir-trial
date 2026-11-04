@@ -3976,7 +3976,7 @@ button.rack-btn:disabled { background: #e5e7eb !important; color: #6b7280 !impor
 /* Title block + document-control panel */
 .rpt-titleblock { margin-top: 18px; padding-bottom: 12px; border-bottom: 1.5px solid var(--rpt-ink); align-items: flex-end; }
 .rpt-doctitle { font-family: var(--rpt-serif); font-size: 21px !important; font-weight: 600 !important; letter-spacing: 0.005em; color: var(--rpt-ink); line-height: 1.2; }
-.rpt-docsub { font-size: 10px; color: var(--rpt-red); text-transform: uppercase; letter-spacing: 0.14em; font-weight: 600; margin-top: 4px; order: -1; }
+.rpt-docsub { font-size: 10px; color: var(--rpt-red); letter-spacing: 0.14em; font-weight: 600; margin-top: 4px; order: -1; }
 .rpt-titleblock > .min-w-0 { display: flex; flex-direction: column; }
 .rpt-titleblock > .min-w-0 > .rpt-docsub { order: -1; margin: 0 0 4px; }
 .rpt-docmeta { background: var(--rpt-panel); border: 1px solid var(--rpt-rule); border-left: 2px solid var(--rpt-red); padding: 6px 12px; text-align: left; font-size: 11px; line-height: 1.7; color: var(--rpt-ink); }
@@ -3985,10 +3985,10 @@ button.rack-btn:disabled { background: #e5e7eb !important; color: #6b7280 !impor
 /* Machine identity + key numbers */
 .mr-doc .mr-identity { margin-top: 18px; }
 .mr-doc .mr-machine { font-family: var(--rpt-serif); font-weight: 600; letter-spacing: 0; }
-.mr-doc .mr-label { color: var(--rpt-faint); font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.08em; }
+.mr-doc .mr-label { color: var(--rpt-faint); font-size: 9.5px; letter-spacing: 0.08em; }
 .mr-doc .mr-fact { font-weight: 600; }
 .mr-doc .rpt-photo, .mr-doc .rpt-photo.rpt-photo-sm { border: 1px solid var(--rpt-rule); border-radius: 4px; background: #fff; overflow: hidden; }
-.mr-doc .mr-stamp { border: 1px solid currentColor; border-radius: 999px; padding: 4px 14px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.mr-doc .mr-stamp { border: 1px solid currentColor; border-radius: 999px; padding: 4px 14px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em; }
 .mr-doc .mr-stamp.is-done { color: var(--rpt-green); background: #f1f6ee; }
 .mr-doc .mr-stamp.is-progress { color: var(--rpt-amber); background: #fbf6ec; }
 .mr-doc .mr-summary { border: 1px solid var(--rpt-rule); border-radius: 4px; background: var(--rpt-panel); padding: 10px 0; }
@@ -4005,7 +4005,7 @@ button.rack-btn:disabled { background: #e5e7eb !important; color: #6b7280 !impor
 
 /* Tables: header rule, hairlines, faint zebra */
 .mr-doc .mr-table { border-top: 0; }
-.mr-doc .mr-th { color: var(--rpt-mute); text-transform: uppercase; letter-spacing: 0.09em; font-size: 9px; font-weight: 700; border-bottom: 1px solid var(--rpt-ink); }
+.mr-doc .mr-th { color: var(--rpt-mute); letter-spacing: 0.09em; font-size: 9px; font-weight: 700; border-bottom: 1px solid var(--rpt-ink); }
 .mr-doc .mr-tr { border-bottom-color: var(--rpt-rule); padding-left: 6px; padding-right: 6px; }
 .mr-doc .mr-table > .mr-tr:not(.mr-th):nth-child(odd), .mr-doc .mr-table > .mr-hop:nth-child(odd) { background: var(--rpt-zebra); }
 
@@ -4060,4 +4060,48 @@ button.rack-btn:disabled { background: #e5e7eb !important; color: #6b7280 !impor
   .mr-doc .rpt-badge { font-size: 7pt; border-width: 0.6pt; padding: 0 1.2mm; }
   .mr-doc .rpt-sigbox { border-width: 0.5pt; min-height: 10mm; }
   .mr-doc .mr-footnote { font-size: 7pt; }
+}
+
+/* Reports v3.1 (2026-11-04) — one clean sans (Inter) for every heading so the
+   look never falls back to a Times-style serif; no section numerals; no
+   typewriter digits; figures stay tabular. Visual only. */
+.mr-doc, .rpt-lh, .rpt-titleblock, .report-area { --rpt-serif: 'Inter', 'Helvetica Neue', Arial, sans-serif; }
+.mr-doc .mr-num { display: none !important; }
+.mr-doc .mr-mono, .mr-doc .mr-serial { font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif !important; font-size: 1em; letter-spacing: 0.01em; font-variant-numeric: tabular-nums; }
+.rpt-lh-name { font-weight: 700; letter-spacing: 0.2em; }
+.rpt-doctitle, .mr-doc .mr-machine { font-weight: 700 !important; letter-spacing: -0.012em; }
+.mr-doc .mr-h { font-weight: 700; letter-spacing: -0.005em; }
+.mr-doc .mr-sum-v { font-weight: 700; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.mr-doc .rpt-dept-name { font-weight: 700; }
+.mr-doc .mr-muted:only-child { color: var(--rpt-faint); }
+/* Status words print as quiet outlined badges (readable in black and white). */
+.mr-doc .rpt-status { border: 1px solid currentColor; border-radius: 3px; padding: 0 6px; font-size: 9.5px; font-weight: 700; letter-spacing: 0.06em; line-height: 1.6; background: #fff; }
+.mr-doc .rpt-status.mr-green { background: #f1f6ee; }
+.mr-doc .rpt-status.mr-amber { background: #fbf6ec; }
+.mr-doc .rpt-status.mr-red { background: #fbefef; }
+@media print { .mr-doc .rpt-status { font-size: 6.6pt; border-width: 0.6pt; padding: 0 1.4mm; } }
+/* Report Center on paper: same quiet skin as the machine reports. */
+@media print {
+  .rpt-lh .rpt-lh-rule { border-top: 0.9pt solid #b3141f !important; }
+  .report-area .rpt-table-wrap { border: 0 !important; background: none !important; }
+  .report-area .rpt-table-wrap > div:first-child { border-bottom: 0 !important; padding: 0 0 1.6mm !important; font-size: 10pt !important; font-weight: 700 !important; color: #15171c !important; }
+  .report-area table tbody tr:nth-child(even) td { background: #f8f8f6 !important; }
+  .report-area table th { background: #fff !important; color: #4a505a !important; letter-spacing: 0.09em; }
+  .report-area table tr { border-color: #e3e5e9 !important; }
+  .report-area .rpt-wide td:empty { display: none !important; }
+  .report-area .rpt-wide td:empty::after { content: none !important; }
+  .report-area .kpi-tile { border: 0.5pt solid #e3e5e9 !important; background: #f6f6f3 !important; }
+  .report-area .kpi-tile .text-\[26px\] { color: #15171c !important; letter-spacing: -0.01em; }
+  .report-area, .report-area td { font-variant-numeric: tabular-nums; }
+  .report-area .rpt-lh .rpt-lh-rule { border-color: #b3141f !important; }
+  .report-area .kpi-tile * { background: transparent !important; }
+  .report-area .rpt-wide tbody tr:nth-child(even) td { background: transparent !important; }
+  .report-area .rpt-wide tbody tr:nth-child(even) { background: #f8f8f6 !important; }
+  .report-area .rpt-docmeta { background: #f6f6f3 !important; border-color: #e3e5e9 !important; border-left-color: #b3141f !important; }
+  .report-area .rpt-docmeta * { background: transparent !important; }
+}
+/* Small-caps labels on paper only: on screen the words keep their own case
+   (copy/paste and screen readers read "Ready for dispatch", not "READY ..."). */
+@media print {
+  .rpt-docsub, .mr-doc .mr-label, .mr-doc .mr-stamp, .mr-doc .mr-th, .mr-doc .rpt-status { text-transform: uppercase; }
 }
