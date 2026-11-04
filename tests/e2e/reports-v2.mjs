@@ -29,7 +29,10 @@ const v2 = () => {
       { code: "N-1", name: "Nut", unit: "Nos", issueQty: 4 },
       { code: "SNS-1", name: "Proximity sensor", unit: "Nos", issueQty: 0, criticalInput: { type: "serial", confirmed: false, notIssued: true, remark: "not in stock", requiredQty: 1 } },
     ] }]);
-  const ms = J("erp_machines"); ms.find((m) => m.id === 5).issueId = 7001; S("erp_machines", ms);
+  // SN-103 (in production): a critical part not issued and still awaited, and one received short of serials.
+  S("erp_outward", [...J("erp_outward"), { id: 7002, date: iso(5).slice(0, 10), ref: "M-10", label: "Kneading Machine 10kg", serialNo: "SN-103", units: 1,
+    items: [{ code: "SNS-1", name: "Proximity sensor", unit: "Nos", issueQty: 0, criticalInput: { type: "serial", confirmed: false, notIssued: true, remark: "not in stock", requiredQty: 1 } }] }]);
+  const ms = J("erp_machines"); ms.find((m) => m.id === 5).issueId = 7001; ms.find((m) => m.id === 3).issueId = 7002; S("erp_machines", ms);
   const au = J("erp_audit");
   au.unshift({ id: 8101, ts: iso(9), user: "Store Keeper", type: "outward_bom", module: "Outward", action: "BOM Issued: M-10 × 1", ref: "M-10", serialNo: "SN-105", details: {} });
   S("erp_audit", au);
@@ -49,6 +52,9 @@ const v2 = () => {
     { id: 34, machineId: 5, description: "Checklist not completed (Before Transfer): Panel gland sealed", assignedDepartment: "Electrical", raisedInDepartment: "Electrical", raisedBy: "super_admin_001", kind: "owed", status: "resolved", raisedAt: iso(4.1), resolvedAt: iso(3.9), resolvedBy: "super_admin_001", resolvedInDepartment: "Electrical", resolutionNotes: "Gland fitted", receivedQty: 0, receipts: [] },
     { id: 35, machineId: 5, description: "Part not issued at BOM Outward: Proximity sensor", itemCode: "SNS-1", itemName: "Proximity sensor", qty: 1, critical: true, source: "not_issued", assignedDepartment: "Stores", raisedInDepartment: "Stores", kind: "owed", status: "resolved", raisedAt: iso(9), receivedAt: iso(5), resolvedAt: iso(5), receivedQty: 1,
       receipts: [{ id: 1, qtyReceived: 1, receivedAt: iso(5), receivedByName: "Store Keeper", verification: { kind: "serial", critical: true, serials: ["SNS-77"] } }] },
+    { id: 36, machineId: 3, description: "Part not issued at BOM Outward: Proximity sensor", itemCode: "SNS-1", itemName: "Proximity sensor", qty: 1, critical: true, source: "not_issued", assignedDepartment: "Stores", raisedInDepartment: "Stores", kind: "owed", status: "open", raisedAt: iso(5), receivedQty: 0, receipts: [] },
+    { id: 37, machineId: 3, description: "Encoder short", itemCode: "ENC-1", itemName: "Encoder", qty: 2, critical: true, assignedDepartment: "Electrical", raisedInDepartment: "Electrical", kind: "owed", status: "open", raisedAt: iso(3), receivedQty: 1,
+      receipts: [{ id: 2, qtyReceived: 1, receivedAt: iso(2), receivedByName: "Store Keeper", verification: { kind: "serial", critical: true, serials: ["ENC-501"] } }] },
     { id: 33, machineId: 5, description: "Warning label to be stuck", assignedDepartment: "Electrical", raisedInDepartment: "Electrical", raisedBy: "super_admin_001", kind: "owed", status: "open", raisedAt: iso(4.4), receivedQty: 0, receipts: [] },
   );
   S("erp_pending_handover_items", pj);
@@ -97,6 +103,18 @@ ok("customer: finished work is filed under the department that did it (Touch-up 
 ok("customer: open comment is not on the customer copy", !doc.includes("Warning label to be stuck"));
 ok("customer: no delay reasons, holds or ratings", !/re-machined|Motor supplier|Trial bay busy|\bRating\b|ON HOLD|Over by/i.test(doc));
 ok("customer: sign-off names the same company", (await p.locator("[data-report-customer-signoff]").innerText()).toUpperCase().includes(`FOR ${LEGAL}`));
+await close();
+
+// ── Critical edge cases on SN-103: not issued + still awaited prints once; serials short are not "all recorded" ──
+await openFromMenu("customer", 3);
+const crit3 = await p.locator("[data-report-critical]").innerText();
+ok("customer SN-103: a not-issued part still awaited prints once", (crit3.match(/Proximity sensor/g) || []).length === 1 && crit3.includes("To be fitted"), crit3.replace(/\n/g, " | ").slice(0, 400));
+ok("customer SN-103: a part short of serials says so and is not counted as recorded",
+  crit3.includes("ENC-501") && crit3.includes("1 of 2 serials recorded") && /2 critical items · 2 not yet recorded/.test(crit3), crit3.replace(/\n/g, " | ").slice(0, 400));
+await close();
+await openFromMenu("company", 3);
+const ccrit3 = await p.locator("[data-report-critical]").innerText();
+ok("company SN-103: one Proximity sensor row, never labelled Issued with BOM", (ccrit3.match(/Proximity sensor/g) || []).length === 1 && !/Issued with BOM/.test(ccrit3) && ccrit3.includes("1 serial missing"), ccrit3.replace(/\n/g, " | ").slice(0, 400));
 await close();
 
 // ── Company report ──

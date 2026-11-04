@@ -15683,8 +15683,9 @@ function rptCriticalItems({ machine, outwardLog = [], auditLog = [], items = {},
   const outward = (outwardLog || []).filter((e) => (machine.issueId && String(e.id) === String(machine.issueId)) || (e.ref === machine.bomKey && sn && e.serialNo === sn));
   const issueAudit = (auditLog || []).find((a) => a.type === "outward_bom" && a.ref === machine.bomKey && sn && String(a.serialNo || "") === sn) || null;
   const rows = [
-    ...outward.flatMap((e) => (e.items || []).map((it) => ({ code: it.code, name: it.name, unit: it.unit || "", qty: Number(it.issueQty) || 0, ci: it.criticalInput || null,
-      when: (issueAudit && issueAudit.ts) || e.date || "", by: (issueAudit && issueAudit.user) || "", via: "Issued with BOM" }))),
+    ...outward.flatMap((e) => (e.items || []).map((it) => ({ src: "outward", code: it.code, name: it.name, unit: it.unit || "", qty: Number(it.issueQty) || 0, ci: it.criticalInput || null,
+      when: (issueAudit && issueAudit.ts) || e.date || "", by: (issueAudit && issueAudit.user) || "",
+      via: it.criticalInput && it.criticalInput.notIssued ? "Not issued at BOM Outward" : "Issued with BOM" }))),
     ...(auditLog || []).filter((a) => a.type === "pending_fulfilled" && sn && String(a.serialNo || "") === sn)
       .map((a) => ({ code: a.itemCode, name: a.itemName, unit: "", qty: Number(a.qty) || 0, ci: (a.details && a.details.criticalInput) || null,
         when: a.ts || a.date || "", by: a.user || "", via: "Given later from Pending Stock" })),
@@ -15701,13 +15702,13 @@ function rptCriticalItems({ machine, outwardLog = [], auditLog = [], items = {},
   const out = rows.filter((r) => { const i = inv(r.code); return (i && i.isCritical) || !!r.ci; }).map((r) => {
     const ci = r.ci || {};
     const serials = ci.type === "serial" || Array.isArray(ci.serials) ? (ci.serials || []).filter(Boolean) : [];
-    const status = ci.notIssued ? "not_issued" : serials.length ? "serial" : ci.type === "checkbox" ? (ci.confirmed ? "verified" : "unconfirmed") : "none";
+    // A serial-numbered part is recorded only when every unit has its serial.
+    const status = ci.notIssued ? "not_issued" : serials.length ? (r.qty > 0 && serials.length < r.qty ? "serial_partial" : "serial") : ci.type === "checkbox" ? (ci.confirmed ? "verified" : "unconfirmed") : "none";
     return { ...r, serials, status, remark: ci.remark || "" };
   });
-  // A part left out at BOM Outward and fitted later (pending job or Pending
-  // Stock) prints once, as fitted — not also as "Not issued".
-  const fitted = new Set(out.filter((r) => r.status === "serial" || r.status === "verified").map((r) => r.code));
-  return out.filter((r) => !(r.status === "not_issued" && fitted.has(r.code)));
+  // A part left out at BOM Outward is followed up later (pending job or
+  // Pending Stock): it prints once, with that later record's live status.
+  return out.filter((r) => !(r.src === "outward" && r.status === "not_issued" && out.some((o) => o !== r && o.code === r.code)));
 }
 const rptCriticalSummary = (rows) => {
   const n = rows.length; if (!n) return "No critical items recorded for this machine.";
@@ -15919,7 +15920,7 @@ function CustomerMachineReport({ machineId, machineLog = [], bomDefs = {}, hando
               <div key={`${c.code}-${i}`} className="mr-tr" data-report-critical-row={c.code} style={{ gridTemplateColumns: "2.4fr 0.6fr 3fr 1.3fr" }}>
                 <div className="mr-td" data-l="Component"><div><div className="font-semibold">{c.name || c.code}</div><div className="mr-label mr-mono">{c.code}</div></div></div>
                 <div className="mr-td mr-mono md:text-right" data-l="Qty">{c.qty}</div>
-                <div className="mr-td" data-l="Serial numbers">{c.serials.length ? <span className="mr-mono">{c.serials.join(", ")}</span> : c.status === "verified" ? "Checked · no serial number" : c.status === "not_issued" ? <span className="mr-amber">To be fitted</span> : <span className="mr-muted">—</span>}</div>
+                <div className="mr-td" data-l="Serial numbers">{c.serials.length ? <div><span className="mr-mono">{c.serials.join(", ")}</span>{c.status === "serial_partial" ? <div className="mr-amber mr-small">{c.serials.length} of {c.qty} serials recorded</div> : null}</div> : c.status === "verified" ? "Checked · no serial number" : c.status === "not_issued" ? <span className="mr-amber">To be fitted</span> : <span className="mr-muted">—</span>}</div>
                 <div className="mr-td" data-l="Verified">{c.status === "serial" || c.status === "verified" ? <span className="mr-green">✓ {rptFmtD(c.when) || "Yes"}</span> : <span className="mr-muted">Pending</span>}</div>
               </div>
             ))}
