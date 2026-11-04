@@ -41,7 +41,8 @@ import ItemSearchSelect from "./components/ItemSearchSelect.jsx";
 import VendorSearchSelect from "./components/VendorSearchSelect.jsx";
 import { appendAuditWithUser, getAuditLog, subscribeAudit } from "./auth/auditStore.js";
 const AuditHistoryPage = React.lazy(() => importWithReload(() => import("./pages/AuditHistoryPage.jsx")));
-import { isSupabaseEnabled, IS_PROD, ALLOW_DEMO } from "./config/env.js";
+import { isSupabaseEnabled, IS_PROD, ALLOW_DEMO, ENABLED_MODULES_ENV, ERP_INSTANCE } from "./config/env.js";
+import { MODULES, ALWAYS_ON_MODULES, SETTINGS_TAB_MODULE, effectiveEnabledModules, isModuleOn, envLockedModules, normaliseModuleSelection } from "./utils/modules.js";
 import { getSupabase } from "./supabase/client.js";
 import { loadSettings, saveSettings } from "./stores/settingsStore.js";
 import { listVendors, createVendor, updateVendor, deleteVendor, archiveVendor, bulkCreateVendors } from "./stores/vendorsStore.js";
@@ -8341,6 +8342,69 @@ const Section = ({ icon, title, children }) => (
   </div>
 );
 
+// Go-live 2026-11-04 — Settings → Modules (super admin only). One switch per
+// module; turning one OFF asks "Are you sure?". Saves through onSaveModules
+// (handleSaveModules → settings.enabledModules + audit modules_changed).
+// Modules outside the deployment's VITE_ENABLED_MODULES ceiling are shown
+// locked OFF; Settings / Users / Roles are locked ON.
+function ModulesPanel({ settings, onSaveModules }) {
+  const locked = envLockedModules(ENABLED_MODULES_ENV);
+  const fromSettings = () => {
+    const eff = effectiveEnabledModules(settings?.enabledModules, null);
+    return MODULES.map((m) => m.id).filter((id) => isModuleOn(id, eff));
+  };
+  const [on, setOn] = useState(fromSettings);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const savedKey = JSON.stringify(fromSettings());
+  const dirty = JSON.stringify(MODULES.map((m) => m.id).filter((id) => on.includes(id))) !== savedKey;
+  // Adopt a change saved elsewhere while nothing is being edited here.
+  useEffect(() => { if (!dirty) setOn(JSON.parse(savedKey)); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [savedKey]);
+  const flip = (id, next) => {
+    if (!next && !window.confirm(`Are you sure? "${MODULES.find((m) => m.id === id)?.label || id}" will disappear for everyone after you press Save.`)) return;
+    setMsg("");
+    setOn((prev) => next ? [...new Set([...prev, id])] : prev.filter((x) => x !== id));
+  };
+  const save = async () => {
+    setBusy(true); setMsg("");
+    const res = await onSaveModules(on);
+    setBusy(false);
+    setMsg(res?.success ? "Saved. Everyone sees the new module list now." : `Save failed: ${res?.error || "unknown error"}`);
+  };
+  return (
+    <Section icon="🧩" title="Modules (on / off)">
+      <div className="text-[12px] text-slate-500 mb-3">
+        A module that is OFF is hidden from the menu for everyone, including you. Turning it ON again brings it back with all its data.
+        Machine Tracker's BOM issue and 📄 Reports menu follow Machine Tracker, not the Outward / Reports switches.
+      </div>
+      {MODULES.map((m) => {
+        const always = ALWAYS_ON_MODULES.includes(m.id);
+        const envOff = locked.includes(m.id);
+        if (always || envOff) {
+          return (
+            <div key={m.id} className="flex items-center justify-between py-3.5 border-b border-slate-200 last:border-0">
+              <div>
+                <div className="text-[13px] font-semibold text-slate-900">{m.label}</div>
+                <div className="text-[11px] text-slate-500 mt-0.5">{always ? "Always ON (so you can never lock yourself out)" : "OFF in this deployment (VITE_ENABLED_MODULES)"}</div>
+              </div>
+              <span className="text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: always ? "rgba(22,163,74,0.12)" : "rgba(17,24,39,0.06)", color: always ? "#15803d" : "#6b7280" }}>{always ? "ON" : "OFF"}</span>
+            </div>
+          );
+        }
+        return <Toggle key={m.id} checked={on.includes(m.id)} onChange={(v) => flip(m.id, v)} label={m.label} desc={on.includes(m.id) ? "ON" : "OFF"} />;
+      })}
+      <div className="mt-4 flex items-center gap-3 flex-wrap">
+        <button type="button" data-save-modules disabled={busy || !dirty} onClick={save}
+                className="text-xs font-bold px-4 py-2 rounded-xl"
+                style={{ background: dirty ? "#2640B0" : "rgba(17,24,39,0.08)", color: dirty ? "#fff" : "#6b7280", minHeight: 40 }}>
+          {busy ? "Saving…" : "💾 Save modules"}
+        </button>
+        {msg && <span className="text-[12px] font-semibold" style={{ color: msg.startsWith("Saved") ? "#15803d" : "#b91c1c" }}>{msg}</span>}
+      </div>
+    </Section>
+  );
+}
+
 // 2026-11-03 "organise, don't change": a collapsible group with a plain-English
 // heading and a one-line helper. Children stay mounted while closed (just
 // hidden), so every control, data-* hook and string is still in the page.
@@ -8942,7 +9006,9 @@ function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, onSave, i
   // Scoped view — when provided, only show matching tabs and start on initialTab
   initialTab = "company", restrictTabs = null, pageTitle = "Settings",
   // Admin Data Cleanup (migration 051) — optional
-  machineLog = [], onAdminCleanup }) {
+  machineLog = [], onAdminCleanup,
+  // Go-live module switch — optional (absent ⇒ every tab, no Modules tab)
+  moduleOn = null, onSaveModules = null }) {
   // Snapshot of the last KNOWN-PERSISTED settings — used for the dirty-state pill
   // ("Unsaved changes") so operators see they need to click Save. Updated only after
   // a save round-trips successfully.
@@ -9083,8 +9149,11 @@ function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, onSave, i
     { id: "reports",       label: "📄 Report Settings",      desc: "Logo, company line, PDF language" },
     { id: "notifications", label: "🔔 Notifications",  desc: "WhatsApp / email alerts" },
     { id: "data",          label: "💾 Data & Backup",  desc: "Export + backup" },
+    ...(isSuperAdmin && onSaveModules ? [{ id: "modules", label: "🧩 Modules", desc: "Turn whole modules on / off (super admin)" }] : []),
   ];
-  const visibleTabs = restrictTabs ? SETTINGS_TABS.filter((t) => restrictTabs.includes(t.id)) : SETTINGS_TABS;
+  // Tabs of a switched-OFF module (Purchase Order, Inventory, WhatsApp alerts) hide with it.
+  const moduleTabs = typeof moduleOn === "function" ? SETTINGS_TABS.filter((t) => !SETTINGS_TAB_MODULE[t.id] || moduleOn(SETTINGS_TAB_MODULE[t.id])) : SETTINGS_TABS;
+  const visibleTabs = restrictTabs ? moduleTabs.filter((t) => restrictTabs.includes(t.id)) : moduleTabs;
   const activeTab = visibleTabs.find((t) => t.id === tab) || visibleTabs[0];
 
   return (
@@ -9652,6 +9721,11 @@ function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, onSave, i
               desc="Send the same notifications by email (future)" />
           </Section>
           </div>
+        )}
+
+        {/* ── Modules tab (go-live, super admin only) ───────────────────────── */}
+        {activeTab.id === "modules" && isSuperAdmin && onSaveModules && (
+          <ModulesPanel settings={initialSettings} onSaveModules={onSaveModules} />
         )}
 
         {/* ── Data & Backup tab ─────────────────────────────────────────────── */}
@@ -26444,12 +26518,8 @@ export default function App() {
   // permission change, and also quietly rescues the "Go to Dashboard" button.
   // A user with no viewable page at all stays put and still sees the refusal,
   // which is correct — there is nothing to send them to.
-  useEffect(() => {
-    if (authLoading || !currentUser || typeof canView !== "function") return;
-    if (canView(activePage)) return;
-    const firstAllowed = navItems.find((item) => canView(item.id));
-    if (firstAllowed && firstAllowed.id !== activePage) setActivePage(firstAllowed.id);
-  }, [authLoading, currentUser, canView, activePage]);
+  // (The redirect effect itself lives just below the `settings` state: it
+  // also honours the module on/off switch, which is read from settings.)
   const [collapsed,     setCollapsed]     = useState(false);
   // Below the md breakpoint the sidebar stops being a column and becomes a
   // drawer. On a phone a 240px rail eats most of the screen, and the ERP has to
@@ -26573,6 +26643,24 @@ export default function App() {
   const [deptRatings, setDeptRatings] = useState(() => { if (SUPA) return []; { const v = readLocalJson("erp_dept_ratings", NO_LOCAL_LIST); if (v !== NO_LOCAL_LIST) return v; } return []; });
   const [auditLog,   setAuditLog]   = useState(() => getAuditLog());
   const [settings,   setSettings]   = useState(() => { try { const s = localStorage.getItem("erp_settings"); if (s) return { ...SETTINGS_DEFAULTS, ...JSON.parse(s) }; } catch {} return { ...SETTINGS_DEFAULTS }; });
+  // Go-live 2026-11-04 — module on/off switch (src/utils/modules.js).
+  // settings.enabledModules ∩ VITE_ENABLED_MODULES; both unset ⇒ every module
+  // ON (Trial unchanged). canOpenPage = module ON *and* role may view it; it
+  // gates the sidebar, phone tab bar, page router, jumps and the redirect.
+  // Embedded gates (BOM issue inside Machine Tracker, the 📄 Reports menu) keep
+  // using canView only — never canOpenPage.
+  const enabledModules = useMemo(() => effectiveEnabledModules(settings?.enabledModules, ENABLED_MODULES_ENV), [settings?.enabledModules]);
+  const moduleOn    = useCallback((id) => isModuleOn(id, enabledModules), [enabledModules]);
+  const canOpenPage = useCallback((id) => moduleOn(id) && typeof canView === "function" && canView(id), [moduleOn, canView]);
+  // Jumps from inside pages / search / notifications: a switched-OFF module is
+  // a no-op (with every module ON this is exactly setActivePage).
+  const goToPage    = useCallback((id) => { if (moduleOn(id)) setActivePage(id); }, [moduleOn]);
+  useEffect(() => {
+    if (authLoading || !currentUser || typeof canView !== "function") return;
+    if (canOpenPage(activePage)) return;
+    const firstAllowed = navItems.find((item) => canOpenPage(item.id));
+    if (firstAllowed && firstAllowed.id !== activePage) setActivePage(firstAllowed.id);
+  }, [authLoading, currentUser, canView, canOpenPage, activePage]);
   // 2026-10-30 — working calendar (Tuesday + admin holidays) drives every
   // department / acceptance timer. Kept in sync with settings here so the pure
   // helpers in handoverLogic never need React.
@@ -26580,12 +26668,12 @@ export default function App() {
   // 2026-11-04 (fix/perf-1) — warm the charts chunk in the background once the
   // app is idle, only for people who can open a page with charts.
   useEffect(() => {
-    if (!currentUser || !(canView("analytics") || canView("history"))) return undefined;
+    if (!currentUser || !(canOpenPage("analytics") || canOpenPage("history"))) return undefined;
     const ric = window.requestIdleCallback || ((f) => setTimeout(f, 3000));
     const cic = window.cancelIdleCallback || clearTimeout;
     const id = ric(() => { loadCharts().catch(() => {}); }, { timeout: 8000 });
     return () => cic(id);
-  }, [currentUser, canView]);
+  }, [currentUser, canOpenPage]);
   // Migration 029 — list of all users (for the Settings dept-employee picker +
   // the Finish & Transfer worker/main-employee picker). Fetched once on mount
   // when Supabase is enabled; falls back silently to [] if the schema isn't
@@ -26647,6 +26735,11 @@ export default function App() {
     // Snapshot before so the audit record can show what actually changed. Keep
     // the detail payload shallow (no logo blob) so audit rows stay small.
     const before = settings || {};
+    // The module on/off list is owned by Settings → Modules (handleSaveModules).
+    // A Settings form opened earlier may still carry an older copy — never let
+    // an unrelated "Save Changes" switch modules back on or off.
+    if (Object.prototype.hasOwnProperty.call(before, "enabledModules")) newSettings.enabledModules = before.enabledModules;
+    else delete newSettings.enabledModules;
     setSettings(newSettings);                            // optimistic UI
     const res = await saveSettings(newSettings);
     if (!res.success) {
@@ -26669,6 +26762,39 @@ export default function App() {
         companyName: newSettings.companyName || "",
         gstPresent: !!newSettings.gst,
       },
+    });
+    return res;
+  };
+
+  // Go-live 2026-11-04 — Settings → Modules (super admin only). Saves the ON
+  // list into the org settings row (settings.enabledModules) and records a
+  // modules_changed audit event. RLS on public.settings already limits writes
+  // to the super admin.
+  const handleSaveModules = async (list) => {
+    if (currentUser?.role !== "super_admin") return { success: false, error: "Only the super admin can change modules." };
+    const next   = normaliseModuleSelection(list);
+    const before = settings || {};
+    const prevOn = MODULES.map((m) => m.id).filter((id) => isModuleOn(id, effectiveEnabledModules(before.enabledModules, null)));
+    const newSettings = { ...before, enabledModules: next };
+    setSettings(newSettings);                            // optimistic UI
+    const res = await saveSettings(newSettings);
+    if (!res.success) {
+      console.warn("[App] handleSaveModules: save failed —", res.error);
+      setSettings((prev) => {
+        const out = { ...prev };
+        if (Object.prototype.hasOwnProperty.call(before, "enabledModules")) out.enabledModules = before.enabledModules;
+        else delete out.enabledModules;
+        return out;
+      });
+      return res;
+    }
+    const turnedOn  = next.filter((id) => !prevOn.includes(id));
+    const turnedOff = prevOn.filter((id) => !next.includes(id));
+    logAudit({
+      type: "modules_changed", module: "Settings",
+      action: `Modules changed${turnedOff.length ? ` · OFF: ${turnedOff.join(", ")}` : ""}${turnedOn.length ? ` · ON: ${turnedOn.join(", ")}` : ""}`,
+      ref: "modules",
+      details: { enabledModules: next, turnedOn, turnedOff },
     });
     return res;
   };
@@ -26951,7 +27077,7 @@ export default function App() {
         const target = NAV[e.key.toLowerCase()];
         if (target && !isTyping()) {
           e.preventDefault();
-          if (typeof canView !== "function" || canView(target)) {
+          if (typeof canView !== "function" || canOpenPage(target)) {
             setActivePage(target);
             setShowSearch(false);
             setShowNotifs(false);
@@ -26967,7 +27093,7 @@ export default function App() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [showShortcuts, showSearch, showNotifs, canView]);
+  }, [showShortcuts, showSearch, showNotifs, canView, canOpenPage]);
 
   // ── 2026-11-03 — Admin "Ready machines" popup (owner-approved) ──
   // Read-only: derived from machineLog (status + the accept-into-Ready history
@@ -30310,7 +30436,7 @@ export default function App() {
   };
 
   const pages = {
-    dashboard: <DashboardPage items={items} pos={pos} vendorList={vendorList} machineLog={machineLog} pendingLog={pendingLog} followUps={followUps} handovers={handovers} pendingHandoverItems={pendingHandoverItems} onNavigate={setActivePage} settings={settings} canView={canView} />,
+    dashboard: <DashboardPage items={items} pos={pos} vendorList={vendorList} machineLog={machineLog} pendingLog={pendingLog} followUps={followUps} handovers={handovers} pendingHandoverItems={pendingHandoverItems} onNavigate={goToPage} settings={settings} canView={canOpenPage} />,
     inventory: <InventoryPage items={items} setItems={setItems} handleUpdateStock={handleUpdateStock}
                               pos={pos} inwardLog={inwardLog} outwardLog={outwardLog}
                               pendingLog={pendingLog} bomDefs={bomDefs} machineLog={machineLog}
@@ -30327,7 +30453,7 @@ export default function App() {
                               handleUpdateStock={handleUpdateStock}
                               onClearPending={handleClearPending}
                               outwardLog={outwardLog}
-                              onNavigate={setActivePage} canDo={canDo} />,
+                              onNavigate={goToPage} canDo={canDo} />,
     pipeline:  <OrderPipelinePage
                               items={items} pos={pos} vendorList={vendorList} followUps={followUps}
                               onUpdatePO={handleUpdatePO} onCreatePO={handleCreatePO}
@@ -30339,7 +30465,7 @@ export default function App() {
                               isSuperAdmin={currentUser?.role === "super_admin"}
                               onReverseReceive={handleReverseReceive}
                               onSetItemDefaultRate={handleSetItemDefaultRate} />,
-    machines:  <MachinePage   machineLog={machineLog} checklistResponses={checklistResponses} filterRequest={mtFilterReq} outwardLog={outwardLog} onUpdateTrialCertificate={handleUpdateTrialCertificate} canView={canView} onUpdateStage={guarded.updateStage} onNavigate={setActivePage} canDo={canDo}
+    machines:  <MachinePage   machineLog={machineLog} checklistResponses={checklistResponses} filterRequest={mtFilterReq} outwardLog={outwardLog} onUpdateTrialCertificate={handleUpdateTrialCertificate} canView={canView} onUpdateStage={guarded.updateStage} onNavigate={goToPage} canDo={canDo}
                               items={items}
                               /* 2026-10-30 — BOM Outward, embedded at the top. Shown
                                  only to roles that may issue a BOM, same as Outward. */
@@ -30395,6 +30521,7 @@ export default function App() {
                               auditLog={auditLog}
                               canDo={canDo} currentUser={currentUser} />,
     settings:  <SettingsPage settings={settings} onSave={handleSaveSettings} isSuperAdmin={currentUser?.role === "super_admin"} canDo={canDo} onRegisterSignature={handleRegisterSignature} currentUser={currentUser}
+                              moduleOn={moduleOn} onSaveModules={handleSaveModules}
                               machineLog={machineLog} onAdminCleanup={handleAdminCleanupDone}
                               checklistTemplates={checklistTemplates}
                               onCreateChecklistTemplate={handleCreateChecklistTemplate}
@@ -30440,7 +30567,7 @@ export default function App() {
           mobileOpen={mobileNavOpen}
           onMobileClose={() => setMobileNavOpen(false)}
           badges={{ pending: pendingLog.length, pipeline: pipelineBadge, machines: machineLog.filter((m) => m.status !== "completed" && m.stage !== "BOM Issued").length, whatsapp: waUnread }}
-          canView={canView}
+          canView={canOpenPage}
           onSearchOpen={() => setShowSearch(true)}
           onNotifsOpen={() => setShowNotifs((v) => !v)}
           notifCount={activeNotifs.length}
@@ -30457,12 +30584,12 @@ export default function App() {
         buildTag={APP_BUILD}
         onNavigateHome={() => setActivePage("dashboard")}
       >
-        {canView(activePage)
+        {canOpenPage(activePage)
           ? <React.Suspense fallback={<div className="flex-1 p-6" data-page-loading><SkeletonLoader /></div>}>{pages[activePage] || <DashboardPage />}</React.Suspense>
           : <>
               <Topbar title="Access Denied" />
               <AccessDeniedPage onNavigateHome={() => {
-                const first = navItems.find((item) => canView(item.id));
+                const first = navItems.find((item) => canOpenPage(item.id));
                 setActivePage(first ? first.id : "dashboard");
               }} />
             </>
@@ -30475,7 +30602,7 @@ export default function App() {
         <GlobalSearch
           items={items} pos={pos} vendorList={vendorList} machineLog={machineLog}
           onClose={() => setShowSearch(false)}
-          onNavigate={setActivePage}
+          onNavigate={goToPage}
         />
         </SafeBoundary>
       )}
@@ -30485,7 +30612,7 @@ export default function App() {
           notifications={notifications}
           dismissed={dismissedIds}
           onClose={() => setShowNotifs(false)}
-          onNavigate={(page) => { setActivePage(page); setShowNotifs(false); }}
+          onNavigate={(page) => { goToPage(page); setShowNotifs(false); }}
           onDismiss={dismissNotif}
           onDismissAll={dismissAllNotifs}
         />
@@ -30650,6 +30777,16 @@ export default function App() {
         </div>
       )}
 
+      {/* ── Go-live 2026-11-04 — TRIAL ribbon (VITE_ERP_INSTANCE=trial only).
+          Click-through (pointer-events: none) so it never blocks work. ── */}
+      {ERP_INSTANCE === "trial" && (
+        <div data-trial-ribbon role="note" aria-label="This is the TRIAL ERP, not the real company ERP"
+             className="no-print fixed left-1/2 -translate-x-1/2 z-[300] text-[11px] font-black tracking-wider px-3 py-0.5 rounded-b-lg"
+             style={{ top: 0, background: "#B45309", color: "#fff", pointerEvents: "none", boxShadow: "0 2px 6px rgba(0,0,0,0.18)" }}>
+          TRIAL — not the real ERP
+        </div>
+      )}
+
       {/* ── Mobile bottom nav ── */}
       {/* 2026-10-31 — same stroked icons as the sidebar (emoji rendered
           differently on every phone), only pages this login may open, and a
@@ -30658,7 +30795,7 @@ export default function App() {
           Tracker); its bar was just "Machines" + "More", a menu with nothing
           more in it. No bar for such a login; the ☰ button still opens the
           drawer (profile, sign out). */}
-      {navItems.filter((item) => canView(item.id)).length > 1 && (
+      {navItems.filter((item) => canOpenPage(item.id)).length > 1 && (
       <nav aria-label="Quick navigation" className="mobile-tabbar md:hidden fixed bottom-0 left-0 right-0 z-50 flex items-stretch justify-around pt-1.5 px-1 no-print"
            style={{ background: "var(--surface-card)", borderTop: "1px solid var(--border-subtle)", boxShadow: "0 -2px 8px rgba(0,0,0,0.06)" }}>
         {[
@@ -30667,7 +30804,7 @@ export default function App() {
           { id: "outward",   Icon: ArrowUpFromLine, label: "Outward" },
           { id: "pipeline",  Icon: RefreshCw,       label: "Pipeline" },
           { id: "whatsapp",  Icon: MessageCircle,   label: "WhatsApp" },
-        ].filter((item) => canView(item.id)).map((item) => {
+        ].filter((item) => canOpenPage(item.id)).map((item) => {
           const on = activePage === item.id;
           return (
             <button key={item.id} onClick={() => { setActivePage(item.id); setMobileNavOpen(false); }}
