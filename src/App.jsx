@@ -12671,7 +12671,7 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
           {(() => {
             const cs = bomCostSummary(bomCostLines(sourceItems, findInv, receivedPoRates(pos), units));
             return (
-              <button onClick={() => setShowCostPanel((v) => !v)} title="Component rates and BOM cost"
+              <button data-bom-cost onClick={() => setShowCostPanel((v) => !v)} title="Component rates and BOM cost"
                       className="text-[11px] font-bold px-3 py-1.5 rounded-lg border transition-all"
                       style={showCostPanel ? { background: "rgba(21,128,61,0.10)", color: "#15803d", borderColor: "rgba(21,128,61,0.35)" }
                                            : { background: "var(--surface-card)", color: cs.complete ? "#15803d" : "#b91c1c", borderColor: "var(--border-rim)" }}>

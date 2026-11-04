@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Eye, EyeOff, LogIn } from "lucide-react";
 import logoOnDark from "../assets/brand/shantaz-logo-on-dark.svg";
 import { MadeInIndia } from "../components/IndiaFlag.jsx";
@@ -29,12 +29,10 @@ import { useAuth } from "../auth/AuthContext.jsx";
 // screen").
 // 2026-11-04 (world UI) — new look only. The logic above the return (fields,
 // autofill guard, submit, error handling) is unchanged. The 3D scene is a
-// separate lazy chunk that starts only after the form has painted: the real
-// SHANTAZ logo (gear, wheat, letters, tagline — traced from the owner's
-// artwork) built in 3D on capable devices; the same logo flat, with one soft
-// shine, for reduced motion / low-end phones (deviceMemory <= 2, Save-Data) /
-// no WebGL. Every user sees the same login.
-const LoginLogo3D = lazy(() => import("./LoginLogo3D.jsx"));
+// hook point for the 3D logo (feat/logo-3d delivers LoginBrand3D; it is wired
+// here as a lazy chunk once it lands). Until then, and always for reduced
+// motion / low-end phones (deviceMemory <= 2, Save-Data) / no WebGL, the real
+// logo is shown flat with one soft shine. Every user sees the same login.
 
 let heroModeMemo = "";
 const heroMode = () => {
@@ -110,20 +108,15 @@ export default function LoginPage({ notice = "", onRetry = null }) {
 
   return (
     <div data-login-screen className="lg-root">
-      {/* Stage: static steel + amber light paints at once; the 3D rack fades in over it. */}
+      {/* Stage: navy scene + soft light paint at once; the real logo sits on it
+          from the first frame (data-hero tells the coming 3D layer what this
+          device can run). */}
       <div className="lg-stage" aria-hidden="true">
         <div className="lg-grid" />
         <div className="lg-light" />
-        {hero === "webgl" && (
-          <Suspense fallback={null}>
-            <LoginLogo3D onFail={() => setHero("still")} />
-          </Suspense>
-        )}
-        {(hero === "still" || hero === "css") && (
-          <div className="lg-brand2d">
-            <span className="lg-logo2d" style={{ "--logo": `url("${logoOnDark}")` }}><img src={logoOnDark} alt="" draggable={false} /></span>
-          </div>
-        )}
+        <div className="lg-brand2d" data-hero={hero || "pending"}>
+          <span className="lg-logo2d" style={{ "--logo": `url("${logoOnDark}")` }}><img src={logoOnDark} alt="" draggable={false} /></span>
+        </div>
         {company && <div className="lg-company-line">{company}</div>}
         <div className="lg-vignette" />
       </div>
