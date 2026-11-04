@@ -79,3 +79,88 @@ jobs:
           [ $trc = 0 ] || echo "::error::npm test failed (exit $trc)"
           [ $brc = 0 ] || echo "::error::npm run build failed (exit $brc)"
           [ $trc = 0 ] && [ $brc = 0 ]
+
+  # ── Full browser e2e (every tests/e2e/*.mjs suite) against the local-mode
+  # production build, split over 4 parallel runners (balanced by
+  # tests/e2e/timings.txt). Runs on every push (feature branches + main);
+  # the pull_request copy of this workflow skips it so it never runs twice.
+  # Agents run only the suites related to their change locally
+  # (scripts/ship.sh check); this is the full gate. The "e2e" job below is
+  # the single check scripts/ship.sh waits for.
+  e2e-shard:
+    name: e2e shard ${{ matrix.shard }}/4
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    env:
+      TZ: Asia/Calcutta          # same zone as the dev box the suites were written on
+      E2E_PAR: "2"
+      PW_VERSION: "1.63.0"       # same Playwright as the dev box
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        id: node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+
+      - name: Cache node_modules
+        id: deps
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: nm-${{ runner.os }}-node${{ steps.node.outputs.node-version }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies
+        if: steps.deps.outputs.cache-hit != 'true'
+        run: npm ci --no-audit --no-fund
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: pw-${{ runner.os }}-${{ env.PW_VERSION }}
+
+      - name: Install Playwright where the suites import it
+        # The suites import /usr/local/lib/node_modules_global/playwright/index.js
+        # (the dev box's global install); recreate that path here. One frozen
+        # suite also saves a screenshot under /home/claude/work.
+        run: |
+          npm install --no-save --no-audit --no-fund --prefix "$RUNNER_TEMP/pw" "playwright@$PW_VERSION" >/dev/null
+          sudo mkdir -p /usr/local/lib/node_modules_global /home/claude/work
+          sudo ln -sfn "$RUNNER_TEMP/pw/node_modules/playwright" /usr/local/lib/node_modules_global/playwright
+          sudo chown -R "$USER" /home/claude
+          "$RUNNER_TEMP/pw/node_modules/.bin/playwright" install --with-deps chromium
+
+      - name: Build (local mode, same as the e2e build on the dev box)
+        env:
+          VITE_USE_SUPABASE: "false"
+        run: npx vite build --outDir "$RUNNER_TEMP/dist-e2e"
+
+      - name: Run this shard's suites
+        run: bash scripts/e2e-ci.sh ${{ matrix.shard }} 4 "$RUNNER_TEMP/dist-e2e"
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-logs-shard-${{ matrix.shard }}
+          path: e2e-logs/
+          retention-days: 7
+
+  e2e:
+    name: e2e
+    if: always() && github.event_name == 'push'
+    needs: e2e-shard
+    runs-on: ubuntu-latest
+    steps:
+      - name: All e2e shards passed
+        run: |
+          echo "shards: ${{ needs.e2e-shard.result }}"
+          [ "${{ needs.e2e-shard.result }}" = success ] || { echo "::error::e2e shards: ${{ needs.e2e-shard.result }}"; exit 1; }
