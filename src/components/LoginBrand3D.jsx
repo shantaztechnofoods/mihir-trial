@@ -1,17 +1,18 @@
 import React, { useEffect, useRef } from "react";
 import {
-  WebGLRenderer, WebGLRenderTarget, Scene, PerspectiveCamera, OrthographicCamera, Group, Mesh, Shape, Path,
+  WebGLRenderer, WebGLRenderTarget, Scene, PerspectiveCamera, OrthographicCamera, Group, Mesh,
   ExtrudeGeometry, PlaneGeometry, BoxGeometry, MeshPhysicalMaterial, MeshStandardMaterial, MeshBasicMaterial,
   ShaderMaterial, AmbientLight, DirectionalLight, PointLight, PMREMGenerator, SRGBColorSpace,
-  ACESFilmicToneMapping, BackSide, Vector2, Vector3, Color,
+  ACESFilmicToneMapping, BackSide, Vector3, Color, Float32BufferAttribute,
 } from "three";
-import { Font } from "three/examples/jsm/loaders/FontLoader.js";
-import { shantazLogo } from "./shantazLogoGeometry.js";
+import { SVGLoader } from "three/examples/jsm/loaders/SVGLoader.js";
+import { BRAND, LOGO_SVG, shantazLogo } from "./shantazLogoGeometry.js";
 
 export { default as ShantazLogoSVG } from "./ShantazLogoSVG.jsx";
 
 // Login hero (2026-11-04): the SHANTAZ logo in 3D — gear, wheat, wordmark,
-// ®, tagline — extruded from the same clean-vector geometry as the 2D logo.
+// ®, tagline — extruded (SVGLoader → ExtrudeGeometry) from the exact paths of
+// the owner's CorelDRAW master, the same file the 2D logo draws.
 //
 // Intro (~2.3 s): the gear rolls in from the left (~120°, mechanical settle)
 // → wheat grows out of it, grains pop one by one → SHANTAZ assembles left to
@@ -25,7 +26,7 @@ export { default as ShantazLogoSVG } from "./ShantazLogoSVG.jsx";
 // sign-in card); the logo sits left-of-centre on desktop, at the top on
 // phones. Each light sweep fires window event "shantaz:sweep"
 // ({ detail: { duration, intro } }) so other UI can sync its sheen.
-const U = 0.02;              // logo unit (px of the 500 px logo file) → scene unit
+const U = 0.02;              // logo unit (0.5 mm of the CDR master) → scene unit
 const INTRO_END = 2.4;
 const SWEEP_EVERY = 7;
 const SWEEP_LEN = 1.1;
@@ -76,91 +77,117 @@ export default function LoginBrand3D({ onFail, fullBleed = false }) {
     scene.environment = envRT.texture;
     room.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
 
-    // ── materials ──
-    // gear: polished black gunmetal (true to the black gear in the logo); the cool rim light + bevels make it read on navy
-    const gearMat = new MeshPhysicalMaterial({ color: 0x1c1f24, metalness: 0.95, roughness: 0.26, clearcoat: 1, clearcoatRoughness: 0.12, anisotropy: 0.6, transparent: true, opacity: 0 });
-    const wheatA = new MeshPhysicalMaterial({ color: 0x2a641c, metalness: 0.1, roughness: 0.42, sheen: 1, sheenColor: new Color(0x9fe07c), sheenRoughness: 0.45, clearcoat: 0.3, clearcoatRoughness: 0.4 });
-    const wheatB = wheatA.clone(); wheatB.color.set(0x30701f);
-    const redMat = new MeshPhysicalMaterial({ color: 0xe20014, metalness: 0.15, roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.08, emissive: 0xe20014, emissiveIntensity: 0.12 }); // true logo red
+    // ── materials (true colours from the CDR master) ──
+    // gear: brushed black gunmetal; cool rim lights on the bevels + a light pool behind it make it read on navy
+    const gearMat = new MeshPhysicalMaterial({ color: 0x22252a, metalness: 0.88, roughness: 0.3, anisotropy: 0.85, anisotropyRotation: Math.PI / 2, clearcoat: 1, clearcoatRoughness: 0.1, transparent: true, opacity: 0 }); // brushed
+    // wheat: the file's gradient (bright #4AAC26 at the foot of each piece → deep #1D5113 at its tip) as vertex colours
+    const wheatMat = new MeshPhysicalMaterial({ color: 0xffffff, vertexColors: true, metalness: 0.05, roughness: 0.45, sheen: 0.6, sheenColor: new Color(0x9fe07c), sheenRoughness: 0.45, clearcoat: 0.3, clearcoatRoughness: 0.4 });
+    const redMat = new MeshPhysicalMaterial({ color: 0xe30016, metalness: 0.15, roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.08, emissive: 0xe30016, emissiveIntensity: 0.12 });
     const tagMat = new MeshStandardMaterial({ color: 0xc3ccdb, metalness: 0.7, roughness: 0.38, transparent: true, opacity: 0 });
 
-    // ── geometry from the shared logo definition ──
+    // ── geometry: the exact CDR paths (src/assets/shantaz-logo.svg) via SVGLoader ──
     const L = shantazLogo();
-    const cx = L.box.x + L.box.w / 2, cy = L.box.y + L.box.h / 2;
-    const X = (x) => (x - cx) * U, Y = (y) => -(y - cy) * U;
-    const toShape = (outer, holes, [px, py]) => {
-      const s = new Shape(outer.map(([x, y]) => new Vector2(X(x) - px, Y(y) - py)));
-      (holes || []).forEach((h) => s.holes.push(new Path(h.map(([x, y]) => new Vector2(X(x) - px, Y(y) - py)))));
-      return s;
+    const CX = L.box.x + L.box.w / 2, CY = L.box.y + L.box.h / 2;
+    const toScene = (x, y) => [(x - CX) * U, -(y - CY) * U];
+    const svgPaths = new SVGLoader().parse(LOGO_SVG).paths;
+    const part = (name) => svgPaths.filter((p) => p.userData.node.getAttribute("data-part") === name);
+    const shapeBox = (shapes) => {
+      const bx = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+      shapes.forEach((s) => s.getPoints().forEach((q) => { bx.minX = Math.min(bx.minX, q.x); bx.maxX = Math.max(bx.maxX, q.x); bx.minY = Math.min(bx.minY, q.y); bx.maxY = Math.max(bx.maxY, q.y); }));
+      return bx;
     };
-    const extrude = (shapes, depth, bevel, segs = 3) => {
-      const g = new ExtrudeGeometry(shapes, { depth, bevelEnabled: bevel > 0, bevelThickness: bevel, bevelSize: bevel * 0.8, bevelSegments: segs, curveSegments: 6 });
-      g.translate(0, 0, -depth / 2);
+    // extrude in logo units, then → scene units (y up, centred), pivot at `pivot` (scene units)
+    const extrude = (shapes, depth, bevel, pivot, segs = 2) => {
+      const d = depth / U, bv = bevel / U;
+      const g = new ExtrudeGeometry(shapes, { depth: d, bevelEnabled: bv > 0, bevelThickness: bv, bevelSize: bv * 0.8, bevelSegments: segs, curveSegments: 10 });
+      g.translate(-CX, -CY, -d / 2);
+      g.scale(U, -U, -U);                    // flip y (and z, to keep the winding)
+      g.translate(-pivot[0], -pivot[1], 0);
       return g;
     };
+    const glyphs = (path) => SVGLoader.createShapes(path).map((s) => ({ s, bb: shapeBox([s]) })).sort((a, c) => a.bb.minX - c.bb.minX);
 
     const rig = new Group(); scene.add(rig);
     const logo = new Group(); rig.add(logo);
 
     // gear (pivot = gear centre, so it can roll)
-    const gp = [X(L.gear.center[0]), Y(L.gear.center[1])];
+    const gp = toScene(...L.gearCenter);
     const gear = new Group(); gear.position.set(gp[0], gp[1], 0); logo.add(gear);
-    gear.add(new Mesh(extrude([toShape(L.gear.outer, [], gp)], 0.22, 0.02), gearMat));
+    gear.add(new Mesh(extrude(SVGLoader.createShapes(part("gear")[0]), 0.22, 0.04, gp, 3), gearMat));
 
-    // wheat: each stalk grows up from its base; grains (+ awns) pop one by one
-    const stalks = [], grains = [];
-    L.wheat.forEach((s, si) => {
-      const bp = [X(s.base[0]), Y(s.base[1])];
-      const grp = new Group(); grp.position.set(bp[0], bp[1], 0.15 + si * 0.012); grp.scale.set(0.35, 0.001, 1);
-      grp.add(new Mesh(extrude([toShape(s.stem, [], bp)], 0.04, 0.008, 2), wheatA));
-      s.grains.forEach((g, k) => {
-        const ap = [X(g.at[0]), Y(g.at[1])];
-        const shapes = [toShape(g.pts, [], ap)];
-        if (g.awn) shapes.push(toShape(g.awn, [], ap));
-        const m = new Mesh(extrude(shapes, 0.05, 0.012, 2), g.tone ? wheatB : wheatA);
-        m.position.set(ap[0] - bp[0], ap[1] - bp[1], 0); m.scale.setScalar(0.001);
-        grp.add(m); grains.push({ m, si, k });
-      });
-      logo.add(grp); stalks.push(grp);
+    // wheat: grows up out of the gear (pivot = foot of the wheat); grains pop one by one from their foot
+    const C0 = new Color(BRAND.wheatLight), C1 = new Color(BRAND.wheatDark);
+    const wheatPieces = part("wheat").map((p) => { const shapes = SVGLoader.createShapes(p); return { p, shapes, bb: shapeBox(shapes) }; });
+    const wAll = wheatPieces.reduce((a, w) => ({ minX: Math.min(a.minX, w.bb.minX), maxX: Math.max(a.maxX, w.bb.maxX), maxY: Math.max(a.maxY, w.bb.maxY) }), { minX: Infinity, maxX: -Infinity, maxY: -Infinity });
+    const wp = toScene((wAll.minX + wAll.maxX) / 2, wAll.maxY);
+    const wheat = new Group(); wheat.position.set(wp[0], wp[1], 0.13); wheat.scale.set(0.35, 0.001, 1); logo.add(wheat);
+    const grains = [];
+    wheatPieces.forEach(({ p, shapes, bb }) => {
+      const piv = toScene((bb.minX + bb.maxX) / 2, bb.maxY);
+      const g = extrude(shapes, 0.05, 0.01, piv);
+      const pos = g.attributes.position, hgt = (bb.maxY - bb.minY) * U || 1, col = new Float32Array(pos.count * 3), c = new Color();
+      for (let i = 0; i < pos.count; i++) { c.copy(C0).lerp(C1, clamp01(pos.getY(i) / hgt)); col.set([c.r, c.g, c.b], i * 3); }
+      g.setAttribute("color", new Float32BufferAttribute(col, 3));
+      const m = new Mesh(g, wheatMat); m.position.set(piv[0] - wp[0], piv[1] - wp[1], 0);
+      const stem = p.userData.node.getAttribute("data-kind") === "stem";
+      if (!stem) m.scale.setScalar(0.001);
+      wheat.add(m); if (!stem) grains.push({ m, y: bb.maxY });
     });
-    grains.sort((a, b) => (a.k >> 1) - (b.k >> 1) || a.si - b.si || a.k - b.k); // bottom → top
+    grains.sort((a, c) => c.y - a.y); // bottom → top
 
-    // wordmark (pivot = letter bottom centre)
-    const letters = L.word.map((l) => {
-      const p = [X(l.x + l.w / 2), Y(l.outer.reduce((m, q) => Math.max(m, q[1]), 0))];
+    // wordmark: one mesh per letter (pivot = letter bottom centre)
+    const letters = glyphs(part("wordmark")[0]).map(({ s, bb }) => {
+      const p = toScene((bb.minX + bb.maxX) / 2, bb.maxY);
       const mat = redMat.clone(); mat.transparent = true; mat.opacity = 0;
-      const m = new Mesh(extrude([toShape(l.outer, l.holes, p)], 0.26, 0.022, 2), mat);
+      const m = new Mesh(extrude([s], 0.26, 0.022, p), mat);
       m.position.set(p[0], p[1], 0); logo.add(m);
-      return { m, mat, x: p[0] };
+      return { m, mat, x: p[0], top: bb.minY, bottom: bb.maxY };
     });
-    const wordL = letters[0].x - 0.4, wordR = letters[letters.length - 1].x + 0.4, wordY = Y(L.word[1].top + 20);
+    const wordR = letters[letters.length - 1].x + 0.4;
+    const wordY = toScene(0, (letters[1].top + letters[1].bottom) / 2)[1];
 
-    // ® (clean circle + R)
-    const rc = [X(L.reg[0].outer[0][0] - 6.8), Y(L.reg[0].outer[0][1])];
+    // ® (pops)
+    const regShapes = SVGLoader.createShapes(part("registered")[0]); const rbb = shapeBox(regShapes);
+    const rc = toScene((rbb.minX + rbb.maxX) / 2, (rbb.minY + rbb.maxY) / 2);
     const regMat = tagMat.clone(); regMat.transparent = false; regMat.opacity = 1;
-    const reg = new Mesh(extrude(L.reg.map((r) => toShape(r.outer, r.holes, rc)), 0.05, 0.006, 2), regMat);
+    const reg = new Mesh(extrude(regShapes, 0.05, 0.006, rc), regMat);
     reg.position.set(rc[0], rc[1], 0.02); reg.scale.setScalar(0.001); logo.add(reg);
 
-    // tagline: real Cinzel glyphs, one mesh per letter so it can track in
-    const font = new Font(L.tag.font);
-    const tagMid = X((L.tag.x0 + L.tag.x1) / 2);
-    const tag = L.tag.glyphs.map((g, i) => {
+    // tagline: flat metallic, one mesh per glyph so it can track in
+    let tagBottom = -Infinity;
+    const tag = glyphs(part("tagline")[0]).map(({ s, bb }, i) => {
+      const p = toScene((bb.minX + bb.maxX) / 2, bb.maxY); tagBottom = Math.max(tagBottom, bb.maxY);
       const mat = tagMat.clone();
-      const m = new Mesh(extrude(font.generateShapes(g.ch, L.tag.size * U), 0.03, 0, 1), mat);
-      m.position.set(X(g.x), Y(g.y), 0); logo.add(m);
-      return { m, mat, x: X(g.x), i };
+      const m = new Mesh(extrude([s], 0.03, 0, p, 1), mat);
+      m.position.set(p[0], p[1], 0); logo.add(m);
+      return { m, mat, x: p[0], i };
     });
-    const floorY = Y(L.tag.baseline) - 0.1;
+    const tagMid = tag.reduce((a, g) => a + g.x, 0) / tag.length;
+    const floorY = toScene(0, tagBottom)[1] - 0.1;
 
     // ── lights ──
     scene.add(new AmbientLight(0x9fb0d0, 0.25));
     const key = new DirectionalLight(0xeef3ff, 1.4); key.position.set(-3, 4, 6); scene.add(key);
     const rim = new DirectionalLight(0xffb26b, 1.3); rim.position.set(4, 2.5, -4); scene.add(rim);
-    const coolRim = new DirectionalLight(0xa9c8ff, 3.2); coolRim.position.set(-4, 4, 1.2); scene.add(coolRim); // cool rim on the gunmetal gear's edges
-    // the gear's top arc sits behind the wheat and went near-black on navy: a soft cool light just above it lifts that rim
-    const gearR = Math.max(...L.gear.outer.map(([x, y]) => Math.hypot(x - L.gear.center[0], y - L.gear.center[1]))) * U;
-    const gearTop = new PointLight(0xc4d6ff, 7, gearR * 3.2, 2); gearTop.position.set(gp[0] - gearR * 0.15, gp[1] + gearR * 1.15, gearR * 0.85); scene.add(gearTop);
-    const sweep = new PointLight(0xfff4e6, 0, 0, 2); sweep.position.set(wordL, wordY + 0.2, 0.75); scene.add(sweep);
+    // cool rim lights grazing the gear's bevels (top-left, left, bottom) so every tooth edge catches light
+    const coolRim = new DirectionalLight(0xa9c8ff, 4.5); coolRim.position.set(-4, 4, 1.2); scene.add(coolRim);
+    const rimL = new DirectionalLight(0xbfd6ff, 3.5); rimL.position.set(-6, -1, 0.6); scene.add(rimL);
+    const rimB = new DirectionalLight(0xbfd6ff, 3.0); rimB.position.set(1, -5, 0.8); scene.add(rimB);
+    // soft steel-blue light pool behind the logo (strongest behind the gear) so the black gear silhouettes against it
+    const glowMat = new ShaderMaterial({
+      transparent: true, depthWrite: false, toneMapped: false,
+      uniforms: { uGear: { value: [gp[0], gp[1]] } },
+      vertexShader: "varying vec2 vP; void main(){ vP = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
+      fragmentShader: `uniform vec2 uGear; varying vec2 vP;
+        void main(){
+          vec2 q = vP / vec2(5.6, 2.8); float a = exp(-dot(q, q) * 1.4) * 0.22;
+          vec2 g = (vP - uGear) / 2.3; a += exp(-dot(g, g) * 1.6) * 0.42;
+          gl_FragColor = vec4(0.47, 0.60, 0.80, clamp(a, 0.0, 0.6));
+        }`,
+    });
+    const glow = new Mesh(new PlaneGeometry(16, 10), glowMat); glow.position.z = -0.9; glow.renderOrder = -1; rig.add(glow);
+    const sweep = new PointLight(0xfff4e6, 0, 0, 2); sweep.position.set(gp[0] - 1.6, wordY + 0.2, 0.75); scene.add(sweep);
+    const sweepL = gp[0] - 1.6; // the sweep starts at the gear (specular pass over the gunmetal), then crosses the wordmark
 
     // ── faint blurred reflection: the logo mirrored under the floor line,
     //    rendered at quarter resolution, blurred and faded in a full-screen pass
@@ -200,7 +227,7 @@ export default function LoginBrand3D({ onFail, fullBleed = false }) {
       let rw = w, rh = h, rcx = w / 2, rcy = h / 2;
       if (fullBleed) {
         if (w >= 1024) { const card = Math.max(400, w * 0.34) + 40; rw = (w - card) * 0.9; rh = h * 0.7; rcx = (w - card) / 2 + 16; rcy = h * 0.45; }
-        else { rw = w * 0.92; rh = Math.max(220, h * 0.36); rcx = w / 2; rcy = Math.max(250, h * 0.4) * 0.52; }
+        else { rw = w - 56; rh = Math.max(220, h * 0.36); rcx = w / 2; rcy = Math.max(250, h * 0.4) * 0.52; } // centred, ≥ 28 px each side
       }
       const fW = rw / w, fH = rh / h;
       const d = Math.max(W / fW / (2 * tan * camera.aspect), (H * 1.3) / fH / (2 * tan));
@@ -234,10 +261,8 @@ export default function LoginBrand3D({ onFail, fullBleed = false }) {
       gear.rotation.z = roll * (1 - ge);
       gearMat.opacity = outCubic(span(t, 0, 0.3));
       // 2. wheat grows up out of the gear, grains pop one by one
-      stalks.forEach((s, i) => {
-        const e = outCubic(span(t, 0.55 + i * 0.08, 0.5));
-        s.scale.set(0.35 + 0.65 * e, Math.max(0.001, e), 1);
-      });
+      const we = outCubic(span(t, 0.55, 0.5));
+      wheat.scale.set(0.35 + 0.65 * we, Math.max(0.001, we), 1);
       grains.forEach((g, i) => { const e = outBack(span(t, 0.75 + (i / grains.length) * 0.55, 0.26), 2.2); g.m.scale.setScalar(Math.max(0.001, e)); });
       // 3. SHANTAZ assembles left → right
       letters.forEach((l, i) => {
@@ -264,7 +289,7 @@ export default function LoginBrand3D({ onFail, fullBleed = false }) {
           try { window.dispatchEvent(new CustomEvent("shantaz:sweep", { detail: { duration: SWEEP_LEN * 1000, intro: t < INTRO_END } })); } catch { /* old browser */ }
         }
         const k = st / SWEEP_LEN;
-        sweep.position.x = wordL - 0.4 + k * (wordR - wordL + 0.8);
+        sweep.position.x = sweepL + k * (wordR + 0.4 - sweepL);
         sweep.intensity = Math.sin(k * Math.PI) * 5.5;
       } else sweep.intensity = 0;
       // after the intro: opaque materials (cheaper, correct sorting)
@@ -283,10 +308,10 @@ export default function LoginBrand3D({ onFail, fullBleed = false }) {
       rig.updateMatrixWorld();
       floorV.set(0, floorY, 0).applyMatrix4(rig.matrixWorld).project(camera);
       fsMat.uniforms.uFloor.value = (floorV.y + 1) / 2;
-      logo.scale.y = -1; logo.position.y = 2 * floorY;
+      logo.scale.y = -1; logo.position.y = 2 * floorY; glow.visible = false;
       renderer.setRenderTarget(reflRT); renderer.setClearColor(0x000000, 0); renderer.clear();
       renderer.render(scene, camera);
-      logo.scale.y = 1; logo.position.y = 0;
+      logo.scale.y = 1; logo.position.y = 0; glow.visible = true;
       renderer.setRenderTarget(null); renderer.clear();
       renderer.render(fsScene, fsCam);
       renderer.render(scene, camera);
