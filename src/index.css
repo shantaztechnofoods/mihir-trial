@@ -3794,4 +3794,16 @@ button.rack-btn:disabled { background: #e5e7eb !important; color: #6b7280 !impor
   /* Report Center: its print rule boxes every image; not the letterhead logo or a signature. */
   .report-area .mr-doc img, .report-area .rpt-lh img { border: 0 !important; }
   .report-area .rpt-rc-head { margin-bottom: 4mm; }
+  /* Report Center tables: every column on the page (wide tables wrap instead of
+     being cut at the right edge), hairline rules, no app cards or shadows. */
+  .report-area { font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; padding: 0 !important; }
+  .report-area .overflow-x-auto, .report-area .overflow-hidden { overflow: visible !important; }
+  .report-area table { width: 100% !important; table-layout: auto; border-collapse: collapse; }
+  .report-area table th, .report-area table td { white-space: normal !important; overflow-wrap: break-word; padding: 1.1mm 1.4mm !important; font-size: 7.2pt !important; }
+  .report-area table th { text-transform: uppercase; letter-spacing: 0.04em; font-size: 6.6pt !important; border-bottom: 0.8pt solid #111 !important; }
+  .report-area table tr { border-color: #d2d2d2 !important; }
+  /* Very wide data tables (10+ columns): fixed columns that wrap, so the last ones are never cut off. */
+  .report-area table:has(th:nth-child(10)) { table-layout: fixed; }
+  .report-area table:has(th:nth-child(10)) th, .report-area table:has(th:nth-child(10)) td { font-size: 5.8pt !important; padding: 0.8mm 0.6mm !important; overflow-wrap: anywhere; word-break: break-word; letter-spacing: 0; }
+  .report-area .rounded-xl, .report-area .rounded-lg { border-radius: 2px !important; box-shadow: none !important; }
 }

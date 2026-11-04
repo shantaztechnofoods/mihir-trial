@@ -776,7 +776,7 @@ test("App: machine report, reachable from the card, and popups that always close
   assert.match(rep, /Appendix A · Checklist answers/);
   assert.match(rep, /const jobs = \[\.\.\.openJobs\.slice\(\)\.sort\(byTime\), \.\.\.resolvedJobs\.slice\(\)\.sort\(byTime\)\];/);
   assert.match(rep, /data-report-issue=\{open \? "open" : "resolved"\} className=\{`mr-issue \$\{open \? "is-open" : "is-done"\}`\}/);
-  assert.match(rep, /<JobHistory item=\{p\} users=\{allUsers\} compact \/>/, "how and when each issue was resolved");
+  assert.match(rep, /<JobHistory item=\{p\} users=\{allUsers\} compact reportDates \/>/, "how and when each issue was resolved");
   // every evidence section is still composed, plus the checklist appendix
   for (const s of ["<Hdr />", "<CriticalParts />", "<Journey />", "<TrialCertificate />", "<PendingJobsHistory />", "<StageHistory />", "<AttachmentsList />", "<SignOff />", "<ChecklistAppendix />"])
     assert.ok(rep.includes(s), s);

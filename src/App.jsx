@@ -15137,7 +15137,7 @@ function AtoZMachineReport({
                       <div className="mr-label" data-report-accept-team>team: {h.acceptedByTeamSnapshot.map((x) => (x && (x.fullName || x.username || x.name)) || "").filter(Boolean).join(", ")}</div>
                     )}
                     <div className="mr-label">Accept window {dur(h.acceptTimeoutMinutes)}</div>
-                    {h.status === "accepted" && <div className="mr-label">{h.acceptedSignatureSvg || h.mainEmployeeSignatureSvg ? "Signed · see signature register" : "Signed on file (earlier record)"}</div>}
+                    {h.status === "accepted" && <div className="mr-label">{h.acceptedSignatureSvg || h.mainEmployeeSignatureSvg ? "Signed (section 07)" : "Signed on file (earlier record)"}</div>}
                   </div></div>
                   <div className="mr-td" data-l="Time / target"><div>
                     <div className={over ? "mr-red" : ""}>{!h.actualDurationMinutes && !h.expectedDurationMinutes ? "—" : `${dur(h.actualDurationMinutes)} of ${dur(h.expectedDurationMinutes)}`}</div>
@@ -15238,7 +15238,7 @@ function AtoZMachineReport({
                       <div className="mr-td" data-l="Raised"><div><div>{p.raisedInDepartment || "—"}</div><div className="mr-label">{fmtDT(p.raisedAt)}</div></div></div>
                       <div className="mr-td" data-l="Assigned to">{p.assignedDepartment || "Unassigned"}</div>
                     </div>
-                    <div className="mr-issue-history"><JobHistory item={p} users={allUsers} compact /></div>
+                    <div className="mr-issue-history"><JobHistory item={p} users={allUsers} compact reportDates /></div>
                   </div>
                 );
               })}
@@ -16495,6 +16495,9 @@ function ReportKPI({ label, value, color = "#2E50D6", suffix = "" }) {
   );
 }
 
+// 2026-11-04 — ISO timestamps in report tables read as "04 Nov 2026, 09:32"
+// (the exported CSV / Excel keep the raw values).
+const rptCellText = (v) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(v) ? rptFmtDT(v) : String(v ?? ""));
 function ReportTable({ title, rows, t = (k) => k }) {
   if (!rows || rows.length === 0) {
     return (
@@ -16521,7 +16524,7 @@ function ReportTable({ title, rows, t = (k) => k }) {
             {rows.map((r, i) => (
               <tr key={i} className="border-t border-slate-200">
                 {columns.map((c) => (
-                  <td key={c} className="px-3 py-1.5 text-slate-500 whitespace-nowrap">{String(r[c] ?? "")}</td>
+                  <td key={c} className="px-3 py-1.5 text-slate-500 whitespace-nowrap">{rptCellText(r[c])}</td>
                 ))}
               </tr>
             ))}
@@ -17043,7 +17046,13 @@ const TC_SHEET_CSS = [
   ".tc-foot{position:absolute;left:13mm;right:13mm;bottom:6mm;display:flex;justify-content:space-between;gap:4mm;border-top:1px solid #d1d5db;padding-top:1.5mm;font-size:8.5px;color:#6b7280}",
   // 2026-11-04 — letterhead on the stand-alone certificate; the slimmer embedded form.
   ".tc-lh{text-align:center;padding-bottom:2.5mm;margin-bottom:3mm;border-bottom:.6px solid #9ca3af}",
-  ".tc-lh-logo{display:block;margin:0 auto 1.5mm;height:15mm;width:auto;max-width:60mm;object-fit:contain}",
+  ".tc-lh-logo{display:block;margin:0 auto 1.2mm;height:12mm;width:auto;max-width:56mm;object-fit:contain}",
+  // With the letterhead on top the sheet still fits one A4 page.
+  ".tc-has-lh th,.tc-has-lh td{padding:.42mm 1.8mm}",
+  ".tc-has-lh .tc-sec{margin-top:2.6mm}",
+  ".tc-has-lh .tc-title{font-size:16px;margin-bottom:2mm}",
+  ".tc-has-lh .tc-rule{margin-bottom:3mm}",
+  ".tc-has-lh .tc-sigs{margin-top:4mm}",
   ".tc-lh-name{font-size:14px;font-weight:700;letter-spacing:.02em}",
   ".tc-lh-line{font-size:9px;color:#4b5563;margin-top:.6mm}",
   ".tc-head.tc-head-1{grid-template-columns:1fr 1fr}",
@@ -17190,7 +17199,7 @@ function TrialCertificateSheet({ machine, cert, remarks = "", embedded = false, 
   };
 
   return (
-    <div className={`tc-sheet${embedded ? " tc-embedded" : ""}`}>
+    <div className={`tc-sheet${embedded ? " tc-embedded" : ""}${!embedded && company ? " tc-has-lh" : ""}`}>
       {!embedded && company && (
         <div className="tc-lh">
           {company.logo && <img src={company.logo} alt="" className="tc-lh-logo" />}
@@ -17889,10 +17898,11 @@ function ChecklistRows({ answers, onToggle, onRemark, voice = null, placeholder 
 // Part received (the receive remark), Work completed — each with who, which
 // department and when. Used in Pending Jobs, on the machine card, in the
 // machine's Production report and in the A-to-Z machine report.
-function JobHistory({ item, users = [], compact = false }) {
+// reportDates (2026-11-04): inside a printed report, the report date style.
+function JobHistory({ item, users = [], compact = false, reportDates = false }) {
   const entries = pendingItemHistory(item);
   const nameOf = (id) => { if (!id) return ""; const u = (users || []).find((x) => x.id === id); return u ? (u.fullName || u.username || "") : ""; };
-  const when = (iso) => { if (!iso) return ""; const d = new Date(iso); return Number.isNaN(d.getTime()) ? "" : `${fmtDate(d)} ${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`; };
+  const when = (iso) => { if (!iso) return ""; const d = new Date(iso); if (Number.isNaN(d.getTime())) return ""; return reportDates ? rptFmtDT(d) : `${fmtDate(d)} ${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`; };
   const tone = { reported: "#b45309", received: "#1d4ed8", completed: "#15803d" };
   const textLabel = { reported: "Reason", received: "Receive remark", completed: "Completion note" };
   return (
@@ -24393,7 +24403,7 @@ function hrExportPDF(title, rows, cols, company = {}) {
     table{border-collapse:collapse;width:100%}
     thead{display:table-header-group}
     th{text-align:left;font-size:9px;font-weight:700;color:#333;text-transform:uppercase;letter-spacing:.04em;padding:6px 8px;border-top:1.2px solid #111;border-bottom:.75px solid #111}
-    td{padding:5px 8px;border-bottom:.5px solid #d6d6d6;vertical-align:top;overflow-wrap:anywhere}
+    td{padding:5px 8px;border-bottom:.5px solid #d6d6d6;vertical-align:top;overflow-wrap:break-word}
     tr{break-inside:avoid;page-break-inside:avoid}
     .foot{margin-top:14px;padding-top:6px;border-top:.5px solid #d6d6d6;font-size:9px;color:#666;text-align:center}
     .print-btn{margin-bottom:14px;padding:7px 20px;background:#111827;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px}
