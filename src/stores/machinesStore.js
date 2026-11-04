@@ -213,6 +213,85 @@ export async function updateMachine(id, updates) {
   return { success: true };
 }
 
+// ── Migration 063 — atomic history append + compare-and-set ─────────────────
+// Sending the WHOLE history array lets two people who change one machine at
+// the same moment (Hold + stage change) race each other. machine_append_history
+// appends only the new entries under a row lock, and — when expectedStage is
+// given — refuses (stale) if someone else already moved the machine.
+// Before 063 is applied (function missing) this falls back to updateMachine
+// with the caller's full history, exactly as before.
+export const STALE_MACHINE_MSG = "Someone else just changed this machine — refreshed";
+let appendRpcMissing = false;
+export function _resetAppendRpcCache() { appendRpcMissing = false; }
+
+export function isMissingFunctionError(err) {
+  if (!err) return false;
+  if (err.code === "PGRST202" || err.code === "42883") return true;
+  return /could not find the function|function .* does not exist/i.test(err.message || err.details || err.hint || "");
+}
+
+// camelCase updates → the column names the function accepts. Only keys the
+// caller actually set are sent (null is kept: it clears the column).
+export function toAppendUpdates(updates = {}) {
+  const u = {};
+  if (updates.stage               != null)      u.stage                 = updates.stage;
+  if (updates.status              != null)      u.status                = updates.status;
+  if (updates.completedDate       != null)      u.completed_date        = toIsoDate(updates.completedDate);
+  if (updates.currentDepartment   !== undefined) u.current_department    = updates.currentDepartment   || null;
+  if (updates.departmentEnteredAt !== undefined) u.department_entered_at = updates.departmentEnteredAt || null;
+  if (updates.pendingHandoverId   !== undefined) u.pending_handover_id   = updates.pendingHandoverId ?? null;
+  if (updates.holdActive          !== undefined) u.hold_active           = !!updates.holdActive;
+  if (updates.holdReason          !== undefined) u.hold_reason           = updates.holdReason || "";
+  if (updates.trialCertificate    !== undefined) u.trial_certificate     = updates.trialCertificate || null;
+  return u;
+}
+
+/**
+ * Append history entries (and optionally change workflow columns) safely.
+ * @param {*} id machine id
+ * @param {{ entries: object[], updates?: object, expectedStage?: string|null,
+ *           fullHistory: object[], audit?: object|null }} opts
+ *   fullHistory — the complete array the old path would have sent (fallback only).
+ *   audit — { type, module, action, ref, serialNo, details } written by the
+ *           database in the same transaction (result.audited === true).
+ * @returns {Promise<{ success: boolean, stale?: boolean, audited?: boolean, rpc?: boolean, machine?: object, error?: string }>}
+ */
+export async function appendMachineHistory(id, { entries = [], updates = {}, expectedStage = null, fullHistory, audit = null } = {}) {
+  const history = Array.isArray(fullHistory) ? fullHistory : null;
+  if (!isSupabaseEnabled()) {
+    setLocal(getLocal().map((m) => m.id !== id ? m : { ...m, ...updates, history: history || [...(m.history || []), ...entries] }));
+    return { success: true };
+  }
+  const c = getSupabase(); if (!c) return { success: false, error: "no client" };
+  const fallback = () => updateMachine(id, history ? { ...updates, history } : { ...updates });
+  if (appendRpcMissing) return fallback();
+  let data, error;
+  try {
+    ({ data, error } = await c.rpc("machine_append_history", {
+      p_machine_id:     id,
+      p_entries:        entries,
+      p_updates:        toAppendUpdates(updates),
+      p_expected_stage: expectedStage || null,
+      p_audit:          audit ? { type: audit.type, module: audit.module || "Machine", action: audit.action,
+                                  ref: audit.ref || null, serial_no: audit.serialNo || null, details: audit.details || {} } : null,
+    }));
+  } catch (e) { error = e; }
+  if (error && isMissingFunctionError(error)) {
+    console.warn("[machines:append] migration 063 not applied — using the whole-row update");
+    appendRpcMissing = true;
+    return fallback();
+  }
+  if (error) { console.error("[machines:append] failed", error); return { success: false, error: error.message || String(error) }; }
+  const machine = data && data.machine ? fromRow(data.machine) : undefined;
+  if (data && data.stale) {
+    console.warn("[machines:append] stale — machine changed by someone else", { id, expectedStage, now: machine?.stage });
+    return { success: false, stale: true, error: STALE_MACHINE_MSG, machine };
+  }
+  if (!data || data.ok !== true) return { success: false, error: "machine not updated" };
+  console.info("[machines:append] ok", { id, entries: entries.length });
+  return { success: true, rpc: true, audited: data.audited === true, machine };
+}
+
 // Feature 3: hard-delete a machine row. Used by the rack remove flow when the
 // operator wants to cancel a rack build entirely. The App layer is responsible
 // for reversing stock + audit logging BEFORE calling this — this is just the

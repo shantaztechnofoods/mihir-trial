@@ -4,6 +4,7 @@
 import { isSupabaseEnabled } from "../config/env.js";
 import { getSupabase } from "../supabase/client.js";
 import { fetchAllRows, readLocalJson } from "../utils/fetchAll.js";
+import { shrinkImageFile } from "../utils/imageResize.js";
 
 const LOCAL_KEY = "erp_attachments";
 const BUCKET    = "machine-attachments";
@@ -62,6 +63,9 @@ export async function fetchAllAttachments() {
 
 export async function uploadAttachment({ machineId, department, stage, file, caption, isCustomerVisible = false, uploadedBy }) {
   if (!file) return { success: false, error: "No file" };
+  // Camera / gallery photos are shrunk to ≤ 2000 px JPEG first (videos and
+  // documents pass through unchanged).
+  file = await shrinkImageFile(file);
   if (file.size > MAX_BYTES) return { success: false, error: `File too large (max 50 MB).` };
   const kind = inferKind(file.type, file.name);
   const ts = Date.now();
