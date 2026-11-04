@@ -28,11 +28,11 @@ import BrandLogo from "../components/BrandLogo.jsx";
 // screen").
 // 2026-11-04 (world UI) — new look only. The logic above the return (fields,
 // autofill guard, submit, error handling) is unchanged. The 3D scene is a
-// separate lazy chunk that starts only after the form has painted: three.js
-// rack on capable devices, the CSS-3D rack otherwise, and a still CSS rack for
-// reduced motion / low-end phones (deviceMemory <= 2, Save-Data).
-const LoginScene3D = lazy(() => import("./LoginScene3D.jsx"));
-const LoginHero = lazy(() => import("./LoginHero.jsx"));
+// separate lazy chunk that starts only after the form has painted: the SHANTAZ
+// wordmark in 3D on capable devices; the real 2D logo with a soft shine for
+// reduced motion / low-end phones (deviceMemory <= 2, Save-Data) / no WebGL.
+const LoginBrand3D = lazy(() => import("./LoginBrand3D.jsx"));
+const TAGLINE = "INNOVATION FOR LIFE";
 
 const heroMode = () => {
   try {
@@ -104,18 +104,23 @@ export default function LoginPage({ notice = "", onRetry = null }) {
       <div className="lg-stage" aria-hidden="true">
         <div className="lg-grid" />
         <div className="lg-light" />
-        {hero && (
+        {hero === "webgl" && (
           <Suspense fallback={null}>
-            {hero === "webgl"
-              ? <LoginScene3D onFail={() => setHero("css")} />
-              : <div className="lg-css3d"><LoginHero still={hero === "still"} /></div>}
+            <LoginBrand3D onFail={() => setHero("still")} />
           </Suspense>
+        )}
+        {(hero === "still" || hero === "css") && (
+          <div className="lg-brand2d">
+            <span className="lg-shine"><BrandLogo size={112} rounded={24} /></span>
+            <div className="lg-tagline is-on">
+              {TAGLINE.split("").map((c, i) => <span key={i} style={{ transitionDelay: `${i * 35}ms` }}>{c === " " ? "\u00a0" : c}</span>)}
+            </div>
+          </div>
         )}
         <div className="lg-vignette" />
       </div>
 
       <header className="lg-brand">
-        <span className="lg-logo"><BrandLogo size={64} rounded={16} /></span>
         <div className="lg-brand-text">
           {company && <div className="lg-company">{company}</div>}
           <p className="lg-line" aria-label={line}>

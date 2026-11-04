@@ -166,15 +166,27 @@
   .lg-light { position: absolute; width: 70vmax; height: 70vmax; right: -18vmax; top: -30vmax; border-radius: 50%;
     background: radial-gradient(circle, rgba(232, 150, 46, .26) 0%, rgba(232, 150, 46, .08) 34%, transparent 62%); filter: blur(6px); }
   .lg-vignette { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(120% 90% at 50% 40%, transparent 55%, rgba(5, 10, 20, .55) 100%); }
-  .lg-3d, .lg-css3d { position: absolute; inset: 0 0 auto 0; height: 46dvh; opacity: 0; animation: lg-in var(--dur-hero) var(--ease-enter) 60ms forwards; }
-  .lg-3d canvas { width: 100% !important; height: 100% !important; display: block; }
+  /* Brand hero: the SHANTAZ wordmark (3D) or the real logo (2D fallback) + tagline */
+  .lg-brand3d, .lg-brand2d { position: absolute; inset: 0 0 auto 0; height: max(250px, 40dvh); }
+  .lg-3d { position: absolute; inset: 0 0 8% 0; }
+  .lg-3d canvas { width: 100% !important; height: 100% !important; display: block;
+    -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 54%, transparent 72%); mask-image: linear-gradient(to bottom, #000 0%, #000 54%, transparent 72%); }
+  .lg-tagline { position: absolute; left: 0; right: 0; top: 62%; text-align: center; white-space: nowrap;
+    font: 500 12px/1 var(--font-display); font-stretch: 125%; letter-spacing: .42em; padding-left: .42em; color: #C3CEDF; }
+  .lg-tagline span { display: inline-block; opacity: 0; transform: translateY(6px); transition: opacity 360ms var(--ease-enter), transform 360ms var(--ease-enter); }
+  .lg-tagline.is-on span { opacity: 1; transform: none; }
+  .lg-brand2d { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; padding-bottom: 4%; }
+  .lg-brand2d .lg-tagline { position: static; }
+  .lg-shine { position: relative; display: inline-flex; border-radius: 24px; overflow: hidden; box-shadow: 0 24px 60px -20px rgba(0, 0, 0, .7), 0 0 0 1px rgba(255, 255, 255, .08); }
+  .lg-shine::after { content: ""; position: absolute; inset: -20%; background: linear-gradient(115deg, transparent 35%, rgba(255, 255, 255, .55) 50%, transparent 65%);
+    transform: translateX(-120%); animation: lg-shine 1.2s var(--ease-enter) .3s 1 forwards; pointer-events: none; }
+  @keyframes lg-shine { to { transform: translateX(120%); } }
   @keyframes lg-in { to { opacity: 1; } }
 
-  .lg-brand { position: relative; z-index: 2; grid-row: 2; padding: 0 20px 14px; display: flex; align-items: center; gap: 14px; }
-  .lg-logo { display: inline-flex; border-radius: 16px; box-shadow: 0 10px 30px -10px rgba(0, 0, 0, .6), 0 0 0 1px rgba(255, 255, 255, .08); animation: lg-logo 600ms var(--ease-pop) backwards; }
-  @keyframes lg-logo { from { opacity: 0; transform: scale(.8) translateY(6px); } to { opacity: 1; transform: none; } }
+  .lg-brand { position: relative; z-index: 2; grid-row: 2; padding: 0 20px 14px; display: flex; justify-content: center; text-align: center; }
   .lg-company { font-size: 15px; font-weight: 700; color: #F4F7FC; animation: lg-word 420ms var(--ease-enter) 120ms backwards; }
-  .lg-line { margin-top: 4px; font-size: 13px; color: #A9B5CA; line-height: 1.35; }
+  .lg-line { display: none; margin-top: 4px; font-size: 13px; color: #A9B5CA; line-height: 1.35; }
+  .lg-company { font-size: 13px !important; font-weight: 600 !important; color: #AEB9CB !important; letter-spacing: .02em; }
   .lg-line span { display: inline-block; white-space: pre; animation: lg-word 420ms var(--ease-enter) backwards; }
   @keyframes lg-word { from { opacity: 0; transform: translateY(8px); filter: blur(3px); } to { opacity: 1; transform: none; filter: none; } }
 
@@ -220,14 +232,17 @@
 
   /* Phone: stage on top, the card is a sheet from the bottom */
   @media (max-width: 1023px) {
-    .lg-3d, .lg-css3d { height: 44dvh; }
   }
   /* Laptop: stage fills the screen, glass card floats on the right */
   @media (min-width: 1024px) {
     .lg-root { grid-template-columns: 1fr minmax(400px, 34vw); grid-template-rows: 1fr auto; }
-    .lg-3d, .lg-css3d { inset: 0 34vw 0 0; height: auto; }
-    .lg-brand { grid-column: 1; grid-row: 2; padding: 0 56px 52px; align-items: flex-end; }
-    .lg-logo .brand-logo { width: 84px !important; height: 84px !important; border-radius: 20px !important; }
+    .lg-brand3d, .lg-brand2d { inset: 0 34vw 0 0; height: auto; }
+    .lg-3d { inset: 6% 4% 26% 4%; }
+    .lg-tagline { font-size: 15px; }
+    .lg-shine .brand-logo { width: 168px !important; height: 168px !important; border-radius: 32px !important; }
+    .lg-brand { grid-column: 1; grid-row: 2; padding: 0 56px 52px; justify-content: flex-start; text-align: left; }
+    .lg-line { display: block; }
+    .lg-company { font-size: 15px !important; }
     .lg-company { font-size: 18px; }
     .lg-line { font: 600 30px/1.15 var(--font-display); font-stretch: 112%; color: #EEF2F9; max-width: 560px; letter-spacing: -0.015em; margin-top: 8px; }
     .lg-panel { grid-column: 2; grid-row: 1 / span 2; align-items: center; padding: 32px 40px 32px 0; }
@@ -242,40 +257,18 @@
     .lg-input { font-size: 15px !important; }
   }
 
-  /* CSS-3D rack (fallback hero) */
-  .lh-root { position: absolute; inset: 0; perspective: 1100px; perspective-origin: 50% 35%; --px: 0; --py: 0; }
-  .lh-floor { display: none; }
-  .lh-cam { position: absolute; left: 50%; top: 52%; transform-style: preserve-3d; transform: scale(var(--lh-scale, .78)); }
-  .lh-tilt { transform-style: preserve-3d; transform: rotateX(calc(-12deg + var(--py) * -8deg)) rotateY(calc(var(--px) * 14deg)); transition: transform 600ms var(--ease-enter); }
-  .lh-rig { transform-style: preserve-3d; animation: lh-turn 22s ease-in-out infinite alternate; }
-  .lh-root.is-still .lh-rig { animation: none; transform: rotateY(-28deg); }
-  .lh-root.is-paused .lh-rig { animation-play-state: paused; }
-  @keyframes lh-turn { from { transform: rotateY(-48deg); } to { transform: rotateY(18deg); } }
-  .lh-box { position: absolute; left: 0; top: 0; transform-style: preserve-3d; }
-  .lh-f { position: absolute; left: 0; top: 0; backface-visibility: hidden; }
-  .lh-steel .lh-f { background: linear-gradient(180deg, #C9D1DD, #8C97A9); }
-  .lh-steel .lh-right, .lh-steel .lh-left { background: linear-gradient(180deg, #8E9AAD, #5D687B); }
-  .lh-steel .lh-top { background: #DCE2EA; }
-  .lh-crate .lh-f { background: linear-gradient(180deg, #2C3749, #1F2836); box-shadow: inset 0 0 0 1px rgba(170, 190, 220, .16); }
-  .lh-crate .lh-top { background: #3A475C; }
-  .lh-crate .lh-right, .lh-crate .lh-left { background: #1A222F; }
-  .lh-heat .lh-front::after { content: ""; position: absolute; left: 50%; top: 50%; width: 38px; height: 38px; margin: -19px 0 0 -19px; border-radius: 50%;
-    background: radial-gradient(circle, #FFD08A, #E8962E 55%, #7A3E0C); box-shadow: 0 0 26px 6px rgba(232, 150, 46, .55); animation: lh-glow 3.2s ease-in-out infinite; }
-  .lh-panel .lh-front::after { content: ""; position: absolute; right: 12px; top: 12px; width: 6px; height: 6px; border-radius: 50%; background: #4ADE80; box-shadow: 0 0 8px #4ADE80; }
-  @keyframes lh-glow { 50% { box-shadow: 0 0 34px 10px rgba(232, 150, 46, .7); filter: brightness(1.12); } }
-  .lh-shadow { position: absolute; left: -170px; top: 150px; width: 340px; height: 70px; border-radius: 50%; background: radial-gradient(closest-side, rgba(0, 0, 0, .55), transparent); transform: rotateX(80deg); }
-  @media (min-width: 1024px) { .lh-cam { --lh-scale: 1.15; } }
 }
 
 /* ═══ Reduced motion: no entrances, no loops, no celebration motion ═══════ */
 @media (prefers-reduced-motion: reduce) {
   /* fewer and gentler: movement goes, short opacity fades stay */
   .app-shell > .flex-1, .app-shell > main, [data-staff-section] .mt-card, .wu-stagger > *, .modal-backdrop > div, .toast,
-  .lg-card, .lg-line span, .lg-logo, .lg-company, .wu-seal { animation: wu-fade 160ms ease backwards !important; }
+  .lg-card, .lg-line span, .lg-company, .wu-seal { animation: wu-fade 160ms ease backwards !important; }
   .progress-bar, [data-wu-fill] { animation: none !important; }
   .app-shell button:not(:disabled):active { transform: none; }
   html { scroll-behavior: auto !important; }
-  .lg-grid, .lh-rig, .skeleton, .wu-sk { animation: none !important; }
+  .lg-grid, .lg-shine::after, .skeleton, .wu-sk { animation: none !important; }
+  .lg-tagline span { transition: opacity 160ms ease !important; transform: none !important; }
   .wu-confetti { display: none !important; }
 }
 
