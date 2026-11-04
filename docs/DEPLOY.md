@@ -10,6 +10,9 @@ https://purchase-inventory-os.vercel.app and https://mihir-trial.vercel.app)
 > Never point a test deployment at the production Supabase project. Never run
 > `supabase db reset`, `TRUNCATE` or `DELETE FROM` on production (CLAUDE.md §5).
 
+Hosting somewhere other than Vercel (Docker / nginx / own Node API): see
+`HOSTING-ANYWHERE.md` at the repo root. Supabase and Edge Function steps below are the same.
+
 ## 0. What you need
 * Node 20 (the version in `.nvmrc`; Vercel uses the same) and npm.
 * A GitHub account with access to the repo, a Vercel account, a Supabase account.
