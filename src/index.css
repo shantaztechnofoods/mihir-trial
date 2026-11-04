@@ -3704,3 +3704,94 @@ button.rack-btn:disabled { background: #e5e7eb !important; color: #6b7280 !impor
 .mt-card-actions { flex-wrap: wrap !important; }
 .mt-card-actions > span { white-space: nowrap; }
 .rpt-photo img { object-fit: contain; background: #fff; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Professional reports (2026-11-04)
+
+   Letterhead (logo centred and larger, company name, address, GSTIN / phone /
+   e-mail, thin rule) and the title block are shared by every report sheet.
+   Everything under "@media print" is the paper copy only: Inter in near-black,
+   hairline rules, muted status ink instead of app colours, no app chips or
+   buttons, page numbers and a running head from page 2 (written per report by
+   RptPageStyle). The on-screen view is left as it was.
+   ═══════════════════════════════════════════════════════════════════════ */
+.rpt-lh { text-align: center; padding-bottom: 12px; border-bottom: 1px solid #b9b4a8; }
+.rpt-lh .rpt-lh-logo, .mr-doc .rpt-lh .rpt-lh-logo { display: block; margin: 0 auto 8px; height: 64px; width: auto; max-width: 240px; object-fit: contain; }
+.rpt-lh-name { font-size: 20px; font-weight: 700; letter-spacing: 0.005em; line-height: 1.25; color: #14110d; }
+.rpt-lh-line { font-size: 11px; line-height: 1.5; color: #5c5341; }
+.rpt-titleblock { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap;
+  margin-top: 14px; padding-bottom: 10px; border-bottom: 2px solid #14110d; }
+.rpt-doctitle { font-size: 17px !important; font-weight: 700; letter-spacing: -0.005em; color: #14110d; }
+.rpt-docsub { font-size: 11px; color: #5c5341; margin-top: 1px; }
+.rpt-docmeta { text-align: right; font-size: 11px; line-height: 1.55; color: #14110d; }
+.rpt-meta-k { display: inline-block; min-width: 34px; color: #5c5341; font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; }
+.mr-doc .rpt-facts-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.mr-doc .rpt-voice-row { grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 10px; }
+.mr-doc .rpt-sigbox.mr-sig { display: flex; padding-bottom: 0; }
+.mr-doc .rpt-sigbox.mr-sig img { height: auto; max-height: 38px; max-width: 120px; }
+.mr-doc .rpt-sigtable { margin-top: 2px; }
+@media (max-width: 639.98px) {
+  .mr-doc .rpt-facts-5 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .rpt-docmeta { text-align: left; }
+  .rpt-lh .rpt-lh-logo, .mr-doc .rpt-lh .rpt-lh-logo { height: 52px; }
+}
+
+@media print {
+  .mr-doc, .rpt-rc-head {
+    --mr-ink: #111111; --mr-mute: #555555; --mr-rule: #d2d2d2; --mr-rule-strong: #111111;
+    --mr-red: #8a1f1f; --mr-red-bg: transparent; --mr-green: #1f5a37; --mr-amber: #74470c;
+    font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+    color: #111; font-size: 9.2pt; line-height: 1.42;
+    font-feature-settings: "tnum" 1, "cv11" 1;
+  }
+  /* The running head is a page margin box now (page 2 on); the in-flow copy would repeat page 1's letterhead. */
+  .mr-doc .mr-runhead { display: none !important; }
+  /* Letterhead and title block on paper */
+  .rpt-lh { padding-bottom: 3.2mm; border-bottom: 0.6pt solid #8a8a8a; break-inside: avoid; }
+  .rpt-lh .rpt-lh-logo, .mr-doc .rpt-lh .rpt-lh-logo { height: 17mm; max-width: 70mm; margin-bottom: 2mm; }
+  .rpt-lh-name { font-size: 15pt; color: #111; }
+  .rpt-lh-line { font-size: 7.8pt; color: #4a4a4a; }
+  .rpt-titleblock { margin-top: 4mm; padding-bottom: 2.6mm; border-bottom: 1.2pt solid #111; break-after: avoid; break-inside: avoid; }
+  .rpt-doctitle { font-size: 13pt !important; color: #111; }
+  .rpt-docsub, .rpt-docmeta { font-size: 8.2pt; }
+  .rpt-meta-k { font-size: 7pt; color: #666; }
+  .mr-doc .mr-machine { font-size: 15pt; }
+  .mr-doc .mr-h { font-size: 10.5pt; letter-spacing: 0.005em; }
+  .mr-doc .mr-num { font-size: 8pt; color: #777; }
+  .mr-doc .mr-mono, .mr-doc .mr-num { font-family: 'JetBrains Mono', 'Liberation Mono', Consolas, monospace; }
+  .mr-doc .mr-th { color: #333; text-transform: uppercase; letter-spacing: 0.05em; font-size: 7pt; }
+  .mr-doc .mr-table { border-top-width: 0.9pt; }
+  .mr-doc .mr-tr { border-bottom-width: 0.5pt; }
+  .mr-doc .mr-sum { border-left-width: 0.5pt; }
+  .mr-doc .mr-summary { border-top-width: 0.5pt; border-bottom-width: 0.5pt; }
+  /* Status ink, not app colour: no filled chips, no tinted rows. */
+  .mr-doc .mr-stamp { border-width: 0.9pt; font-size: 8.5pt; padding: 1.4mm 3mm; letter-spacing: 0.03em; }
+  .mr-doc .mr-tag { background: none; color: var(--mr-red); border: 0.6pt solid currentColor; font-size: 6.8pt; padding: 0 1.2mm; letter-spacing: 0.04em; text-transform: uppercase; }
+  .mr-doc .mr-issue.is-open { background: none; box-shadow: inset 1.2pt 0 0 var(--mr-red); padding-left: 3mm; }
+  .mr-doc .mr-sum.is-red { border-left: 1.2pt solid var(--mr-red); }
+  .mr-doc .mr-step { border-top-width: 1.5pt; }
+  .mr-doc .mr-step.is-done { border-top-color: #111; }
+  .mr-doc .mr-step.is-current { border-top-color: var(--mr-amber); }
+  .mr-doc .mr-step.is-pending { border-top-color: #cfcfcf; }
+  /* No app controls on paper. */
+  .mr-doc button, .mr-doc [data-voice-play], .mr-doc .rpt-voice-play { display: none !important; }
+  .mr-doc .rpt-voice-row { grid-template-columns: minmax(0, 1fr); }
+  /* Clean page breaks: rows, issues, signatures and checklist blocks never split;
+     a heading always travels with what follows; no lone lines. */
+  .mr-doc p, .mr-doc .mr-td, .mr-doc .rpt-lh-line { orphans: 3; widows: 3; }
+  .mr-doc .mr-h, .mr-doc .rpt-subh { break-after: avoid; page-break-after: avoid; }
+  .mr-doc .rpt-sigtable .mr-tr, .mr-doc .mr-signoff, .mr-doc .rpt-hero, .mr-doc .mr-identity, .mr-doc .mr-facts { break-inside: avoid; page-break-inside: avoid; }
+  .mr-doc .rpt-sub > .rpt-subh + * { break-before: avoid; page-break-before: avoid; }
+  /* Signatures: one small box, a thin line under it. */
+  .mr-doc .rpt-sigbox { border-bottom-width: 0.5pt; }
+  .mr-doc .mr-sign-line { border-bottom-width: 0.6pt; }
+  /* The trial certificate inside a report takes the report's type. */
+  .mr-doc .mr-cert .tc-sheet { font-family: inherit; color: #111; }
+  .mr-doc .mr-cert .tc-sec { background: #f3f3f3; border-color: #9a9a9a; letter-spacing: 0.06em; }
+  .mr-doc .mr-cert .tc-sheet th, .mr-doc .mr-cert .tc-sheet td, .mr-doc .mr-cert .tc-note { border-color: #9a9a9a; }
+  .mr-doc .mr-cert .tc-sheet th { background: #fafafa; }
+  .mr-doc .mr-footnote { font-size: 7.5pt; color: #666; border-top-width: 0.5pt; }
+  /* Report Center: its print rule boxes every image; not the letterhead logo or a signature. */
+  .report-area .mr-doc img, .report-area .rpt-lh img { border: 0 !important; }
+  .report-area .rpt-rc-head { margin-bottom: 4mm; }
+}

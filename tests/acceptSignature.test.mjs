@@ -73,10 +73,14 @@ test("handler refuses without a drawn signature and records name, department, ti
 });
 
 test("the signature is visible in the machine report and the machine history", () => {
-  const rep = slice("{machineHandovers.map((h) => {", "mr-hop-note");
-  assert.match(rep, /data-report-accept-signature/);
+  // 2026-11-04 — printed once, in the report's signature register (name, department, date, image).
+  const rep = slice("  const sigRows = [", "// D7 — the release sign-off");
   assert.match(rep, /svgDataUri\(h\.acceptedSignatureSvg\)/);
   assert.match(rep, /h\.acceptedByName \|\| userName\(h\.acceptedBy\)/);
+  assert.match(rep, /dept: h\.acceptedInDepartment \|\| h\.toDepartment, when: h\.acceptedAt/);
+  const reg = slice("function RptSignatureRegister(", "function trialCertSignatureRows(");
+  assert.match(reg, /data-report-accept-signature/);
+  assert.match(reg, /<img src=\{r\.src\}/);
   assert.match(app, /data-history-accept-signature/);
   assert.match(app, /svgDataUri\(ho\.acceptedSignatureSvg\)/);
 });
