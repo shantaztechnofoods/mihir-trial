@@ -287,11 +287,6 @@
       radial-gradient(26% 14% at var(--sx) calc(var(--sy) + 9%), rgba(228, 0, 43, .10), transparent 75%);
     animation: lg-breathe 9s ease-in-out infinite alternate; }
   @keyframes lg-breathe { from { opacity: .82; } to { opacity: 1; } }
-  /* the floor the logo stands on: a soft horizon, no grid */
-  .lg-floor { position: absolute; left: 0; right: 0; top: calc(var(--sy) + 17%); height: 40%; pointer-events: none;
-    background:
-      radial-gradient(38% 22% at var(--sx) 0%, rgba(140, 165, 220, .10), transparent 80%),
-      linear-gradient(90deg, transparent 8%, rgba(255, 255, 255, .06) 50%, transparent 92%) top / 100% 1px no-repeat; }
   .lg-grain { position: absolute; inset: 0; pointer-events: none; opacity: .07; mix-blend-mode: overlay;
     background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .9 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"); }
   .lg-vignette { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(130% 100% at var(--sx) 35%, transparent 55%, rgba(0, 0, 0, .55) 100%); }
@@ -366,7 +361,6 @@
   /* Laptop: the scene fills the screen, the card floats on the right */
   @media (min-width: 1024px) {
     .lg-root { --sx: 33%; --sy: 44%; grid-template-columns: minmax(0, 1fr) minmax(400px, 34vw); grid-template-rows: 1fr; }
-    .lg-floor { top: calc(var(--sy) + 15%); }
     .lg-brand2d { inset: 0 34vw 0 0; height: auto; padding: 0 48px; }
     .lg-logo2d { width: min(44vw, 540px); }
     .lg-panel { grid-column: 2; grid-row: 1; align-items: center; justify-content: flex-start; padding: 32px 48px 32px 0; }
@@ -626,20 +620,6 @@
   @media (hover: hover) and (pointer: fine) { .wu-addrow:hover { border-color: var(--action) !important; color: var(--action) !important; } }
   /* Signature: Save is the one cobalt action in the box */
   .wu-sig-save { background: var(--action) !important; font-weight: 600 !important; box-shadow: var(--press-hi), 0 1px 2px rgba(11, 18, 32, .18) !important; }
-}
-
-/* ═══ Login 3D framing: the reflection fades out softly below the floor ═══ */
-@media screen {
-  .lg-brand3d--full .lg-3d {
-    -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 28%, rgba(0, 0, 0, .22) 30.5%, transparent 40%);
-            mask-image: linear-gradient(to bottom, #000 0%, #000 28%, rgba(0, 0, 0, .22) 30.5%, transparent 40%); }
-  .lg-floor { top: 28%; }
-  @media (min-width: 1024px) {
-    .lg-brand3d--full .lg-3d {
-      -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 58.5%, rgba(0, 0, 0, .22) 61%, transparent 72%);
-              mask-image: linear-gradient(to bottom, #000 0%, #000 58.5%, rgba(0, 0, 0, .22) 61%, transparent 72%); }
-    .lg-floor { top: 59%; }
-  }
 }
 
 /* ═══ Admin desktop: readable small text, quiet alert rows ════════════════ */

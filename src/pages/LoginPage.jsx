@@ -131,11 +131,10 @@ export default function LoginPage({ notice = "", onRetry = null }) {
 
   return (
     <div data-login-screen className="lg-root">
-      {/* Stage: one dark studio scene (spotlight, floor glow, film grain) paints
+      {/* Stage: one dark studio scene (spotlight, film grain) paints
           at once; the real logo (3D, or flat on low-end / reduced motion) sits on it. */}
       <div className="lg-stage" aria-hidden="true">
         <div className="lg-spot" />
-        <div className="lg-floor" />
         {hero === "webgl" && (
           <Suspense fallback={null}>
             <LoginBrand3D fullBleed onFail={onHeroFail} />
