@@ -3969,7 +3969,13 @@ function POModal({ initialPO, vendorList, items, onSave, onClose, prefill = null
       template:  initialPO.template  || poCfg.template,
       // ERP upgrade (migration 018) — fall back to today / 18% local for legacy POs.
       purchaseType: initialPO.purchaseType || DEFAULT_PURCHASE_TYPE_KEY,
-      poDate:       initialPO.poDate || initialPO.date || todayIso(),
+      // A legacy PO has only date = "4 Nov 2026"; the date picker needs
+      // yyyy-mm-dd or it shows an empty PO Date field.
+      poDate: (() => {
+        const v = initialPO.poDate || initialPO.date;
+        const d = parseDisplayDate(v);
+        return d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}` : (v || todayIso());
+      })(),
     };
     return {
       vendor:    prefill?.vendor || vendorList[0]?.name || "",
@@ -3983,6 +3989,8 @@ function POModal({ initialPO, vendorList, items, onSave, onClose, prefill = null
       poDate:       prefill?.poDate || todayIso(),
     };
   });
+  // PO Date as first shown, so Save can tell whether the operator changed it.
+  const initialPoDateRef = useRef(form.poDate);
 
   const [addCode,      setAddCode]      = useState("");
   const [addQty,       setAddQty]       = useState("");
@@ -4155,7 +4163,12 @@ function POModal({ initialPO, vendorList, items, onSave, onClose, prefill = null
       amount: total,
       status,
       gstType: purchaseTypeMeta?.gstType || null,
-      date:    form.poDate || todayIso(),
+      // Same "4 Nov 2026" form every other PO date uses. Edit used to write the
+      // raw date-picker value ("2026-11-04") into po.date, so the edited PO's
+      // date showed in a different format and could not be parsed for sorting.
+      // An unchanged PO Date keeps the stored date as is (no false "date"
+      // change in the po_edited audit row).
+      date:    isEdit && initialPO.date && form.poDate === initialPoDateRef.current ? initialPO.date : isoToDisplayDate(form.poDate || todayIso()),
     });
   };
 
@@ -26474,6 +26487,7 @@ function ReadyMachinesPopup({ items = [], bomDefs = {}, onOk, onView }) {
 
 function NotificationPanel({ notifications, dismissed, onClose, onNavigate, onDismiss, onDismissAll }) {
   const TYPE_CFG = {
+    machine_waiting: { label: "Machine waiting for you", icon: "📥", color: "#c2410c", nav: "machines" },
     critical:      { label: "Critical Stock",     icon: "🔴", color: "#b91c1c", nav: "inventory" },
     warning:       { label: "Low Stock Alert",    icon: "🟠", color: "#b45309", nav: "inventory" },
     approval:      { label: "Approval Pending",   icon: "📋", color: "#2E50D6", nav: "pipeline" },
@@ -27269,7 +27283,25 @@ export default function App() {
   const allItemsForNotif = Object.entries(safeItems).flatMap(([cat, list]) =>
     Array.isArray(list) ? list.map((i) => ({ ...(i || {}), category: cat })) : []
   );
+  // 2026-11-04 (MT audit, owner decision) — "machine waiting for you": every
+  // pending hand-over addressed to one of my departments (to accept, or on the
+  // rack for me to take). Read-only, derived from the same `handovers` state
+  // the Machine Tracker uses; a new hand-over has a new id, so it shows again.
+  const myBellDepts = Array.isArray(currentUser?.departments) ? currentUser.departments.filter(Boolean) : [];
+  const waitingForMe = myBellDepts.length && canOpenPage("machines")
+    ? (Array.isArray(handovers) ? handovers : []).filter((h) => h && h.status === "pending" && myBellDepts.includes(h.toDepartment))
+    : [];
   const notifications = [
+    ...waitingForMe.map((h) => {
+      const m = safeMachines.find((x) => String(x?.id) === String(h.machineId)) || null;
+      const onRack = !!(h.releaseRequired && !h.releasedAt);
+      const late = !onRack && isHoldOverdue(h.sentAt, h.acceptTimeoutMinutes, Date.now());
+      return {
+        id: `machine_waiting-${h.id}`, type: "machine_waiting",
+        title: `${late ? "Late · " : ""}${onRack ? "On the rack for you" : "Waiting for you to accept"}: ${(m && m.bomKey) || h.bomKey || "Machine"}`,
+        desc:  `${(m && m.serialNo) || h.serialNo ? `S/N ${(m && m.serialNo) || h.serialNo} · ` : ""}from ${h.fromDepartment || "—"} → ${h.toDepartment}`,
+      };
+    }),
     ...allItemsForNotif.filter((i) => i?.status === "critical").map((i) => ({
       id: `critical-${i.code}`, type: "critical",
       title: `Critical: ${i.name}`,
@@ -27595,6 +27627,19 @@ export default function App() {
         )
       )];
       affectedIds.forEach((issueId) => notifyMachineComplete(issueId, newPendingLog.filter((p) => p.issueId === issueId)));
+      // The received stock went straight out to these shortfalls — record it
+      // (same as Inward), or the Audit Trail shows a receipt with no trace of
+      // where the stock went.
+      Object.entries(lineDeductions).forEach(([code, { deduct, fMap }]) => {
+        const li = (po.lineItems || []).find((l) => l.code === code);
+        logAudit({
+          type: "pending_fulfilled", module: "Pending",
+          action: `Auto-fulfilled on PO receive ${id}: ${li?.name || code} × ${roundQty(deduct)}`,
+          ref: code, itemCode: code, itemName: li?.name || code,
+          qty: roundQty(deduct), vendor: po.vendor,
+          details: { auto: "po", po: id, items: [...fMap.entries()].map(([k, q]) => `${k}×${q}`) },
+        });
+      });
     }
 
     const newLog = [...(po.activityLog || []), { action: "Received", date: dateStr, note: "Stock updated automatically" }];
