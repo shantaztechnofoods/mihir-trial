@@ -5,12 +5,13 @@ import {
   ShaderMaterial, AmbientLight, DirectionalLight, PointLight, PMREMGenerator, SRGBColorSpace,
   ACESFilmicToneMapping, BackSide, Vector2, Vector3, Color,
 } from "three";
+import { Font } from "three/examples/jsm/loaders/FontLoader.js";
 import { shantazLogo } from "./shantazLogoGeometry.js";
 
 export { default as ShantazLogoSVG } from "./ShantazLogoSVG.jsx";
 
-// Login hero (2026-11-04): the real SHANTAZ logo in 3D — gear, wheat,
-// wordmark, ®, tagline — extruded from the same geometry as the 2D logo.
+// Login hero (2026-11-04): the SHANTAZ logo in 3D — gear, wheat, wordmark,
+// ®, tagline — extruded from the same clean-vector geometry as the 2D logo.
 //
 // Intro (~2.3 s): the gear rolls in from the left (~120°, mechanical settle)
 // → wheat grows out of it, grains pop one by one → SHANTAZ assembles left to
@@ -78,6 +79,7 @@ export default function LoginBrand3D({ onFail, fullBleed = false }) {
     // ── materials ──
     const gearMat = new MeshPhysicalMaterial({ color: 0x6b7280, metalness: 0.9, roughness: 0.32, clearcoat: 0.5, clearcoatRoughness: 0.25, anisotropy: 0.6, transparent: true, opacity: 0 });
     const wheatA = new MeshPhysicalMaterial({ color: 0x2f6b1f, metalness: 0.1, roughness: 0.42, sheen: 1, sheenColor: new Color(0x9fe07c), sheenRoughness: 0.45, clearcoat: 0.3, clearcoatRoughness: 0.4 });
+    const wheatB = wheatA.clone(); wheatB.color.set(0x3d8a2a);
     const redMat = new MeshPhysicalMaterial({ color: 0xe4002b, metalness: 0.6, roughness: 0.28, clearcoat: 1, clearcoatRoughness: 0.08 });
     const tagMat = new MeshStandardMaterial({ color: 0xc3ccdb, metalness: 0.7, roughness: 0.38, transparent: true, opacity: 0 });
 
@@ -99,50 +101,53 @@ export default function LoginBrand3D({ onFail, fullBleed = false }) {
     const rig = new Group(); scene.add(rig);
     const logo = new Group(); rig.add(logo);
 
-    const boxPivot = (p, fy = 1) => [X(p.box[0] + p.box[2] / 2), Y(p.box[1] + p.box[3] * fy)];
-
     // gear (pivot = gear centre, so it can roll)
     const gp = [X(L.gear.center[0]), Y(L.gear.center[1])];
     const gear = new Group(); gear.position.set(gp[0], gp[1], 0); logo.add(gear);
-    gear.add(new Mesh(extrude(L.gear.pieces.map((p) => toShape(p.outer, p.holes, gp)), 0.22, 0.02), gearMat));
+    gear.add(new Mesh(extrude([toShape(L.gear.outer, [], gp)], 0.22, 0.02), gearMat));
 
-    // wheat: the whole bunch grows up from where it leaves the gear; each traced
-    // piece (grain clusters, leaves) pops in from its own base, bottom first
-    const bp = [X(L.wheat.base[0]), Y(L.wheat.base[1])];
-    const wheat = new Group(); wheat.position.set(bp[0], bp[1], 0.15); wheat.scale.set(0.35, 0.001, 1); logo.add(wheat);
-    const grains = L.wheat.pieces.map((p) => {
-      const ap = boxPivot(p);
-      const m = new Mesh(extrude([toShape(p.outer, p.holes, ap)], 0.06, 0.012, 2), wheatA);
-      m.position.set(ap[0] - bp[0], ap[1] - bp[1], 0); m.scale.setScalar(0.001);
-      wheat.add(m);
-      return { m, y: ap[1] };
-    }).sort((a, b) => a.y - b.y);
+    // wheat: each stalk grows up from its base; grains (+ awns) pop one by one
+    const stalks = [], grains = [];
+    L.wheat.forEach((s, si) => {
+      const bp = [X(s.base[0]), Y(s.base[1])];
+      const grp = new Group(); grp.position.set(bp[0], bp[1], 0.15 + si * 0.012); grp.scale.set(0.35, 0.001, 1);
+      grp.add(new Mesh(extrude([toShape(s.stem, [], bp)], 0.04, 0.008, 2), wheatA));
+      s.grains.forEach((g, k) => {
+        const ap = [X(g.at[0]), Y(g.at[1])];
+        const shapes = [toShape(g.pts, [], ap)];
+        if (g.awn) shapes.push(toShape(g.awn, [], ap));
+        const m = new Mesh(extrude(shapes, 0.05, 0.012, 2), g.tone ? wheatB : wheatA);
+        m.position.set(ap[0] - bp[0], ap[1] - bp[1], 0); m.scale.setScalar(0.001);
+        grp.add(m); grains.push({ m, si, k });
+      });
+      logo.add(grp); stalks.push(grp);
+    });
+    grains.sort((a, b) => (a.k >> 1) - (b.k >> 1) || a.si - b.si || a.k - b.k); // bottom → top
 
     // wordmark (pivot = letter bottom centre)
     const letters = L.word.map((l) => {
-      const p = boxPivot(l);
+      const p = [X(l.x + l.w / 2), Y(l.outer.reduce((m, q) => Math.max(m, q[1]), 0))];
       const mat = redMat.clone(); mat.transparent = true; mat.opacity = 0;
-      const m = new Mesh(extrude([toShape(l.outer, l.holes, p)], 0.26, 0.026), mat);
+      const m = new Mesh(extrude([toShape(l.outer, l.holes, p)], 0.26, 0.022, 2), mat);
       m.position.set(p[0], p[1], 0); logo.add(m);
       return { m, mat, x: p[0] };
     });
     const wordL = letters[0].x - 0.4, wordR = letters[letters.length - 1].x + 0.4, wordY = Y(L.word[1].top + 20);
 
-    // ®
-    const rp = L.reg.reduce((a, p) => (p.box[2] * p.box[3] > a.box[2] * a.box[3] ? p : a), L.reg[0]);
-    const rc = boxPivot(rp, 0.5);
+    // ® (clean circle + R)
+    const rc = [X(L.reg[0].outer[0][0] - 6.8), Y(L.reg[0].outer[0][1])];
     const regMat = tagMat.clone(); regMat.transparent = false; regMat.opacity = 1;
     const reg = new Mesh(extrude(L.reg.map((r) => toShape(r.outer, r.holes, rc)), 0.05, 0.006, 2), regMat);
     reg.position.set(rc[0], rc[1], 0.02); reg.scale.setScalar(0.001); logo.add(reg);
 
-    // tagline: one mesh per traced letter so it can track in
+    // tagline: real Cinzel glyphs, one mesh per letter so it can track in
+    const font = new Font(L.tag.font);
     const tagMid = X((L.tag.x0 + L.tag.x1) / 2);
     const tag = L.tag.glyphs.map((g, i) => {
-      const p = boxPivot(g);
       const mat = tagMat.clone();
-      const m = new Mesh(extrude([toShape(g.outer, g.holes, p)], 0.03, 0, 1), mat);
-      m.position.set(p[0], p[1], 0); logo.add(m);
-      return { m, mat, x: p[0], i };
+      const m = new Mesh(extrude(font.generateShapes(g.ch, L.tag.size * U), 0.03, 0, 1), mat);
+      m.position.set(X(g.x), Y(g.y), 0); logo.add(m);
+      return { m, mat, x: X(g.x), i };
     });
     const floorY = Y(L.tag.baseline) - 0.1;
 
@@ -224,9 +229,11 @@ export default function LoginBrand3D({ onFail, fullBleed = false }) {
       gear.rotation.z = roll * (1 - ge);
       gearMat.opacity = outCubic(span(t, 0, 0.3));
       // 2. wheat grows up out of the gear, grains pop one by one
-      const we = outCubic(span(t, 0.55, 0.6));
-      wheat.scale.set(0.35 + 0.65 * we, Math.max(0.001, we), 1);
-      grains.forEach((g, i) => { const e = outBack(span(t, 0.7 + (i / grains.length) * 0.55, 0.28), 2.2); g.m.scale.setScalar(Math.max(0.001, e)); });
+      stalks.forEach((s, i) => {
+        const e = outCubic(span(t, 0.55 + i * 0.08, 0.5));
+        s.scale.set(0.35 + 0.65 * e, Math.max(0.001, e), 1);
+      });
+      grains.forEach((g, i) => { const e = outBack(span(t, 0.75 + (i / grains.length) * 0.55, 0.26), 2.2); g.m.scale.setScalar(Math.max(0.001, e)); });
       // 3. SHANTAZ assembles left → right
       letters.forEach((l, i) => {
         const e = outCubic(span(t, 1.0 + i * 0.075, 0.45));

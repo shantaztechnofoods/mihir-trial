@@ -1,8 +1,9 @@
 import React, { useId } from "react";
-import { BRAND, partPath, shantazLogo } from "./shantazLogoGeometry.js";
+import { BRAND, partPath, shantazLogo, toPath } from "./shantazLogoGeometry.js";
 
 // 2D SHANTAZ logo (gear + wheat + wordmark + ® + tagline) as one inline SVG,
-// traced from the owner's logo file — same geometry as the 3D login hero.
+// a clean vector redraw of the owner's logo file — same geometry as the 3D
+// login hero.
 // For the sidebar/header, reports, and the login fallback (reduced motion /
 // no WebGL). Self-contained: needs no CSS.
 //   tone="light"  – real colours, for light backgrounds
@@ -15,17 +16,21 @@ export default function ShantazLogoSVG({ tone = "light", shine = false, showTagl
   const dark = tone === "dark";
   const gearFill = dark ? "#AEB7C6" : BRAND.gear;
   const inkFill = dark ? "#C3CCDB" : BRAND.ink;
-  const greenFill = dark ? "#2F6B1F" : BRAND.green;
   const b = L.box;
-  const tagTop = Math.min(...L.tag.glyphs.map((g) => g.box[1]));
+  const tagTop = L.tag.baseline - L.tag.size * 0.75;
   const h = showTagline ? b.h : tagTop - 3 - b.y;
+  const g1 = dark ? "#2F6B1F" : BRAND.green, g2 = dark ? "#3D8A2A" : BRAND.green2;
   // flat list of paths (a <clipPath> may only hold shapes, no groups)
   const parts = [
-    ...L.gear.pieces.map((p) => ({ d: partPath(p), fill: gearFill })),
-    ...L.wheat.pieces.map((p) => ({ d: partPath(p), fill: greenFill })),
+    { d: toPath(L.gear.outer), fill: gearFill },
+    ...L.wheat.flatMap((s) => [
+      { d: toPath(s.stem), fill: g1 },
+      ...s.grains.filter((g) => g.awn).map((g) => ({ d: toPath(g.awn), fill: g1 })),
+      ...s.grains.map((g) => ({ d: toPath(g.pts), fill: g.tone ? g2 : g1 })),
+    ]),
     ...L.word.map((p) => ({ d: partPath(p), fill: BRAND.red })),
     ...L.reg.map((p) => ({ d: partPath(p), fill: inkFill })),
-    ...(showTagline ? L.tag.glyphs.map((p) => ({ d: partPath(p), fill: inkFill })) : []),
+    ...(showTagline ? L.tag.glyphs.map((g) => ({ d: g.d, fill: inkFill })) : []),
   ];
   const shapes = (fill) => parts.map((p, i) => <path key={i} d={p.d} fill={fill ? p.fill : undefined} fillRule="evenodd" />);
   const sweepW = 60;
