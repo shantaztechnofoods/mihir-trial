@@ -138,6 +138,8 @@ function exportsOf(f, seen = new Set()) {
   return names;
 }
 function resolveSpec(from, spec) {
+  // Vite asset queries ("./logo.svg?raw", "?url", "?inline") name the same file.
+  spec = spec.replace(/\?[\w&=-]*$/, "");
   if (spec.startsWith(".") || spec.startsWith("/")) {
     const base = spec.startsWith("/") ? resolve(ROOT, "." + spec) : resolve(dirname(from), spec);
     for (const c of [base, `${base}.js`, `${base}.jsx`, `${base}.mjs`, join(base, "index.js"), join(base, "index.jsx")])
