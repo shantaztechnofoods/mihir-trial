@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # SHANTAZ ERP — fast, safe ship script.   Usage: scripts/ship.sh <command> [args]
-#   check                 preflight + guards + npm test, build and ALL browser suites IN PARALLEL
-#                         (E2E_ONLY=<name-part> scripts/ship.sh check  → only matching browser suites, for quick loops; always run the full check before `pr`)
+#   check                 preflight + guards + npm test + build + the browser suites RELATED TO YOUR CHANGE
+#                         (scripts/e2e-pick.py maps changed files -> suites). The FULL e2e suite runs in GitHub
+#                         Actions on every push (job "e2e", 4 shards) and is part of the merge gate.
+#                         E2E_ONLY=<name-part> → only matching suites; SHIP_E2E=all → every suite locally (rarely needed).
 #   bump <tag>            set APP_BUILD (src/App.jsx) and APP_BUILD_TAG (src/main.jsx) to the same tag
 #   pr "<title>" <body-file>   commit everything, push, open the PR (body file = markdown; attribution is appended)
 #   wait [pr#]            poll CI until every check finishes (exit 1 on failure)
-#   merge <pr#>           refuse unless CI is green, then merge (merge commit)
+#   merge <pr#>           refuse unless CI "ci" (unit + build) AND "e2e" (full browser suite) are green, then merge
 #   reviewed <pr#>        AFTER code-review:code-review found no open issue: write the marker for the PR's current head
 #   all "<title>" <body-file> <tag>   bump -> check -> pr -> wait   (+ merge when SHIP_AUTOMERGE=1, CI is green AND
 #                         code-review:code-review has passed for that exact commit — see "Code-review gate" below)
@@ -15,7 +17,7 @@
 # Speed (same checks): one shared heavy-job lock (/tmp/aud/heavy.lock) so agents take turns on the CPUs,
 # ONE vite build reused for every browser suite and cached by source hash, longest suites first,
 # E2E_PAR = CPU count, node_modules reused from the main checkout, CI polled with back-off.
-# Env: E2E_PAR, E2E_ONLY, E2E_PORT, E2E_DIST, SHIP_AUTOMERGE=1, SHIP_NO_CACHE=1, SHIP_NO_LOCK=1,
+# Env: E2E_PAR, E2E_ONLY, SHIP_E2E=all, E2E_PORT, E2E_DIST, SHIP_AUTOMERGE=1, SHIP_NO_CACHE=1, SHIP_NO_LOCK=1,
 #      SHIP_LOCK=<file>, SHIP_CACHE_DIR=<dir>, SHIP_WAIT_MAX=<seconds>, SHIP_REMOVAL_REASON, SHIP_MODEL,
 #      SHIP_REVIEW_DIR=<dir> (default /tmp/aud/review-ok).
 # Code-review gate: SHIP_AUTOMERGE=1 NEVER skips code review. It merges only when the file
@@ -186,7 +188,14 @@ cmd_check(){
   for i in $(seq 1 40); do curl -s "localhost:$PORT" >/dev/null && break; sleep 0.25; done
   local te; te=$(now)
   local -a suites=(); local s
-  for s in tests/e2e/*.mjs; do [ -n "${E2E_ONLY:-}" ] && [[ "$(basename "$s" .mjs)" != *"$E2E_ONLY"* ]] && continue; suites+=("$s"); done
+  if [ -n "${E2E_ONLY:-}" ] || [ "${SHIP_E2E:-}" = all ]; then
+    for s in tests/e2e/*.mjs; do [ -n "${E2E_ONLY:-}" ] && [[ "$(basename "$s" .mjs)" != *"$E2E_ONLY"* ]] && continue; suites+=("$s"); done
+  else
+    # Local = targeted: only the suites related to what changed since main. The full suite runs in CI.
+    local base; base=$(git merge-base HEAD origin/main 2>/dev/null || echo origin/main)
+    say "browser suites for your change (full suite runs in CI):"
+    while read -r s; do [ -n "$s" ] && suites+=("tests/e2e/$s.mjs"); done < <(python3 scripts/e2e-pick.py --changed "$base")
+  fi
   say "running ${#suites[@]} browser suites, $par at a time, longest first ..."
   local running=0
   while read -r s; do
@@ -231,8 +240,8 @@ cmd_wait(){
   while :; do
     r=$(checks "$sha" 2>/dev/null || true)
     case "$r" in *failure*|*cancelled*|*timed_out*|*action_required*) die "CI failed: $r";; esac
-    # green only once the "ci" job itself is registered and every check has completed
-    if [[ ",$r" == *",ci=completed:success"* ]] && [[ "$r" != *queued* ]] && [[ "$r" != *in_progress* ]] && [[ "$r" != *pending* ]]; then
+    # green only once "ci" (unit + build) AND "e2e" (full browser suite, all shards) passed and nothing is still running
+    if [[ ",$r" == *",ci=completed:success"* ]] && [[ ",$r" == *",e2e=completed:success"* ]] && [[ "$r" != *queued* ]] && [[ "$r" != *in_progress* ]] && [[ "$r" != *pending* ]]; then
       say "${c_ok}✓ CI green ($(el))${c_off}"; return 0; fi
     [ $(( $(date +%s) - start )) -ge "$max" ] && die "CI still running after ${max}s: $r"
     sleep "$d"; d=$(( d < 10 ? d + 2 : 10 ))   # 3,5,7,9,10,10… s
@@ -258,6 +267,7 @@ cmd_merge(){
   r=$(checks "$sha")
   case "$r" in ""|*queued*|*in_progress*|*failure*|*cancelled*) die "CI is not green: $r";; esac
   [[ ",$r" == *",ci=completed:success"* ]] || die "CI job 'ci' has not passed on ${sha:0:7}: $r"
+  [[ ",$r" == *",e2e=completed:success"* ]] || die "CI job 'e2e' (full browser suite) has not passed on ${sha:0:7} — merge origin/main if your branch predates it: $r"
   [ "$(gh api -X PUT "repos/$REPO/pulls/$n/merge" -f merge_method=merge --jq .merged)" = true ] && say "${c_ok}✓ merged #$n — Vercel is deploying main${c_off}" || die "merge refused"
   say "next: verify the live site (new build tag + the changed screen) from a browser tab"
 }
@@ -268,5 +278,5 @@ case "${1:-help}" in
          review_ok "$PR_NUM" || die "SHIP_AUTOMERGE refused: run code-review:code-review on PR #$PR_NUM, then: scripts/ship.sh reviewed $PR_NUM && scripts/ship.sh merge $PR_NUM"
          cmd_merge "$PR_NUM"
        else say "next: code-review:code-review on PR #$PR_NUM, then: scripts/ship.sh reviewed $PR_NUM && scripts/ship.sh merge $PR_NUM"; fi;;
-  *) sed -n '2,25p' "$0";;
+  *) sed -n '2,27p' "$0";;
 esac
