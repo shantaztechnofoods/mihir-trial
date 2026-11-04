@@ -94,8 +94,9 @@ export function appendTranscript(text, phrase) {
 // Edge Function `voice-transcribe` returns { text } or { error }.
 export const VOICE_TRANSCRIBE_FN = "voice-transcribe";
 export const VOICE_TRANSCRIBE_MAX_BYTES = 2 * 1024 * 1024;
-export const VOICE_WRITING_TEXT = "✍️ Writing your words…";
-export const VOICE_WRITE_PROMPT = "Audio saved — now write the same in words in the box";
+// 2026-11-04 (owner): the mic only WRITES TEXT — no audio is saved.
+export const VOICE_WRITING_TEXT = "Writing…";
+export const VOICE_WRITE_PROMPT = "Could not hear — please type";
 
 export function bytesToBase64(bytes) {
   const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes || []);
@@ -148,4 +149,32 @@ export function fillTranscript(prev, text) {
 export function readVoiceLang(storage) {
   try { const v = storage && storage.getItem(VOICE_LANG_KEY); if (v && VOICE_LANGS.some(([c]) => c === v)) return v; } catch {}
   return VOICE_LANG_DEFAULT;
+}
+
+// ── 2026-11-04 (owner): mic = text only ──────────────────────────────────
+// Light tidy-up of browser dictation (the fallback when the server cannot
+// write the words): drop filler words, collapse spaces, capitalise the first
+// Latin letter, end with a full stop (। for Devanagari). Never translates.
+const FILLERS = /(^|\s)(um+|uh+|umm+|hmm+|er+|ah+|अं+|ऊं+|हम्म+)(?=\s|[,.!?।]|$)/giu;
+export function tidySpoken(text) {
+  let t = String(text || "").replace(FILLERS, " ").replace(/\s+/g, " ").replace(/\s+([,.!?।])/g, "$1").trim();
+  if (!t) return "";
+  t = t.replace(/^([a-z])/, (c) => c.toUpperCase());
+  if (!/[.!?।]$/.test(t)) t += /[\u0900-\u097F]/.test(t) ? "।" : ".";
+  return t;
+}
+
+// Append spoken words to what is already in the box (space between).
+export function appendSpoken(prev, text) {
+  const add = String(text || "").trim();
+  const cur = clearVoiceText(String(prev || ""));
+  if (!add) return cur;
+  return cur.trim() ? `${cur.replace(/\s+$/, "")} ${add}` : add;
+}
+
+// iPhone/iPad: browser dictation fights the recorder for the mic, so the
+// live preview is skipped there (the server writes the words).
+export function isAppleMobile(nav) {
+  const ua = String((nav && nav.userAgent) || "");
+  return /iPhone|iPad|iPod/i.test(ua) || (/Macintosh/.test(ua) && Number(nav && nav.maxTouchPoints) > 1);
 }

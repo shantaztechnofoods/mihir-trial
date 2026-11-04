@@ -451,8 +451,12 @@ const USER_FACING_STRINGS = [
   "Quantity must be more than 0.",
   // 2026-11-03 — voice notes (🎤 Record) in Machine Tracker
   "🎤 Voice note",
-  "Recording… ",
-  "Are you sure? Remove this voice note?",
+  // 2026-11-04 (owner) — the 🎤 writes text only: "Recording… " became
+  // "Listening… "; the saved-note Remove ("Are you sure? Remove this voice
+  // note?") went with the audio. Old notes still play (VoicePlayButton).
+  "Listening… ",
+  "tidySpoken(",
+  "appendSpoken(",
   // 2026-11-03 — browser live dictation inside the recorder was dropped (it
   // needed a language choice); "Typing by voice not supported…" went with it.
   "VoiceNoteRecorder",
