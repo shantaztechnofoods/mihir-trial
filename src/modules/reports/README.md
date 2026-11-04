@@ -14,13 +14,13 @@ Report Center (KPIs, tables, department scoreboard, exports), the four printable
 | file | lines |
 |---|---|
 | `AtoZMachineReport.jsx` | 547 |
-| `HistoryPage.jsx` | 1198 |
+| `HistoryPage.jsx` | 1205 |
 | `MachineReports.jsx` | 240 |
 | `ReportCenterPage.jsx` | 780 |
 | `i18n.js` | 48 |
 | `index.js` | 9 |
-| `reportFormat.js` | 311 |
-| `reportParts.jsx` | 200 |
+| `reportFormat.js` | 324 |
+| `reportParts.jsx` | 203 |
 
 `index.js` is the public surface — the app shell and other modules import only from it:
 `AtoZMachineReport`, `HistoryPage`, `REPORT_LANGS`, `CustomerMachineReport`, `OnHoldReport`, `PendingJobsReport`, `ReportCenterPage`, `machineReportRef`, `printWithTitle`, `RPT_PERIODS`, `rptCompany`
@@ -32,7 +32,7 @@ The screens here are presentational: state and every write (handler) still live 
 _No App.jsx handlers are passed in (read-only screens, or the module calls its stores / Edge Function directly)._
 
 Depends on other modules (imported through their `index.js`): `modules/pending-jobs`, `modules/trial-certificate`
-Shared code used: `src/shared/components/LazyCharts.jsx`, `src/shared/components/LeadIcon.jsx`, `src/shared/components/MoreRowsNote.jsx`, `src/shared/components/useProgressiveCount.js`, `src/shared/format.js`, `src/shared/loadXlsx.js`, `src/shared/machineStages.js`, `src/shared/printFormat.js`, `src/shared/settingsDefaults.js`, `src/shared/ui/Topbar.jsx`, `src/shared/voice/VoiceNote.jsx`
+Shared code used: `src/shared/components/DebouncedSearchInput.jsx`, `src/shared/components/LazyCharts.jsx`, `src/shared/components/LeadIcon.jsx`, `src/shared/components/MoreRowsNote.jsx`, `src/shared/components/useProgressiveCount.js`, `src/shared/format.js`, `src/shared/loadXlsx.js`, `src/shared/machineStages.js`, `src/shared/printFormat.js`, `src/shared/settingsDefaults.js`, `src/shared/ui/Topbar.jsx`, `src/shared/voice/VoiceNote.jsx`
 Lower layers used: `src/stores/`, `src/utils/`
 Used by: `app/App.jsx (shell)`, `modules/machine-tracker`, `modules/settings`
 

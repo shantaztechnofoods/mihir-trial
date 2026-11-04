@@ -1,6 +1,7 @@
 // src/modules/bom/BomChecklistSlots.jsx — moved verbatim from the former single-file src/App.jsx
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
 import React, { useState, useEffect, useRef } from "react";
+import { LeadIcon } from "../../shared/components/LeadIcon.jsx";
 import { duplicateTemplateItems } from "../../utils/checklistLogic.js";
 import { CHECKLIST_DEPTS, CHECKLIST_STAGES } from "./bomDurations.js";
 
@@ -200,7 +201,7 @@ export function BomChecklistSlots({
             <div className="px-5 py-3 border-b border-slate-200 flex items-start justify-between flex-shrink-0"
                  style={{ background: "linear-gradient(90deg,rgba(46, 80, 214,0.14),rgba(38, 64, 176,0.06))" }}>
               <div>
-                <div className="text-sm font-black text-slate-900">📋 Checklist · {editing.dept}</div>
+                <div className="text-sm font-black text-slate-900"><LeadIcon e="📋" />Checklist · {editing.dept}</div>
                 <div className="text-[11px] text-slate-400 mt-0.5">{CHECKLIST_STAGES.find((s) => s.key === editing.stage).long}</div>
                 <div className="text-[10px] text-slate-500 mt-0.5">{CHECKLIST_STAGES.find((s) => s.key === editing.stage).hint}</div>
               </div>
@@ -284,7 +285,7 @@ export function BomChecklistSlots({
               {editErr && (
                 <div className="text-[11px] font-bold px-3 py-2 rounded-md"
                      style={{ background: "rgba(239,68,68,0.08)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.3)" }}>
-                  ⚠ {editErr}
+                  <LeadIcon e="⚠" />{editErr}
                 </div>
               )}
             </div>

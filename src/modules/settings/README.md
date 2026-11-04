@@ -12,12 +12,12 @@ Company and app settings, report language, PO template (from modules/purchase), 
 | file | lines |
 |---|---|
 | `AdminCleanupPanel.jsx` | 26 |
-| `ChecklistAdminPanel.jsx` | 190 |
-| `EmployeeMembersPanel.jsx` | 279 |
+| `ChecklistAdminPanel.jsx` | 191 |
+| `EmployeeMembersPanel.jsx` | 280 |
 | `ModulesPanel.jsx` | 70 |
 | `SettingsPage.jsx` | 789 |
 | `index.js` | 4 |
-| `settingsUi.jsx` | 41 |
+| `settingsUi.jsx` | 42 |
 
 `index.js` is the public surface — the app shell and other modules import only from it:
 `SettingsPage`

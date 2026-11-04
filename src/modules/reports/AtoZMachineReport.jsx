@@ -136,7 +136,7 @@ export function AtoZMachineReport({
         <div className="min-w-0">
           <div className="mr-label">Machine</div>
           <div className="mr-machine">{machine.bomLabel || bom.label || machine.bomKey}</div>
-          <div className="mr-mono mr-serial">Model {machine.bomKey} · Serial no. {machine.serialNo || "—"}</div>
+          <div className="mr-mono mr-serial">Model {machine.bomKey}{machine.serialNo ? ` · Serial no. ${machine.serialNo}` : ""}</div>
         </div>
         <div data-report-status className={`mr-stamp ${isReady ? "is-done" : "is-progress"}`}>
           {isReady ? "Ready for dispatch" : `In production · ${displayStageOf(machine) || machine.stage}`}
@@ -149,8 +149,8 @@ export function AtoZMachineReport({
           ["Build time", buildDays ? `${buildDays} day${buildDays === 1 ? "" : "s"}` : ""],
           ["Rack", machine.rackSlot ? slotLabel(machine.rackSlot) : (rackCapacityFor(machine.bomKey, bom) > 0 ? "Left the rack" : "Direct production")],
           ["BOM issue ref", machine.issueId ? String(machine.issueId) : "", true],
-        ].map(([k, v, mono]) => (
-          <div key={k} className="min-w-0"><div className="mr-label">{k}</div><div className={`mr-fact ${mono ? "mr-mono" : ""}`}>{v || "—"}</div></div>
+        ].filter(([, v]) => v).map(([k, v, mono]) => (
+          <div key={k} className="min-w-0"><div className="mr-label">{k}</div><div className={`mr-fact ${mono ? "mr-mono" : ""}`}>{v}</div></div>
         ))}
       </div>
       {/* D4 — summary row */}
@@ -161,7 +161,7 @@ export function AtoZMachineReport({
           { k: "Signatures", v: sigRows.length, attr: { "data-report-sig-count": "" } },
           { k: "Open issues", v: openJobs.length, red: openJobs.length > 0 },
           { k: "Resolved issues", v: resolvedJobs.length },
-          { k: "Average rating", v: sum.average !== null ? rate(sum.average) : "—" },
+          { k: "Average rating", v: sum.average !== null ? rate(sum.average) : "Not rated" },
         ].map((g) => (
           <div key={g.k} className={`mr-sum ${g.red ? "is-red" : ""}`}><div className="mr-sum-v" {...(g.attr || {})}>{g.v}</div><div className="mr-label">{g.k}</div></div>
         ))}
@@ -212,7 +212,7 @@ export function AtoZMachineReport({
                   : r.status === "unconfirmed" ? <span className="mr-red">Not confirmed</span>
                   : <span className="mr-muted">No confirmation recorded</span>}
               </div>
-              <div className="mr-td" data-l="Issued / verified"><div><div>{fmtDT(r.when) || "—"}{r.by ? <span> · {r.by}</span> : null}</div><div className="mr-label">{r.via}</div></div></div>
+              <div className="mr-td" data-l="Issued / verified"><div><div>{fmtDT(r.when) || ""}{r.by ? <span> · {r.by}</span> : null}</div><div className="mr-label">{r.via}</div></div></div>
             </div>
           ))}
         </div>
@@ -236,7 +236,7 @@ export function AtoZMachineReport({
       </div>
       {machineHandovers.length === 0 ? <p className="mr-empty">No hand-overs recorded yet. The machine is at {machine.stage}.</p> : (
         <div className="mr-table">
-          {/* 2026-11-04 — signatures moved to the one signature register (section 07). */}
+          {/* 2026-11-04 — signatures moved to the one signature register. */}
           <div className="mr-tr mr-th" style={{ gridTemplateColumns: "1.25fr 1.05fr 1.4fr 1.15fr 1.25fr 1fr" }}>
             <div>Hand-over</div><div>Handed over</div><div>Accepted</div><div>Time / target</div>
             <div>{show.showEmployees !== false ? "Team (lead in bold)" : ""}</div><div>{show.showChecklists !== false ? "Checks" : ""}</div>
@@ -259,28 +259,28 @@ export function AtoZMachineReport({
                     </div>
                     {show.showRatings !== false && rating && <div className="mr-label">Rating {rate(rating.rating)}</div>}
                   </div></div>
-                  <div className="mr-td" data-l="Handed over"><div><div>{fmtDT(h.sentAt) || "—"}</div>{userName(h.sentBy) && <div className="mr-label">by {userName(h.sentBy)}</div>}</div></div>
+                  <div className="mr-td" data-l="Handed over"><div><div>{fmtDT(h.sentAt) || ""}</div>{userName(h.sentBy) && <div className="mr-label">by {userName(h.sentBy)}</div>}</div></div>
                   <div className="mr-td" data-l="Accepted"><div>
-                    <div>{h.acceptedAt ? fmtDT(h.acceptedAt) : h.status === "pending" ? "Waiting" : "—"}</div>
+                    <div>{h.acceptedAt ? fmtDT(h.acceptedAt) : h.status === "pending" ? "Waiting" : ""}</div>
                     {(h.acceptedByName || userName(h.acceptedBy)) && <div className="mr-label" data-report-accepted-by>by {h.acceptedByName || userName(h.acceptedBy)}</div>}
                     {h.acceptedAt && h.acceptedInDepartment && h.acceptedInDepartment !== h.toDepartment && <div className="mr-label">into {h.acceptedInDepartment}</div>}
                     {show.showEmployees !== false && Array.isArray(h.acceptedByTeamSnapshot) && h.acceptedByTeamSnapshot.length > 0 && (
-                      <div className="mr-label" data-report-accept-team>team: {h.acceptedByTeamSnapshot.map((x) => (x && (x.fullName || x.username || x.name)) || "").filter((n) => n && n !== (h.acceptedByName || userName(h.acceptedBy))).join(", ") || "—"}</div>
+                      <div className="mr-label" data-report-accept-team>team: {h.acceptedByTeamSnapshot.map((x) => (x && (x.fullName || x.username || x.name)) || "").filter((n) => n && n !== (h.acceptedByName || userName(h.acceptedBy))).join(", ") || "none named"}</div>
                     )}
                     <div className="mr-label">Accept window {dur(h.acceptTimeoutMinutes)}</div>
                     {h.status === "accepted" && !(h.acceptedSignatureSvg || h.mainEmployeeSignatureSvg) && <div className="mr-label">Signed on file (earlier record)</div>}
                   </div></div>
                   <div className="mr-td" data-l="Time / target"><div>
-                    <div className={`rpt-nowrap ${over ? "mr-red" : ""}`}>{!h.actualDurationMinutes && !h.expectedDurationMinutes ? "—" : `${dur(h.actualDurationMinutes)} of ${dur(h.expectedDurationMinutes)}`}</div>
+                    <div className={`rpt-nowrap ${over ? "mr-red" : ""}`}>{!h.actualDurationMinutes && !h.expectedDurationMinutes ? "" : `${dur(h.actualDurationMinutes)} of ${dur(h.expectedDurationMinutes)}`}</div>
                     {over && <div className="mr-red mr-small">Over by {dur(h.overrunMinutes)}</div>}
                   </div></div>
                   <div className="mr-td" data-l="Team">{show.showEmployees !== false && (ordered.length
                     ? <div>{ordered.map((uid) => <div key={uid} className={uid === lead ? "font-bold" : ""} title={uid === lead ? "Lead / main employee" : undefined}>{nameFromSnap(uid, h.workedBySnapshot)}</div>)}</div>
-                    : <span className="mr-muted">—</span>)}</div>
+                    : null)}</div>
                   <div className="mr-td" data-l="Checks">{show.showChecklists !== false && (hopResp.length ? <div>{hopResp.map((cr) => {
                       const ans = cr.answers || []; const done = ans.filter((a) => a.checked).length; const miss = ans.length - done;
-                      return <div key={cr.id}>{({ before_dispatch: "Dispatch", before_receive: "Receive", during_work: "During work" })[cr.stage] || "Checklist"} {done}/{ans.length}{miss ? <span className="mr-red"> · {miss} not done</span> : null}</div>;
-                    })}<div className="mr-label">Full answers: Appendix A</div></div> : <span className="mr-muted">—</span>)}</div>
+                      return <div key={cr.id} className="rpt-badges"><span className={`rpt-badge ${miss ? "is-warn" : "is-ok"}`}>{({ before_dispatch: "Dispatch", before_receive: "Receive", during_work: "During work" })[cr.stage] || "Checklist"} {done} of {ans.length}</span>{miss ? <span className="rpt-badge is-no">{miss} open</span> : null}</div>;
+                    })}<div className="mr-label">Full answers: Appendix A</div></div> : null)}</div>
                 </div>
                 {/* The delay reason is printed once, in "Holds and late reasons" below. */}
                 {raised.length > 0 && (
@@ -291,7 +291,7 @@ export function AtoZMachineReport({
               </div>
             );
           })}
-          {machineHandovers.some((h) => h.acceptedSignatureSvg || h.mainEmployeeSignatureSvg) && <p className="mr-label rpt-table-note">Hand-over and acceptance signatures, with name, department and date, are in the signature register (section 07).</p>}
+          {machineHandovers.some((h) => h.acceptedSignatureSvg || h.mainEmployeeSignatureSvg) && <p className="mr-label rpt-table-note">Hand-over and acceptance signatures, with name, department and date, are in the signature register at the end of this report.</p>}
         </div>
       )}
       {/* 2026-11-03 — holds and late reasons for this machine (read-only). */}
@@ -311,9 +311,9 @@ export function AtoZMachineReport({
                   <div key={r.key} className="mr-tr" style={{ gridTemplateColumns: "1.3fr 1.3fr 0.9fr 2.4fr 1.1fr" }}>
                     <div className="mr-td" data-l="What"><span className={r.open ? "mr-red font-semibold" : "mr-amber font-semibold"}>{r.label}{r.open ? " · open" : ""}</span></div>
                     <div className="mr-td" data-l="Where / when"><div><div>{r.to ? `${r.from} → ${r.to}` : r.from}</div><div className="mr-label">{fmtDT(r.startAt)}</div></div></div>
-                    <div className="mr-td md:text-right" data-l="Length">{r.minutes != null ? dur(r.minutes) : "—"}</div>
+                    <div className="mr-td md:text-right" data-l="Length">{r.minutes != null ? dur(r.minutes) : ""}</div>
                     <div className="mr-td" data-l="Reason">{r.reason || <span className="mr-muted">No reason given</span>}</div>
-                    <div className="mr-td" data-l="Who">{r.by || "—"}{r.releasedBy ? <div className="mr-label">released by {r.releasedBy}</div> : null}</div>
+                    <div className="mr-td" data-l="Who">{r.by || ""}{r.releasedBy ? <div className="mr-label">released by {r.releasedBy}</div> : null}</div>
                   </div>
                 ))}
                 {late.map((h) => (
@@ -322,7 +322,7 @@ export function AtoZMachineReport({
                     <div className="mr-td" data-l="Where / when"><div><div>{h.fromDepartment}</div><div className="mr-label">{fmtDT(h.sentAt)}</div></div></div>
                     <div className="mr-td md:text-right" data-l="Length">{dur(h.overrunMinutes)}</div>
                     <div className="mr-td" data-l="Reason">{h.overrunNarration}</div>
-                    <div className="mr-td" data-l="Who">{userName(h.sentBy) || "—"}</div>
+                    <div className="mr-td" data-l="Who">{userName(h.sentBy) || ""}</div>
                   </div>
                 ))}
               </div>
@@ -371,7 +371,7 @@ export function AtoZMachineReport({
               {(p.itemCode || p.itemName) && <div className="mr-label">Part {p.itemCode ? <span className="mr-mono">{p.itemCode}</span> : null}{p.itemName ? ` ${p.itemName}` : ""}{p.qty != null ? ` × ${p.qty}` : ""}{(Number(p.receivedQty) || 0) > 0 ? ` · ${p.receivedQty} received` : ""}{p.partSerialNo ? <> · part S/N <span className="mr-mono">{p.partSerialNo}</span></> : null}</div>}
               <div className="mr-label">{src}{hop ? ` · at ${hop.fromDepartment} → ${hop.toDepartment} hand-over` : ""}</div>
             </div></div>
-            <div className="mr-td" data-l="Raised"><div><div>{p.raisedInDepartment || "—"}</div><div className="mr-label">{fmtDT(p.raisedAt)}</div></div></div>
+            <div className="mr-td" data-l="Raised"><div><div>{p.raisedInDepartment || ""}</div><div className="mr-label">{fmtDT(p.raisedAt)}</div></div></div>
             <div className="mr-td" data-l="Assigned to">{p.assignedDepartment || "Unassigned"}</div>
           </div>
           <div className="mr-issue-history"><JobHistory item={p} users={allUsers} compact reportDates /></div>
@@ -411,9 +411,9 @@ export function AtoZMachineReport({
           <div className="mr-tr mr-th" style={{ gridTemplateColumns: "1.1fr 1.1fr 4fr" }}><div>Date</div><div>Stage</div><div>Note</div></div>
           {(machine.history || []).map((h, i) => (
             <div key={i} className="mr-tr" style={{ gridTemplateColumns: "1.1fr 1.1fr 4fr" }}>
-              <div className="mr-td" data-l="Date">{fmtD(h.date) || h.date || "—"}</div>
+              <div className="mr-td" data-l="Date">{fmtD(h.date) || h.date || ""}</div>
               <div className="mr-td font-semibold" data-l="Stage">{h.stage}</div>
-              <div className="mr-td" data-l="Note">{h.note || "—"}</div>
+              <div className="mr-td" data-l="Note">{h.note || ""}</div>
             </div>
           ))}
         </div>
@@ -434,8 +434,8 @@ export function AtoZMachineReport({
           {fileAttach.map((a) => (
             <div key={a.id} className="mr-tr" style={{ gridTemplateColumns: "3fr 1.5fr 1.2fr" }}>
               <div className="mr-td" data-l="File"><div><div>{a.caption || a.name || a.fileName || a.kind || "attachment"}</div><div className="mr-label">{a.caption && (a.fileName || a.name) ? `${a.fileName || a.name} · ` : ""}{a.kind === "image" ? "Photo" : a.kind === "video" ? "Video" : a.kind === "pdf" ? "PDF" : a.kind || "File"}{a.isCustomerVisible ? " · shown to customer" : " · internal"}</div></div></div>
-              <div className="mr-td" data-l="Department">{a.department || "—"}</div>
-              <div className="mr-td" data-l="Added">{fmtDT(a.createdAt || a.uploadedAt) || "—"}{userName(a.uploadedBy) ? <div className="mr-label">by {userName(a.uploadedBy)}</div> : null}</div>
+              <div className="mr-td" data-l="Department">{a.department || ""}</div>
+              <div className="mr-td" data-l="Added">{fmtDT(a.createdAt || a.uploadedAt) || ""}{userName(a.uploadedBy) ? <div className="mr-label">by {userName(a.uploadedBy)}</div> : null}</div>
             </div>
           ))}
         </div>
@@ -446,7 +446,7 @@ export function AtoZMachineReport({
           {voiceAttach.map((a) => (
             <div key={`v-${a.id}`} className="mr-check-row rpt-voice-row" data-report-voice-note>
               <span className="rpt-voice-play">{isVoiceAttachment(a) ? <VoicePlayButton attachment={a} /> : <span className="mr-muted">♪</span>}</span>
-              <div className="min-w-0">{a.caption || a.fileName || a.name || "Voice note"}<span className="mr-label"> · {a.department || "—"} · {fmtDT(a.uploadedAt || a.createdAt)}{userName(a.uploadedBy) ? ` · ${userName(a.uploadedBy)}` : ""}</span></div>
+              <div className="min-w-0">{a.caption || a.fileName || a.name || "Voice note"}<span className="mr-label"> · {a.department || ""} · {fmtDT(a.uploadedAt || a.createdAt)}{userName(a.uploadedBy) ? ` · ${userName(a.uploadedBy)}` : ""}</span></div>
             </div>
           ))}
         </div>
@@ -497,8 +497,8 @@ export function AtoZMachineReport({
       return (
         <div key={cr.id} className="mr-check mr-avoid" data-report-appendix-checklist={cr.stage || ""}>
           <div className="mr-check-head">
-            <div className="font-semibold">{cr.department || "—"} · {STAGE_LABEL[cr.stage] || cr.stage || "Checklist"}{hop ? <span className="mr-label"> · {hop.fromDepartment} → {hop.toDepartment}</span> : null}</div>
-            <div className="mr-label">{cr.templateName || "—"} v{cr.templateVersion || 1}{cr.submittedAt ? ` · ${fmtDT(cr.submittedAt)}` : ""}{userName(cr.submittedBy) ? ` · ${userName(cr.submittedBy)}` : ""} · <span className={done < ans.length ? "mr-red" : "mr-green"}>{done}/{ans.length} done</span></div>
+            <div className="font-semibold">{cr.department || ""} · {STAGE_LABEL[cr.stage] || cr.stage || "Checklist"}{hop ? <span className="mr-label"> · {hop.fromDepartment} → {hop.toDepartment}</span> : null}</div>
+            <div className="mr-label">{cr.templateName || ""} v{cr.templateVersion || 1}{cr.submittedAt ? ` · ${fmtDT(cr.submittedAt)}` : ""}{userName(cr.submittedBy) ? ` · ${userName(cr.submittedBy)}` : ""} · <span className={done < ans.length ? "mr-red" : "mr-green"}>{done} of {ans.length} done</span></div>
           </div>
           {ans.map((a, i) => (
             <div key={i} className="mr-check-row">
@@ -524,7 +524,7 @@ export function AtoZMachineReport({
 
   return (
     <div className="mr-doc" data-machine-report>
-      <RptPageStyle page="machine-report" head={`${company.name || RPT_LEGAL_NAME} · Machine production report`} refText={reportRef} foot="Machine production report · internal" />
+      <RptPageStyle page="machine-report" head={`${company.name || RPT_LEGAL_NAME} · Machine production report`} refText={reportRef} foot="Computer-generated report · Confidential, internal use only" />
       {/* D8 — the print frame (on paper the running head is a page margin box, from page 2 on). */}
       <table className="mr-frame">
         <thead><tr><td><div className="mr-runhead"><span>{company.name || RPT_LEGAL_NAME} · Machine production report</span><span className="mr-mono">{reportRef}</span></div></td></tr></thead>

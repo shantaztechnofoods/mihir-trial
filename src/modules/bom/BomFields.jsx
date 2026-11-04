@@ -1,6 +1,7 @@
 // src/modules/bom/BomFields.jsx — moved verbatim from the former single-file src/App.jsx
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
 import React, { useState, useRef } from "react";
+import { LeadIcon } from "../../shared/components/LeadIcon.jsx";
 import { uploadItemMedia } from "../../utils/storage.js";
 import { PHYSICAL_RACK_LAYOUT, rackOfBom, physicalRackFamily, physicalRackSlots } from "../../utils/rackSlots.js";
 import { DURATION_DEPTS } from "./bomDurations.js";
@@ -26,7 +27,7 @@ export function BomPhotoField({ value, onChange }) {
   };
   return (
     <div data-bom-photo-field className="rounded-xl p-4" style={{ background: "rgba(17,24,39,0.03)", border: "1px solid rgba(17,24,39,0.08)" }}>
-      <div className="text-[11px] font-bold text-slate-900">📷 Machine photo</div>
+      <div className="text-[11px] font-bold text-slate-900"><LeadIcon e="📷" />Machine photo</div>
       <div className="text-[10px] text-slate-500 mt-0.5 mb-3">Shown on every machine card of this model so workers recognise it. PNG or JPG.</div>
       <div className="flex items-center gap-4 flex-wrap">
         <div className="w-32 h-32 sm:w-40 sm:h-40 rounded-xl overflow-hidden flex items-center justify-center flex-shrink-0"
@@ -49,7 +50,7 @@ export function BomPhotoField({ value, onChange }) {
           )}
         </div>
       </div>
-      {err && <div className="text-[10px] text-red-500 font-bold mt-2">⚠ {err}</div>}
+      {err && <div className="text-[10px] text-red-500 font-bold mt-2"><LeadIcon e="⚠" />{err}</div>}
     </div>
   );
 }

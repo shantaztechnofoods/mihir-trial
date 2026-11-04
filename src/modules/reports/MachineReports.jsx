@@ -48,9 +48,9 @@ export function CustomerMachineReport({ machineId, machineLog = [], bomDefs = {}
           <div className="mr-label">Machine</div>
           <div className="mr-machine">{machine.bomLabel || bom.label || machine.bomKey}</div>
           <div className="mr-facts rpt-facts-3">
-            {[["Model", machine.bomKey], ["Serial no.", machine.serialNo || "—", true], ["Build started", rptFmtD(machine.createdDate) || "—"],
-              ["Ready on", rptFmtD(machine.completedDate) || "In production"], ["Build time", buildDays ? `${buildDays} day${buildDays === 1 ? "" : "s"}` : "—"],
-              ["Trial", cert ? "Passed · certificate below" : "Scheduled"]].map(([k, v, mono]) => (
+            {[["Model", machine.bomKey], ["Serial no.", machine.serialNo || "", true], ["Build started", rptFmtD(machine.createdDate) || ""],
+              ["Ready on", rptFmtD(machine.completedDate) || "In production"], ["Build time", buildDays ? `${buildDays} day${buildDays === 1 ? "" : "s"}` : ""],
+              ["Trial", cert ? "Passed · certificate below" : "Scheduled"]].filter(([, v]) => v).map(([k, v, mono]) => (
               <div key={k} className="min-w-0"><div className="mr-label">{k}</div><div className={`mr-fact ${mono ? "mr-mono" : ""}`}>{v}</div></div>
             ))}
           </div>
@@ -59,7 +59,7 @@ export function CustomerMachineReport({ machineId, machineLog = [], bomDefs = {}
       </div>
       <div className="mr-summary rpt-summary-4" data-report-glance>
         {[{ k: "Stages completed", v: `${records.filter((r) => r.state === "done").length} of ${records.length}` },
-          { k: "Check points OK", v: points ? `${passed} of ${points}` : "—" },
+          { k: "Check points OK", v: points ? `${passed} of ${points}` : "None" },
           { k: "Critical items", v: critical.length },
           { k: "Finishing work done", v: commentGroups.reduce((s, g) => s + g.rows.length, 0) }]
           .map((g) => <div key={g.k} className="mr-sum"><div className="mr-sum-v">{g.v}</div><div className="mr-label">{g.k}</div></div>)}
@@ -84,7 +84,7 @@ export function CustomerMachineReport({ machineId, machineLog = [], bomDefs = {}
               <div key={`${c.code}-${i}`} className="mr-tr" data-report-critical-row={c.code} style={{ gridTemplateColumns: "2.4fr 0.6fr 3fr 1.3fr" }}>
                 <div className="mr-td" data-l="Component"><div><div className="font-semibold">{c.name || c.code}</div><div className="mr-label mr-mono">{c.code}</div></div></div>
                 <div className="mr-td mr-mono md:text-right" data-l="Qty">{c.qty}</div>
-                <div className="mr-td" data-l="Serial numbers">{c.serials.length ? <div><span className="mr-mono">{c.serials.join(", ")}</span>{c.status === "serial_partial" ? <div className="mr-amber mr-small">{c.serials.length} of {c.qty} serials recorded</div> : null}</div> : c.status === "verified" ? "Checked · no serial number" : c.status === "not_issued" ? <span className="mr-amber">To be fitted</span> : <span className="mr-muted">—</span>}</div>
+                <div className="mr-td" data-l="Serial numbers">{c.serials.length ? <div><span className="mr-mono">{c.serials.join(", ")}</span>{c.status === "serial_partial" ? <div className="mr-amber mr-small">{c.serials.length} of {c.qty} serials recorded</div> : null}</div> : c.status === "verified" ? "Checked · no serial number" : c.status === "not_issued" ? <span className="mr-amber">To be fitted</span> : null}</div>
                 <div className="mr-td" data-l="Verified">{c.status === "serial" || c.status === "verified" ? <span className="mr-green">✓ {rptFmtD(c.when) || "Yes"}</span> : <span className="mr-muted">Pending</span>}</div>
               </div>
             ))}
@@ -99,7 +99,7 @@ export function CustomerMachineReport({ machineId, machineLog = [], bomDefs = {}
               <div key={a.id} className="mr-tr" style={{ gridTemplateColumns: "3fr 1fr 1.2fr" }}>
                 <div className="mr-td" data-l="Document">{a.caption || a.fileName || a.name || "Document"}</div>
                 <div className="mr-td" data-l="Type">{a.kind === "image" ? "Photo" : a.kind === "video" ? "Video" : "Document"}</div>
-                <div className="mr-td" data-l="Date">{rptFmtD(a.uploadedAt || a.createdAt) || "—"}</div>
+                <div className="mr-td" data-l="Date">{rptFmtD(a.uploadedAt || a.createdAt) || ""}</div>
               </div>
             ))}
           </div>
@@ -110,7 +110,7 @@ export function CustomerMachineReport({ machineId, machineLog = [], bomDefs = {}
               : <p className="mr-empty">The machine is run under load at Trial; its certificate is added here when the trial is complete.</p>}
       </RptSec>
       <RptSec n="05" title="Final sign-off" cls="rpt-signoff-sec" attr={{ "data-report-customer-signoff": "" }}>
-        <p className="mr-small" style={{ marginBottom: 14 }}>We certify that the machine described above, serial no. <b className="mr-mono">{machine.serialNo || "—"}</b>, was built to its approved bill of materials, inspected at every stage{critical.length ? ", with its critical components recorded," : ""} and {cert ? "run on trial before release" : "will be run on trial before release"}.</p>
+        <p className="mr-small" style={{ marginBottom: 14 }}>We certify that the machine described above, serial no. <b className="mr-mono">{machine.serialNo || ""}</b>, was built to its approved bill of materials, inspected at every stage{critical.length ? ", with its critical components recorded," : ""} and {cert ? "run on trial before release" : "will be run on trial before release"}.</p>
         {/* 2026-11-04 — the Trial signatures already captured print here with
             name, department and date; only the lines still to sign stay blank. */}
         <RptSignatureRegister rows={certSigs} />
@@ -135,7 +135,7 @@ export function OnHoldReport({ period = "this_month", machineLog = [], handovers
   const totalMin = rows.reduce((s, r) => s + (r.minutes || 0), 0);
   const group = (keyOf) => {
     const g = {};
-    rows.forEach((r) => { const k = keyOf(r) || "—"; g[k] = g[k] || { k, n: 0, min: 0, machines: new Set() }; g[k].n++; g[k].min += r.minutes || 0; g[k].machines.add(r.machineId); });
+    rows.forEach((r) => { const k = keyOf(r) || "Not stated"; g[k] = g[k] || { k, n: 0, min: 0, machines: new Set() }; g[k].n++; g[k].min += r.minutes || 0; g[k].machines.add(r.machineId); });
     return Object.values(g).sort((a, b) => b.n - a.n || b.min - a.min);
   };
   const byDept = group((r) => r.kind === "manual" ? r.from : r.to);
@@ -145,7 +145,7 @@ export function OnHoldReport({ period = "this_month", machineLog = [], handovers
   return (
     <ReportSheet kind="hold" settings={settings} title="On hold report" subtitle={periodText} refText={`HOLD-${new Date(now).toISOString().slice(0, 7)}`} generatedBy={generatedBy}>
       <div className="mr-summary rpt-summary-4" data-report-glance>
-        {[{ k: "Machines held", v: machines.size }, { k: "Hold events", v: rows.length }, { k: "Still on hold", v: rows.filter((r) => r.open).length, red: rows.some((r) => r.open) }, { k: "Total time held", v: rows.length ? rptDur(totalMin) : "—" }]
+        {[{ k: "Machines held", v: machines.size }, { k: "Hold events", v: rows.length }, { k: "Still on hold", v: rows.filter((r) => r.open).length, red: rows.some((r) => r.open) }, { k: "Total time held", v: rows.length ? rptDur(totalMin) : "None" }]
           .map((g) => <div key={g.k} className={`mr-sum ${g.red ? "is-red" : ""}`}><div className="mr-sum-v">{g.v}</div><div className="mr-label">{g.k}</div></div>)}
       </div>
       <RptSec n="01" title="Holds in this period" count={rows.length} attr={{ "data-report-hold-list": "" }}>
@@ -154,12 +154,12 @@ export function OnHoldReport({ period = "this_month", machineLog = [], handovers
             <div className="mr-tr mr-th" style={{ gridTemplateColumns: "1.3fr 1.3fr 1.55fr 0.9fr 1.85fr 1.1fr" }}><div>Machine</div><div>Where</div><div>Since</div><div className="text-right">How long</div><div>Reason</div><div>Who</div></div>
             {rows.map((r) => (
               <div key={r.key} className="mr-tr" data-report-hold-row={r.kind} style={{ gridTemplateColumns: "1.3fr 1.3fr 1.55fr 0.9fr 1.85fr 1.1fr" }}>
-                <div className="mr-td" data-l="Machine"><div><div className="font-semibold">{r.bomKey}</div><div className="mr-label mr-mono">{r.serialNo || "—"}</div></div></div>
-                <div className="mr-td" data-l="Where"><div><div>{r.to ? `${r.from} → ${r.to}` : r.from || "—"}</div><div className={`mr-label ${r.open ? "mr-red" : ""}`}>{r.label}{r.open ? " · open" : ""}</div></div></div>
-                <div className="mr-td" data-l="Since"><div><div className="rpt-nowrap">{rptFmtDT(r.startAt) || "—"}</div>{r.endAt ? <div className="mr-label rpt-nowrap">to {rptFmtDT(r.endAt)}</div> : null}</div></div>
-                <div className={`mr-td md:text-right ${r.open ? "mr-red font-semibold" : ""}`} data-l="How long">{r.minutes != null ? rptDur(r.minutes) : "—"}</div>
+                <div className="mr-td" data-l="Machine"><div><div className="font-semibold">{r.bomKey}</div><div className="mr-label mr-mono">{r.serialNo || ""}</div></div></div>
+                <div className="mr-td" data-l="Where"><div><div>{r.to ? `${r.from} → ${r.to}` : r.from || ""}</div><div className={`mr-label ${r.open ? "mr-red" : ""}`}>{r.label}{r.open ? " · open" : ""}</div></div></div>
+                <div className="mr-td" data-l="Since"><div><div className="rpt-nowrap">{rptFmtDT(r.startAt) || ""}</div>{r.endAt ? <div className="mr-label rpt-nowrap">to {rptFmtDT(r.endAt)}</div> : null}</div></div>
+                <div className={`mr-td md:text-right ${r.open ? "mr-red font-semibold" : ""}`} data-l="How long">{r.minutes != null ? rptDur(r.minutes) : ""}</div>
                 <div className="mr-td" data-l="Reason">{r.reason || <span className="mr-muted">{r.kind === "overdue" ? "Waiting for the next department" : "No reason given"}</span>}</div>
-                <div className="mr-td" data-l="Who"><div><div>{r.by || "—"}</div>{r.releasedBy ? <div className="mr-label">released by {r.releasedBy}</div> : null}</div></div>
+                <div className="mr-td" data-l="Who"><div><div>{r.by || ""}</div>{r.releasedBy ? <div className="mr-label">released by {r.releasedBy}</div> : null}</div></div>
               </div>
             ))}
           </div>
@@ -199,7 +199,7 @@ export function PendingJobsReport({ includeDone = false, dept = "", machineLog =
   const order = (d) => { const i = DEPARTMENT_SEQUENCE.indexOf(d); return i < 0 ? 99 : i; };
   const depts = [...new Set(list.map((p) => p.assignedDepartment || "Unassigned"))].sort((a, b) => order(a) - order(b) || a.localeCompare(b));
   const counts = list.reduce((c, p) => { const s = pendingItemStage(p); c[s] = (c[s] || 0) + 1; return c; }, {});
-  const age = (p) => { const t = rptMs(p.raisedAt); if (t == null) return "—"; const end = p.status === "resolved" ? (rptMs(p.resolvedAt) || now) : now; return rptDur(Math.max(0, (end - t) / 60000)); };
+  const age = (p) => { const t = rptMs(p.raisedAt); if (t == null) return ""; const end = p.status === "resolved" ? (rptMs(p.resolvedAt) || now) : now; return rptDur(Math.max(0, (end - t) / 60000)); };
   const critOpen = list.filter((p) => p.critical && pendingItemIsOpen(p)).length;
   return (
     <ReportSheet kind="pending" settings={settings} title="Pending jobs report" subtitle={`${includeDone ? "Open and completed" : "Open"} jobs${dept ? ` · ${dept}` : " · all departments"}`} refText={`PJ-${new Date(now).toISOString().slice(0, 10)}`} generatedBy={generatedBy}>
@@ -219,13 +219,13 @@ export function PendingJobsReport({ includeDone = false, dept = "", machineLog =
                 const isPart = !!(p.itemCode || p.itemName || p.qty != null);
                 return (
                   <div key={p.id} className="mr-tr" data-report-pending-row={st} style={{ gridTemplateColumns: "1.3fr 2.4fr 0.8fr 1.4fr 0.9fr" }}>
-                    <div className="mr-td" data-l="Machine"><div><div className="font-semibold">{m.bomKey || p.bomKey || "—"}</div><div className="mr-label mr-mono">{m.serialNo || p.serialNo || ""}</div></div></div>
+                    <div className="mr-td" data-l="Machine"><div><div className="font-semibold">{m.bomKey || p.bomKey || ""}</div><div className="mr-label mr-mono">{m.serialNo || p.serialNo || ""}</div></div></div>
                     <div className="mr-td" data-l="Part / work"><div>
                       <div>{p.critical ? <span className="mr-tag">Critical</span> : null}{p.itemName || p.description}</div>
-                      <div className="mr-label">{isPart ? "Part" : "Work"}{p.itemCode ? <> · <span className="mr-mono">{p.itemCode}</span></> : null}{p.itemName && p.description && p.description !== p.itemName ? ` · ${p.description}` : ""} · raised in {p.raisedInDepartment || "—"}, {rptFmtD(p.raisedAt)}</div>
+                      <div className="mr-label">{isPart ? "Part" : "Work"}{p.itemCode ? <> · <span className="mr-mono">{p.itemCode}</span></> : null}{p.itemName && p.description && p.description !== p.itemName ? ` · ${p.description}` : ""} · raised in {p.raisedInDepartment || ""}, {rptFmtD(p.raisedAt)}</div>
                     </div></div>
-                    <div className="mr-td md:text-right mr-mono" data-l="Qty">{p.qty != null ? <div><div>{p.qty}</div>{(Number(p.receivedQty) || 0) > 0 && <div className="mr-label">{p.receivedQty} recd</div>}</div> : "—"}</div>
-                    <div className="mr-td" data-l="Status"><div><div className={`${cls} font-semibold`}>{lbl}</div>{st === "completed" && <div className="mr-label">{rptFmtD(p.resolvedAt)}{rptUserName(allUsers, p.resolvedBy) ? ` · ${rptUserName(allUsers, p.resolvedBy)}` : ""}</div>}</div></div>
+                    <div className="mr-td md:text-right mr-mono" data-l="Qty">{p.qty != null ? <div><div>{p.qty}</div>{(Number(p.receivedQty) || 0) > 0 && <div className="mr-label">{p.receivedQty} recd</div>}</div> : ""}</div>
+                    <div className="mr-td" data-l="Status"><div><span className={`rpt-badge rpt-status ${cls}`}>{lbl}</span>{st === "completed" && <div className="mr-label">{rptFmtD(p.resolvedAt)}{rptUserName(allUsers, p.resolvedBy) ? ` · ${rptUserName(allUsers, p.resolvedBy)}` : ""}</div>}</div></div>
                     <div className="mr-td md:text-right" data-l="Age">{age(p)}</div>
                   </div>
                 );

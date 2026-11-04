@@ -2,6 +2,7 @@
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
 import React, { useEffect, useRef } from "react";
 import { Cog, CircleCheckBig } from "lucide-react";
+import { LeadIcon } from "../../shared/components/LeadIcon.jsx";
 import { trialSignedBy, formatReadyWhen } from "../../utils/readyPopup.js";
 import { BomPhotoThumb } from "../bom/index.js";
 
@@ -26,7 +27,7 @@ export function ReadyMachinesPopup({ items = [], bomDefs = {}, onOk, onView }) {
         <div className="rp-head">
           <div className="rp-seal" aria-hidden="true"><CircleCheckBig size={26} strokeWidth={2.2} /></div>
           <div className="min-w-0">
-            <h2 id="rp-title" className="rp-title" data-ready-title>🎉 {n} machine{n === 1 ? " is" : "s are"} Ready</h2>
+            <h2 id="rp-title" className="rp-title" data-ready-title><LeadIcon e="🎉" />{n} machine{n === 1 ? " is" : "s are"} Ready</h2>
             <p className="rp-sub">Finished since you last looked</p>
           </div>
         </div>

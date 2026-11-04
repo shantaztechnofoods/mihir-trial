@@ -1,6 +1,7 @@
 // src/modules/purchase/POModal.jsx — moved verbatim from the former single-file src/App.jsx
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
 import React, { useState, useEffect, useRef } from "react";
+import { LeadIcon } from "../../shared/components/LeadIcon.jsx";
 import ItemSearchSelect from "../../shared/components/ItemSearchSelect.jsx";
 import { parseDisplayDate } from "../../utils/parseDate.js";
 import { isoToDisplayDate } from "../../utils/parseDate.js";
@@ -321,7 +322,7 @@ export function POModal({ initialPO, vendorList, items, onSave, onClose, prefill
                           {isSelected && <span className="ml-auto text-[8px] font-black text-blue-700">✓ SELECTED</span>}
                         </div>
                         <div className="text-[11px] font-bold text-slate-900 truncate max-w-[130px] mb-1" title={v.name}>{v.name}</div>
-                        {v.contactPerson && <div className="text-[9px] text-slate-500 mb-1">👤 {v.contactPerson}</div>}
+                        {v.contactPerson && <div className="text-[9px] text-slate-500 mb-1"><LeadIcon e="👤" />{v.contactPerson}</div>}
                         <div className="text-[9px] text-slate-400 font-mono font-bold">
                           {v.lastRate ? `₹${v.lastRate.toLocaleString("en-IN")} / unit` : <span className="text-slate-600">No rate history</span>}
                         </div>
@@ -477,7 +478,7 @@ export function POModal({ initialPO, vendorList, items, onSave, onClose, prefill
                    style={{ background: "rgba(34,197,94,0.05)", border: "1px solid rgba(34,197,94,0.25)" }}>
                 <div className="flex items-center justify-between mb-2">
                   <div>
-                    <div className="text-[11px] font-bold text-emerald-300">📦 Low Stock for {form.vendor}</div>
+                    <div className="text-[11px] font-bold text-emerald-300"><LeadIcon e="📦" />Low Stock for {form.vendor}</div>
                     <div className="text-[10px] text-slate-500 mt-0.5">{lowItems.length} preferred low-stock item{lowItems.length !== 1 ? "s" : ""} · tap to add to PO</div>
                   </div>
                   <button onClick={addAllLowStockItems}
@@ -562,7 +563,7 @@ export function POModal({ initialPO, vendorList, items, onSave, onClose, prefill
               );
             })()}
 
-            {addErr && <div className="text-[10px] text-red-600 mb-2">⚠ {addErr}</div>}
+            {addErr && <div className="text-[10px] text-red-600 mb-2"><LeadIcon e="⚠" />{addErr}</div>}
 
             {form.lineItems.length > 0 ? (
               <div className="rounded-xl overflow-hidden border border-slate-200">
@@ -674,12 +675,12 @@ export function POModal({ initialPO, vendorList, items, onSave, onClose, prefill
             <Btn variant="ghost" size="sm" onClick={onClose}>Cancel</Btn>
             <button onClick={() => handleSave("draft")}
                     className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-lg px-3 py-1.5 text-slate-500 border border-slate-200 bg-slate-50 hover:bg-slate-100 transition-all">
-              💾 Save Draft
+              <LeadIcon e="💾" />Save Draft
             </button>
             <button onClick={() => handleSave("pending")}
                     className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-lg px-3 py-1.5 text-white border transition-all"
                     style={{ background: "#2640B0", borderColor: "rgba(38, 64, 176,0.5)", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
-              📤 Submit for Approval
+              <LeadIcon e="📤" />Submit for Approval
             </button>
           </div>
         </div>

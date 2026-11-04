@@ -118,7 +118,7 @@ export function PurchasePage({ pos, vendorList, items, onCreatePO, onUpdatePO, o
               ))}
             </div>
             <input value={search} onChange={(e) => setSearch(e.target.value)}
-              placeholder="🔍 Search PO / vendor..."
+              placeholder="Search PO / vendor..."
               className="ml-auto bg-slate-50 border border-white/10 rounded-lg px-3 py-1.5 text-xs placeholder-slate-400 outline-none focus:border-blue-500/40 w-52" />
           </div>
 

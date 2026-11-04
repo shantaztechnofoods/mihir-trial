@@ -1,7 +1,7 @@
 // src/modules/inventory/InwardPage.jsx — moved verbatim from the former single-file src/App.jsx
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
 import React, { useState, useMemo } from "react";
-import { LeadIcon } from "../../shared/components/LeadIcon.jsx";
+import { LeadIcon, LeadLabel, Glyph } from "../../shared/components/LeadIcon.jsx";
 import ItemSearchSelect from "../../shared/components/ItemSearchSelect.jsx";
 import VendorSearchSelect from "../../shared/components/VendorSearchSelect.jsx";
 import { useProgressiveCount } from "../../shared/components/useProgressiveCount.js";
@@ -75,7 +75,7 @@ export function InwardPage({ items, handleUpdateStock, vendorList, onInwardCompl
       {toast && (
         <div className="fixed bottom-6 right-6 z-[60] flex items-center gap-3 px-5 py-3.5 rounded-2xl"
              style={{ background: "var(--surface-raised)", border: "1px solid rgba(34,197,94,0.45)", boxShadow: "0 20px 60px rgba(17,24,39,0.14)", animation: "slideUp 0.3s ease both" }}>
-          <span className="text-lg">📥</span>
+          <span className="text-lg"><Glyph e="📥" size={18} /></span>
           <div>
             <div className="text-xs font-black text-slate-900">+{toast.qty} {toast.unit} — {toast.item}</div>
             <div className="text-[10px] text-slate-500 mt-0.5">From: {toast.vendor}</div>
@@ -99,7 +99,7 @@ export function InwardPage({ items, handleUpdateStock, vendorList, onInwardCompl
         {/* ── Entry Form ── */}
         <div className="section-card p-6" style={{ animation: "slideUp 0.4s ease both" }}>
           <div className="flex items-center gap-2.5 mb-5">
-            <div className="sec-icon" style={{ background: "rgba(5,150,105,0.1)", color: "#059669" }}>📥</div>
+            <div className="sec-icon" style={{ background: "rgba(5,150,105,0.1)", color: "#059669" }}><Glyph e="📥" size={16} /></div>
             <h2 className="text-[14px] font-bold" style={{ color: "var(--text-strong)" }}>New Inward Entry</h2>
             <span className="sp-pill sp-pill-green">GRN</span>
           </div>
@@ -217,7 +217,7 @@ export function InwardPage({ items, handleUpdateStock, vendorList, onInwardCompl
               <button onClick={handleSubmit} disabled={submitting}
                       className="inline-flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-bold text-slate-900 border transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                       style={{ background: "#15803d", borderColor: "rgba(34,197,94,0.5)", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
-                {submitting ? "⏳ Submitting…" : "📥 Submit Inward"}
+                <LeadLabel text={submitting ? "⏳ Submitting…" : "📥 Submit Inward"} />
               </button>
             )}
           </div>

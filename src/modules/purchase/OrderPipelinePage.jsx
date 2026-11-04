@@ -1,7 +1,7 @@
 // src/modules/purchase/OrderPipelinePage.jsx — moved verbatim from the former single-file src/App.jsx
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
 import React, { useState, useEffect } from "react";
-import { LeadIcon } from "../../shared/components/LeadIcon.jsx";
+import { LeadIcon, LeadLabel, Glyph } from "../../shared/components/LeadIcon.jsx";
 import { isoToDisplayDate } from "../../utils/parseDate.js";
 import { sendPOWhatsApp, waErrorToast } from "../../utils/whatsapp.js";
 import { poTaxLines } from "../../utils/gst.js";
@@ -211,7 +211,7 @@ export function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdateP
     <div className="flex items-center justify-between mb-3">
       <div className="flex items-center gap-2">
         <div className="w-1 h-5 rounded-full" style={{ background: color }} />
-        <span className="text-[12px] font-semibold text-slate-900">{icon} {title}</span>
+        <span className="text-[12px] font-semibold text-slate-900"><LeadLabel text={`${icon} ${title}`} /></span>
       </div>
       <span className="text-[11px] font-semibold text-slate-900 px-2 py-0.5 rounded-full" style={{ background: color+"22", border:`1px solid ${color}44` }}>{count}</span>
     </div>
@@ -223,7 +223,7 @@ export function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdateP
   const ViewBtn = ({ po }) => (
     <button onClick={() => setViewPO(po)}
             className="flex-1 text-[9px] font-bold py-1 rounded-lg text-slate-400 border border-slate-200 bg-slate-50 hover:text-slate-900 hover:bg-slate-100 transition-all">
-      📄 View PO
+      <LeadIcon e="📄" />View PO
     </button>
   );
   const card = "rounded-xl p-3.5 border transition-all hover:scale-[1.005]";
@@ -271,7 +271,7 @@ export function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdateP
           <button onClick={openVendorWizard}
                   className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-lg px-3 py-1.5 text-slate-900 border transition-all"
                   style={{ background: "#15803d", borderColor: "rgba(34,197,94,0.5)", color: "#ffffff" }}>
-            📦 Create Vendor PO
+            <LeadIcon e="📦" />Create Vendor PO
           </button>
         )}
         {canDo("pipeline","create") && (
@@ -356,10 +356,10 @@ export function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdateP
                       return (
                         <div className="mb-1.5">
                           {links.length === 1 ? (
-                            <div className="text-[9px] text-slate-500 truncate">🏭 {links[0].vendorName}</div>
+                            <div className="text-[9px] text-slate-500 truncate"><LeadIcon e="🏭" />{links[0].vendorName}</div>
                           ) : (
                             <div className="flex flex-wrap items-center gap-1 mb-0.5">
-                              <span className="text-[9px] text-slate-600">🏭</span>
+                              <span className="text-[9px] text-slate-600"><Glyph e="🏭" size={11} /></span>
                               {links.slice(0, 2).map((l, i) => (
                                 <span key={i} className="text-[8px] font-bold px-1.5 py-0.5 rounded-full truncate max-w-[80px]"
                                       style={{ color: roleCol(l.role), background: `${roleCol(l.role)}14`, border: `1px solid ${roleCol(l.role)}28` }}>
@@ -412,9 +412,9 @@ export function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdateP
                   </div>
                   <div className="text-[11px] font-bold text-slate-900 truncate mb-0.5">{po.vendor}</div>
                   <div className="text-[9px] text-slate-500 mb-0.5">₹{(po.amount||0).toLocaleString("en-IN")} · {po.lineItems?.length||0} items · {po.date}</div>
-                  {po.priority && <div className={`text-[9px] font-bold mb-2 ${po.priority==="urgent"?"text-red-400":po.priority==="high"?"text-amber-700":"text-slate-600"}`}>⚡ {po.priority.toUpperCase()}</div>}
+                  {po.priority && <div className={`text-[9px] font-bold mb-2 ${po.priority==="urgent"?"text-red-400":po.priority==="high"?"text-amber-700":"text-slate-600"}`}><LeadIcon e="⚡" />{po.priority.toUpperCase()}</div>}
                   {po.notes && <div className="text-[9px] text-slate-500 mb-2 truncate italic">"{po.notes}"</div>}
-                  {po.rejectReason && <div className="text-[9px] text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-2 py-1.5 mb-2">❌ {po.rejectReason}</div>}
+                  {po.rejectReason && <div className="text-[9px] text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-2 py-1.5 mb-2"><LeadIcon e="❌" />{po.rejectReason}</div>}
                   <div className="flex gap-1 mb-1.5">
                     {canDo("pipeline","approve") && (
                       <button onClick={() => onUpdatePO(po.id, { status:"approved", rejectReason:null })}
@@ -454,7 +454,7 @@ export function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdateP
                     {canDo("pipeline","ordered") && (
                       <button onClick={() => { setMoModal(po); setEta(""); setEtaCustom(""); }}
                               className="w-full text-[10px] font-bold py-1.5 rounded-lg text-slate-900 border border-blue-500/40 bg-blue-600/20 hover:bg-blue-600/30 transition-all mb-1.5">
-                        📋 Confirm Order + ETA
+                        <LeadIcon e="📋" />Confirm Order + ETA
                       </button>
                     )}
                     <ViewBtn po={po} />
@@ -517,7 +517,7 @@ export function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdateP
                       {canDo("pipeline","receive") && (
                         <button onClick={() => handleReceive(f.poId)}
                                 className="flex-1 text-[9px] font-bold py-1.5 rounded-lg text-green-400 border border-green-500/30 bg-green-500/10 hover:bg-green-500/20 transition-all">
-                          📦 Mark Received
+                          <LeadIcon e="📦" />Mark Received
                         </button>
                       )}
                       {po && <ViewBtn po={po} />}
@@ -685,7 +685,7 @@ export function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdateP
                   <button onClick={() => sendWA(viewPO)} className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg text-green-400 border border-green-500/30 bg-green-500/10 hover:bg-green-500/20 transition-all"><LeadIcon e="💬" />WhatsApp</button>
                   <button onClick={() => generatePOPdf(viewPO, vnd, settings)}
                           className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg text-amber-700 border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 transition-all">
-                    📄 PDF
+                    <LeadIcon e="📄" />PDF
                   </button>
                   <button onClick={() => setViewPO(null)} className="w-7 h-7 rounded-lg bg-slate-50 hover:bg-red-500/20 hover:text-red-400 text-slate-500 transition-all flex items-center justify-center text-sm font-bold ml-0.5">✕</button>
                 </div>
@@ -714,8 +714,8 @@ export function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdateP
                 <div className="p-3.5 rounded-xl" style={{ background:"rgba(17,24,39,0.03)", border:"1px solid rgba(17,24,39,0.08)" }}>
                   <div className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.12em] mb-2">Vendor</div>
                   <div className="text-[13px] font-black text-slate-900 mb-2">{viewPO.vendor}</div>
-                  {vnd?.contactPerson && <div className="flex items-center gap-1.5 text-[10.5px] text-slate-400 mb-1">👤 {vnd.contactPerson}</div>}
-                  {vnd?.phone && <div className="flex items-center gap-1.5 text-[10.5px] text-slate-400 mb-1">📱 {vnd.phone}</div>}
+                  {vnd?.contactPerson && <div className="flex items-center gap-1.5 text-[10.5px] text-slate-400 mb-1"><LeadIcon e="👤" />{vnd.contactPerson}</div>}
+                  {vnd?.phone && <div className="flex items-center gap-1.5 text-[10.5px] text-slate-400 mb-1"><LeadIcon e="📱" />{vnd.phone}</div>}
                   {vnd?.gst && <div className="text-[10px] font-mono text-slate-500 mb-1">GSTIN: {vnd.gst}</div>}
                   {vnd?.address && <div className="text-[10px] text-slate-500 leading-relaxed">{vnd.address}</div>}
                   {!vnd && <div className="text-[10px] text-slate-600 italic">Vendor details not on file</div>}
@@ -851,7 +851,7 @@ export function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdateP
                 <button onClick={() => { setMoModal(viewPO); setViewPO(null); setEta(""); setEtaCustom(""); }}
                         className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-lg px-3 py-1.5 text-white border transition-all"
                         style={{ background:"#2640B0", borderColor:"rgba(38, 64, 176,0.5)", color: "#ffffff" }}>
-                  📋 Confirm Order + ETA
+                  <LeadIcon e="📋" />Confirm Order + ETA
                 </button>
               )}
               {["ordered","overdue"].includes(viewPO.status) && (() => {
@@ -860,7 +860,7 @@ export function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdateP
                   <button onClick={() => { setFuModal(fu); setViewPO(null); setFuFreq(1); setFuCustom(""); }}
                           className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-lg px-3 py-1.5 text-white border transition-all"
                           style={{ background:"#6d28d9", borderColor:"rgba(167,139,250,0.5)", color: "#ffffff" }}>
-                    🔔 Follow-Up Done
+                    <LeadIcon e="🔔" />Follow-Up Done
                   </button>
                 ) : null;
               })()}
@@ -868,7 +868,7 @@ export function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdateP
                 <button onClick={() => { handleReceive(viewPO.id); setViewPO(null); }}
                         className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-lg px-3 py-1.5 text-slate-900 border transition-all"
                         style={{ background:"#15803d", borderColor:"rgba(34,197,94,0.5)", color: "#ffffff" }}>
-                  📦 Mark Received
+                  <LeadIcon e="📦" />Mark Received
                 </button>
               )}
               {viewPO.status === "received" && isSuperAdmin && onReverseReceive && (
@@ -884,7 +884,7 @@ export function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdateP
                         className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-lg px-3 py-1.5 text-red-400 border transition-all"
                         style={{ background:"rgba(239,68,68,0.1)", borderColor:"rgba(239,68,68,0.35)" }}
                         title="Super Admin only: delete test/incorrect record">
-                  🗑️ Delete Record
+                  <LeadIcon e="🗑️" />Delete Record
                 </button>
               )}
             </div>
@@ -908,7 +908,7 @@ export function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdateP
             </div>
             <div className="px-3 py-2.5 rounded-lg text-[10.5px] text-amber-300 leading-relaxed"
                  style={{ background:"rgba(245,158,11,0.08)", border:"1px solid rgba(245,158,11,0.25)" }}>
-              ⚠️ This will subtract the received quantities from inventory and revert the PO status. Action will be logged in audit history.
+              <LeadIcon e="⚠️" />This will subtract the received quantities from inventory and revert the PO status. Action will be logged in audit history.
             </div>
             <div>
               <div className="text-[10px] font-medium text-slate-500 uppercase tracking-[0.08em] mb-1.5">Reason <span className="text-red-600">*</span></div>
@@ -976,7 +976,7 @@ export function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdateP
               </div>
               <button onClick={()=>setEta("custom")}
                       className={`w-full py-2 rounded-lg text-xs font-bold border transition-all mb-2 ${eta==="custom"?"bg-purple-500/20 text-purple-400 border-purple-500/40":"bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100"}`}>
-                📅 Custom Date
+                <LeadIcon e="📅" />Custom Date
               </button>
               {eta==="custom" && <input type="date" value={etaCustom} onChange={e=>setEtaCustom(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-900 outline-none modal-input" />}
               {!eta && <div className="text-[10px] text-amber-700 mt-1">Select an ETA to confirm</div>}
@@ -986,7 +986,7 @@ export function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdateP
               <button onClick={handleConfirm} disabled={!eta||(eta==="custom"&&!etaCustom)}
                       className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-lg px-4 py-1.5 text-white border transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                       style={{ background:"#2640B0", borderColor:"rgba(38, 64, 176,0.5)", color: "#ffffff" }}>
-                ✅ Confirm & Start Follow-Up
+                <LeadIcon e="✅" />Confirm & Start Follow-Up
               </button>
             </div>
           </div>
@@ -1013,7 +1013,7 @@ export function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdateP
               </div>
               <button onClick={()=>setFuFreq("custom")}
                       className={`w-full py-2 rounded-lg text-xs font-bold border transition-all mb-2 ${fuFreq==="custom"?"bg-purple-500/20 text-purple-400 border-purple-500/40":"bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100"}`}>
-                📅 Custom Date
+                <LeadIcon e="📅" />Custom Date
               </button>
               {fuFreq==="custom" && <input type="date" value={fuCustom} onChange={e=>setFuCustom(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-900 outline-none modal-input" />}
             </div>
@@ -1090,7 +1090,7 @@ export function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdateP
                   onClick={() => { openCreatePO(item, parsedQty); setQtyModal(null); }}
                   className="flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-semibold rounded-lg px-3 py-1.5 text-white border transition-all disabled:opacity-40"
                   style={{ background: "linear-gradient(135deg,#2E50D6,#2640B0)", borderColor: "rgba(38, 64, 176,0.5)" }}>
-                  📋 Create PO →
+                  <LeadIcon e="📋" />Create PO →
                 </button>
               </div>
             </div>

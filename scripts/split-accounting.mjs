@@ -24,7 +24,9 @@
 //     "New files" = every file under src/ that carries the header line
 //     "moved verbatim from the former single-file src/App.jsx".
 //  2. Every whole file moved with git mv (src/pages/*, src/components/*) is
-//     identical to its old version apart from import lines.
+//     identical to its old version apart from import lines (and, as in 1,
+//     the folder part of a dynamic import("./…/File.jsx") — only the file
+//     name is compared, e.g. LoginPage's lazy LoginBrand3D import).
 //  3. Each module index.js holds only `export { … } from "./…";` lines (no
 //     logic hides in a barrel).
 import { execFileSync } from "node:child_process";
@@ -59,6 +61,7 @@ function nonImportLines(code) {
   }
   return out;
 }
+const dynImport = (l) => l.replace(/import\((["'])(?:\.\.?\/)+(?:[^"']*\/)?([^"'/]+)\1\)/g, "import($1$2$1)");
 const norm = (l) => l
   .replace(/^export (?=(async )?(function|const|let|var|class) )/, "")
   // the build tag value is release metadata (scripts/ship.sh bump changes it on every ship)
@@ -137,8 +140,8 @@ const renames = git("diff", "--name-status", "-M50%", baseSha, "--", "src").spli
   .filter((l) => /^R\d*\t/.test(l)).map((l) => l.split("\t").slice(1));
 for (const [from, to] of renames) {
   if (!fs.existsSync(path.join(ROOT, to))) continue;
-  const a = multiset(nonImportLines(git("show", `${baseSha}:${from}`)).map((l) => l.trimEnd()));
-  const b = multiset(nonImportLines(fs.readFileSync(path.join(ROOT, to), "utf8")).map((l) => l.trimEnd()));
+  const a = multiset(nonImportLines(git("show", `${baseSha}:${from}`)).map((l) => dynImport(l.trimEnd())));
+  const b = multiset(nonImportLines(fs.readFileSync(path.join(ROOT, to), "utf8")).map((l) => dynImport(l.trimEnd())));
   const d = diff(a, b);
   const same = !d.missing.length && !d.extra.length;
   if (!same) ok = false;

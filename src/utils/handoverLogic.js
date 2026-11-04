@@ -304,6 +304,20 @@ export function canFinishTransfer(canDoFn /* (module, action) => bool */) {
   return !!canDoFn("machines", "finishTransfer");
 }
 
+// Start Assembly ("Assemble" on a rack machine). 2026-11-04, owner decision:
+// the Assembly head starts the build himself. Allowed for updateStage (admin)
+// OR a floor login of the Assembly department (finishTransfer + "Assembly" in
+// users.departments). Deliberately NOT updateStage for the floor: that would
+// unscope them in the database and allow stage skipping. Other departments
+// and roles without finishTransfer stay off. The DB already permits this
+// move: a BOM Issued machine counts as Assembly (eff_dept, migration 058).
+export function canStartAssembly(canDoFn /* (module, action) => bool */, departments) {
+  if (typeof canDoFn !== "function") return false;
+  if (canDoFn("machines", "updateStage")) return true;
+  return !!canDoFn("machines", "finishTransfer")
+    && Array.isArray(departments) && departments.includes("Assembly");
+}
+
 // Admin check for Settings → Department Workflow section.
 export function canConfigureDept(canDoFn) {
   if (typeof canDoFn !== "function") return false;

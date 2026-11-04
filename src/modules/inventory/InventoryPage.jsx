@@ -1,7 +1,7 @@
 // src/modules/inventory/InventoryPage.jsx — moved verbatim from the former single-file src/App.jsx
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
 import React, { useState, useEffect, useRef, useMemo, useDeferredValue } from "react";
-import { LeadIcon } from "../../shared/components/LeadIcon.jsx";
+import { LeadIcon, Glyph } from "../../shared/components/LeadIcon.jsx";
 import { useProgressiveCount } from "../../shared/components/useProgressiveCount.js";
 import MoreRowsNote from "../../shared/components/MoreRowsNote.jsx";
 import { AddItemModal } from "./AddItemModal.jsx";
@@ -681,7 +681,7 @@ export function InventoryPage({ items, setItems, handleUpdateStock, pos = [], in
               <button onClick={() => handleConfirmDelete(deleteModal.category, deleteModal.item.code)}
                       className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-lg px-4 py-1.5 text-white border transition-all"
                       style={{ background: "#b91c1c", borderColor: "rgba(239,68,68,0.5)", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
-                🗑️ Delete
+                <LeadIcon e="🗑️" />Delete
               </button>
             </div>
           </div>
@@ -713,7 +713,7 @@ export function InventoryPage({ items, setItems, handleUpdateStock, pos = [], in
         {canDo("inventory","add") && (
           <button onClick={() => setShowImport(true)}
                   className="text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-900 hover:border-slate-300 transition-all flex items-center gap-1.5">
-            ⬆ Import Items
+            <LeadIcon e="⬆" />Import Items
           </button>
         )}
         {canDo("inventory","delete") && (
@@ -721,7 +721,7 @@ export function InventoryPage({ items, setItems, handleUpdateStock, pos = [], in
                   title="Delete demo items and BOMs together"
                   className="text-xs font-bold px-3 py-1.5 rounded-lg border transition-all flex items-center gap-1.5"
                   style={{ borderColor: "rgba(239,68,68,0.35)", color: "#dc2626" }}>
-            🧹 Clear Demo Data
+            <LeadIcon e="🧹" />Clear Demo Data
           </button>
         )}
         {canDo("inventory","add") && <Btn variant="primary" size="sm" onClick={() => setShowModal(true)}>+ Add Item</Btn>}
@@ -764,7 +764,7 @@ export function InventoryPage({ items, setItems, handleUpdateStock, pos = [], in
             </button>
           );
           return (
-            <div className="rounded-xl"
+            <div className="wu-attn rounded-xl"
                  style={{ background: "rgba(239,68,68,0.04)", border: "1px solid rgba(239,68,68,0.18)" }}>
               {/* Header row — clickable, ~60px tall. Always visible. */}
               <button
@@ -781,7 +781,7 @@ export function InventoryPage({ items, setItems, handleUpdateStock, pos = [], in
                     {/* Preview chips are labels, not buttons: they sit inside the
                         header toggle and a <button> may not contain a <button>. */}
                     {alerts.slice(0, 10).map((i) => (
-                      <span key={i.code} className="text-[10px] font-bold font-mono px-2 py-0.5 rounded-lg flex-shrink-0"
+                      <span key={i.code} className="wu-attn-chip text-[10px] font-bold font-mono px-2 py-0.5 rounded-lg flex-shrink-0" data-status={i.status}
                             style={{ background: i.status === "critical" ? "rgba(220,38,38,0.08)" : "rgba(217,119,6,0.08)", border: i.status === "critical" ? "1px solid rgba(220,38,38,0.22)" : "1px solid rgba(217,119,6,0.22)", color: i.status === "critical" ? "#dc2626" : "#b45309" }}>
                         {i.code} · {i.stock} {i.unit}
                       </span>
@@ -835,7 +835,7 @@ export function InventoryPage({ items, setItems, handleUpdateStock, pos = [], in
           </select>
 
           <div className="relative ml-auto">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 text-[11px] pointer-events-none">🔍</span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 text-[11px] pointer-events-none"><Glyph e="🔍" size={13} /></span>
             <input ref={searchRef} value={search} onChange={(e) => setSearch(e.target.value)}
                    placeholder="Search code, name, vendor, location..."
                    className="bg-slate-50 border border-slate-200 rounded-lg pl-7 pr-3 py-1.5 text-xs placeholder-slate-400 outline-none focus:border-blue-500/40 w-72 transition-all"
@@ -882,13 +882,13 @@ export function InventoryPage({ items, setItems, handleUpdateStock, pos = [], in
                   return (
                     <tr key={`${item.category}-${item.code}`}
                         onClick={() => setSelectedItem({ item: { ...item }, category: item.category })}
-                        className={`border-b border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors ${isCrit ? "bg-red-500/[0.025]" : ""} ${lastAddedCode === item.code ? "bg-blue-500/[0.08]" : ""}`}>
+                        className={`wu-imrow border-b border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors ${isCrit ? "bg-red-500/[0.025]" : ""} ${lastAddedCode === item.code ? "bg-blue-500/[0.08]" : ""}`}>
                       <td className="px-4 py-4 text-xs font-mono font-bold text-blue-600 whitespace-nowrap">{item.code}</td>
                       <td className="px-4 py-4 text-xs font-semibold max-w-[160px]" style={{ color: "var(--text-strong)" }}>
                         <div className="truncate">{item.name}</div>
                       </td>
                       <td className="px-4 py-4">
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md whitespace-nowrap"
+                        <span className="wu-cat text-[10px] font-bold px-2 py-0.5 rounded-md whitespace-nowrap"
                               style={{ background: `${catColor}14`, color: catColor, border: `1px solid ${catColor}28` }}>
                           {item.category}
                         </span>
@@ -920,24 +920,24 @@ export function InventoryPage({ items, setItems, handleUpdateStock, pos = [], in
                           {canDo("inventory","adjust") && (
                             <button onClick={() => setQuickAdjust({ item: { ...item }, category: item.category, mode: "add" })}
                                     title="Add Stock"
-                                    className="w-6 h-6 rounded flex items-center justify-center text-xs font-black text-green-700 hover:text-green-900 transition-all"
+                                    className="wu-rowbtn w-6 h-6 rounded flex items-center justify-center text-xs font-black text-green-700 hover:text-green-900 transition-all"
                                     style={{ background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.22)" }}>＋</button>
                           )}
                           {canDo("inventory","adjust") && (
                             <button onClick={() => setQuickAdjust({ item: { ...item }, category: item.category, mode: "remove" })}
                                     title="Remove Stock"
-                                    className="w-6 h-6 rounded flex items-center justify-center text-xs font-black text-amber-700 hover:text-amber-900 transition-all"
+                                    className="wu-rowbtn w-6 h-6 rounded flex items-center justify-center text-xs font-black text-amber-700 hover:text-amber-900 transition-all"
                                     style={{ background: "rgba(217, 119, 6,0.1)", border: "1px solid rgba(217, 119, 6,0.22)" }}>－</button>
                           )}
                           {canDo("inventory","edit") && (
                             <button onClick={() => setEditingItem({ item: { ...item }, category: item.category })}
                                     title="Edit"
-                                    className="w-6 h-6 rounded flex items-center justify-center text-[11px] text-slate-500 hover:text-slate-900 transition-all"
-                                    style={{ background: "rgba(17,24,39,0.04)", border: "1px solid rgba(17,24,39,0.10)" }}>✏</button>
+                                    className="wu-rowbtn w-6 h-6 rounded flex items-center justify-center text-[11px] text-slate-500 hover:text-slate-900 transition-all"
+                                    style={{ background: "rgba(17,24,39,0.04)", border: "1px solid rgba(17,24,39,0.10)" }}><Glyph e="✏" size={13} /></button>
                           )}
                           {item.status !== "safe" && (
-                            <span className="text-[9px] font-black text-red-700 px-1.5 py-0.5 rounded whitespace-nowrap"
-                                  style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)" }}>🚨</span>
+                            <span className="wu-rowflag text-[9px] font-black text-red-700 px-1.5 py-0.5 rounded whitespace-nowrap"
+                                  style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)" }}><Glyph e="🚨" size={13} /></span>
                           )}
                         </div>
                       </td>

@@ -54,7 +54,7 @@ export function AttachmentLink({ attachment }) {
 export function ModalX({ onClose, disabled = false, label = "Close" }) {
   return (
     <button type="button" aria-label={label} title={label} data-modal-close onClick={onClose} disabled={disabled}
-            className="absolute top-2.5 right-2.5 z-10 w-9 h-9 rounded-full flex items-center justify-center text-[15px] font-black transition-colors disabled:opacity-40"
+            className="modal-x absolute top-2.5 right-2.5 z-10 w-10 h-10 rounded-full flex items-center justify-center text-[15px] font-black transition-colors disabled:opacity-40"
             style={{ background: "rgba(17,24,39,0.07)", color: "var(--text-dim)" }}>✕</button>
   );
 }

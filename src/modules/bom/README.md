@@ -14,9 +14,9 @@ BOM lifecycle and editors: the BOM drawer (create / duplicate / rename / safe de
 |---|---|
 | `BOMDrawer.jsx` | 1719 |
 | `BOMPasteLines.jsx` | 176 |
-| `BomChecklistSlots.jsx` | 321 |
+| `BomChecklistSlots.jsx` | 322 |
 | `BomCostPanel.jsx` | 104 |
-| `BomFields.jsx` | 130 |
+| `BomFields.jsx` | 131 |
 | `BomLineCheckPointsModal.jsx` | 109 |
 | `bomDurations.js` | 87 |
 | `index.js` | 9 |

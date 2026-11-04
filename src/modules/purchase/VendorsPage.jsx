@@ -1,8 +1,9 @@
 // src/modules/purchase/VendorsPage.jsx — moved verbatim from the former single-file src/App.jsx
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
 import React, { useState, useEffect, useRef } from "react";
-import { LeadIcon } from "../../shared/components/LeadIcon.jsx";
+import { LeadIcon, Glyph } from "../../shared/components/LeadIcon.jsx";
 import { openVendorWhatsApp, waErrorToast } from "../../utils/whatsapp.js";
+import DebouncedSearchInput from "../../shared/components/DebouncedSearchInput.jsx";
 import { VendorImportModal } from "./VendorImportModal.jsx";
 import { VendorModal } from "./VendorModal.jsx";
 import { Btn, MetricCard, StatusBadge } from "../../shared/ui/primitives.jsx";
@@ -78,7 +79,7 @@ export function VendorsPage({ vendorList, pos, items, onAddVendor, onEditVendor,
       {toast && (
         <div className="fixed bottom-6 right-6 z-[60] flex items-center gap-3 px-5 py-3.5 rounded-2xl"
              style={{ background: "var(--surface-raised)", border: "1px solid rgba(46, 80, 214,0.45)", boxShadow: "0 20px 60px rgba(17,24,39,0.14)", animation: "slideUp 0.3s ease both" }}>
-          <span className="text-lg">🏭</span>
+          <span className="text-lg"><Glyph e="🏭" size={18} /></span>
           <div className="text-xs font-black text-slate-900">{toast}</div>
           <button onClick={() => setToast(null)} className="ml-2 text-slate-600 hover:text-slate-500 text-xs">✕</button>
         </div>
@@ -181,12 +182,12 @@ export function VendorsPage({ vendorList, pos, items, onAddVendor, onEditVendor,
       })()}
 
       <Topbar title="Vendor Management" subtitle={`${activeVendors.length} suppliers · ${activeVendors.filter((v) => v.status === "preferred").length} preferred`}>
-        <input ref={searchRef} value={search} onChange={(e) => setSearch(e.target.value)}
+        <DebouncedSearchInput ref={searchRef} value={search} onChange={setSearch}
                placeholder="Search vendors..." className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 outline-none w-44 focus:border-[#2E50D6]/40 focus:outline-none transition-colors" />
         {canDo("vendors","add") && (
           <button onClick={() => setShowImport(true)}
                   className="text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-900 hover:border-slate-300 transition-all flex items-center gap-1.5">
-            ⬆ Import
+            <LeadIcon e="⬆" />Import
           </button>
         )}
         {canDo("vendors","add") && <Btn variant="primary" size="sm" onClick={() => { setEditingVendor(null); setShowModal(true); }}>+ Add Vendor</Btn>}
@@ -216,8 +217,8 @@ export function VendorsPage({ vendorList, pos, items, onAddVendor, onEditVendor,
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1 min-w-0 mr-3">
                       <div className="text-[14px] font-bold text-[#111827] truncate leading-tight mb-0.5">{v.name}</div>
-                      <div className="text-[11px] text-slate-500">📍 {v.location || "—"}{v.years != null ? ` · ${v.years} yr${v.years !== 1 ? "s" : ""}` : ""}</div>
-                      {v.contactPerson && <div className="text-[10px] text-slate-400 mt-0.5">👤 {v.contactPerson}</div>}
+                      <div className="text-[11px] text-slate-500"><LeadIcon e="📍" />{v.location || "—"}{v.years != null ? ` · ${v.years} yr${v.years !== 1 ? "s" : ""}` : ""}</div>
+                      {v.contactPerson && <div className="text-[10px] text-slate-400 mt-0.5"><LeadIcon e="👤" />{v.contactPerson}</div>}
                     </div>
                     <div className="flex flex-col items-end gap-1 shrink-0">
                       <StatusBadge status={v.status} />
@@ -265,9 +266,9 @@ export function VendorsPage({ vendorList, pos, items, onAddVendor, onEditVendor,
                   {/* Action buttons */}
                   <div className="flex gap-1.5 pt-2.5 border-t border-slate-100" onClick={(e) => e.stopPropagation()}>
                     <Btn variant="wa"    size="xs" onClick={() => { const r = openVendorWhatsApp(v); if (!r.ok) showToast(waErrorToast(r.error)); }}><LeadIcon e="📱" />WA</Btn>
-                    <Btn variant="mail"  size="xs">✉️</Btn>
-                    {canDo("vendors","edit")   && <Btn variant="ghost" size="xs" onClick={() => { setEditingVendor(v); setShowModal(true); }}>✏️</Btn>}
-                    {canDo("vendors","delete") && <Btn variant="red"   size="xs" onClick={() => setConfirmDelete(v)}>🗑</Btn>}
+                    <Btn variant="mail"  size="xs"><Glyph e="✉️" size={14} /></Btn>
+                    {canDo("vendors","edit")   && <Btn variant="ghost" size="xs" onClick={() => { setEditingVendor(v); setShowModal(true); }}><Glyph e="✏️" size={14} /></Btn>}
+                    {canDo("vendors","delete") && <Btn variant="red"   size="xs" onClick={() => setConfirmDelete(v)}><Glyph e="🗑" size={14} /></Btn>}
                   </div>
                 </div>
               </div>
@@ -351,11 +352,11 @@ export function VendorsPage({ vendorList, pos, items, onAddVendor, onEditVendor,
                 {/* Contact */}
                 <div className="space-y-1.5">
                   <div className="text-[10px] font-medium text-slate-500 uppercase tracking-[0.08em]">Contact</div>
-                  {v.contactPerson && <div className="text-[11px] text-slate-500">👤 {v.contactPerson}</div>}
-                  <div className="text-[11px] text-slate-500">📞 {v.phone}</div>
-                  <div className="text-[11px] text-slate-500">✉️ {v.email}</div>
+                  {v.contactPerson && <div className="text-[11px] text-slate-500"><LeadIcon e="👤" />{v.contactPerson}</div>}
+                  <div className="text-[11px] text-slate-500"><LeadIcon e="📞" />{v.phone}</div>
+                  <div className="text-[11px] text-slate-500"><LeadIcon e="✉️" />{v.email}</div>
                   {v.gst     && <div className="text-[11px] text-slate-500">GST: <span className="font-mono text-slate-600">{v.gst}</span></div>}
-                  {v.address && <div className="text-[11px] text-slate-500">📍 {v.address}</div>}
+                  {v.address && <div className="text-[11px] text-slate-500"><LeadIcon e="📍" />{v.address}</div>}
                 </div>
 
                 {/* Terms */}

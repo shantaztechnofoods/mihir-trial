@@ -1,7 +1,7 @@
 // src/modules/inventory/OutwardPage.jsx — moved verbatim from the former single-file src/App.jsx
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
 import React, { useState, useEffect } from "react";
-import { LeadIcon } from "../../shared/components/LeadIcon.jsx";
+import { LeadIcon, Glyph } from "../../shared/components/LeadIcon.jsx";
 import ItemSearchSelect from "../../shared/components/ItemSearchSelect.jsx";
 import { rackOfBom, rackCapacityFor, slotLabel, setLabel, pairSlotOf, rackBoms } from "../../utils/rackSlots.js";
 import { BOMDrawer, BOMPasteLines, BomChecklistSlots, BomLineCheckPointsModal, BomPhotoField, DeptDurationFields, RackStatusNote, durationsFormFrom, durationsStoreFrom, validateDurationsForm } from "../bom/index.js";
@@ -486,7 +486,7 @@ export function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, on
                           }}
                         className="inline-flex items-center gap-1.5 text-[11px] font-bold rounded-lg px-4 py-1.5 text-white border transition-all"
                         style={{ background: "#b91c1c", borderColor: "rgba(239,68,68,0.5)", color: "#ffffff" }}>
-                  🗑 Delete BOM
+                  <LeadIcon e="🗑" />Delete BOM
                 </button>
               )}
             </div>
@@ -540,7 +540,7 @@ export function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, on
                         }}
                       className="inline-flex items-center gap-1.5 text-[11px] font-bold rounded-lg px-4 py-1.5 text-white border transition-all"
                       style={{ background: "#b91c1c", borderColor: "rgba(239,68,68,0.5)", color: "#ffffff" }}>
-                🗑 Remove
+                <LeadIcon e="🗑" />Remove
               </button>
             </div>
           </div>
@@ -670,7 +670,7 @@ export function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, on
                                         color:      (ci.checkPoints || []).length ? "#b45309" : "#64748b",
                                         border:     `1px solid ${(ci.checkPoints || []).length ? "rgba(217,119,6,0.3)" : "rgba(17,24,39,0.12)"}`,
                                       }}>
-                                ✅ {(ci.checkPoints || []).length || "+"}
+                                <LeadIcon e="✅" />{(ci.checkPoints || []).length || "+"}
                               </button>
                             </div>
                           </div>
@@ -756,7 +756,7 @@ export function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, on
               {createErr && (
                 <div className="px-3 py-2 rounded-lg text-[11px] text-red-300"
                      style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)" }}>
-                  ⚠ {createErr}
+                  <LeadIcon e="⚠" />{createErr}
                 </div>
               )}
             </div>
@@ -841,7 +841,7 @@ export function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, on
                             </button>
                             <button onClick={() => { setActionsKey(null); setOpenBOM(bomKey); }}
                                     className="w-full text-left px-3 py-2 text-[11px] font-bold text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-all flex items-center gap-2">
-                              <span>✏️</span>Edit BOM
+                              <span><Glyph e="✏️" size={14} /></span>Edit BOM
                             </button>
                             {onDuplicateBOM && canDo("outward","bom") && (
                               <button onClick={() => {
@@ -878,7 +878,7 @@ export function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, on
                                         setConfirmDeleteBOM({ key: bomKey, label: bom.label, info });
                                       }}
                                       className="w-full text-left px-3 py-2 text-[11px] font-bold text-red-400 hover:bg-red-500/10 transition-all flex items-center gap-2 border-t border-slate-200">
-                                <span>🗑</span>Delete BOM
+                                <span><Glyph e="🗑" size={14} /></span>Delete BOM
                               </button>
                             )}
                           </div>
@@ -1057,7 +1057,7 @@ export function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, on
           {manualError && (
             <div className="mt-3 p-3 rounded-xl text-[10px] text-red-400 font-bold"
                  style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.3)" }}>
-              ⚠ {manualError}
+              <LeadIcon e="⚠" />{manualError}
             </div>
           )}
 
@@ -1111,7 +1111,7 @@ export function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, on
                             <span title={title}
                                   className="ml-2 text-[9px] font-bold px-1.5 py-0.5 rounded-full"
                                   style={{ background: "rgba(217, 119, 6,0.1)", color: "#B45309", border: "1px solid rgba(217, 119, 6,0.3)" }}>
-                              🔒 {crit.length} critical
+                              <LeadIcon e="🔒" />{crit.length} critical
                             </span>
                           );
                         })()}

@@ -1,6 +1,7 @@
 // src/modules/inventory/AddItemModal.jsx — moved verbatim from the former single-file src/App.jsx
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
 import React, { useState, useEffect, useRef } from "react";
+import { LeadIcon, LeadLabel } from "../../shared/components/LeadIcon.jsx";
 import { uploadItemMedia, MAX_UPLOAD_BYTES } from "../../utils/storage.js";
 import { ITEM_GST_RATES } from "../../utils/gst.js";
 import { recomputeStatus } from "../../shared/format.js";
@@ -435,7 +436,7 @@ export function AddItemModal({ machines, onSave, onClose, initialValues = null, 
           <button type="button" onClick={() => setShowAdvanced((v) => !v)}
                   className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-[12px] font-bold text-slate-700 transition-all"
                   style={{ background: "rgba(17,24,39,0.03)", border: "1px solid rgba(17,24,39,0.12)" }}>
-            <span>⚙️ Purchase / Vendor / Media details {showAdvanced ? "" : "(optional)"}</span>
+            <span><LeadIcon e="⚙️" />Purchase / Vendor / Media details {showAdvanced ? "" : "(optional)"}</span>
             <span className="text-[10px]">{showAdvanced ? "▲ Hide" : "▼ Show"}</span>
           </button>
 
@@ -548,8 +549,8 @@ export function AddItemModal({ machines, onSave, onClose, initialValues = null, 
                             <div className="text-xs font-semibold text-slate-900 truncate">{v.name}</div>
                             {(v.contactPerson || v.leadDays) && (
                               <div className="text-[9px] text-slate-500 flex gap-2 mt-0.5">
-                                {v.contactPerson && <span>👤 {v.contactPerson}</span>}
-                                {v.leadDays ? <span>🕐 {v.leadDays}d lead</span> : null}
+                                {v.contactPerson && <span><LeadIcon e="👤" />{v.contactPerson}</span>}
+                                {v.leadDays ? <span><LeadIcon e="🕐" />{v.leadDays}d lead</span> : null}
                               </div>
                             )}
                           </div>
@@ -589,9 +590,9 @@ export function AddItemModal({ machines, onSave, onClose, initialValues = null, 
                         <div className="text-xs font-semibold text-slate-900 truncate">{link.vendorName}</div>
                         {v && (
                           <div className="text-[9px] text-slate-500 flex gap-2 mt-0.5">
-                            {v.contactPerson && <span>👤 {v.contactPerson}</span>}
-                            {v.phone && <span>📞 {v.phone}</span>}
-                            {v.leadDays ? <span>🕐 {v.leadDays}d</span> : null}
+                            {v.contactPerson && <span><LeadIcon e="👤" />{v.contactPerson}</span>}
+                            {v.phone && <span><LeadIcon e="📞" />{v.phone}</span>}
+                            {v.leadDays ? <span><LeadIcon e="🕐" />{v.leadDays}d</span> : null}
                           </div>
                         )}
                       </div>
@@ -600,9 +601,9 @@ export function AddItemModal({ machines, onSave, onClose, initialValues = null, 
                         onChange={(e) => changeRole(link.vendorId, e.target.value)}
                         className="text-[10px] font-bold rounded-lg px-2 py-1 outline-none border flex-shrink-0"
                         style={{ background: `${rc}14`, color: rc, borderColor: `${rc}40`, fontFamily: "'Inter',system-ui,sans-serif" }}>
-                        <option value="Preferred">⭐ Preferred</option>
-                        <option value="Approved">✅ Approved</option>
-                        <option value="Backup">🔘 Backup</option>
+                        <option value="Preferred">Preferred</option>
+                        <option value="Approved">Approved</option>
+                        <option value="Backup">Backup</option>
                       </select>
                       <button onClick={() => removeVendorLink(link.vendorId)}
                               className="w-5 h-5 flex-shrink-0 flex items-center justify-center rounded text-slate-600 hover:text-red-400 hover:bg-red-500/10 transition-all text-xs">
@@ -682,7 +683,7 @@ export function AddItemModal({ machines, onSave, onClose, initialValues = null, 
                     {designFile && !designBusy && <button onClick={() => { setDesignFile(""); setDesignName(""); }}
                             className="text-[10px] font-bold px-2.5 py-1 rounded-lg border border-red-500/20 text-red-400 hover:bg-red-500/10 transition-all">Remove</button>}
                   </div>
-                  {designName && <div className="text-[9px] text-slate-500 mt-1 truncate" title={designName}>📎 {designName}</div>}
+                  {designName && <div className="text-[9px] text-slate-500 mt-1 truncate" title={designName}><LeadIcon e="📎" />{designName}</div>}
                   <div className="text-[9px] text-slate-600 mt-0.5">PNG/JPG/PDF, up to {MAX_MB} MB · stored in Supabase Storage</div>
                 </div>
               </div>
@@ -690,7 +691,7 @@ export function AddItemModal({ machines, onSave, onClose, initialValues = null, 
             {mediaErr && (
               <div className="mt-2 px-3 py-2 rounded-lg text-[11px] text-red-300 break-words"
                    style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)" }}>
-                ⚠️ {mediaErr}
+                <LeadIcon e="⚠️" />{mediaErr}
               </div>
             )}
           </div>
@@ -721,7 +722,7 @@ export function AddItemModal({ machines, onSave, onClose, initialValues = null, 
                       e.currentTarget.style.boxShadow = "0 0 12px rgba(46, 80, 214,0.45), 0 2px 8px rgba(17,24,39,0.08)";
                       e.currentTarget.style.borderColor = "rgba(38, 64, 176,0.5)";
                     }}>
-              {isEdit ? "💾 Save Changes" : "💾 Save Item"}
+              <LeadLabel text={isEdit ? "💾 Save Changes" : "💾 Save Item"} />
             </button>
           </div>
         </div>

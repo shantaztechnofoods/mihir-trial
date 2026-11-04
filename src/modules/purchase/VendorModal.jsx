@@ -78,9 +78,9 @@ export function VendorModal({ initialVendor, onSave, onClose, existingNames = []
             <div>
               <ILabel text="Vendor Priority" />
               <select value={form.priority} onChange={upd("priority")} className={inpCls(false)} style={selStyle}>
-                <option value="Preferred">⭐ Preferred</option>
-                <option value="Approved">✅ Approved</option>
-                <option value="Backup">🔘 Backup</option>
+                <option value="Preferred">Preferred</option>
+                <option value="Approved">Approved</option>
+                <option value="Backup">Backup</option>
               </select>
             </div>
             <div>

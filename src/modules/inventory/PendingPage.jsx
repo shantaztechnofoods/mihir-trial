@@ -1,6 +1,7 @@
 // src/modules/inventory/PendingPage.jsx — moved verbatim from the former single-file src/App.jsx
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
 import React, { useState, useRef, useMemo } from "react";
+import { LeadIcon } from "../../shared/components/LeadIcon.jsx";
 import { roundQty } from "../../shared/format.js";
 import { STAGE_COLORS } from "../../shared/machineStages.js";
 import { Topbar } from "../../shared/ui/Topbar.jsx";
@@ -459,7 +460,7 @@ export function PendingPage({ pendingLog, onClearPending, onFulfillPending, onFu
                 {cf.err && (
                   <div className="text-[11px] font-bold px-3 py-2 rounded-md"
                        style={{ background: "rgba(239,68,68,0.08)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.3)" }}>
-                    ⚠ {cf.err}
+                    <LeadIcon e="⚠" />{cf.err}
                   </div>
                 )}
               </div>
@@ -583,7 +584,7 @@ export function PendingPage({ pendingLog, onClearPending, onFulfillPending, onFu
                             {machine && (
                               <span className="text-[9px] font-bold px-2 py-0.5 rounded-full"
                                     style={{ background: stageColor + "18", color: stageColor, border: `1px solid ${stageColor}35` }}>
-                                🔧 {machine.stage}
+                                <LeadIcon e="🔧" />{machine.stage}
                               </span>
                             )}
                           </div>

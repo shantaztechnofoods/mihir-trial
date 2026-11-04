@@ -166,7 +166,7 @@ export function PODetailModal({ po, onClose, onApprove, onMarkOrdered, onMarkRec
             <button onClick={() => { setConfirmReceive(true); setConfirmDelete(false); }}
                     className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-lg px-3 py-1.5 text-slate-900 border transition-all"
                     style={{ background: "#15803d", borderColor: "rgba(34,197,94,0.5)", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
-              ✅ Mark Received
+              <LeadIcon e="✅" />Mark Received
             </button>
           )}
         </div>

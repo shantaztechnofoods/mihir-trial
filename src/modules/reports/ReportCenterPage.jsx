@@ -402,7 +402,7 @@ export function ReportCenterPage({
             title, date range and print date once. Not on the Machine journey
             tab: that report carries its own letterhead (it printed twice, with
             an empty first page). */}
-        {tab !== "machine" && <RptPageStyle page="rc-report" head={`${rptCompany(settings).name || RPT_LEGAL_NAME} · ${(tabs.find((t) => t.id === tab) || {}).label || ""} ${String(T("Report")).toLowerCase()}`} foot={`${(tabs.find((t) => t.id === tab) || {}).label || ""} ${String(T("Report")).toLowerCase()}`} />}
+        {tab !== "machine" && <RptPageStyle page="rc-report" head={`${rptCompany(settings).name || RPT_LEGAL_NAME} · ${(tabs.find((t) => t.id === tab) || {}).label || ""} ${String(T("Report")).toLowerCase()}`} foot={tab === "customer" ? "Computer-generated report" : "Computer-generated report · Confidential, internal use only"} />}
         {tab !== "machine" && (
           <div className="hidden print:block rpt-doc rpt-rc-head" data-report-center-head>
             <RptLetterhead company={rptCompany(settings)} showLogo={rc.showLogo !== false} line={rc.companyLine || ""} />
@@ -767,7 +767,7 @@ export function ReportTable({ title, rows, t = (k) => k, users = [] }) {
             {rows.map((r, i) => (
               <tr key={i} className="border-t border-slate-200">
                 {columns.map((c) => (
-                  <td key={c} data-l={rptColLabel(t(c))} data-col={c} className={`px-3 py-1.5 text-slate-500 whitespace-nowrap${/^(Serial|Machine)$/.test(c) ? " rpt-nowrap" : ""}`}>{cellText(r[c], c)}</td>
+                  <td key={c} data-l={rptColLabel(t(c))} data-col={c} className={`px-3 py-1.5 text-slate-500 whitespace-nowrap${/^(Serial|Machine)$/.test(c) ? " rpt-nowrap" : ""}`}>{((x) => (x === "—" ? "" : x))(cellText(r[c], c))}</td>
                 ))}
               </tr>
             ))}

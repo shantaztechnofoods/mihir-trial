@@ -12,8 +12,8 @@ The Trial department's certificate: the fill-in modal (steps, speeds, timings, c
 ## Files
 | file | lines |
 |---|---|
-| `TrialCertificateModal.jsx` | 417 |
-| `TrialCertificateSheet.jsx` | 435 |
+| `TrialCertificateModal.jsx` | 418 |
+| `TrialCertificateSheet.jsx` | 487 |
 | `index.js` | 5 |
 
 `index.js` is the public surface — the app shell and other modules import only from it:
@@ -26,7 +26,7 @@ The screens here are presentational: state and every write (handler) still live 
 _No App.jsx handlers are passed in (read-only screens, or the module calls its stores / Edge Function directly)._
 
 Depends on other modules (imported through their `index.js`): _none_
-Shared code used: `src/shared/printFormat.js`, `src/shared/ui/SignaturePad.jsx`
+Shared code used: `src/shared/components/LeadIcon.jsx`, `src/shared/printFormat.js`, `src/shared/ui/SignaturePad.jsx`
 Lower layers used: `src/utils/`
 Used by: `modules/machine-tracker`, `modules/reports`
 

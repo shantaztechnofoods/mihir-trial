@@ -11,7 +11,7 @@ Home page: stock / PO / machine KPIs, recent stock movements, charts and quick l
 ## Files
 | file | lines |
 |---|---|
-| `DashboardPage.jsx` | 566 |
+| `DashboardPage.jsx` | 556 |
 | `index.js` | 4 |
 
 `index.js` is the public surface — the app shell and other modules import only from it:
@@ -27,7 +27,7 @@ The screens here are presentational: state and every write (handler) still live 
 | `<DashboardPage>` | `canView` | `canOpenPage` |
 
 Depends on other modules (imported through their `index.js`): _none_
-Shared code used: `src/shared/components/LeadIcon.jsx`, `src/shared/format.js`, `src/shared/machineStages.js`, `src/shared/settingsDefaults.js`, `src/shared/ui/Topbar.jsx`, `src/shared/ui/primitives.jsx`
+Shared code used: `src/shared/components/LeadIcon.jsx`, `src/shared/format.js`, `src/shared/settingsDefaults.js`, `src/shared/ui/Topbar.jsx`, `src/shared/ui/primitives.jsx`
 Lower layers used: `src/stores/`, `src/utils/`
 Used by: `app/App.jsx (shell)`
 

@@ -187,7 +187,7 @@ export function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, on
         <button onClick={() => handleSave()}
                 className="inline-flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-xl transition-all duration-200"
                 style={{ background: saved ? "rgba(22,163,74,0.12)" : "#2640B0", color: saved ? "#15803d" : "#fff", border: saved ? "1px solid rgba(22,163,74,0.35)" : "1px solid rgba(38, 64, 176,0.45)", boxShadow: saved ? "none" : "0 0 12px rgba(46, 80, 214,0.3)" }}>
-          {saved ? "✅ Saved!" : "💾 Save Changes"}
+          <LeadLabel text={saved ? "✅ Saved!" : "💾 Save Changes"} />
         </button>
       </Topbar>
 
@@ -772,7 +772,7 @@ export function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, on
                 </div>
                 <button onClick={handleExportExcel}
                         className="flex-shrink-0 text-[12px] font-bold px-4 py-2 rounded-xl border transition-all text-green-400 hover:bg-green-500/10 border-green-500/20 hover:border-green-500/40">
-                  ⬇ Export Excel
+                  <LeadIcon e="⬇" />Export Excel
                 </button>
               </div>
             </div>

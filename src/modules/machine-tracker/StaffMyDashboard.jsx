@@ -1,6 +1,7 @@
 // src/modules/machine-tracker/StaffMyDashboard.jsx — moved verbatim from the former single-file src/App.jsx
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
 import React, { useEffect } from "react";
+import { LeadIcon } from "../../shared/components/LeadIcon.jsx";
 import { formatDuration } from "../../utils/handoverLogic.js";
 
 // ── Staff "My Dashboard" (2026-11-03, owner approved) ────────────────────────
@@ -40,21 +41,20 @@ export function StaffMyDashboard({ departments = [], handovers = [], deptRatings
          onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="w-full sm:max-w-3xl h-full sm:h-auto sm:max-h-[92vh] flex flex-col sm:rounded-2xl overflow-hidden"
            style={{ background: "var(--surface-raised, #f8fafc)", boxShadow: "0 24px 70px rgba(17,24,39,0.3)" }}>
-        <div className="flex items-center gap-3 px-4 sm:px-6 py-3 flex-shrink-0" style={{ background: "#2640B0", color: "#fff" }}>
+        <div className="wu-md-head flex items-center gap-3 px-4 sm:px-6 py-3 flex-shrink-0">
           <div className="flex-1 min-w-0">
-            <div className="text-[20px] sm:text-[22px] font-black leading-tight">📊 My Dashboard</div>
-            <div className="text-[14px] font-bold opacity-90 truncate">{departments.join(", ")}</div>
+            <div className="wu-md-title"><LeadIcon e="📊" />My Dashboard</div>
+            <div className="wu-md-sub truncate">{departments.join(", ")}</div>
           </div>
           <button type="button" data-my-dashboard-close aria-label="Close My Dashboard" onClick={onClose}
-                  className="min-w-[52px] min-h-[52px] px-3 rounded-xl text-[18px] font-black flex items-center justify-center gap-1.5"
-                  style={{ background: "rgba(255,255,255,0.18)", color: "#fff" }}>
+                  className="wu-md-close min-w-[52px] min-h-[52px] px-3 rounded-xl flex items-center justify-center gap-1.5">
             ✕ <span className="text-[15px]">Close</span>
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-3 sm:space-y-4">
+        <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-3 sm:space-y-4 wu-stagger">
           {/* 1. Stars */}
           <div data-my-dash-stars className="rounded-2xl p-4 sm:p-5 text-center" style={card}>
-            <div className="text-[15px] font-black uppercase tracking-[0.06em]" style={{ color: "var(--text-dim)" }}>⭐ Stars</div>
+            <div className="wu-md-h"><LeadIcon e="⭐" />Stars</div>
             <div className="text-[40px] sm:text-[48px] leading-none mt-2 tracking-[0.04em]" aria-label={avg === null ? "No stars yet" : `${avg} out of 5 stars`}>
               <span style={{ color: "#f59e0b" }}>{"★".repeat(full)}</span><span style={{ color: "#d1d5db" }}>{"★".repeat(5 - full)}</span>
             </div>
@@ -67,15 +67,15 @@ export function StaffMyDashboard({ departments = [], handovers = [], deptRatings
           <div data-my-dash-finished className="grid grid-cols-2 gap-3 sm:gap-4">
             {[["This week", thisWeek, "week"], ["This month", thisMonth, "month"]].map(([label, n, k]) => (
               <div key={k} data-my-dash-count={k} className="rounded-2xl p-4 text-center" style={card}>
-                <div className="text-[15px] font-black" style={{ color: "var(--text-dim)" }}>✅ {label}</div>
-                <div className="text-[48px] sm:text-[56px] font-black leading-none mt-2 tabular-nums" style={{ color: "#15803d" }}>{n}</div>
+                <div className="text-[15px] font-black" style={{ color: "var(--text-dim)" }}><LeadIcon e="✅" />{label}</div>
+                <div className="wu-md-num mt-2 tabular-nums">{n}</div>
                 <div className="text-[14px] font-bold mt-1" style={{ color: "var(--text-dim)" }}>machine{n === 1 ? "" : "s"} done</div>
               </div>
             ))}
           </div>
           {/* 2. Time per machine */}
           <div data-my-dash-times className="rounded-2xl p-4 sm:p-5" style={card}>
-            <div className="text-[15px] font-black uppercase tracking-[0.06em] mb-3" style={{ color: "var(--text-dim)" }}>⏱ Time per machine</div>
+            <div className="wu-md-h mb-3"><LeadIcon e="⏱" />Time per machine</div>
             {done.length === 0 && <div className="text-[16px] font-bold py-2" style={{ color: "var(--text-dim)" }}>No machine finished yet.</div>}
             <div className="flex flex-col gap-2">
               {done.map((h) => {
@@ -84,19 +84,17 @@ export function StaffMyDashboard({ departments = [], handovers = [], deptRatings
                 const target = Number(h.expectedDurationMinutes) || 0;
                 const late = (Number(h.overrunMinutes) || 0) > 0 || (target > 0 && actual > target);
                 return (
-                  <div key={h.id} data-my-dash-row={h.id} className="flex items-center gap-3 rounded-xl px-3 py-2.5 min-h-[56px]"
-                       style={{ background: late ? "rgba(239,68,68,0.06)" : "rgba(21,128,61,0.06)", border: `1px solid ${late ? "rgba(239,68,68,0.3)" : "rgba(21,128,61,0.25)"}` }}>
+                  <div key={h.id} data-my-dash-row={h.id} className="wu-md-row flex items-center gap-3 rounded-xl px-3 py-2.5 min-h-[56px]">
                     <div className="flex-1 min-w-0">
                       <div className="text-[16px] font-black truncate" style={{ color: "var(--text-strong)" }}>{(m && m.bomLabel) || h.bomKey || (m && m.bomKey) || "Machine"}</div>
                       <div className="text-[14px] font-bold" style={{ color: "var(--text-dim)" }}>
                         {(h.serialNo || (m && m.serialNo)) ? `S/N ${h.serialNo || m.serialNo}` : ""}{departments.length > 1 ? ` · ${h.fromDepartment}` : ""}
                       </div>
                       <div className="text-[16px] font-black tabular-nums mt-0.5" style={{ color: "var(--text-strong)" }}>
-                        ⏱ {formatDuration(actual)}{target ? <span className="font-bold" style={{ color: "var(--text-dim)" }}> / {formatDuration(target)}</span> : null}
+                        <LeadIcon e="⏱" />{formatDuration(actual)}{target ? <span className="font-bold" style={{ color: "var(--text-dim)" }}> / {formatDuration(target)}</span> : null}
                       </div>
                     </div>
-                    <span data-my-dash-badge={late ? "late" : "ontime"} className="flex-shrink-0 text-[15px] font-black px-3 py-2 rounded-full text-white"
-                          style={{ background: late ? "#dc2626" : "#15803d" }}>
+                    <span data-my-dash-badge={late ? "late" : "ontime"} className={`wu-md-pill flex-shrink-0 ${late ? "is-bad" : "is-ok"}`}>
                       {late ? "✗ Late" : "✓ On time"}
                     </span>
                   </div>

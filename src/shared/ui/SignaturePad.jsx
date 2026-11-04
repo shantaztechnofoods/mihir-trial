@@ -88,7 +88,7 @@ export function SignaturePad({ onSave, onCancel, initialSvg = "", light = false 
           </button>
         )}
         <button type="button" onClick={save}
-                className="text-[11px] font-black text-white px-4 py-1.5 rounded-lg transition-all"
+                className="wu-sig-save text-[11px] font-black text-white px-4 py-1.5 rounded-lg transition-all"
                 style={{ background: "#2640B0", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
           Save Signature
         </button>

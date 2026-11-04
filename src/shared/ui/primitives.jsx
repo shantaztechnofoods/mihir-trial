@@ -1,6 +1,7 @@
 // src/shared/ui/primitives.jsx — moved verbatim from the former single-file src/App.jsx
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
 import React from "react";
+import { Glyph } from "../components/LeadIcon.jsx";
 
 export const statusConfig = {
   critical: { label: "CRITICAL",  bg: "", text: "", border: "", dot: "#dc2626",   style: { background: "rgba(220,38,38,0.08)",   color: "#dc2626", border: "1px solid rgba(220,38,38,0.22)" } },
@@ -26,7 +27,7 @@ export const statusConfig = {
 export const StatusBadge = ({ status }) => {
   const cfg = statusConfig[status] || statusConfig.safe;
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold"
+    <span className="wu-status inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold" data-status={status}
           style={{ letterSpacing: "0.05em", ...cfg.style }}>
       {cfg.dot && <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: cfg.dot }} />}
       {cfg.label}
@@ -111,7 +112,7 @@ export function MetricCard({ label, value, delta, deltaUp, icon, barPct, barColo
         {icon && (
           <div className="w-9 h-9 rounded-xl flex items-center justify-center text-base flex-shrink-0 -mt-0.5 -mr-0.5"
                style={{ background: color + "14", color }}>
-            {icon}
+            <Glyph e={icon} size={18} />
           </div>
         )}
       </div>
@@ -173,7 +174,7 @@ export function SkeletonLoader({ rows = 3, type = "text" }) {
 export function EmptyState({ icon = "📭", title = "Nothing here yet", desc = "", action = null }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 px-6 text-center select-none">
-      <div className="text-5xl mb-4" style={{ opacity: 0.45 }}>{icon}</div>
+      <div className="text-5xl mb-4" style={{ opacity: 0.45 }}><Glyph e={icon} size={34} /></div>
       <div className="text-sm font-semibold mb-1.5" style={{ color: "var(--text-strong)" }}>{title}</div>
       {desc && <div className="text-xs max-w-xs leading-relaxed" style={{ color: "var(--text-dim)" }}>{desc}</div>}
       {action && <div className="mt-5">{action}</div>}

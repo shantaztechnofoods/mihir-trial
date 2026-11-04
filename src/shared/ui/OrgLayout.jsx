@@ -1,6 +1,7 @@
 // src/shared/ui/OrgLayout.jsx — moved verbatim from the former single-file src/App.jsx
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
 import React, { useState } from "react";
+import { Glyph } from "../components/LeadIcon.jsx";
 
 // 2026-11-03 "organise, don't change": a collapsible group with a plain-English
 // heading and a one-line helper. Children stay mounted while closed (just
@@ -10,7 +11,7 @@ export function OrgGroup({ id, icon, title, hint, badge = null, defaultOpen = tr
   return (
     <section data-org-group={id} className="org-group" data-open={open ? "1" : "0"}>
       <button type="button" className="org-group-head" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
-        <span className="org-group-icon" aria-hidden="true">{icon}</span>
+        <span className="org-group-icon" aria-hidden="true"><Glyph e={icon} size={18} /></span>
         <span className="org-group-text">
           <span className="org-group-title">{title}</span>
           {hint && <span className="org-group-hint">{hint}</span>}

@@ -33,3 +33,6 @@ export const rptFmtDT = (v) => { if (v == null || v === "") return ""; if (rptDa
 // Settings → Company name (active company), then the legacy settings name,
 // then the registered name below. The certificate's company box reads the same.
 export const RPT_LEGAL_NAME = "SHANTA G TECHNOFOODS LLP";
+
+// One contact line for every letterhead: GSTIN · phone · e-mail · website.
+export const rptContactLine = (co = {}) => [co.gst ? `GSTIN ${co.gst}` : "", co.phone ? `Tel ${co.phone}` : "", co.email || "", co.website || ""].filter(Boolean).join("   ·   ");

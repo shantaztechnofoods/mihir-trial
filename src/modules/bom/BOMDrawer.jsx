@@ -1,7 +1,7 @@
 // src/modules/bom/BOMDrawer.jsx — moved verbatim from the former single-file src/App.jsx
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
 import React, { useState, useMemo } from "react";
-import { LeadIcon } from "../../shared/components/LeadIcon.jsx";
+import { LeadIcon, Glyph } from "../../shared/components/LeadIcon.jsx";
 import ItemSearchSelect from "../../shared/components/ItemSearchSelect.jsx";
 import { receivedPoRates, bomCostLines, bomCostSummary, validateBomLines, formatINR } from "../../utils/bomCost.js";
 import { rackCapacityFor, slotLabel } from "../../utils/rackSlots.js";
@@ -762,11 +762,11 @@ export function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpda
           {(() => {
             const cs = bomCostSummary(bomCostLines(sourceItems, findInv, receivedPoRates(pos), units));
             return (
-              <button onClick={() => setShowCostPanel((v) => !v)} title="Component rates and BOM cost"
+              <button data-bom-cost onClick={() => setShowCostPanel((v) => !v)} title="Component rates and BOM cost"
                       className="text-[11px] font-bold px-3 py-1.5 rounded-lg border transition-all"
                       style={showCostPanel ? { background: "rgba(21,128,61,0.10)", color: "#15803d", borderColor: "rgba(21,128,61,0.35)" }
                                            : { background: "var(--surface-card)", color: cs.complete ? "#15803d" : "#b91c1c", borderColor: "var(--border-rim)" }}>
-                💰 {formatINR(cs.knownTotal)}{cs.complete ? "" : ` · ${cs.missingRate + cs.missingItem} missing`}
+                <LeadIcon e="💰" />{formatINR(cs.knownTotal)}{cs.complete ? "" : ` · ${cs.missingRate + cs.missingItem} missing`}
               </button>
             );
           })()}
@@ -789,7 +789,7 @@ export function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpda
         {!editMode && (
           <div className="flex items-center gap-2 px-4 sm:px-6 pb-4 flex-wrap">
             <div className="relative flex-1 min-w-[180px]">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 text-xs">🔍</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 text-xs"><Glyph e="🔍" size={14} /></span>
               <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search items, codes..."
                      className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-7 pr-3 py-1.5 text-xs text-slate-700 placeholder-slate-400 outline-none focus:border-blue-500/30" />
             </div>
@@ -815,7 +815,7 @@ export function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpda
           /* ── Edit Mode — full width, unchanged ── */
           <div className="flex-1 overflow-y-auto"><div className="org-bom-edit p-4 sm:p-6 space-y-4 max-w-3xl">
             <div className="text-[10px] font-bold text-amber-700 bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-3">
-              ✏️ Edit Mode — Modify items, quantities, then Save BOM to apply changes permanently.
+              <LeadIcon e="✏️" />Edit Mode — Modify items, quantities, then Save BOM to apply changes permanently.
             </div>
 
             {/* 2026-11-03 — Edit BOM organised into numbered steps. Same
@@ -827,7 +827,7 @@ export function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpda
             {/* Rename — BOM Key + Machine Model Name */}
             <div className="rounded-xl p-4" style={{ background: "rgba(139,92,246,0.05)", border: "1px solid rgba(139,92,246,0.22)" }}>
               <div className="flex items-center gap-2 mb-3">
-                <span className="text-base">✏️</span>
+                <span className="text-base"><Glyph e="✏️" size={15} /></span>
                 <div className="text-[11px] font-bold text-slate-900">BOM Identity</div>
                 <span className="text-[9px] text-purple-300 px-1.5 py-0.5 rounded-full" style={{ background: "rgba(139,92,246,0.15)" }}>Rename safe</span>
               </div>
@@ -848,7 +848,7 @@ export function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpda
               <div className="text-[10px] text-slate-500 mt-2">
                 Renaming updates Machine Tracker, Outward log and Pending entries to match. Existing audit history is preserved.
               </div>
-              {renameErr && <div className="text-[10px] text-red-400 mt-2">⚠ {renameErr}</div>}
+              {renameErr && <div className="text-[10px] text-red-400 mt-2"><LeadIcon e="⚠" />{renameErr}</div>}
             </div>
 
             {/* Production rack — fixed floor racks only (2026-10-30). */}
@@ -988,7 +988,7 @@ export function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpda
                                       color:      pts.length ? "#b45309" : "#64748b",
                                       border:     `1px solid ${pts.length ? "rgba(217,119,6,0.3)" : "rgba(17,24,39,0.12)"}`,
                                     }}>
-                              ✅ {pts.length || "+"}
+                              <LeadIcon e="✅" />{pts.length || "+"}
                             </button>
                           );
                         })()}
@@ -1037,7 +1037,7 @@ export function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpda
                           style={{ background: "#2640B0", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>Add</button>
                 </div>
               </div>
-              {addErr && <div className="text-[10px] text-red-400 mt-2">⚠ {addErr}</div>}
+              {addErr && <div className="text-[10px] text-red-400 mt-2"><LeadIcon e="⚠" />{addErr}</div>}
             </div>
               </div>
             </OrgStep>
@@ -1050,7 +1050,7 @@ export function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpda
             <div data-org-durations>
               <div className="text-[11px] font-bold text-slate-500 mb-2">Department Durations <span className="font-medium">· days + hours</span></div>
               <DeptDurationFields value={editDurations} onChange={(v) => { setEditDurations(v); setEditDurErr(""); }} />
-              {editDurErr && <div className="text-[10px] text-red-500 font-bold mt-2">⚠ {editDurErr}</div>}
+              {editDurErr && <div className="text-[10px] text-red-500 font-bold mt-2"><LeadIcon e="⚠" />{editDurErr}</div>}
             </div>
             </OrgStep>
 
@@ -1138,10 +1138,10 @@ export function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpda
             </OrgStep>
 
             {editValidationErr && (
-              <div className="text-[11px] font-semibold rounded-xl px-4 py-2.5" style={{ background: "rgba(185,28,28,0.08)", color: "#b91c1c", border: "1px solid rgba(185,28,28,0.25)" }}>⚠ {editValidationErr}</div>
+              <div className="text-[11px] font-semibold rounded-xl px-4 py-2.5" style={{ background: "rgba(185,28,28,0.08)", color: "#b91c1c", border: "1px solid rgba(185,28,28,0.25)" }}><LeadIcon e="⚠" />{editValidationErr}</div>
             )}
             {(() => { const w = validateBomLines(editItems, findInv).warnings; return w.length ? (
-              <div className="text-[10px] rounded-xl px-4 py-2" style={{ background: "rgba(180,83,9,0.08)", color: "#b45309", border: "1px solid rgba(180,83,9,0.25)" }}>{w.map((x, i) => <div key={i}>⚠ {x}</div>)}</div>
+              <div className="text-[10px] rounded-xl px-4 py-2" style={{ background: "rgba(180,83,9,0.08)", color: "#b45309", border: "1px solid rgba(180,83,9,0.25)" }}>{w.map((x, i) => <div key={i}><LeadIcon e="⚠" />{x}</div>)}</div>
             ) : null; })()}
             <div className="org-edit-footer">
               <button onClick={() => { setEditMode(false); resetEditState(); }}
@@ -1246,11 +1246,11 @@ export function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpda
               <span className="text-slate-400">Issuing <span className="font-black text-green-400">{totalIssuing}</span> units</span>
               {totalPending > 0 && (
                 <><span className="text-slate-700">·</span>
-                <span className="font-bold text-amber-700">⚠ {totalPending} units pending</span></>
+                <span className="font-bold text-amber-700"><LeadIcon e="⚠" />{totalPending} units pending</span></>
               )}
               {hasOverIssue && (
                 <><span className="text-slate-700">·</span>
-                <span className="font-bold" style={{color:"#b45309"}}>⚠ {totalOverIssue} over-issued</span></>
+                <span className="font-bold" style={{color:"#b45309"}}><LeadIcon e="⚠" />{totalOverIssue} over-issued</span></>
               )}
               {missingN > 0 && (
                 <><span className="text-slate-700">·</span>
@@ -1273,7 +1273,7 @@ export function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpda
                       disabled={!canSubmit}
                       className="text-xs font-black px-6 py-2.5 rounded-xl border transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                       style={{ background: canSubmit ? "#2640B0" : "#9ca3af", color: "#ffffff", boxShadow: canSubmit ? "0 1px 2px rgba(17,24,39,0.14)" : "none", borderColor: "transparent" }}>
-                📤 Issue Stock
+                <LeadIcon e="📤" />Issue Stock
               </button>
             ) : (
               <div className="flex items-center gap-2">
@@ -1481,7 +1481,7 @@ export function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpda
               {criticalErr && (
                 <div className="text-[11px] font-bold px-3 py-2 rounded-md whitespace-pre-line"
                      style={{ background: "rgba(239,68,68,0.08)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.3)" }}>
-                  ⚠ {criticalErr}
+                  <LeadIcon e="⚠" />{criticalErr}
                 </div>
               )}
             </div>
@@ -1563,7 +1563,7 @@ export function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpda
             {destError && (
               <div className="mx-5 mt-4 px-3 py-2 rounded-lg text-[11px] font-semibold"
                    style={{ background: "rgba(239,68,68,0.08)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.3)" }}>
-                ⚠ {destError}
+                <LeadIcon e="⚠" />{destError}
               </div>
             )}
             <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1626,7 +1626,7 @@ export function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpda
                  style={{ background: "linear-gradient(90deg,rgba(46, 80, 214,0.14),rgba(38, 64, 176,0.06))" }}>
               <div>
                 <div className="text-sm font-black text-slate-900 flex items-center gap-2">
-                  ⏱️ Department Durations
+                  <LeadIcon e="⏱️" />Department Durations
                 </div>
                 <div className="text-[11px] text-slate-400 mt-0.5">
                   {bomKey}{serialNo ? ` · S/N ${serialNo}` : ""} · lock-in deadlines for this machine
@@ -1679,7 +1679,7 @@ export function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpda
               {durationErr && (
                 <div className="text-[11px] font-bold px-3 py-2 rounded-md"
                      style={{ background: "rgba(239,68,68,0.08)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.3)" }}>
-                  ⚠ {durationErr}
+                  <LeadIcon e="⚠" />{durationErr}
                 </div>
               )}
             </div>

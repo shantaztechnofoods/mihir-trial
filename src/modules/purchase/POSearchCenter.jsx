@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo } from "react";
 import { PURCHASE_TYPES, PURCHASE_TYPE_BY_KEY } from "../../utils/gst.js";
 import { getActiveCompany, normalizePOSettings, openPOPdf } from "../../utils/poTemplate.js";
+import DebouncedSearchInput from "../../shared/components/DebouncedSearchInput.jsx";
 
 // ─── PDF GENERATOR ────────────────────────────────────────────────────────────
 
@@ -89,7 +90,7 @@ export function POSearchCenter({
         <div className="grid grid-cols-1 md:grid-cols-6 gap-2.5">
           <div className="md:col-span-2">
             <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Search</div>
-            <input value={searchQ} onChange={(e) => { setSearchQ(e.target.value); setPage(0); }}
+            <DebouncedSearchInput value={searchQ} onChange={(v) => { setSearchQ(v); setPage(0); }}
                    placeholder="PO number, vendor, item code, item name…"
                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs placeholder-slate-400 outline-none focus:border-blue-500/40" />
           </div>

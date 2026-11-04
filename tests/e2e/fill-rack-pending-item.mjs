@@ -20,7 +20,8 @@ const controls = () => p.evaluate(() => ({
   addPending: !!document.querySelector("[data-add-pending-item]"),
   issue: [...document.querySelectorAll("button")].some((x) => /Issue Stock/.test(x.innerText)),
   note: !!document.querySelector("input[placeholder^='Issue reference']"),
-  cost: [...document.querySelectorAll("button")].some((x) => /^💰/.test(x.innerText.trim())),
+  // #110 drew the 💰 emoji as a line icon, so the button is found by its data hook
+  cost: !!document.querySelector("button[data-bom-cost]"),
 }));
 const fillSerial = async (sn) => { await p.locator("input[placeholder^='e.g. SHT']").fill(sn); await p.getByRole("button", { name: /Proceed to Issue/ }).click(); await p.waitForTimeout(900); };
 

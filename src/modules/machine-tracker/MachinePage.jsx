@@ -1,10 +1,11 @@
 // src/modules/machine-tracker/MachinePage.jsx — moved verbatim from the former single-file src/App.jsx
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { Boxes, AlertOctagon, Trash2, Bell } from "lucide-react";
-import { LeadIcon } from "../../shared/components/LeadIcon.jsx";
+import { Wrench, User, Boxes, AlertOctagon, Trash2, Bell } from "lucide-react";
+import { celebrate } from "../../utils/worldMotion.js";
+import { LeadIcon, LeadLabel, Glyph } from "../../shared/components/LeadIcon.jsx";
 import SafeBoundary from "../../shared/components/SafeBoundary.jsx";
-import { DEPARTMENT_SEQUENCE, readDeptWorkflowSettings, isClosedDay, nextDepartment, computeElapsedMinutes, computeOverrun, isHoldOverdue, heldMinutes, isRackReleaseHop, formatDuration, canAcceptHandover, canFinishTransfer, canConfigureDept, workerIdsOf } from "../../utils/handoverLogic.js";
+import { DEPARTMENT_SEQUENCE, readDeptWorkflowSettings, isClosedDay, nextDepartment, computeElapsedMinutes, computeOverrun, isHoldOverdue, heldMinutes, isRackReleaseHop, formatDuration, canAcceptHandover, canFinishTransfer, canStartAssembly, canConfigureDept, workerIdsOf } from "../../utils/handoverLogic.js";
 import { pendingItemIsPart, pendingItemIsDone, pendingItemIsOpen, pendingItemStage, pendingItemRemaining } from "../../stores/pendingItemsStore.js";
 import { formatRatingBadge, summarizeMachineRatings } from "../../utils/ratingLogic.js";
 import { startChecklistResponse, toggleAnswer, setAnswerRemark, validateChecklistAnswers, checklistProblemText, pickTemplate, setAllAnswers } from "../../utils/checklistLogic.js";
@@ -398,6 +399,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
         return;
       }
       setTrialCertModal(null);
+      celebrate("Sent");   // world UI: success moment (visual only)
       showToast(
         `${machine.bomKey} → Ready`,
         "Trial Certificate saved. Awaiting Ready acceptance."
@@ -466,6 +468,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
         return;
       }
       setFinishModal(null);
+      celebrate("Sent");   // world UI: success moment (visual only)
       const backToRack = !!machine.rackSlot && fromDepartment === "Assembly" && isRackReleaseHop(fromDepartment, toDepartment);
       showToast(backToRack ? `${machine.bomKey}${machine.serialNo ? ` — ${machine.serialNo}` : ""} · Assembled · Ready` : `${machine.bomKey} → ${toDepartment}`,
         backToRack ? `Back on ${slotLabel(machine.rackSlot)} — an admin sends it to ${toDepartment} from the Rack View` : (overrunMinutes > 0 ? `Awaiting accept · Overrun ${formatDuration(overrunMinutes)}` : "Awaiting accept"));
@@ -570,6 +573,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
       return;
     }
     setAcceptModal(null);
+    celebrate(handover.toDepartment === "Ready" ? "Ready" : "Accepted");   // world UI: success moment (visual only)
     showToast(`Accepted into ${handover.toDepartment}`,
       `${handover.bomKey}${handover.serialNo ? ` · S/N ${handover.serialNo}` : ""}${pendingItemsToRaise.length ? ` · ${pendingItemsToRaise.length} pending item${pendingItemsToRaise.length === 1 ? "" : "s"} raised` : ""}`);
   };
@@ -611,6 +615,11 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
   // and calls the SAME handler as the admin tracker — nothing is duplicated.
   const staffMode  = !isAdminUser;
   const isProdHead = staffMode && (currentUser?.role === "Production Head" || (canDo("machines", "release") && !isFloorLogin));
+  // 2026-11-04 (owner) — the Assembly head presses "Assemble" himself, so an
+  // Assembly floor login also gets the Production Rack View (Fill / Send /
+  // Remove stay behind their own permissions there).
+  const canStartAsm = canStartAssembly(canDo, myDepartments);
+  const isAssemblyFloor = staffMode && !isProdHead && canStartAsm;
   // 2026-11-03 — staff "My Dashboard" panel (read-only; see StaffMyDashboard).
   const [myDashOpen, setMyDashOpen] = useState(false);
   const canReleaseFromRack = canDo("machines", "release") || isAdminUser;
@@ -919,7 +928,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                                 <button data-needs-net type="button" onClick={() => setJobAction({ item: p, action: "receive", notes: "", busy: false, error: "" })}
                                         className="text-[10.5px] font-bold px-2.5 py-1 rounded-lg border transition-all"
                                         style={{ background: "rgba(37,99,235,0.08)", border: "1px solid rgba(37,99,235,0.35)", color: "#1d4ed8" }}>
-                                  📦 Part received
+                                  <LeadLabel text="📦 Part received" />
                                 </button>
                               )}
                               {canAct && onResolvePendingItem && p.status === "open" && !pendingItemIsPart(p) && (
@@ -954,7 +963,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
     const block = (key, title, icon, tone, arr, empty) => (
       <section data-jobs-section={key} className="space-y-2">
         <div className="flex items-center gap-2">
-          <span className="text-[12.5px] font-black" style={{ color: tone }}>{icon} {title}</span>
+          <span className="text-[12.5px] font-black" style={{ color: tone }}><LeadLabel text={`${icon} ${title}`} /></span>
           <span data-jobs-count={key} className="text-[10.5px] font-black px-2 py-0.5 rounded-full" style={{ background: `${tone}1a`, color: tone }}>{arr.length}</span>
         </div>
         {arr.length === 0
@@ -1278,9 +1287,10 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
 
       {/* Arrival alert banner (staff only) — tap to go to that machine's card. */}
       {staffMode && arrival && (
-        <div className="arrival-banner" role="alert" data-arrival-banner>
+        <div className="arrival-banner" role="alert" data-arrival-banner
+             data-arrival-tone={arrival.deadline ? (String(arrival.text).startsWith("⏰") ? "bad" : "wait") : "ok"}>
           <button type="button" className="arrival-banner-main" onClick={openArrival} data-arrival-open>
-            {arrival.text}
+            <LeadLabel text={arrival.text} />
           </button>
           <button type="button" className="arrival-banner-close" aria-label="Close" onClick={() => setArrival(null)}>✕</button>
         </div>
@@ -1295,7 +1305,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
         <div className="fixed bottom-6 right-6 z-[60] flex items-center gap-3 px-5 py-3.5 rounded-2xl"
              style={{ background: `var(--surface-raised)`, border: `2px solid ${borderColor}`, boxShadow: `0 20px 60px rgba(17,24,39,0.14)`, animation: "slideUp 0.3s ease both" }}>
           <div className="w-8 h-8 rounded-full flex items-center justify-center text-base flex-shrink-0" style={{ background: bg }}>
-            {icon}
+            <Glyph e={icon} size={16} />
           </div>
           <div>
             <div className="text-xs font-bold text-slate-900">{toast.text}</div>
@@ -1315,7 +1325,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                   className="h-9 px-3 rounded-lg text-[12px] font-black flex items-center gap-1.5"
                   style={{ background: "rgba(46, 80, 214,0.10)", color: "#2640B0", border: "1px solid rgba(46, 80, 214,0.35)" }}
                   title="Customer, company, on hold and pending jobs reports">
-            📄 Reports
+            <LeadIcon e="📄" />Reports
           </button>
         )}
         {/* Departments Called, behind a bell. Same count and same scope as the
@@ -1343,11 +1353,11 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
             deadlines, HOLD rules, checklist templates, signature + password
             policy. Hidden from non-admin operators. */}
         {canConfigureDept(canDo) && (
-          <button onClick={() => onNavigate("machines_settings")}
+          <button data-mt-settings onClick={() => onNavigate("machines_settings")}
                   title="Open Machine Tracker settings (deadlines, HOLD rules, checklists, employees)"
                   className="h-9 px-3 rounded-lg text-[12px] font-black inline-flex items-center gap-1.5 transition-all"
                   style={{ background: "rgba(46, 80, 214,0.1)", border: "1px solid rgba(46, 80, 214,0.35)", color: "#2640B0" }}>
-            ⚙️ Settings
+            <LeadLabel text="⚙️ Settings" />
           </button>
         )}
       </Topbar>
@@ -1357,7 +1367,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
         {/* Search: type a machine name or serial number, the list shows it. */}
         {!staffMode && (
           <div className="relative" data-mt-search>
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[18px] pointer-events-none">🔍</span>
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[18px] pointer-events-none"><Glyph e="🔍" size={18} /></span>
             <input type="search" value={searchQ} data-mt-search-input
                    onChange={(e) => {
                      const v = e.target.value; setSearchQ(v); if (v.trim()) setMtTab("production");
@@ -1385,7 +1395,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
             <div className="mt-today flex items-center gap-2 flex-wrap" data-mt-today>
               <span className="text-[16px] font-black mr-1" style={{ color: "var(--text-strong)" }}>Today:</span>
               {parts.length === 0 && (
-                <span className="text-[16px] font-black" style={{ color: "#15803d" }} data-mt-today-ok>✅ All machines on time</span>
+                <span className="text-[16px] font-black" style={{ color: "#15803d" }} data-mt-today-ok><LeadIcon e="✅" />All machines on time</span>
               )}
               {isClosedDay(nowTick) && (
                 <span data-mt-closed-day className="min-h-[36px] px-3 rounded-full text-[13px] font-bold inline-flex items-center gap-1.5"
@@ -1403,7 +1413,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                           }}
                           className="min-h-[44px] px-4 rounded-full text-[15px] font-bold inline-flex items-center gap-1.5 transition-all active:scale-[0.97]"
                           style={{ background: x.bg, color: x.color, border: `${isOn ? 2 : 1}px solid ${isOn ? x.color : x.bd}` }}>
-                    <span aria-hidden="true">{x.icon}</span>
+                    <Glyph e={x.icon} />
                     <span className="tabular-nums">{x.n}</span> {x.word}
                   </button>
                 );
@@ -1439,7 +1449,8 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
             signatures and checklists are untouched. No machine history,
             ratings or reports: those stay admin-only. */}
         {staffMode && (() => {
-          const btn = "min-h-[48px] w-full sm:w-auto px-5 rounded-xl text-[15px] font-black transition-all active:scale-[0.98]";
+          // World UI (2026-11-04): one button anatomy, tone by meaning (classes in world-ui.css).
+          const btn = "min-h-[48px] w-full sm:w-auto text-[15px] wu-btn";
           const canAccept  = canAcceptHandover(canDo) && !!onAcceptHandover;
           const canFinish  = canFinishTransfer(canDo) && !!onFinishTransfer;
           const canJobs    = canFinishTransfer(canDo);
@@ -1456,19 +1467,39 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
           const myJobs     = (pendingHandoverItems || []).filter((p) => pendingItemIsOpen(p) && myDepartments.includes(p.assignedDepartment));
           const awaitingRelease = startedAll.filter((m) => { const h = machineHandover(m); return !!(h && isAwaitingRelease(h)); });
           const Section = ({ title, count, hint, children }) => (
-            <div className="section-card no-lift p-4 sm:p-5" data-staff-section={title}>
-              <div className="flex items-baseline gap-2 flex-wrap mb-3">
-                <h2 className="text-[16px] font-black" style={{ color: "var(--text-strong)" }}>{title}</h2>
-                <span className="text-[14px] font-black tabular-nums" style={{ color: count ? "#2640B0" : "var(--text-dim)" }}>({count})</span>
-                {hint && <span className="text-[12px]" style={{ color: "var(--text-dim)" }}>{hint}</span>}
+            <div className="wu-section" data-staff-section={title}>
+              <div className="wu-section-head">
+                <h2 className="wu-section-title">{title}</h2>
+                <span className={`wu-count${count ? " is-on" : ""}`} aria-label={`${count} machines`}>{count}</span>
+                {hint && <span className="wu-section-hint">{hint}</span>}
               </div>
               {children}
             </div>
           );
-          const Empty = ({ text }) => <div className="text-[14px] py-3" style={{ color: "var(--text-dim)" }}>{text}</div>;
-          const Card  = ({ children, tone }) => (
-            <div className="mt-card no-lift p-4 flex flex-col gap-3" style={tone ? { borderColor: tone } : undefined}>{children}</div>
+          // Empty state: a small line drawing + one line saying what happens next.
+          const Empty = ({ text }) => (
+            <div className="wu-empty">
+              <svg viewBox="0 0 64 48" width="56" height="42" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round">
+                <path d="M8 18l24-10 24 10-24 10z" /><path d="M8 18v16l24 10 24-10V18" /><path d="M32 28v16" />
+              </svg>
+              <span>{text}</span>
+            </div>
           );
+          const Card  = ({ children, tone }) => (
+            <div className="mt-card no-lift wu-card" data-tone={tone || undefined}>{children}</div>
+          );
+          // Where the machine is on the line (display only — read from its stage).
+          const LINE = ["Assembly", "Mechanical", "Electrical", "Trial", "Ready"];
+          const stageLine = (stage) => {
+            const at = LINE.indexOf(stage);
+            if (at < 0) return null;
+            return (
+              <div className="wu-line" data-wu-stages aria-label={`Stage: ${stage}`}>
+                {LINE.map((d, i) => <span key={d} className={i < at ? "is-done" : i === at ? "is-now" : ""} title={d} />)}
+                <em>Step {at + 1} of {LINE.length}</em>
+              </div>
+            );
+          };
           // 2026-11-03 — "▶ 🎤 2": the machine has voice notes; tap plays the latest.
           const voiceBadge = (m) => {
             const vs = m ? voiceNotesFor(attachments, m.id) : [];
@@ -1481,37 +1512,46 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
           // Release button for the same permission.
           const canHoldM = !!onSetMachineHold && (isAdminUser || canFinishTransfer(canDo) || canDo("machines", "updateStage"));
           const holdBadge = (m) => (m && m.holdActive) ? (
-            <div data-staff-hold-badge={m.id} className="text-[13px] font-black mt-1.5 px-2.5 py-1.5 rounded-lg break-words"
-                 style={{ background: "rgba(239,68,68,0.12)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.45)" }}>
-              🛑 ON HOLD{m.holdReason ? ` · ${m.holdReason}` : ""}
+            <div data-staff-hold-badge={m.id} className="wu-hold-badge">
+              <LeadIcon e="⏸" />ON HOLD{m.holdReason ? ` · ${m.holdReason}` : ""}
             </div>
           ) : null;
           const holdBtn = (m) => (canHoldM && m) ? (
-            <button data-needs-net type="button" className={btn}
+            <button data-needs-net type="button" className={`${btn} ${m.holdActive ? "wu-soft-ok" : "wu-soft"}`}
                     {...(m.holdActive ? { "data-staff-release-hold": m.id } : { "data-staff-hold": m.id })}
-                    onClick={() => setHoldModal({ machine: m, release: !!m.holdActive, reason: "", busy: false, error: "" })}
-                    style={m.holdActive ? { background: "rgba(21,128,61,0.10)", border: "1px solid rgba(21,128,61,0.4)", color: "#15803d" }
-                                        : { background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.35)", color: "#b91c1c" }}>
-              {m.holdActive ? "▶ Release ON HOLD" : "⏸ ON HOLD"}
+                    onClick={() => setHoldModal({ machine: m, release: !!m.holdActive, reason: "", busy: false, error: "" })}>
+              <LeadLabel text={m.holdActive ? "▶ Release ON HOLD" : "⏸ ON HOLD"} />
             </button>
           ) : null;
           const heldNote = (m, what) => (
-            <div data-staff-held={m.id} className="min-h-[48px] flex items-center text-[14px] font-bold" style={{ color: "#dc2626" }}>
-              🛑 On hold — release the hold to {what}
+            <div data-staff-held={m.id} className="wu-held">
+              <LeadIcon e="⏸" />On hold — release the hold to {what}
             </div>
           );
           // Migration 061 — the BOM's machine photo (64px) at the left of the
           // card's title block, so workers recognise the machine at a glance.
+          // World UI: picture first on every card; a machine without a BOM photo
+          // gets a quiet machine tile so all cards line up the same way.
           const withPhoto  = (m, h, body) => {
             const url = (bomDefs || {})[(m && m.bomKey) || (h && h.bomKey)]?.photoUrl;
-            if (!url) return body;
             return (
-              <div className="flex items-start gap-3">
-                <BomPhotoThumb url={url} size={64} />
+              <div className="wu-card-top">
+                <BomPhotoThumb url={url} size={64} className="wu-photo"
+                               fallback={<span className="wu-photo wu-photo-ph" aria-hidden="true"><Wrench size={24} strokeWidth={1.7} /></span>} />
                 <div className="min-w-0 flex-1">{body}</div>
               </div>
             );
           };
+          // Route: Rack → Accept → Work → Send, with counts. Tap a step to jump to it.
+          const route = [
+            { key: "rack",   label: "Rack",   n: rackForMe.length,  sec: "On the rack for you" },
+            { key: "accept", label: "Accept", n: toAccept.length,   sec: "To accept" },
+            { key: "work",   label: "Work",   n: myWorking.length,  sec: "In your department" },
+            { key: "send",   label: "Send",   n: sentOn.length,     sec: "Sent on" },
+          ];
+          const canActOn = { rack: canTakeFromRack && canAccept, accept: canAccept, work: true };
+          const nowStep = (route.find((r) => r.key !== "send" && r.n > 0 && canActOn[r.key]) || route.find((r) => r.n > 0) || route[3]).key;
+          const goStep = (sec) => { try { document.querySelector(`[data-staff-section='${sec}']`)?.scrollIntoView({ behavior: "smooth", block: "start" }); } catch { /* ignore */ } };
           // No department: say so and show nothing else. A Store Manager still
           // keeps the BOM section above when the role may issue a BOM.
           if (!isProdHead && !hasDepartments) {
@@ -1526,33 +1566,47 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
             );
           }
           return (
-            <div className="space-y-4" data-staff-dashboard>
-              {/* My Dashboard — opens the read-only scorecard for my departments */}
-              {!isProdHead && hasDepartments && (
-                <button type="button" data-my-dashboard-open onClick={() => setMyDashOpen(true)}
-                        className="w-full min-h-[64px] px-5 rounded-2xl text-[20px] font-black text-white flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
-                        style={{ background: "#2640B0", boxShadow: "0 8px 24px rgba(38,64,176,0.25)" }}>
-                  📊 My Dashboard
-                </button>
-              )}
-              {/* Header */}
-              <div className="flex items-baseline gap-2 flex-wrap px-1">
-                <span className="text-[12px] font-bold uppercase tracking-[0.08em]" style={{ color: "var(--text-dim)" }}>
-                  {isProdHead ? "Production Head" : `Your department${myDepartments.length === 1 ? "" : "s"}:`}
-                </span>
-                <span className="text-[18px] font-black" style={{ color: "var(--text-strong)" }}>
-                  {isProdHead ? "Rack release" : myDepartments.join(", ")}
-                </span>
-                {currentUser?.fullName && <span className="text-[12px] ml-auto" style={{ color: "var(--text-dim)" }}>{currentUser.fullName}</span>}
-                {!isProdHead && (
-                  <button type="button" data-arrival-toggle aria-pressed={arrivalOn} onClick={toggleArrival}
-                          aria-label={arrivalOn ? "Arrival alert on — tap to turn off" : "Arrival alert off — tap to turn on"}
-                          title={arrivalOn ? "Alert sound ON" : "Alert sound OFF"}
-                          className={`${currentUser?.fullName ? "" : "ml-auto "}min-w-[44px] h-[44px] px-3 rounded-xl text-[15px] font-black inline-flex items-center justify-center gap-1 transition-all active:scale-[0.97]`}
-                          style={arrivalOn
-                            ? { background: "rgba(21,128,61,0.10)", color: "#15803d", border: "1px solid rgba(21,128,61,0.35)" }
-                            : { background: "var(--surface-card)", color: "var(--text-dim)", border: "1px solid var(--border-subtle)" }}>
-                    {arrivalOn ? "🔔 On" : "🔕 Off"}
+            <div className="wu-staff" data-staff-dashboard>
+              {/* World UI header: who I am, the route with counts, My Dashboard. */}
+              <div className="wu-staff-hero" data-staff-hero>
+                <div className="wu-hero-row">
+                  <div className="min-w-0 flex-1">
+                    <span className="wu-hero-k">
+                      {isProdHead ? "Production Head" : `Your department${myDepartments.length === 1 ? "" : "s"}:`}
+                    </span>
+                    <span className="wu-hero-dept">
+                      {isProdHead ? "Rack release" : myDepartments.join(", ")}
+                    </span>
+                    {currentUser?.fullName && <span className="wu-hero-name">{currentUser.fullName}</span>}
+                  </div>
+                  {!isProdHead && (
+                    <button type="button" data-arrival-toggle aria-pressed={arrivalOn} onClick={toggleArrival}
+                            aria-label={arrivalOn ? "Arrival alert on — tap to turn off" : "Arrival alert off — tap to turn on"}
+                            title={arrivalOn ? "Alert sound ON" : "Alert sound OFF"}
+                            className={`wu-alert${arrivalOn ? " is-on" : ""}`}>
+                      <LeadLabel text={arrivalOn ? "🔔 On" : "🔕 Off"} />
+                    </button>
+                  )}
+                </div>
+                {!isProdHead && hasDepartments && (
+                  <nav className="wu-route" aria-label="Your work, step by step" data-staff-route>
+                    {route.map((r, i) => (
+                      <React.Fragment key={r.key}>
+                        {i > 0 && <span className="wu-route-sep" aria-hidden="true" />}
+                        <button type="button" data-staff-route-step={r.key} onClick={() => goStep(r.sec)}
+                                className={`wu-step${r.key === nowStep ? " is-now" : ""}${r.n ? " has" : ""}`}
+                                aria-current={r.key === nowStep ? "step" : undefined}>
+                          <span className="wu-step-n tabular-nums">{r.n}</span>
+                          <span className="wu-step-l">{r.label}</span>
+                        </button>
+                      </React.Fragment>
+                    ))}
+                  </nav>
+                )}
+                {/* My Dashboard — opens the read-only scorecard for my departments */}
+                {!isProdHead && hasDepartments && (
+                  <button type="button" data-my-dashboard-open onClick={() => setMyDashOpen(true)} className="wu-mydash">
+                    <LeadIcon e="📊" />My Dashboard
                   </button>
                 )}
               </div>
@@ -1567,8 +1621,8 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                       return (
                         <Card key={m.id}>
                           {withPhoto(m, h, <div>
-                            <div className="text-[17px] font-black" style={{ color: "var(--text-strong)" }}>{titleOf(m, h)}</div>
-                            <div className="text-[13px] mt-0.5" style={{ color: "var(--text-dim)" }}>
+                            <div className="wu-title">{titleOf(m, h)}</div>
+                            <div className="wu-meta">
                               {m.bomLabel || ""}{m.rackSlot ? ` · ${slotLabel(m.rackSlot)}` : " · on the rack"} · to {h.toDepartment}
                             </div>
                           </div>)}
@@ -1576,7 +1630,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                               (details panel / crate face — same handler, same
                               gate). This opens that machine's rack panel. */}
                           {canReleaseFromRack && onReleaseHandover && (
-                            <button type="button" data-staff-release={h.id} className={btn} style={{ background: "#4338ca", color: "#fff" }}
+                            <button type="button" data-staff-release={h.id} className={`${btn} wu-rack`}
                                     onClick={() => {
                                       if (m.rackSlot) { setRackPanel(m.rackSlot); return; }
                                       try { document.querySelector(".rack-shelf")?.scrollIntoView({ behavior: "smooth", block: "start" }); } catch {}
@@ -1598,16 +1652,16 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                     {rackForMe.map((h) => {
                       const m = machineOf(h);
                       return (
-                        <Card key={h.id} tone="rgba(67,56,202,0.45)">
+                        <Card key={h.id} tone="rack">
                           {withPhoto(m, h, <div>
-                            <div className="text-[17px] font-black" style={{ color: "var(--text-strong)" }}>{titleOf(m, h)}</div>
-                            <div className="text-[13px] mt-0.5" style={{ color: "var(--text-dim)" }}>
-                              {m?.bomLabel ? `${m.bomLabel} · ` : ""}{m?.rackSlot ? slotLabel(m.rackSlot) : "on the rack"} → {h.toDepartment}
+                            <div className="wu-title">{titleOf(m, h)}</div>
+                            <div className="wu-meta">
+                              {m?.bomLabel ? `${m.bomLabel} · ` : ""}<span className="whitespace-nowrap">{m?.rackSlot ? `Rack ${slotLabel(m.rackSlot)}` : "on the rack"}</span>
                             </div>
                             {holdBadge(m)}
                           </div>)}
                           {m && m.holdActive ? heldNote(m, "take it") : canTakeFromRack && canAccept ? (
-                            <button data-needs-net type="button" data-staff-take={h.id} className={btn} style={{ background: "#4338ca", color: "#fff" }}
+                            <button data-needs-net type="button" data-staff-take={h.id} className={`${btn} wu-rack`}
                                     disabled={!!acceptModal || rackTakeBusy === h.id}
                                     onClick={async () => {
                                       if (acceptModal || rackTakeBusy) return;
@@ -1617,10 +1671,10 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                                       if (!r || r.success === false) { showToast("Could not take", r?.error || "", "urgent"); return; }
                                       openAcceptModal({ ...h, ...(r.handover || {}), releasedAt: (r.handover && r.handover.releasedAt) || new Date().toISOString() });
                                     }}>
-                              {rackTakeBusy === h.id ? "⏳ Please wait…" : "📥 Take from Rack"}
+                              <LeadLabel text={rackTakeBusy === h.id ? "⏳ Please wait…" : "📥 Take from Rack"} />
                             </button>
                           ) : (
-                            <div className="text-[13px] font-bold" style={{ color: "#4338ca" }}>Waiting for your head to take it</div>
+                            <div className="wu-note wu-note-rack">Waiting for your head to take it</div>
                           )}
                           {m && m.holdActive && holdBtn(m)}
                         </Card>
@@ -1640,20 +1694,21 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                       const late = isHoldOverdue(h.sentAt, h.acceptTimeoutMinutes, nowTick);
                       const waited = h.sentAt ? formatDuration(Math.max(0, Math.floor((nowTick - Date.parse(h.sentAt)) / 60000))) : "";
                       return (
-                        <Card key={h.id} tone={late ? "rgba(239,68,68,0.5)" : "rgba(217,119,6,0.45)"}>
+                        <Card key={h.id} tone={late ? "bad" : "wait"}>
                           {withPhoto(m, h, <div>
-                            <div className="text-[17px] font-black" style={{ color: "var(--text-strong)" }}>{titleOf(m, h)}</div>
-                            <div className="text-[13px] mt-0.5" style={{ color: "var(--text-dim)" }}>
-                              {m?.bomLabel ? `${m.bomLabel} · ` : ""}from {h.fromDepartment} → {h.toDepartment}{waited ? ` · waiting ${waited}` : ""}
+                            <div className="wu-title">{titleOf(m, h)}</div>
+                            <div className="wu-meta">
+                              {m?.bomLabel ? `${m.bomLabel} · ` : ""}from {h.fromDepartment}{waited ? ` · waiting ${waited}` : ""}
                             </div>
-                            {late && <div className="text-[13px] font-black mt-1" style={{ color: "#dc2626" }}><LeadIcon e="🚦" />ON HOLD — accept deadline passed</div>}
+                            {stageLine(h.toDepartment)}
+                            {late && <div className="wu-note wu-note-bad"><LeadIcon e="🚦" />ON HOLD — accept deadline passed</div>}
                             {holdBadge(m)}
                             {voiceBadge(m) && <div className="mt-2">{voiceBadge(m)}</div>}
                           </div>)}
                           {canAccept && m && m.holdActive && heldNote(m, "accept it")}
                           {m && m.holdActive && holdBtn(m)}
                           {canAccept && !(m && m.holdActive) && (
-                            <button data-needs-net type="button" data-staff-accept={h.id} className={btn} style={{ background: "#15803d", color: "#fff" }}
+                            <button data-needs-net type="button" data-staff-accept={h.id} className={`${btn} wu-ok wu-main`}
                                     disabled={!!acceptModal} onClick={() => { if (!acceptModal) openAcceptModal(h); }}>
                               ✓ Accept into {h.toDepartment}
                             </button>
@@ -1679,53 +1734,48 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                       return (
                         <Card key={m.id}>
                           {withPhoto(m, null, <div>
-                            <div className="text-[17px] font-black" style={{ color: "var(--text-strong)" }}>{titleOf(m)}</div>
-                            <div className="text-[13px] mt-0.5" style={{ color: "var(--text-dim)" }}>{m.bomLabel || ""}{m.bomLabel ? " · " : ""}in {dept}</div>
+                            <div className="wu-title">{titleOf(m)}</div>
+                            <div className="wu-meta">{m.bomLabel || ""}{m.bomLabel ? " · " : ""}in {dept}</div>
+                            {stageLine(dept)}
                             <div className="flex items-center gap-2 flex-wrap mt-2">
                               {t && (
-                                <span className="text-[13px] font-bold px-2.5 py-1 rounded-full" data-staff-timer={m.id} data-timer-level={level}
-                                      title={`⏱ ${formatDuration(t.actualMinutes)}${target ? ` / ${formatDuration(target)}` : ""}`}
-                                      style={t.isOverrun ? { background: "rgba(239,68,68,0.1)", color: "#b91c1c", border: "1px solid rgba(239,68,68,0.35)" }
-                                           : level === 80 ? { background: "rgba(217,119,6,0.12)", color: "#b45309", border: "1px solid rgba(217,119,6,0.45)" }
-                                           : { background: "rgba(21,128,61,0.08)", color: "#15803d", border: "1px solid rgba(21,128,61,0.3)" }}>
-                                  {t.isOverrun ? `⏰ Late by ${formatDuration(t.overrunMinutes)}`
+                                <span className={`wu-timer ${t.isOverrun ? "is-bad" : level === 80 ? "is-wait" : "is-ok"}`} data-staff-timer={m.id} data-timer-level={level}
+                                      title={`⏱ ${formatDuration(t.actualMinutes)}${target ? ` / ${formatDuration(target)}` : ""}`}>
+                                  <LeadLabel text={t.isOverrun ? `⏰ Late by ${formatDuration(t.overrunMinutes)}`
                                     : level === 80 ? `⏳ ${formatDuration(leftMinutes)} left`
-                                    : `⏱ ${formatDuration(t.actualMinutes)}${target ? ` / ${formatDuration(target)}` : ""}`}
+                                    : `⏱ ${formatDuration(t.actualMinutes)}${target ? ` / ${formatDuration(target)}` : ""}`} />
                                 </span>
                               )}
                               {jobs.length > 0 && (
-                                <button type="button" data-staff-jobs={m.id} onClick={() => setJobsDrawer(m.id)}
-                                        className="min-h-[44px] text-[14px] font-black px-3 rounded-xl"
-                                        style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.35)", color: "#b91c1c" }}>
-                                  ⚠ {jobs.length} open job{jobs.length === 1 ? "" : "s"}
+                                <button type="button" data-staff-jobs={m.id} onClick={() => setJobsDrawer(m.id)} className="wu-chip wu-chip-bad">
+                                  <LeadIcon e="⚠" />{jobs.length} open job{jobs.length === 1 ? "" : "s"}
                                 </button>
                               )}
                               {voiceBadge(m)}
                             </div>
                             {holdBadge(m)}
                           </div>)}
-                          <div className="flex flex-col sm:flex-row gap-2 sm:flex-wrap">
+                          <div className="wu-actions">
                             {during && (
-                              <button type="button" data-staff-during={m.id} className={btn} style={{ background: "#2640B0", color: "#fff" }} onClick={() => openDuringWorkModal(m)}>
-                                📋 During-Work Checks
+                              <button type="button" data-staff-during={m.id} className={`${btn} wu-soft`} onClick={() => openDuringWorkModal(m)}>
+                                <LeadIcon e="📋" />During-Work Checks
                               </button>
                             )}
                             {canReport && (
-                              <button type="button" data-staff-issue={m.id} className={btn}
-                                      style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.4)", color: "#dc2626" }}
+                              <button type="button" data-staff-issue={m.id} className={`${btn} wu-soft-bad`}
                                       onClick={() => { setRaiseModal({ machine: m }); setRaiseText(""); setRaiseDept(""); setRaiseErr(""); setRaisePart(emptyPendingJob()); }}>
                                 Report Issue
                               </button>
                             )}
                             {m.trialCertificate && canFinish && onUpdateTrialCertificate && (
-                              <button type="button" className={btn} style={{ background: "rgba(217,119,6,0.10)", border: "1px solid rgba(217,119,6,0.4)", color: "#b45309" }}
+                              <button type="button" className={`${btn} wu-soft`}
                                       onClick={() => setTrialCertModal({ machine: m, editOnly: true })}>
-                                ✎ Certificate
+                                <LeadIcon e="✎" />Certificate
                               </button>
                             )}
                             {next && canFinish && m.holdActive && heldNote(m, "finish it")}
                             {next && canFinish && !m.holdActive && (
-                              <button data-needs-net type="button" data-staff-finish={m.id} className={btn} style={{ background: "#15803d", color: "#fff" }} onClick={() => openFinishModal(m)}>
+                              <button data-needs-net type="button" data-staff-finish={m.id} className={`${btn} wu-ok wu-main`} onClick={() => openFinishModal(m)}>
                                 ✓ Finish → {next}
                               </button>
                             )}
@@ -1746,8 +1796,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                       // 2026-11-03 — Sender Undo: the button shows itself only for the
                       // sender, within 5 min, while not yet accepted (senderUndoState).
                       return (
-                      <div key={m.id} data-sent-on={m.id} className="text-[14px] px-3 py-2 rounded-xl flex flex-col sm:flex-row sm:items-center gap-2"
-                           style={{ background: "rgba(17,24,39,0.03)", color: "var(--text-strong)" }}>
+                      <div key={m.id} data-sent-on={m.id} className="wu-sent">
                         <div className="flex-1 min-w-0">
                           <span className="font-black">{titleOf(m, h)}</span> <span style={{ color: "var(--text-dim)" }}>→ {h.toDepartment} · awaiting accept</span>
                         </div>
@@ -1769,10 +1818,10 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                       const m = (machineLog || []).find((x) => String(x.id) === String(p.machineId)) || null;
                       const stage = pendingItemStage(p);
                       return (
-                        <div key={p.id} className="mt-card no-lift p-3.5 flex flex-col gap-2.5" data-staff-job={p.id}>
+                        <div key={p.id} className="mt-card no-lift wu-card wu-job" data-staff-job={p.id}>
                           <div>
-                            <div className="text-[14px] font-black" style={{ color: "var(--text-strong)" }}>{p.description}</div>
-                            <div className="text-[13px] mt-0.5" style={{ color: "var(--text-dim)" }}>
+                            <div className="wu-title wu-title-sm">{p.description}</div>
+                            <div className="wu-meta">
                               {m ? `${m.bomKey}${m.serialNo ? ` · S/N ${m.serialNo}` : ""}` : "Machine"}
                               {(p.itemCode || p.itemName) ? ` · part ${p.itemCode || p.itemName}${p.qty != null ? ` × ${p.qty}` : ""}` : ""}
                               {p.critical ? " · CRITICAL" : ""}
@@ -1781,15 +1830,15 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                             </div>
                           </div>
                           {canJobs && (
-                            <div className="flex flex-col sm:flex-row gap-2">
+                            <div className="wu-actions">
                               {onReceivePendingItem && pendingItemIsPart(p) && canReceiveJob(p) && !p.receivedAt && (
-                                <button data-needs-net type="button" className={btn} style={{ background: "rgba(37,99,235,0.08)", border: "1px solid rgba(37,99,235,0.4)", color: "#1d4ed8" }}
+                                <button data-needs-net type="button" className={`${btn} wu-soft`}
                                         onClick={() => setJobAction({ item: p, action: "receive", notes: "", busy: false, error: "" })}>
-                                  📦 Part received
+                                  <LeadLabel text="📦 Part received" />
                                 </button>
                               )}
                               {onResolvePendingItem && !pendingItemIsPart(p) && (
-                                <button data-needs-net type="button" className={btn} style={{ background: "#15803d", color: "#fff" }}
+                                <button data-needs-net type="button" className={`${btn} wu-ok`}
                                         onClick={() => setJobAction({ item: p, action: "complete", notes: "", busy: false, error: "" })}>
                                   ✓ Work completed
                                 </button>
@@ -1863,7 +1912,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
               {overdueHandovers.length > 0 && (
                 <span className="text-[11px] font-black px-3 py-1 rounded-full"
                       style={{ background: "rgba(239,68,68,0.2)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.5)" }}>
-                  🚦 {overdueHandovers.length} ON HOLD
+                  <LeadIcon e="🚦" />{overdueHandovers.length} ON HOLD
                 </span>
               )}
             </div>
@@ -2310,8 +2359,9 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
         {/* ── Production Rack View ──
             Machines waiting on the rack to be started. Starting a build is the
             first working department's job, so a floor login elsewhere in the
-            line has no use for this and it is hidden from them. */}
-        {(staffMode ? isProdHead : mtTab === "production") && (
+            line has no use for this and it is hidden from them. Staff see it
+            as Production Head or as the Assembly floor login (2026-11-04). */}
+        {(staffMode ? (isProdHead || isAssemblyFloor) : mtTab === "production") && (
         <div>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2.5">
@@ -2438,7 +2488,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                                         width, not measured progress. What is
                                         measured is the time on the bench. */}
                                     <div className="text-[9.5px] font-bold" style={{ color: st.fg }}>
-                                      ⏱ {inAssemblyFor || "just started"} on the bench
+                                      <LeadIcon e="⏱" />{inAssemblyFor || "just started"} on the bench
                                     </div>
                                   </div>
                                 )}
@@ -2549,8 +2599,8 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
               } });
             };
             const assembleLabel = sl.status === "assembling" ? "Mark Assembled" : "Assemble";
-            const assembleOk = (sl.status === "set" && pend.length === 0 && crate.state !== "pending" && canDo("machines", "updateStage")) || (sl.status === "assembling" && !!m && !m.pendingHandoverId && canFinishTransfer(canDo));
-            const assembleWhy = sl.status === "set" ? (pend.length ? "Waiting for material" : crate.state === "pending" ? `Fill the ${rKey} crate first` : !canDo("machines", "updateStage") ? "Needs Machines → Update Stage permission" : "") : sl.status === "assembling" ? (!canFinishTransfer(canDo) ? "Needs Machines → Finish & Transfer permission" : "A transfer is already in progress") : sl.status === "assembled" ? "Already assembled" : "Fill the rack first";
+            const assembleOk = (sl.status === "set" && pend.length === 0 && crate.state !== "pending" && canStartAsm) || (sl.status === "assembling" && !!m && !m.pendingHandoverId && canFinishTransfer(canDo));
+            const assembleWhy = sl.status === "set" ? (pend.length ? "Waiting for material" : crate.state === "pending" ? `Fill the ${rKey} crate first` : !canStartAsm ? "Only the Assembly department can start assembly" : "") : sl.status === "assembling" ? (!canFinishTransfer(canDo) ? "Needs Machines → Finish & Transfer permission" : "A transfer is already in progress") : sl.status === "assembled" ? "Already assembled" : "Fill the rack first";
             // 2026-10-31 — no separate Production Manager login yet: an Admin
             // sends the assembled machine to Mechanical from the rack.
             const canSendFromRack = canDo("machines", "release") || isAdminUser;
@@ -2585,7 +2635,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                     </div>
                     {notIssued.length > 0 && (
                       <div data-not-issued-list className="mx-4 sm:mx-5 mt-3 rounded-lg px-3 py-2.5" style={{ background: "rgba(217,119,6,0.07)", border: "1px solid rgba(217,119,6,0.3)" }}>
-                        <div className="text-[12px] font-black mb-1.5" style={{ color: "#b45309" }}>⏳ {notIssued.length} part{notIssued.length === 1 ? "" : "s"} not issued — pending for {m.serialNo || m.bomKey}</div>
+                        <div className="text-[12px] font-black mb-1.5" style={{ color: "#b45309" }}><LeadIcon e="⏳" />{notIssued.length} part{notIssued.length === 1 ? "" : "s"} not issued — pending for {m.serialNo || m.bomKey}</div>
                         <ul className="space-y-1">
                           {notIssued.map((p2) => (
                             <li key={p2.id} data-pending-item={p2.itemCode || p2.id} className="text-[11.5px] leading-snug flex items-start justify-between gap-2 flex-wrap">
@@ -2746,7 +2796,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                               onClick={() => { setRackPanel(null); setRemoveRackConfirm({ machineId: m.id, serialNo: m.serialNo, bomKey: m.bomKey }); }}
                               className="w-full rounded-lg px-3 py-2 text-[11.5px] font-bold"
                               style={{ color: "#b91c1c", border: "1px solid rgba(185,28,28,0.3)", background: "rgba(185,28,28,0.04)" }}>
-                        🗑 Remove From Rack — return both crates' stock
+                        <LeadIcon e="🗑" />Remove From Rack — return both crates' stock
                       </button>
                     )}
                   </div>
@@ -2759,7 +2809,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
               loud rather than silently dropped from view. */}
           {physicalFamilies.filter((f) => f.overflow > 0).map((f) => (
             <div key={f.id} className="mt-2 text-[10.5px] font-semibold" style={{ color: "#b45309" }}>
-              ⚠ {f.overflow} more {f.label} machine{f.overflow === 1 ? "" : "s"} than the M-{f.label} / R-{f.label} racks hold: {f.overflowMachines.map((m) => m.serialNo || m.bomKey).join(", ")} — use Fill on an empty slot to place one.
+              <LeadIcon e="⚠" />{f.overflow} more {f.label} machine{f.overflow === 1 ? "" : "s"} than the M-{f.label} / R-{f.label} racks hold: {f.overflowMachines.map((m) => m.serialNo || m.bomKey).join(", ")} — use Fill on an empty slot to place one.
             </div>
           ))}
 
@@ -2810,7 +2860,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                           <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full"
                                 title={`${rackShortCount} machine(s) on this rack are still waiting for components`}
                                 style={{ background: "rgba(217,119,6,0.16)", color: "#b45309", border: "1px solid rgba(217,119,6,0.35)" }}>
-                            ⚠ {rackShortCount} incomplete
+                            <LeadIcon e="⚠" />{rackShortCount} incomplete
                           </span>
                         )}
                         <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
@@ -2973,7 +3023,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                             <span className="text-[9px] font-bold px-2 py-0.5 rounded-full"
                                   title={arrivedItems.map((a) => `${a.itemName || a.itemCode}${a.qty ? ` ×${a.qty}` : ""}`).join(", ")}
                                   style={{ background: "rgba(21,128,61,0.10)", color: "#15803d", border: "1px solid rgba(21,128,61,0.35)" }}>
-                              📦 Material arrived ({arrivedItems.length})
+                              <LeadIcon e="📦" />Material arrived ({arrivedItems.length})
                             </span>
                           )}
                         </div>
@@ -2995,7 +3045,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                             <div className="flex items-center gap-1.5 flex-wrap mt-1 text-[10px]">
                               <span className="font-bold px-2 py-0.5 rounded-full" title={`Working time in ${dept} · target ${formatDuration(target)}${due && !t.isOverrun ? ` · due ${dueTxt}` : ""}`}
                                     style={t.isOverrun ? { background: "rgba(239,68,68,0.1)", color: "#b91c1c", border: "1px solid rgba(239,68,68,0.35)" } : { background: "rgba(21,128,61,0.08)", color: "#15803d", border: "1px solid rgba(21,128,61,0.3)" }}>
-                                ⏱ {formatDuration(t.actualMinutes)} / {formatDuration(target)}
+                                <LeadIcon e="⏱" />{formatDuration(t.actualMinutes)} / {formatDuration(target)}
                                 {t.isOverrun ? ` · DELAYED ${formatDuration(t.overrunMinutes)}` : ""}
                               </span>
                               {/* 2026-11-03 — said once, next to the Today line; kept here (hidden) as the per-card hook. */}
@@ -3108,7 +3158,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                                 className="text-[11px] font-black text-white px-3 py-1.5 rounded-lg transition-all"
                                 style={{ background: "#2640B0", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}
                                 title="During-Work Checks">
-                          📋 During-Work Checks
+                          <LeadIcon e="📋" />During-Work Checks
                         </button>
                       )}
                       {/* Phase 1 — report a fault to the department responsible.
@@ -3146,18 +3196,16 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                         machine.holdActive ? (
                           <button data-needs-net type="button" data-card-release-hold={machine.id}
                                   onClick={() => setHoldModal({ machine, release: true, reason: "", busy: false, error: "" })}
-                                  className="text-[11px] font-black px-3 py-1.5 rounded-lg border transition-all"
-                                  style={{ background: "rgba(21,128,61,0.10)", border: "1px solid rgba(21,128,61,0.4)", color: "#15803d" }}
+                                  className="wu-cardbtn wu-cardbtn-ok"
                                   title="Release this machine from ON HOLD">
-                            ▶ Release ON HOLD
+                            <LeadIcon e="▶" />Release ON HOLD
                           </button>
                         ) : (
                           <button data-needs-net type="button" data-card-hold={machine.id}
                                   onClick={() => setHoldModal({ machine, release: false, reason: "", busy: false, error: "" })}
-                                  className="text-[11px] font-black px-3 py-1.5 rounded-lg border transition-all"
-                                  style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.4)", color: "#b91c1c" }}
+                                  className="wu-cardbtn wu-cardbtn-bad"
                                   title="Put this machine ON HOLD (a reason is required)">
-                            ⏸ ON HOLD
+                            <LeadIcon e="⏸" />ON HOLD
                           </button>
                         )
                       )}
@@ -3166,8 +3214,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
       {currentUser?.role === "super_admin" && onDeleteMachine && machine.stage !== "BOM Issued" && (
         <button type="button" data-card-delete={machine.id}
                 onClick={() => setDeleteModal({ machine, reason: "", busy: false, error: "" })}
-                className="text-[11px] font-black px-3 py-1.5 rounded-lg border transition-all"
-                style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.4)", color: "#b91c1c" }}
+                className="wu-cardbtn wu-cardbtn-bad"
                 title="Delete this machine (Super Admin only)">
           <Trash2 size={13} className="inline -mt-0.5 mr-1" aria-hidden="true" />Delete
         </button>
@@ -3221,12 +3268,12 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                             {machineOverdue ? (
                               <span className="text-[10px] font-black px-2 py-1 rounded-lg"
                                     style={{ background: "rgba(239,68,68,0.15)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.45)" }}>
-                                🚦 ON HOLD
+                                <LeadIcon e="🚦" />ON HOLD
                               </span>
                             ) : (
                               <span className="text-[10px] font-black px-2 py-1 rounded-lg"
                                     style={{ background: "rgba(217, 119, 6,0.12)", color: "#B45309", border: "1px solid rgba(217, 119, 6,0.35)" }}>
-                                ⏳ Awaiting accept{h ? ` · ${h.toDepartment}` : ""}
+                                <LeadIcon e="⏳" />Awaiting accept{h ? ` · ${h.toDepartment}` : ""}
                               </span>
                             )}
                             {cardCanAccept && (
@@ -3275,7 +3322,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                                 className="text-[10px] font-bold px-2 py-1.5 rounded-lg border transition-all"
                                 style={{ background: "rgba(217,119,6,0.10)", border: "1px solid rgba(217,119,6,0.35)", color: "#b45309" }}
                                 title="Complete or correct the Trial Certificate">
-                          ✎ Certificate
+                          <LeadIcon e="✎" />Certificate
                         </button>
                       )}
                       {isComplete && machine.trialCertificate && (
@@ -3283,7 +3330,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                                 className="text-[10px] font-bold text-slate-900 px-2 py-1.5 rounded-lg border transition-all"
                                 style={{ background: "rgba(6,182,212,0.12)", border: "1px solid rgba(6,182,212,0.35)", color: "#0e7490" }}
                                 title="View Trial Certificate">
-                          📋 Certificate
+                          <LeadIcon e="📋" />Certificate
                         </button>
                       )}
                       {isComplete && isAdminUser && (
@@ -3587,7 +3634,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                                           <button data-needs-net onClick={() => setJobAction({ item: p, action: "receive", notes: "", busy: false, error: "" })}
                                                   className="text-[10px] font-bold px-2 py-0.5 rounded border"
                                                   style={{ color: "#1d4ed8", borderColor: "rgba(37,99,235,0.4)", background: "rgba(37,99,235,0.08)" }}>
-                                            📦 Part received
+                                            <LeadLabel text="📦 Part received" />
                                           </button>
                                         )}
                                         {canFinishTransfer(canDo) && onResolvePendingItem && !pendingItemIsPart(p) && (
@@ -3943,7 +3990,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
               {holdModal.release ? (
                 <p className="text-[11px] text-slate-600 mb-3">On hold since {m.holdAt ? new Date(m.holdAt).toLocaleString() : "—"}: {m.holdReason || "no reason recorded"}. Releasing lets the machine be finished, transferred and accepted again.</p>
               ) : (
-                <p className="text-[11px] text-slate-600 mb-3">While on hold the machine cannot be transferred or accepted. Pending jobs, receiving and the checklist keep working. The hold, who set it and the reason stay in the history.</p>
+                <p className="text-[13px] text-slate-600 mb-3">Machine stops here until released.</p>
               )}
               <label className="block text-[11px] font-bold text-slate-600 mb-1">{holdModal.release ? "Note (optional)" : <>Reason <span className="text-red-500">*</span></>}</label>
               <textarea data-hold-reason rows={2} value={holdModal.reason} disabled={holdModal.busy} autoFocus
@@ -3955,7 +4002,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
               <div className="flex gap-2 mt-4">
                 <button type="button" onClick={() => setHoldModal(null)} disabled={holdModal.busy} className="flex-1 h-11 rounded-lg text-[13px] font-bold text-slate-600 border transition-all disabled:opacity-40" style={{ borderColor: "rgba(17,24,39,0.12)" }}>Cancel</button>
                 <button data-needs-net type="button" data-hold-confirm onClick={submit} disabled={holdModal.busy} className="flex-[2] min-h-[48px] rounded-xl text-[14px] font-black text-white transition-all disabled:opacity-50" style={{ background: holdModal.release ? "#15803d" : "#dc2626", color: "#ffffff" }}>
-                  {holdModal.busy ? "Saving…" : holdModal.release ? "▶ Release ON HOLD" : "⏸ Put ON HOLD"}
+                  <LeadLabel text={holdModal.busy ? "Saving…" : holdModal.release ? "▶ Release ON HOLD" : "⏸ Put ON HOLD"} />
                 </button>
               </div>
             </div>
@@ -4084,7 +4131,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
             <div role="dialog" aria-label={`Pending jobs for ${m?.serialNo || m?.bomKey || "machine"}`} data-jobs-drawer className="rack-panel h-full w-full max-w-[640px] flex flex-col" style={{ background: "var(--surface-card)", boxShadow: "-20px 0 60px rgba(17,24,39,0.25)" }}>
               <div className="px-4 sm:px-5 py-4 flex items-center justify-between gap-3" style={{ background: "#b91c1c", color: "#fff" }}>
                 <div>
-                  <div className="text-[17px] font-black">⏳ Pending Jobs · {m?.bomKey || "Machine"}{m?.serialNo ? ` · S/N ${m.serialNo}` : ""}</div>
+                  <div className="text-[17px] font-black"><LeadIcon e="⏳" />Pending Jobs · {m?.bomKey || "Machine"}{m?.serialNo ? ` · S/N ${m.serialNo}` : ""}</div>
                   <div className="text-[11px] opacity-90">{openPartsN} part{openPartsN === 1 ? "" : "s"} · {open.length - openPartsN} work pending · {done.length} completed · now in {m?.status === "completed" ? "Ready" : (m?.currentDepartment || m?.stage || "—")}</div>
                 </div>
                 <button type="button" aria-label="Close" onClick={() => setJobsDrawer(null)} className="w-9 h-9 rounded-lg text-[18px] font-black" style={{ background: "rgba(255,255,255,0.18)", color: "#fff" }}>✕</button>
@@ -4385,7 +4432,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
               )}
               <input value={raisePart.itemCode} disabled={raiseBusy} list={inventoryFlat.length ? "raise-part-codes" : undefined}
                      onChange={(e) => { const code = e.target.value; const hit = inventoryFlat.find((it) => it.code.toLowerCase() === code.trim().toLowerCase()); setRaisePart((p) => ({ ...p, itemCode: code, itemName: hit ? hit.name : p.itemName })); }}
-                     placeholder="Part / item code" className="min-w-0 w-full rounded-lg px-2.5 py-2 text-[12px] text-slate-800 outline-none font-mono"
+                     placeholder="Part / item code" className="min-w-0 w-full rounded-lg px-2.5 py-2 text-[12px] text-slate-800 outline-none"
                      style={{ background: "var(--surface-elevated)", border: "1px solid rgba(17,24,39,0.12)" }} />
               <input type="number" min="0" step="any" value={raisePart.qty} disabled={raiseBusy}
                      onChange={(e) => setRaisePart((p) => ({ ...p, qty: e.target.value }))}
@@ -4411,7 +4458,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
             </select>
 
             <p className="text-[11px] text-slate-500 mt-3">
-              The machine stays in {here}. The issue is tracked until it is fixed — it never blocks Finish &amp; Transfer.
+              Tracked until fixed — it never blocks Finish &amp; Transfer.
             </p>
 
             {raiseErr && (
@@ -4427,9 +4474,9 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                       style={{ borderColor: "rgba(17,24,39,0.12)" }}>
                 Cancel
               </button>
-              <button type="button" onClick={submit} disabled={raiseBusy}
+              <button type="button" onClick={submit} disabled={raiseBusy} data-raise-send
                       className="flex-[2] min-h-[48px] rounded-xl text-[14px] font-black text-slate-900 transition-all disabled:opacity-50"
-                      style={{ background: "#dc2626", color: "#ffffff" }}>
+                      style={{ background: "#2E50D6", color: "#ffffff" }}>
                 {raiseBusy ? "Sending…" : (raiseDept ? `Call ${raiseDept}` : "Send")}
               </button>
             </div>
@@ -4466,7 +4513,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                 </div>
                 {famBoms.filter((b) => !b.valid).map((b) => (
                   <div key={b.key} className="text-[10px] mt-0.5 font-semibold" style={{ color: "#b45309" }}>
-                    ⚠ {b.key} also maps to these racks but {b.components === 0 ? "has no components" : `${b.missing} of ${b.components} components are not in the Item Master`} — do not use it for rack builds.
+                    <LeadIcon e="⚠" />{b.key} also maps to these racks but {b.components === 0 ? "has no components" : `${b.missing} of ${b.components} components are not in the Item Master`} — do not use it for rack builds.
                   </div>
                 ))}
               </div>
@@ -4515,7 +4562,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                         className="text-[10px] font-bold px-2.5 py-1.5 rounded-md" style={{ background: "var(--surface-card)", color: f.color, border: `1px solid ${f.color}55` }}>Reserve slot & open BOM →</button>
               </div>
             )}
-            {fillErr && <div className="text-[11px] font-semibold" style={{ color: "#b91c1c" }}>⚠ {fillErr}</div>}
+            {fillErr && <div className="text-[11px] font-semibold" style={{ color: "#b91c1c" }}><LeadIcon e="⚠" />{fillErr}</div>}
           </div>
         </div>
         );
@@ -4568,7 +4615,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                         {stillPending.length > 0 && (
                           <span className="text-[9px] font-black px-1.5 py-0.5 rounded flex-shrink-0"
                                 style={{ background: "rgba(217,119,6,0.14)", color: "#b45309", border: "1px solid rgba(217,119,6,0.3)" }}>
-                            ⚠ {stillPending.length} pending
+                            <LeadIcon e="⚠" />{stillPending.length} pending
                           </span>
                         )}
                         <span className="text-[9px] text-slate-500 flex-shrink-0">Issued {m.createdDate}</span>
@@ -4679,7 +4726,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                         }}
                       className="inline-flex items-center gap-1.5 text-[11px] font-bold rounded-lg px-4 py-1.5 text-white border transition-all"
                       style={{ background: "#b91c1c", borderColor: "rgba(239,68,68,0.5)", color: "#ffffff" }}>
-                🗑 Remove
+                <LeadIcon e="🗑" />Remove
               </button>
             </div>
           </div>
@@ -4710,6 +4757,21 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
               <div className="px-6 py-5 border-b border-slate-100 flex-shrink-0 bg-white">
                 <div className="text-sm font-black text-slate-900">{rackReturn ? "Finish Assembly · Return to Rack" : "Finish & Transfer"}</div>
                 <div className="text-[11px] text-slate-500 mt-0.5">{machine.bomKey}{machine.serialNo ? ` · S/N ${machine.serialNo}` : ""}{rackReturn ? ` · back to ${slotLabel(machine.rackSlot)}` : ""}</div>
+                {(() => {
+                  // World UI: required steps done so far (display only).
+                  const steps = [
+                    ...(isOverrun ? [!!narration.trim()] : []),
+                    ...(finishModal.template && Array.isArray(finishModal.answers) && finishModal.answers.length ? [validateChecklistAnswers(finishModal.answers).ok] : []),
+                    !pendingItemsProblem(finishModal.owedItems),
+                  ];
+                  const done = steps.filter(Boolean).length;
+                  return (
+                    <div className="wu-progress" data-wu-progress aria-label={`${done} of ${steps.length} steps done`}>
+                      <div className="wu-progress-track"><i style={{ transform: `scaleX(${done / steps.length})` }} /></div>
+                      <span>{done} of {steps.length} done</span>
+                    </div>
+                  );
+                })()}
               </div>
               <div className="p-5 space-y-4 flex-1 overflow-y-auto">
                 <div className="grid grid-cols-2 gap-3">
@@ -4738,9 +4800,9 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                 </div>
                 {isOverrun && (
                   <div data-transfer-delay className="rounded-xl">
-                    <label className="text-[11px] font-bold text-red-600 block mb-1.5">
+                    <label className="text-[13px] font-bold text-slate-700 block mb-1.5">
                       Delay reason (required)
-                      <span className="text-red-500 ml-0.5">*</span>
+                      <span className="text-slate-500 ml-0.5">*</span>
                     </label>
                     {(() => {
                       const delayBox = (
@@ -4807,7 +4869,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                   Cancel
                 </button>
                 <span onClick={() => { if ((!transferBusy && isOverrun && !narration.trim())) flagField("[data-transfer-delay]"); }}>
-                <button data-needs-net onClick={submitFinishTransfer} disabled={transferBusy || (isOverrun && !narration.trim())}
+                <button data-needs-net onClick={submitFinishTransfer} data-finish-confirm disabled={transferBusy || (isOverrun && !narration.trim())}
                         className="text-[12px] font-bold text-slate-900 bg-amber-600 hover:bg-amber-700 px-5 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed" style={{ color: "#fff", pointerEvents: (!transferBusy && isOverrun && !narration.trim()) ? "none" : undefined }}>
                   {transferBusy ? "⏳ Please wait…" : rackReturn ? `✓ Assembled · Return to ${slotLabel(machine.rackSlot)}` : `Finish & Transfer → ${toDepartment}`}
                 </button>
@@ -4878,12 +4940,26 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                style={{ background: "rgba(17,24,39,0.45)", backdropFilter: "blur(10px)" }}
                onClick={(e) => e.target === e.currentTarget && !busy && setAcceptModal(null)}>
             <div className="relative w-full max-w-md rounded-2xl overflow-hidden flex flex-col"
-                 style={{ background: "var(--surface-elevated)", border: "1px solid rgba(34,197,94,0.4)", boxShadow: "0 40px 80px rgba(17,24,39,0.22)", maxHeight: "90vh" }}>
+                 style={{ background: "var(--surface-elevated)", border: "1px solid rgba(14,23,38,0.10)", boxShadow: "0 40px 80px rgba(17,24,39,0.22)", maxHeight: "90vh" }}>
               <ModalX onClose={() => setAcceptModal(null)} disabled={!!busy} />
-              <div className="px-6 py-5 border-b border-slate-200 flex-shrink-0"
-                   style={{ background: "linear-gradient(90deg,rgba(34,197,94,0.10),rgba(22,163,74,0.05))" }}>
+              <div className="px-6 py-5 border-b border-slate-200 flex-shrink-0 bg-white" data-sheet-head>
                 <div className="text-sm font-black text-slate-900">Accept into {handover.toDepartment}</div>
                 <div className="text-[11px] text-slate-400 mt-0.5">{handover.bomKey}{handover.serialNo ? ` · S/N ${handover.serialNo}` : ""}</div>
+                {(() => {
+                  // World UI: how far along the required steps are (display only).
+                  const steps = [
+                    ...(acceptDeptEmps.length > 0 ? [selectedTeam.filter(Boolean).length > 0] : []),
+                    !!sigSvg,
+                    ...(hasChecklist ? [validateChecklistAnswers(acceptModal.checklistAnswers || []).ok] : []),
+                  ];
+                  const done = steps.filter(Boolean).length;
+                  return (
+                    <div className="wu-progress" data-wu-progress aria-label={`${done} of ${steps.length} steps done`}>
+                      <div className="wu-progress-track"><i style={{ transform: `scaleX(${steps.length ? done / steps.length : 1})` }} /></div>
+                      <span>{done} of {steps.length} done</span>
+                    </div>
+                  );
+                })()}
               </div>
               <div className="p-5 space-y-4 flex-1 overflow-y-auto">
                 {handover.overrunNarration && (
@@ -4895,7 +4971,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                 {isHoldOverdue(handover.sentAt, handover.acceptTimeoutMinutes, nowTick) && (
                   <div className="rounded-lg px-3 py-2.5" style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.35)" }}>
                     <div className="text-[10px] font-bold uppercase tracking-wide mb-1" style={{ color: "#b91c1c" }}>
-                      🚦 On hold · {formatDuration(heldMinutes(handover.sentAt, handover.acceptTimeoutMinutes, nowTick))} past the acceptance window
+                      <LeadIcon e="🚦" />On hold · {formatDuration(heldMinutes(handover.sentAt, handover.acceptTimeoutMinutes, nowTick))} past the acceptance window
                     </div>
                     <label className="text-[11px] font-bold text-slate-700 block mb-1">Reason for late acceptance <span className="text-red-500">*</span></label>
                     <div className="grid grid-cols-2 gap-2 mb-2" data-late-reasons>
@@ -4906,7 +4982,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                                   onClick={() => setField({ holdPick: label, holdReason: label === "Other" ? "" : label, error: "" })}
                                   className={`rounded-xl text-[13px] font-bold flex items-center justify-center gap-1.5 px-2 transition-all ${on ? "accept-pop" : ""}`}
                                   style={{ minHeight: 48, background: on ? "#dc2626" : "#fff", color: on ? "#fff" : "#7f1d1d", border: `2px solid ${on ? "#dc2626" : "rgba(239,68,68,0.35)"}` }}>
-                            <span style={{ fontSize: 17 }}>{icon}</span>{label}
+                            <span style={{ fontSize: 17 }}><Glyph e={icon} size={17} /></span>{label}
                           </button>
                         );
                       })}
@@ -4937,14 +5013,13 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-[12px] text-slate-900 placeholder-slate-500 outline-none focus:border-green-500/60" />
                       </div>
                     ) : (
-                      <div className="rounded-lg px-3 py-2.5" style={{ background: "rgba(34,197,94,0.07)", border: "1px solid rgba(34,197,94,0.3)" }}>
-                        <div className="text-[11px] font-bold text-emerald-200">
-                          Accepting as <span className="text-slate-900">{currentUser?.fullName || currentUser?.username || "you"}</span>
-                        </div>
+                      <div className="wu-as" data-accept-as>
+                        <User size={16} aria-hidden="true" />
+                        <span>Accepting as <b>{currentUser?.fullName || currentUser?.username || "you"}</b></span>
                       </div>
                     )}
                     {acceptDeptEmps.length > 0 && (
-                      <div data-accept-people className="accept-step rounded-xl px-3 py-3" style={{ background: "rgba(99,102,241,0.05)", border: `2px solid ${selectedTeam.length ? "rgba(34,197,94,0.45)" : "rgba(99,102,241,0.3)"}` }}>
+                      <div data-accept-people className="accept-step rounded-xl px-3 py-3" style={{ background: "#fff", border: "1px solid rgba(14,23,38,0.12)" }}>
                         {stepHead(1, "Receiving employees", selectedTeam.length > 0)}
                         <label className="text-[12px] font-bold text-slate-700 block mb-1">Main person</label>
                         <select data-accept-main value={mainName} disabled={busy}
@@ -4977,7 +5052,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                       </div>
                     )}
                     {/* 2026-11-02 — mandatory Digital Signature for every acceptance */}
-                    <div data-accept-signature className="accept-step rounded-xl px-3 py-3" style={{ background: "rgba(17,24,39,0.02)", border: `1px solid ${sigSvg ? "rgba(34,197,94,0.4)" : "rgba(17,24,39,0.15)"}` }}>
+                    <div data-accept-signature className="accept-step rounded-xl px-3 py-3" style={{ background: "#fff", border: "1px solid rgba(14,23,38,0.12)" }}>
                       {stepHead(acceptDeptEmps.length > 0 ? 2 : 1, "Sign here (Digital signature)", !!sigSvg)}
                       {sigSvg ? (
                         <div>
@@ -5011,10 +5086,10 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                         follow the same "unchecked needs remark" rule as
                         Finish & Transfer. */}
                     {acceptModal.checklistTemplate && (acceptModal.checklistAnswers || []).length > 0 && (
-                      <div data-accept-checklist className="accept-step rounded-xl px-3 py-3" style={{ background: "rgba(46, 80, 214,0.05)", border: "1px solid rgba(46, 80, 214,0.3)" }}>
+                      <div data-accept-checklist className="accept-step rounded-xl px-3 py-3" style={{ background: "#fff", border: "1px solid rgba(14,23,38,0.12)" }}>
                         {stepHead(stepBase + 1, "Check before accepting", false)}
                         <div className="text-[12px] font-semibold text-slate-600 mb-1">
-                          📋 {acceptModal.checklistTemplate.name || "After Acceptance Checklist"}
+                          <LeadIcon e="📋" />{acceptModal.checklistTemplate.name || "After Acceptance Checklist"}
                         </div>
                         <ChecklistBulkBar
                           answers={acceptModal.checklistAnswers}
@@ -5031,7 +5106,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                     )}
 
                     {/* Phase B — raise new pending items at this transfer */}
-                    <div data-accept-pending className="accept-step rounded-xl px-3 py-3" style={{ background: "rgba(17,24,39,0.03)", border: "1px solid rgba(17,24,39,0.10)" }}>
+                    <div data-accept-pending className="accept-step rounded-xl px-3 py-3" style={{ background: "#fff", border: "1px solid rgba(14,23,38,0.12)" }}>
                       {stepHead(stepBase + 1 + (hasChecklist ? 1 : 0), `Anything still pending from ${handover.fromDepartment}?`, false)}
                       <PendingJobRows rows={acceptModal.pendingItemsToRaise || []} inventory={inventoryFlat} disabled={acceptModal.busy}
                                       accent="#dc2626" addLabel="+ Add Pending Item" mode="item" allowComment
@@ -5044,7 +5119,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                 {error && error !== acceptModal.errorField && (
                   <div className="rounded-lg px-3 py-2 text-[11px] font-semibold"
                        style={{ background: "rgba(239,68,68,0.08)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.3)" }}>
-                    ⚠ {error}
+                    <LeadIcon e="⚠" />{error}
                   </div>
                 )}
               </div>
@@ -5105,7 +5180,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                 {error && (
                   <div className="rounded-lg px-3 py-2 text-[11px] font-semibold"
                        style={{ background: "rgba(239,68,68,0.08)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.3)" }}>
-                    ⚠ {error}
+                    <LeadIcon e="⚠" />{error}
                   </div>
                 )}
               </div>
@@ -5162,7 +5237,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                 {error && (
                   <div data-start-chk-error className="rounded-lg px-3 py-2 text-[12px] font-semibold"
                        style={{ background: "rgba(239,68,68,0.08)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.3)" }}>
-                    ⚠ {error}
+                    <LeadIcon e="⚠" />{error}
                   </div>
                 )}
               </div>

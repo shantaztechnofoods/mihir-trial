@@ -2,6 +2,7 @@
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
 import React from "react";
 import { Search, Bell } from "lucide-react";
+import ShantazLogoSVG from "../../shared/components/ShantazLogoSVG.jsx";
 import BrandLogo from "../../shared/components/BrandLogo.jsx";
 import UserProfileMenu from "../../shared/components/UserProfileMenu.jsx";
 import { navItems } from "./navItems.js";
@@ -28,6 +29,7 @@ export function Sidebar({ activePage, setActivePage, collapsed, setCollapsed, ba
               const initial = name[0]?.toUpperCase() || "S";
               return (
                 <div className="sb-brand mb-3">
+                  <ShantazLogoSVG tone="dark" className="sb-logo-wide" />
                   <BrandLogo logo={settings.logo} size={64} rounded={14} />
                   <div className="min-w-0">
                     <div className="text-[13px] font-extrabold leading-none tracking-widest truncate sb-logo-name">{line1}</div>

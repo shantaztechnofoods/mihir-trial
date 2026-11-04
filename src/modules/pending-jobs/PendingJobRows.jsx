@@ -202,7 +202,7 @@ export function PendingJobRows({ rows, onChange, inventory = [], accent = "#b453
           </div>
         ))}
         <button type="button" disabled={disabled} onClick={() => onChange([...list, emptyPendingJob()])}
-                className={`${allowComment ? "text-[13px] px-4" : "text-[11px] px-3 py-1.5"} font-bold rounded-lg border transition-all disabled:opacity-50`}
+                className={`wu-addrow ${allowComment ? "text-[13px] px-4" : "text-[11px] px-3 py-1.5"} font-bold rounded-lg border transition-all disabled:opacity-50`}
                 style={{ background: `${accent}14`, border: `1px solid ${accent}66`, color: accent, ...(allowComment ? { minHeight: 44 } : {}) }}>
           {addLabel}
         </button>

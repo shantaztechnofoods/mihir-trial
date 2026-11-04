@@ -17,13 +17,13 @@ Vendors (list, add/edit, Excel import, WhatsApp link), the Order Pipeline (creat
 | `ApprovalsPage.jsx` | 121 |
 | `OrderPipelinePage.jsx` | 1103 |
 | `PODetailModal.jsx` | 177 |
-| `POModal.jsx` | 691 |
-| `POSearchCenter.jsx` | 202 |
-| `POSettings.jsx` | 321 |
+| `POModal.jsx` | 692 |
+| `POSearchCenter.jsx` | 203 |
+| `POSettings.jsx` | 322 |
 | `PurchasePage.jsx` | 178 |
 | `VendorImportModal.jsx` | 214 |
 | `VendorModal.jsx` | 154 |
-| `VendorsPage.jsx` | 522 |
+| `VendorsPage.jsx` | 523 |
 | `index.js` | 6 |
 
 `index.js` is the public surface — the app shell and other modules import only from it:
@@ -51,7 +51,7 @@ The screens here are presentational: state and every write (handler) still live 
 | `<VendorsPage>` | `onBulkAddVendors` | `handleBulkAddVendors` |
 
 Depends on other modules (imported through their `index.js`): _none_
-Shared code used: `src/shared/components/ItemSearchSelect.jsx`, `src/shared/components/LeadIcon.jsx`, `src/shared/components/SearchableSelect.jsx`, `src/shared/format.js`, `src/shared/loadXlsx.js`, `src/shared/ui/Topbar.jsx`, `src/shared/ui/primitives.jsx`
+Shared code used: `src/shared/components/DebouncedSearchInput.jsx`, `src/shared/components/ItemSearchSelect.jsx`, `src/shared/components/LeadIcon.jsx`, `src/shared/components/SearchableSelect.jsx`, `src/shared/format.js`, `src/shared/loadXlsx.js`, `src/shared/ui/Topbar.jsx`, `src/shared/ui/primitives.jsx`
 Lower layers used: `src/utils/`
 Used by: `app/App.jsx (shell)`, `modules/settings`
 

@@ -1,6 +1,7 @@
 // src/modules/settings/settingsUi.jsx — moved verbatim from the former single-file src/App.jsx
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
 import React from "react";
+import { Glyph } from "../../shared/components/LeadIcon.jsx";
 
 // ─── SETTINGS PAGE ────────────────────────────────────────────────────────────
 
@@ -32,7 +33,7 @@ export const Section = ({ icon, title, children }) => (
   <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
     <div className="flex items-center gap-3 px-6 py-4 border-b border-slate-200"
          style={{ background: "rgba(17,24,39,0.03)" }}>
-      <span className="text-base">{icon}</span>
+      <span className="text-base"><Glyph e={icon} size={17} /></span>
       <span className="text-[14px] font-bold text-slate-900">{title}</span>
     </div>
     <div className="px-6 py-5">{children}</div>

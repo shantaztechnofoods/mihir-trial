@@ -70,8 +70,19 @@ ok("History activity list draws a slice, the rest on scroll", Number(await p.loc
   await p.waitForTimeout(300);
   ok("after printing the History list goes back to a slice", (await p.locator("[data-more-rows]").count()) > 0);
 }
+// perf-2: the History search box waits for a pause in typing, then filters the FULL list; Reset clears the box too
+{
+  const box = p.locator('input[placeholder="Global search…"]');
+  await box.pressSequentially("action number 4999", { delay: 20 });
+  ok("History search box shows every key at once", (await box.inputValue()) === "action number 4999");
+  await p.waitForTimeout(700);
+  const body = await p.locator("body").innerText();
+  ok("History search filters the full 5,000-row log after typing pauses", body.includes("Action number 4999") && !body.includes("Action number 4998") && (await p.locator("[data-more-rows]").count()) === 0);
+  await p.getByRole("button", { name: "✕ Reset" }).click(); await p.waitForTimeout(400);
+  ok("History Reset clears the search box and brings every row back", (await box.inputValue()) === "" && Number(await p.locator("[data-more-rows]").first().getAttribute("data-more-rows").catch(() => 0)) > 4000);
+}
 // 4. other page switches stay inside the budget
-for (const [l, re] of [["Inward", "^Inward"], ["Machine Tracker", "Machine Tracker"], ["Dashboard", "👋"]]) {
+for (const [l, re] of [["Inward", "^Inward"], ["Machine Tracker", "Machine Tracker"], ["Dashboard", "^Good (morning|afternoon|evening)"]]) {
   const t = await tapPage(l, re); ok(`${l} opens within ${BUDGET_PAGE_MS} ms`, t < BUDGET_PAGE_MS, `${t.toFixed(0)} ms`); await p.waitForTimeout(300);
   if (l === "Inward") {
     ok("Inward log draws a slice of the 2,000 entries", Number(await p.locator("[data-more-rows]").first().getAttribute("data-more-rows").catch(() => 0)) > 1500);

@@ -1,6 +1,7 @@
 // src/modules/settings/EmployeeMembersPanel.jsx — moved verbatim from the former single-file src/App.jsx
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
 import React, { useState } from "react";
+import { LeadIcon } from "../../shared/components/LeadIcon.jsx";
 import { Section } from "./settingsUi.jsx";
 
 // ─── Migration 029 — Department-employee assignment row ────────────────────
@@ -78,7 +79,7 @@ export function DeptEmployeesRow({ dept, assigned, notAssigned, canConfig, onSav
           </button>
         </div>
       )}
-      {err && <div className="text-[10px] text-red-600 mt-1">⚠ {err}</div>}
+      {err && <div className="text-[10px] text-red-600 mt-1"><LeadIcon e="⚠" />{err}</div>}
     </div>
   );
 }
@@ -151,7 +152,7 @@ export function EmployeeMembersPanel({ members = [], canConfig = false, onSave }
       {!editing && err && (
         <div className="text-[11px] mb-3 px-3 py-2 rounded-lg"
              style={{ background: "rgba(239,68,68,0.08)", color: "#b91c1c", border: "1px solid rgba(239,68,68,0.3)" }}>
-          ⚠ {err}
+          <LeadIcon e="⚠" />{err}
         </div>
       )}
       <div className="flex items-center justify-between mb-3">
@@ -209,7 +210,7 @@ export function EmployeeMembersPanel({ members = [], canConfig = false, onSave }
           {err && (
             <div className="text-[11px] px-3 py-2 rounded-lg"
                  style={{ background: "rgba(239,68,68,0.08)", color: "#b91c1c", border: "1px solid rgba(239,68,68,0.3)" }}>
-              ⚠ {err}
+              <LeadIcon e="⚠" />{err}
             </div>
           )}
           <div className="flex gap-2">

@@ -1,7 +1,7 @@
 // src/modules/analytics/AnalyticsPage.jsx — moved verbatim from the former single-file src/App.jsx
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
 import React from "react";
-import { LeadIcon } from "../../shared/components/LeadIcon.jsx";
+import { LeadIcon, Glyph } from "../../shared/components/LeadIcon.jsx";
 import { ChartSlot } from "../../shared/components/LazyCharts.jsx";
 import { getCurrSymbol } from "../../shared/format.js";
 import { SETTINGS_DEFAULTS } from "../../shared/settingsDefaults.js";
@@ -194,7 +194,7 @@ export function AnalyticsPage({ items, pos, vendorList, settings = SETTINGS_DEFA
               )}</ChartSlot>
             ) : (
               <div className="h-[220px] flex flex-col items-center justify-center gap-1 text-center">
-                <div className="text-2xl" style={{ opacity: 0.45 }}>🏭</div>
+                <div className="text-2xl" style={{ opacity: 0.45 }}><Glyph e="🏭" size={26} /></div>
                 <div className="text-xs font-semibold" style={{ color: "var(--text-muted)" }}>No PO data yet</div>
               </div>
             )}

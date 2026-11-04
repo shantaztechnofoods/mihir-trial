@@ -16,9 +16,9 @@ Production flow after the BOM is issued: Active Builds, the Production Rack View
 | file | lines |
 |---|---|
 | `DelayReasonsCard.jsx` | 126 |
-| `MachinePage.jsx` | 5188 |
-| `ReadyMachinesPopup.jsx` | 60 |
-| `StaffMyDashboard.jsx` | 112 |
+| `MachinePage.jsx` | 5263 |
+| `ReadyMachinesPopup.jsx` | 61 |
+| `StaffMyDashboard.jsx` | 110 |
 | `checklists.jsx` | 142 |
 | `constants.js` | 22 |
 | `index.js` | 5 |

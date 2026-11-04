@@ -3,6 +3,7 @@
 import { heldMinutes, workerIdsOf } from "../../utils/handoverLogic.js";
 import { pendingItemIsPart } from "../../stores/pendingItemsStore.js";
 import { getActiveCompany } from "../../utils/poTemplate.js";
+import { BRAND_LOGO_DATA_URI } from "../../utils/brandLogo.js";
 import { RPT_LEGAL_NAME, rptFmtDT } from "../../shared/printFormat.js";
 
 // Pilot / test records are kept out of customer and management reports unless
@@ -67,11 +68,23 @@ export const rptDur = (min) => {
   return `${d} day${d === 1 ? "" : "s"}${h ? ` ${h} h` : ""}`;
 };
 
+// 2026-11-04 (reports v3) — the old brand-style names ("Shantaz Technofoods",
+// "... Pvt Ltd") are not the legal name: they print as the registered name.
+// Placeholder / sample contact values (form hints, test seeds) never print.
+// The letterhead always carries the owner's real vector logo.
+export const RPT_OLD_NAME = /^\s*shantaz\s*techno\s*foods\b/i;
+
+export const RPT_SAMPLE = [/ABCDE1234/i, /AABCS1234/i, /@company\.com$/i, /\.example$/i, /^www\.company\.com$/i, /^factory \/ office address$/i, /^\+91 98765 43210$/];
+
+export const rptClean = (v) => { const t = String(v == null ? "" : v).trim(); return t && !RPT_SAMPLE.some((re) => re.test(t)) ? t : ""; };
+
 export const rptCompany = (settings) => {
   let c = {};
   try { c = getActiveCompany(settings) || {}; } catch { c = {}; }
-  const name = String(c.name || "").trim() || String((settings && settings.companyName) || "").trim() || RPT_LEGAL_NAME;
-  return { ...c, name };
+  const pick = (k, legacy) => rptClean(c[k]) || rptClean(settings && settings[legacy || k]);
+  let name = String(c.name || "").trim() || String((settings && settings.companyName) || "").trim();
+  if (!name || RPT_OLD_NAME.test(name)) name = RPT_LEGAL_NAME;
+  return { ...c, name, logo: BRAND_LOGO_DATA_URI, gst: pick("gst"), address: pick("address"), phone: pick("phone"), email: pick("email"), website: rptClean(c.website) };
 };
 
 // Running head (page 2 onwards) and footer for one named page. CSS cannot read

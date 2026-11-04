@@ -1,5 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { SUPABASE_URL } from "../../config/env.js";
+// 5. the owner's original logo file, bundled with the app (2026-11-04) — so
+//    the real logo shows even before Settings / storage are reachable.
+import bundledLogo from "../../assets/brand/shantaz-logo.png";
 
 // The original SHANTAZ logo, shown exactly as uploaded — never redrawn,
 // recoloured or re-encoded. Source order:
@@ -18,7 +21,7 @@ const writeCache = (v) => { try { if (v && v.length < 900000) localStorage.setIt
 
 export default function BrandLogo({ logo = "", size = 44, className = "", rounded = 12, label = "SHANTAZ" }) {
   const bucket = SUPABASE_URL ? SUPABASE_URL.replace(/\/$/, "") + BUCKET_LOGO : "";
-  const sources = [logo, readCache(), bucket].filter(Boolean);
+  const sources = [logo, readCache(), bucket, bundledLogo].filter(Boolean);
   const [idx, setIdx] = useState(0);
   useEffect(() => { setIdx(0); }, [logo]);
   useEffect(() => { if (logo) writeCache(logo); }, [logo]);

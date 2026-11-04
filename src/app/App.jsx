@@ -32,7 +32,7 @@ import { fetchFollowUps, createFollowUp as followupCreate, updateFollowUp as fol
 import { fetchMachines, createMachine as machineCreate, updateMachine as machineUpdate, updateMachineBomKey, deleteMachine as machineDelete, fetchMachineLockState, appendMachineHistory as machineAppendHistory, STALE_MACHINE_MSG } from "../stores/machinesStore.js";
 import { fetchHandovers, createHandover as handoverCreate, acceptHandover as handoverAccept, releaseHandover, adminCancelHandover, fetchHandoverById } from "../stores/handoverStore.js";
 import { getMySignature, saveMySignature, reauthenticateByPassword } from "../stores/signaturesStore.js";
-import { readDeptWorkflowSettings, setWorkCalendar, isHoldOverdue, RACK_RELEASE_HOPS, canAcceptHandover, canFinishTransfer, senderUndoState } from "../utils/handoverLogic.js";
+import { readDeptWorkflowSettings, setWorkCalendar, isHoldOverdue, RACK_RELEASE_HOPS, canAcceptHandover, canFinishTransfer, canStartAssembly, senderUndoState } from "../utils/handoverLogic.js";
 // Phase B
 import { fetchTemplates, createTemplate, updateTemplate, deleteTemplate, fetchResponses, createResponse } from "../stores/checklistsStore.js";
 import { fetchPendingItems, createPendingItem, resolvePendingItem, receivePendingItem, receivePendingPart, pendingItemIsPart, pendingItemIsOpen } from "../stores/pendingItemsStore.js";
@@ -775,12 +775,19 @@ export default function App() {
   }
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--surface-base)", color: "var(--text)", fontFamily: "Inter, system-ui, sans-serif" }}>
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 rounded-full animate-spin" style={{ border: "3px solid rgba(38, 64, 176,0.15)", borderTopColor: "#2640B0" }} />
-          <div style={{ fontSize: 11, color: "#64748b", letterSpacing: 1.4, textTransform: "uppercase", fontWeight: 700 }}>
-            Restoring session{supabaseMode ? "" : ""}…
+      // World UI: the shape of the app while the session is restored (no spinner).
+      <div className="wu-boot" role="status" aria-live="polite">
+        <div className="wu-boot-side" aria-hidden="true">
+          <div className="wu-sk" style={{ height: 44, width: 44, borderRadius: 12 }} />
+          {[70, 55, 62, 48, 66, 52].map((w, i) => <div key={i} className="wu-sk" style={{ width: `${w}%` }} />)}
+        </div>
+        <div className="wu-boot-main">
+          <div className="wu-sk" style={{ height: 22, width: 180 }} aria-hidden="true" />
+          <div className="wu-boot-note">Restoring session{supabaseMode ? "" : ""}…</div>
+          <div className="wu-boot-row" aria-hidden="true">
+            {[0, 1, 2].map((i) => <div key={i} className="wu-sk" style={{ height: 96, borderRadius: 16 }} />)}
           </div>
+          <div className="wu-sk" style={{ height: 220, borderRadius: 16 }} aria-hidden="true" />
         </div>
       </div>
     );
@@ -2377,7 +2384,7 @@ export default function App() {
   // selected and promotes ONLY those from "BOM Issued" (rack) → "Assembly" (active build).
   // The machine now leaves the rack and appears in the Machine Tracker.
   const handleStartProduction = (machineIds) => {
-    if (!authCanDo("machines", "updateStage")) return { success: false, error: "You do not have permission to start assembly (Machines → Update Stage)." };
+    if (!canStartAssembly(authCanDo, Array.isArray(currentUser?.departments) ? currentUser.departments.filter(Boolean) : [])) return { success: false, error: "Only the Assembly department (or an admin) can start assembly." };
     const idArr  = Array.isArray(machineIds) ? machineIds : [machineIds];
     const idSet  = new Set(idArr);
     const targets = machineLog.filter((m) => idSet.has(m.id) && m.stage === "BOM Issued");

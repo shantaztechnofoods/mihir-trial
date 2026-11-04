@@ -14,13 +14,13 @@ Stock: Item Master (items, quick stock change, item detail with history, add/edi
 ## Files
 | file | lines |
 |---|---|
-| `AddItemModal.jsx` | 732 |
+| `AddItemModal.jsx` | 733 |
 | `InventoryPage.jsx` | 975 |
 | `InwardPage.jsx` | 277 |
 | `ItemDetailModal.jsx` | 685 |
 | `ItemImportModal.jsx` | 208 |
 | `OutwardPage.jsx` | 1135 |
-| `PendingPage.jsx` | 685 |
+| `PendingPage.jsx` | 686 |
 | `index.js` | 7 |
 
 `index.js` is the public surface — the app shell and other modules import only from it:

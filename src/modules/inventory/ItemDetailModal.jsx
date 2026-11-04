@@ -76,7 +76,7 @@ export function ItemDetailModal({ item, category, onClose, onDelete, onUpdateSto
                 {item.designFile && (
                   <a href={item.designFile} target="_blank" rel="noreferrer" title={item.designName || "Open design"}
                      className="text-[10px] font-bold text-violet-300 bg-violet-500/10 border border-violet-500/30 px-2 py-0.5 rounded-full hover:bg-violet-500/20 transition-all">
-                    📐 View Design
+                    <LeadIcon e="📐" />View Design
                   </a>
                 )}
               </div>
@@ -202,10 +202,10 @@ export function ItemDetailModal({ item, category, onClose, onDelete, onUpdateSto
                           </div>
                           {v && (
                             <div className="text-[9px] text-slate-500 flex flex-wrap gap-2 mt-0.5">
-                              {v.contactPerson && <span>👤 {v.contactPerson}</span>}
-                              {v.phone && <span>📞 {v.phone}</span>}
-                              {v.leadDays ? <span>🕐 {v.leadDays}d lead</span> : null}
-                              {v.paymentTerms && <span>💳 {v.paymentTerms}</span>}
+                              {v.contactPerson && <span><LeadIcon e="👤" />{v.contactPerson}</span>}
+                              {v.phone && <span><LeadIcon e="📞" />{v.phone}</span>}
+                              {v.leadDays ? <span><LeadIcon e="🕐" />{v.leadDays}d lead</span> : null}
+                              {v.paymentTerms && <span><LeadIcon e="💳" />{v.paymentTerms}</span>}
                             </div>
                           )}
                         </div>

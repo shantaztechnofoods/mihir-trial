@@ -1,6 +1,7 @@
 // src/app/layout/GlobalSearch.jsx — moved verbatim from the former single-file src/App.jsx
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
 import React, { useState, useEffect, useRef } from "react";
+import { Glyph } from "../../shared/components/LeadIcon.jsx";
 import { EmptyState } from "../../shared/ui/primitives.jsx";
 
 // ─── GLOBAL SEARCH ────────────────────────────────────────────────────────────
@@ -130,7 +131,7 @@ export function GlobalSearch({ items, pos, vendorList, machineLog, onClose, onNa
 
         {/* Input */}
         <div className="flex items-center gap-3 px-4 py-3.5" style={{ borderBottom: "1px solid var(--border-subtle)" }}>
-          <span className="text-slate-500 text-base flex-shrink-0">🔍</span>
+          <span className="text-slate-500 text-base flex-shrink-0"><Glyph e="🔍" size={16} /></span>
           <input ref={inputRef} value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={handleKeyDown}
             placeholder="Search items, POs, vendors, machines, serial numbers…"
             className="flex-1 bg-transparent text-sm placeholder-slate-400 outline-none" />

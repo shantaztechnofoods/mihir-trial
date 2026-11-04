@@ -1,12 +1,14 @@
 // src/modules/reports/HistoryPage.jsx — moved verbatim from the former single-file src/App.jsx
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
-import React, { useState } from "react";
-import { LeadIcon } from "../../shared/components/LeadIcon.jsx";
+import React, { useState, useCallback, useMemo } from "react";
+import { LeadIcon, Glyph } from "../../shared/components/LeadIcon.jsx";
 import { ChartSlot } from "../../shared/components/LazyCharts.jsx";
 import { useProgressiveCount } from "../../shared/components/useProgressiveCount.js";
 import MoreRowsNote from "../../shared/components/MoreRowsNote.jsx";
+import DebouncedSearchInput from "../../shared/components/DebouncedSearchInput.jsx";
+import { BRAND_LOGO_DATA_URI } from "../../utils/brandLogo.js";
 import { rptCompany } from "./reportFormat.js";
-import { RPT_LEGAL_NAME, rptFmtD, rptFmtDT } from "../../shared/printFormat.js";
+import { RPT_LEGAL_NAME, rptContactLine, rptFmtD, rptFmtDT } from "../../shared/printFormat.js";
 import { Topbar } from "../../shared/ui/Topbar.jsx";
 
 // ─── HISTORY & REPORTS ────────────────────────────────────────────────────────
@@ -65,29 +67,33 @@ export function hrExportExcel(rows, cols, filename) {
 export function hrExportPDF(title, rows, cols, company = {}) {
   const esc = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]);
   const cell = (v) => {
-    if (v == null || v === "") return "—";
+    if (v == null || v === "") return "";
     if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}(T[\d:.]+(Z|[+-]\d{2}:?\d{2})?)?$/.test(v.trim())) return esc(rptFmtDT(v.trim()));
     return esc(v);
   };
   const co = company || {};
   const name = co.name || RPT_LEGAL_NAME;
-  const contact = [co.gst ? `GSTIN ${co.gst}` : "", co.phone ? `Phone ${co.phone}` : "", co.email || "", co.website || ""].filter(Boolean).join("  ·  ");
+  const contact = rptContactLine(co);
+  const logo = co.logo || BRAND_LOGO_DATA_URI;
   const hdr  = cols.map((c) => `<th>${esc(c.label)}</th>`).join("");
   const body = rows.map((r) => `<tr>${cols.map((c) => `<td>${cell(r[c.key])}</td>`).join("")}</tr>`).join("");
   const generated = rptFmtDT(new Date());
   const w = window.open("", "_blank");
   if (!w) { alert("Pop-up blocked. Allow pop-ups for this site to print or save the report."); return; }
   w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/><title>${esc(title)} — ${esc(rptFmtD(new Date()))}</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"/>
     <style>
     *{box-sizing:border-box}
     body{font-family:Inter,'Segoe UI',Arial,sans-serif;font-size:10.5px;color:#111;margin:24px;font-variant-numeric:tabular-nums}
-    .lh{text-align:center;padding-bottom:10px;border-bottom:2.5px double #8a8a8a}
-    .lh img{display:block;margin:0 auto 6px;height:56px;width:auto;max-width:220px;object-fit:contain}
-    .lh .n{font-size:17px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
-    .lh .l{font-size:9.5px;color:#555;margin-top:2px}
-    .tb{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin:14px 0 10px}
-    h2{font-size:15px;font-weight:700;margin:0}
-    .meta{font-size:9.5px;color:#555;text-align:right}
+    .lh{text-align:center;padding-bottom:4mm;border-bottom:.5pt solid #cfd2d7;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .lh img{display:block;margin:0 auto 3mm;width:48mm;height:auto}
+    .lh .n{font-family:Inter,'Helvetica Neue',Arial,sans-serif;font-size:14.5pt;font-weight:600;letter-spacing:.17em;text-transform:uppercase;color:#15171c}
+    .lh .r{width:18mm;border-top:.9pt solid #b3141f;margin:2.2mm auto 2mm}
+    .lh .l{font-size:7.6pt;color:#5d6470;letter-spacing:.02em;margin-top:.6mm}
+    .tb{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin:5mm 0 4mm;padding-bottom:3mm;border-bottom:1pt solid #15171c}
+    h2{font-family:Inter,'Helvetica Neue',Arial,sans-serif;font-size:16pt;font-weight:600;margin:0}
+    .meta{font-size:8pt;color:#15171c;background:#f6f6f3;border:.5pt solid #e3e5e9;border-left:1.5pt solid #b3141f;padding:1.6mm 3mm}
+    tbody tr:nth-child(even) td{background:#f8f8f6}
     table{border-collapse:collapse;width:100%}
     thead{display:table-header-group}
     th{text-align:left;font-size:9px;font-weight:700;color:#333;text-transform:uppercase;letter-spacing:.04em;padding:6px 8px;border-top:1.2px solid #111;border-bottom:.75px solid #111}
@@ -100,20 +106,21 @@ export function hrExportPDF(title, rows, cols, company = {}) {
       @bottom-right{content:"Page " counter(page) " of " counter(pages);font:8px Inter,Arial,sans-serif;color:#666}}
     @media print{.print-btn{display:none}body{margin:0}}</style></head><body>
     <button class="print-btn" onclick="window.print()">Print / Save as PDF</button>
-    <div class="lh">${co.logo ? `<img src="${esc(co.logo)}" alt=""/>` : ""}<div class="n">${esc(name)}</div>${co.address ? `<div class="l">${esc(co.address)}</div>` : ""}${contact ? `<div class="l">${esc(contact)}</div>` : ""}</div>
+    <div class="lh"><img src="${esc(logo)}" alt="SHANTAZ"/><div class="n">${esc(name)}</div><div class="r"></div>${co.address ? `<div class="l">${esc(co.address)}</div>` : ""}${contact ? `<div class="l">${esc(contact)}</div>` : ""}</div>
     <div class="tb"><h2>${esc(title)}</h2><div class="meta">${rows.length} record${rows.length === 1 ? "" : "s"}</div></div>
     <table><thead><tr>${hdr}</tr></thead><tbody>${body}</tbody></table>
-    <div class="foot">Generated from ERP records on ${esc(generated)}.</div>
+    <div class="foot">Generated from ERP records on ${esc(generated)}. This is a computer-generated document · Confidential, internal use only.</div>
   </body></html>`);
   w.document.close();
 }
 
-export function HRFilterBar({ search, setSearch, dateFrom, setDateFrom, dateTo, setDateTo, vendorFilter, setVendorFilter, vendorList, itemFilter, setItemFilter, allItems, machineFilter, setMachineFilter, machineLog, serialFilter, setSerialFilter, showVendor=true, showItem=true, showMachine=false, showSerial=false, onReset }) {
+// 2026-11-04 (fix/perf-2) — memo: the bar (2,000+ <option>s) re-renders only when its own props change.
+export const HRFilterBar = React.memo(function HRFilterBar({ search, setSearch, dateFrom, setDateFrom, dateTo, setDateTo, vendorFilter, setVendorFilter, vendorList, itemFilter, setItemFilter, allItems, machineFilter, setMachineFilter, machineLog, serialFilter, setSerialFilter, showVendor=true, showItem=true, showMachine=false, showSerial=false, onReset }) {
   return (
     <div className="flex flex-wrap items-center gap-2 px-6 py-3" style={{ background: "rgba(17,24,39,0.03)", borderBottom: "1px solid rgba(17,24,39,0.04)" }}>
       <div className="relative">
-        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs">🔍</span>
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Global search…"
+        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs"><Glyph e="🔍" size={13} /></span>
+        <DebouncedSearchInput value={search} onChange={setSearch} placeholder="Global search…"
           className="bg-slate-50 border border-slate-200 rounded-lg pl-7 pr-3 py-1.5 text-xs text-slate-700 placeholder-slate-400 outline-none focus:border-blue-500/40 w-52" />
       </div>
       <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
@@ -151,7 +158,7 @@ export function HRFilterBar({ search, setSearch, dateFrom, setDateFrom, dateTo, 
       )}
     </div>
   );
-}
+});
 
 export function HRExportBar({ onCSV, onExcel, onPDF }) {
   return (
@@ -212,10 +219,10 @@ export function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, 
   const [machineFilter, setMachineFilter] = useState("");
   const [serialFilter,  setSerialFilter]  = useState("");
 
-  const allItems = Object.values(items).flat();
+  const allItems = useMemo(() => Object.values(items).flat(), [items]);
   const q = search.toLowerCase();
 
-  const resetFilters = () => { setSearch(""); setDateFrom(""); setDateTo(""); setVendorFilter(""); setItemFilter(""); setMachineFilter(""); setSerialFilter(""); };
+  const resetFilters = useCallback(() => { setSearch(""); setDateFrom(""); setDateTo(""); setVendorFilter(""); setItemFilter(""); setMachineFilter(""); setSerialFilter(""); }, []);
 
   const matchDate = (dateStr) => {
     if (!dateFrom && !dateTo) return true;
@@ -495,7 +502,7 @@ export function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, 
           <button key={t.id} onClick={() => setTab(t.id)}
             className="flex items-center gap-1.5 px-3.5 py-2 text-[11px] font-semibold rounded-t-lg transition-all relative"
             style={tab===t.id ? { color:"#2E50D6", background:"rgba(46, 80, 214,0.07)", borderBottom:"2px solid #2E50D6" } : { color:"#475569" }}>
-            <span>{t.icon}</span>{t.label}
+            <span><Glyph e={t.icon} size={14} /></span>{t.label}
           </button>
         ))}
       </div>
@@ -837,7 +844,7 @@ export function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, 
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <div className="text-sm font-black text-slate-900">{v.vendor}</div>
-                          {vd.phone && <div className="text-[10px] text-slate-500 mt-0.5">📞 {vd.phone}</div>}
+                          {vd.phone && <div className="text-[10px] text-slate-500 mt-0.5"><LeadIcon e="📞" />{vd.phone}</div>}
                           {vd.email && <div className="text-[10px] text-slate-500">✉ {vd.email}</div>}
                           {vd.category && <div className="text-[10px] text-slate-600 mt-1">{vd.category}</div>}
                         </div>
@@ -1001,7 +1008,7 @@ export function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, 
               }}
                 className="px-4 py-2.5 rounded-xl text-xs font-bold text-white transition-all hover:scale-[1.02] active:scale-[0.98]"
                 style={{ background: "#2640B0", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
-                📥 Download Report
+                <LeadIcon e="📥" />Download Report
               </button>
             </div>
 
@@ -1015,7 +1022,7 @@ export function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, 
               ].map((k) => (
                 <div key={k.label} className="rounded-xl p-4" style={CARD_STYLE}>
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="text-lg">{k.icon}</span>
+                    <span className="text-lg"><Glyph e={k.icon} size={18} /></span>
                     <span className="text-[10px] text-slate-500">{k.label}</span>
                   </div>
                   <div className="text-xl font-black" style={{color:k.color}}>{k.value}</div>

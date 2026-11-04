@@ -1,6 +1,7 @@
 // src/modules/settings/ChecklistAdminPanel.jsx — moved verbatim from the former single-file src/App.jsx
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
 import React, { useState } from "react";
+import { LeadIcon } from "../../shared/components/LeadIcon.jsx";
 import { SLabel, Section } from "./settingsUi.jsx";
 
 // ── Phase B — Checklist admin panel (Settings tab) ───────────────────────
@@ -181,7 +182,7 @@ export function ChecklistAdminPanel({ templates = [], canConfig = false, onCreat
               </button>
             )}
           </div>
-          {err && <div className="text-[11px] font-semibold text-red-300">⚠ {err}</div>}
+          {err && <div className="text-[11px] font-semibold text-red-300"><LeadIcon e="⚠" />{err}</div>}
         </div>
       )}
     </Section>

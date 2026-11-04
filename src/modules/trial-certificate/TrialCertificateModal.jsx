@@ -1,6 +1,7 @@
 // src/modules/trial-certificate/TrialCertificateModal.jsx — moved verbatim from the former single-file src/App.jsx
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
 import React, { useState, useRef } from "react";
+import { LeadIcon } from "../../shared/components/LeadIcon.jsx";
 import { computeOverrun, formatDuration } from "../../utils/handoverLogic.js";
 import { TC_BTN_GHOST, TC_BTN_PRIMARY, TC_CARD, TC_CELL, TC_FRQ_FIELDS, TC_INP, TC_SHEET_CSS, TC_SPEEDS, TC_TD, TC_TH, TC_TIMING_FIELDS, TRIAL_CHECKPOINTS, TcLabel, TcPreviewFrame, TcReadOnly, TcSectionHead, TcStepper, TrialCertificateSheet, mkTrialCert, printTrialCertificate, tcFmtDate, tcSigSrc } from "./TrialCertificateSheet.jsx";
 import { SignaturePad } from "../../shared/ui/SignaturePad.jsx";
@@ -127,7 +128,7 @@ export function TrialCertificateModal({ machine, nowTick, workflow, busy, onClos
     }
     return (
       <button type="button" onClick={() => setOpen(true)} className={TC_BTN_GHOST + " !py-1.5"}>
-        ✍ Draw signature
+        <LeadIcon e="✍" />Draw signature
       </button>
     );
   };
@@ -261,7 +262,7 @@ export function TrialCertificateModal({ machine, nowTick, workflow, busy, onClos
       {isOverrun && (
         <section className="rounded-xl border border-amber-300 bg-amber-50 p-4 md:p-5">
           <div className="text-[12px] font-bold text-amber-900 mb-2">
-            ⚠ Overrun by {formatDuration(overrunMinutes)} — explanation required
+            <LeadIcon e="⚠" />Overrun by {formatDuration(overrunMinutes)} — explanation required
           </div>
           <textarea value={narration} onChange={(e) => setNarration(e.target.value)} rows={2}
                     placeholder="Briefly explain why the Trial took longer than expected…"
@@ -295,7 +296,7 @@ export function TrialCertificateModal({ machine, nowTick, workflow, busy, onClos
 
       {formError && (
         <div className="rounded-lg border border-red-300 bg-red-50 px-4 py-2.5 text-[12px] font-semibold text-red-700">
-          ⚠ {formError}
+          <LeadIcon e="⚠" />{formError}
         </div>
       )}
     </>
@@ -357,7 +358,7 @@ export function TrialCertificateModal({ machine, nowTick, workflow, busy, onClos
               ← Back to Edit
             </button>
             <button type="button" onClick={() => printTrialCertificate(machine, cert, narration.trim(), company)} className={TC_BTN_GHOST}>
-              🖨 Print / Save as PDF
+              <LeadIcon e="🖨" />Print / Save as PDF
             </button>
             <div className="ml-auto flex flex-wrap items-center gap-3">
               {incomplete.length > 0 && (
@@ -400,7 +401,7 @@ export function TrialCertificatePrintModal({ machine, onClose, company = null })
             </div>
           </div>
           <button type="button" onClick={() => printTrialCertificate(machine, cert, "", company)} className={TC_BTN_PRIMARY} style={{ color: "#fff" }}>
-            🖨 Print / Save as PDF
+            <LeadIcon e="🖨" />Print / Save as PDF
           </button>
           <button type="button" aria-label="Close" onClick={onClose}
                   className="text-slate-600 hover:text-slate-900 text-xl leading-none px-1 transition-colors">✕</button>
