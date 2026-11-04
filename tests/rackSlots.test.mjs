@@ -553,7 +553,9 @@ test("App + migration 052: pending items added at BOM Outward", async () => {
 
   // 1 — the option exists in BOM Outward, and only where a machine exists
   assert.match(app, /data-add-pending-item onClick=\{\(\) => setExtraPending\(\[emptyPendingJob\(\)\]\)\}/);
-  assert.match(app, /\{serialNo && !rackSet && \([\s\S]{0,400}?data-extra-pending/);
+  // 2026-11-04 — also on Fill Rack (owner bug: both BOM entry points must match);
+  // only an R crate with no machine to hang the job on hides it.
+  assert.match(app, /\{serialNo && !\(rackSet && rackSet\.mode === "crate" && rackSet\.machineId == null\) && \([\s\S]{0,400}?data-extra-pending/);
   assert.match(app, /<PendingJobRows rows=\{extraPending\} onChange=\{setExtraPending\} inventory=\{allFlat\}\s*\n\s*addLabel="\+ Add Pending Item" mode="item" \/>/);
 
   // 2/3 — Item Master code or a hand-typed name; Critical / Normal; part serial
