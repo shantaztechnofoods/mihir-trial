@@ -80,7 +80,7 @@ import { useOnline } from "./components/OfflineBanner.jsx";
 import { pulseOffline } from "./utils/online.js";
 import { isReadyPopupRole, newReadySince, readyAtOf, trialSignedBy, readLastSeenReady, writeLastSeenReady, formatReadyWhen } from "./utils/readyPopup.js";
 import { receivedPoRates, bomCostLines, bomCostSummary, validateBomLines, formatINR, RATE_SOURCE_LABEL } from "./utils/bomCost.js";
-import { VOICE_MAX_SECONDS, pickVoiceMime, baseMime, voiceFileName, voiceCaption, isVoiceAttachment, voiceNotesFor, formatClock, micErrorMessage, clearVoiceText, transcribeVoiceBlob, fillTranscript, VOICE_WRITING_TEXT, VOICE_WRITE_PROMPT } from "./utils/voiceNote.js";
+import { VOICE_MAX_SECONDS, pickVoiceMime, baseMime, isVoiceAttachment, voiceNotesFor, formatClock, micErrorMessage, transcribeVoiceBlob, VOICE_WRITING_TEXT, VOICE_WRITE_PROMPT, tidySpoken, appendSpoken, isAppleMobile, readVoiceLang } from "./utils/voiceNote.js";
 import { PHYSICAL_RACK_LAYOUT, rackOfBom, physicalRackFamily, physicalRackSlots, rackCapacityFor, buildFamilyRacks, firstFreeSlot, canAssignSlot, slotLabel, rackKeyNorm, rackViewLog, setSlotOf, setLabel, pairSlotOf, bomFillCheck, rCrateIssues, rackBoms, freeSlotsFor, tierOfSlot } from "./utils/rackSlots.js";
 import { getActiveCompany, normalizePOSettings, openPOPdf, PO_TEMPLATE_OPTIONS } from "./utils/poTemplate.js";
 import {
@@ -92,7 +92,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-03-assembly-start";
+const APP_BUILD = "2026-11-04-harden-1";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -16621,14 +16621,11 @@ function AttachmentLink({ attachment }) {
   );
 }
 
-// ── Voice notes (2026-11-03) ──────────────────────────────────────────────
-// A voice note is an ordinary machine attachment (audio/*), uploaded through
-// the same onUploadAttachment path as photos. The words are written into the
-// text box by the voice-transcribe Edge Function (auto language, no
-// translation). Text fields save exactly as before; the words stay editable.
+// ── Voice (2026-11-03, changed 2026-11-04) ───────────────────────────────
+// Since 2026-11-04 the 🎤 only writes TEXT (no audio is saved). Voice notes
+// saved before that are ordinary machine attachments (audio/*) and still
+// play in history below.
 
-// Report Issue dictation fallback still listens for this event (no picker any more).
-const VN_LANG_EVENT = "erp-voice-lang";
 
 // Plays one saved voice note (signed URL in Supabase mode, data: URL locally).
 function VoicePlayButton({ attachment, big = false, label = "" }) {
@@ -16691,139 +16688,152 @@ function transcribeVoice(blob) {
   return transcribeVoiceBlob(blob, invoke);
 }
 
-// Small 🎤 icon INSIDE the text box (pass the box as `children`) + a one-line
-// recording bar + a one-line saved player. 2026-11-03 (owner): no language
-// picker and no big Record button — after Stop the saved audio is sent to the
-// voice-transcribe Edge Function (auto language: writes Gujarati / Hindi /
-// English as spoken) and the words fill a still-empty box (editable). If that
-// fails (or local/offline mode) the worker is asked to type them; the box
-// stays required — reports need TEXT.
-function VoiceNoteRecorder({ machineId, department, place, item = "", onUpload, onDelete = null, canRemove = false, setText = null, disabled = false, children = null }) {
-  const [phase, setPhase] = useState("idle"); // idle | starting | recording | saving | saved | error
+// Small 🎤 icon INSIDE the text box (pass the box as `children`).
+// 2026-11-04 (owner): the mic only WRITES TEXT into the box — no audio is
+// saved, no player, no "voice note saved". Tap 🎤 → "Listening… 0:05" + Stop
+// inside the box; Stop → "Writing…" → the clip goes straight to the
+// voice-transcribe Edge Function (clean sentences, same language/script, no
+// translation) and is then discarded. Browser dictation (where it can run
+// next to the recorder) is only a live preview + the fallback if the server
+// fails. Both fail → the box turns red: "Could not hear — please type".
+// The box's own required-check is unchanged. Old saved voice notes still
+// play in history (VoicePlayButton / VoiceNoteLine).
+function VoiceNoteRecorder({ place, setText = null, disabled = false, children = null }) {
+  const [phase, setPhase] = useState("idle"); // idle | starting | recording | writing
   const [secs, setSecs]   = useState(0);
   const [err, setErr]     = useState("");
-  const [writing, setWriting] = useState(false);
-  const [att, setAtt]     = useState(null);
-  const [localUrl, setLocalUrl] = useState("");
-  const [playing, setPlaying]   = useState(false);
-  const [askRemove, setAskRemove] = useState(false);
-  const [removing, setRemoving]   = useState(false);
-  const r = useRef({ rec: null, stream: null, timer: null, t0: 0, chunks: [], discard: false, file: null, tx: 0 });
-  const audioRef = useRef(null);
+  const [preview, setPreview] = useState("");
+  const r = useRef({ rec: null, sr: null, stream: null, timer: null, t0: 0, chunks: [], finals: "", interim: "", discard: false, tx: 0, stopping: false });
+  const fieldRef = useRef(null);
   const textRef = useRef(setText); textRef.current = setText;
 
-  const stopAll = () => {
+  const flagBox = () => {
+    try {
+      const el = fieldRef.current && fieldRef.current.querySelector("input, textarea");
+      if (!el) return;
+      el.classList.remove("field-bad"); void el.offsetWidth; el.classList.add("field-bad");
+      setTimeout(() => el.classList.remove("field-bad"), 2600);
+    } catch { /* ignore */ }
+  };
+  const releaseMic = () => {
     const s = r.current;
     if (s.timer) { clearInterval(s.timer); s.timer = null; }
-    try { if (s.rec && s.rec.state !== "inactive") s.rec.stop(); } catch {}
-  };
-  useEffect(() => () => {
-    r.current.discard = true; stopAll();
-    try { r.current.stream && r.current.stream.getTracks().forEach((t) => t.stop()); } catch {}
-    try { audioRef.current && audioRef.current.pause(); } catch {}
-  }, []);
-  useEffect(() => () => { if (localUrl) { try { URL.revokeObjectURL(localUrl); } catch {} } }, [localUrl]);
-
-  const upload = async (file) => {
-    setPhase("saving"); setErr("");
-    const res = await onUpload({ machineId, department, stage: department, file, caption: voiceCaption(place, item), isCustomerVisible: false });
-    if (!res || res.success === false) {
-      r.current.file = file;
-      setPhase("error"); setErr(`NOT SAVED — ${(res && res.error) || "try again"}`);
-      return;
-    }
-    r.current.file = null;
-    setAtt(res.attachment || null);
-    setPhase("saved");
-    if (!textRef.current) return;
-    const tx = ++r.current.tx;
-    setWriting(true); setErr("");
-    const out = await transcribeVoice(file);
-    if (r.current.discard || tx !== r.current.tx) return;
-    setWriting(false);
-    if (!textRef.current) return;
-    // fillTranscript only fills a still-empty box; never overwrites typing.
-    if (out.ok) { textRef.current((prev) => fillTranscript(prev, out.text)); return; }
-    textRef.current((prev) => {
-      if (!String(prev || "").trim() || String(prev).trim() === "🎤 Voice note") {
-        setTimeout(() => setErr(VOICE_WRITE_PROMPT), 0);
-        return "";
-      }
-      return prev;
-    });
-  };
-
-  const finish = () => {
-    const s = r.current;
+    try { s.sr && s.sr.stop(); } catch {}
     try { s.stream && s.stream.getTracks().forEach((t) => t.stop()); } catch {}
     s.stream = null;
+  };
+  useEffect(() => () => {
+    const s = r.current; s.discard = true; s.tx++;
+    try { if (s.rec && s.rec.state !== "inactive") s.rec.stop(); } catch {}
+    releaseMic();
+  }, []);
+
+  const liveText = () => { const s = r.current; return tidySpoken(`${s.finals} ${s.interim}`); };
+
+  // Final text: server first, then the live dictation, else ask to type.
+  const writeOut = async (blob) => {
+    const s = r.current;
+    const tx = ++s.tx;
+    setPhase("writing"); setErr("");
+    // Give browser dictation a moment to deliver its last words.
+    await new Promise((res) => setTimeout(res, 250));
+    let out = { ok: false, text: "" };
+    if (blob && blob.size) out = await transcribeVoice(blob);
+    if (s.discard || tx !== s.tx) return;
+    const text = out.ok ? String(out.text).trim() : liveText();
+    s.finals = ""; s.interim = ""; s.chunks = [];
+    setPreview(""); setPhase("idle");
+    if (!text) { setErr(VOICE_WRITE_PROMPT); flagBox(); return; }
+    if (textRef.current) textRef.current((prev) => appendSpoken(prev, text));
+  };
+
+  const stop = () => {
+    const s = r.current;
+    if (s.stopping) return;
+    s.stopping = true;
+    if (s.timer) { clearInterval(s.timer); s.timer = null; }
+    if (s.rec && s.rec.state !== "inactive") { try { s.rec.stop(); return; } catch {} }
+    // No recorder (dictation-only browser): finish with the live text.
+    releaseMic(); writeOut(null);
+  };
+
+  const onRecStop = () => {
+    const s = r.current;
+    releaseMic();
     if (s.discard) return;
     const type = baseMime((s.rec && s.rec.mimeType) || "") || "audio/webm";
-    const blob = new Blob(s.chunks, { type });
-    s.chunks = [];
-    if (!blob.size) { setPhase("error"); setErr("Nothing was recorded — try again"); return; }
-    const name = voiceFileName(place, Date.now(), type);
-    let file;
-    try { file = new File([blob], name, { type }); } catch { file = blob; try { file.name = name; } catch {} }
-    try { setLocalUrl(URL.createObjectURL(blob)); } catch {}
-    upload(file);
+    const blob = new Blob(s.chunks, { type }); // in memory only — never uploaded or stored
+    writeOut(blob);
+  };
+
+  const startDictation = () => {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) return null;
+    try {
+      const sr = new SR();
+      sr.lang = readVoiceLang(window.localStorage);
+      sr.continuous = true; sr.interimResults = true;
+      sr.onresult = (e) => {
+        const s = r.current; let interim = "";
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          const t = (e.results[i][0] && e.results[i][0].transcript) || "";
+          if (e.results[i].isFinal) s.finals = `${s.finals} ${t}`.trim(); else interim += t;
+        }
+        s.interim = interim;
+        setPreview(liveText());
+      };
+      sr.onerror = () => {};
+      sr.onend = () => { if (r.current.sr === sr) r.current.sr = null; };
+      sr.start();
+      return sr;
+    } catch { return null; }
   };
 
   const start = async () => {
-    if (disabled || phase === "recording" || phase === "starting" || phase === "saving") return;
-    setErr(""); setAskRemove(false);
-    const md = typeof navigator !== "undefined" ? navigator.mediaDevices : null;
-    if (!md || !md.getUserMedia || typeof window.MediaRecorder === "undefined") { setPhase("error"); setErr(micErrorMessage({ name: "unsupported" })); return; }
-    setPhase("starting");
-    let stream;
-    try { stream = await md.getUserMedia({ audio: true }); }
-    catch (e) { setPhase("error"); setErr(micErrorMessage(e)); return; }
+    if (disabled || phase !== "idle") return;
+    setErr(""); setPreview("");
     const s = r.current;
-    if (s.discard) { stream.getTracks().forEach((t) => t.stop()); return; }
-    const mime = pickVoiceMime((m) => window.MediaRecorder.isTypeSupported(m));
-    let rec;
-    try { rec = new window.MediaRecorder(stream, mime ? { mimeType: mime } : undefined); }
-    catch { try { rec = new window.MediaRecorder(stream); } catch (e2) { stream.getTracks().forEach((t) => t.stop()); setPhase("error"); setErr(micErrorMessage(e2)); return; } }
-    s.stream = stream; s.rec = rec; s.chunks = []; s.t0 = Date.now();
-    rec.ondataavailable = (ev) => { if (ev.data && ev.data.size) s.chunks.push(ev.data); };
-    rec.onstop = finish;
-    rec.start(1000);
-    setSecs(0); setPhase("recording");
+    s.finals = ""; s.interim = ""; s.chunks = []; s.stopping = false; s.rec = null; s.sr = null;
+    const md = typeof navigator !== "undefined" ? navigator.mediaDevices : null;
+    const canRecord = !!(md && md.getUserMedia && typeof window.MediaRecorder !== "undefined");
+    const hasSR = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+    if (!canRecord && !hasSR) { setErr(micErrorMessage({ name: "unsupported" })); flagBox(); return; }
+    setPhase("starting");
+    if (canRecord) {
+      let stream;
+      try { stream = await md.getUserMedia({ audio: true }); }
+      catch (e) { setPhase("idle"); setErr(micErrorMessage(e)); return; }
+      if (s.discard) { stream.getTracks().forEach((t) => t.stop()); return; }
+      const mime = pickVoiceMime((m) => window.MediaRecorder.isTypeSupported(m));
+      let rec = null;
+      try { rec = new window.MediaRecorder(stream, mime ? { mimeType: mime } : undefined); }
+      catch { try { rec = new window.MediaRecorder(stream); } catch { rec = null; } }
+      if (!rec) { stream.getTracks().forEach((t) => t.stop()); if (!hasSR) { setPhase("idle"); setErr(micErrorMessage({ name: "unsupported" })); return; } }
+      else {
+        s.stream = stream; s.rec = rec;
+        rec.ondataavailable = (ev) => { if (ev.data && ev.data.size) s.chunks.push(ev.data); };
+        rec.onstop = onRecStop;
+        rec.start(1000);
+      }
+    }
+    // Live preview: not on iPhone/iPad while recording (it fights for the mic).
+    if (hasSR && (!s.rec || !isAppleMobile(navigator))) s.sr = startDictation();
+    if (!s.rec && !s.sr) { releaseMic(); setPhase("idle"); setErr(micErrorMessage({ name: "unsupported" })); return; }
+    s.t0 = Date.now(); setSecs(0); setPhase("recording");
     s.timer = setInterval(() => {
       const el = (Date.now() - s.t0) / 1000;
       setSecs(el);
-      if (el >= VOICE_MAX_SECONDS) stopAll();
+      if (el >= VOICE_MAX_SECONDS) stop();
     }, 200);
   };
 
-  const togglePlay = () => {
-    const a = audioRef.current; if (!a) return;
-    if (playing) { a.pause(); setPlaying(false); return; }
-    a.currentTime = 0;
-    const p = a.play(); setPlaying(true);
-    if (p && p.catch) p.catch(() => setPlaying(false));
-  };
-
-  const doRemove = async () => {
-    if (!att || !onDelete) return;
-    setRemoving(true);
-    const res = await onDelete(att.id);
-    setRemoving(false);
-    if (res && res.success === false) { setErr("Could not remove — ask your admin"); setAskRemove(false); return; }
-    try { audioRef.current && audioRef.current.pause(); } catch {}
-    r.current.tx++; setWriting(false);
-    setAtt(null); setLocalUrl(""); setAskRemove(false); setPlaying(false); setErr(""); setPhase("idle");
-    if (textRef.current) textRef.current((prev) => clearVoiceText(prev));
-  };
-
-  const canRecord = (phase === "idle" || phase === "starting" || phase === "error") && !att;
   return (
     <div className="vn-box" data-voice-recorder={place}>
-      <div className={`vn-field${children ? "" : " vn-field-bare"}`}>
+      <div ref={fieldRef} className={`vn-field${children ? "" : " vn-field-bare"}`}>
         {children}
-        {canRecord && (
+        {(phase === "idle" || phase === "starting") && (
           <button type="button" data-voice-record disabled={disabled || phase === "starting"} onClick={start}
-                  aria-label="Speak (voice note)" title="Speak"
+                  aria-label="Speak — words are written in the box" title="Speak"
                   className="vn-mic">
             {phase === "starting" ? <span className="vn-spin" aria-hidden="true" /> : (
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -16832,45 +16842,21 @@ function VoiceNoteRecorder({ machineId, department, place, item = "", onUpload, 
             )}
           </button>
         )}
-        {phase === "saving" && <span className="vn-mic vn-mic-busy" aria-label="Saving voice note"><span className="vn-spin" aria-hidden="true" /></span>}
+        {phase === "writing" && <span className="vn-mic vn-mic-busy" aria-hidden="true"><span className="vn-spin" /></span>}
         {phase === "recording" && (
           <div data-voice-live className="vn-bar" role="status">
             <span className="vn-dot" aria-hidden="true" />
-            <span className="vn-bar-text">Recording… <span className="tabular-nums" data-voice-clock>{formatClock(secs)}</span></span>
+            <span className="vn-bar-text">Listening… <span className="tabular-nums" data-voice-clock>{formatClock(secs)}</span></span>
             <span className="vn-bar-max tabular-nums">/ {formatClock(VOICE_MAX_SECONDS)}</span>
-            <button type="button" data-voice-stop onClick={stopAll} aria-label="Stop recording" className="vn-stop">
+            <button type="button" data-voice-stop onClick={stop} aria-label="Stop and write the words" className="vn-stop">
               <span aria-hidden="true" className="vn-stop-sq" />Stop
             </button>
           </div>
         )}
       </div>
-      {att && (phase === "saved" || phase === "error") && (
-        <div data-voice-player className="vn-saved">
-          {localUrl ? (
-            <>
-              <audio ref={audioRef} src={localUrl} preload="metadata" onEnded={() => setPlaying(false)} />
-              <button type="button" data-voice-local-play onClick={togglePlay} aria-label={playing ? "Pause" : "Play"} className="vn-play-sm">{playing ? "❚❚" : "▶"}</button>
-            </>
-          ) : <VoicePlayButton attachment={att} />}
-          <span className="vn-saved-text" data-voice-saved>✓ Saved</span>
-          <span className="vn-saved-time tabular-nums">{formatClock(secs)}</span>
-          {canRemove && onDelete && !askRemove && (
-            <button type="button" data-voice-remove onClick={() => setAskRemove(true)} aria-label="Remove voice note" className="vn-del">Remove</button>
-          )}
-          {askRemove && (
-            <div className="w-full flex items-center gap-2 flex-wrap pt-1" data-voice-remove-ask>
-              <span className="text-[12.5px] font-bold text-slate-900">Are you sure? Remove this voice note?</span>
-              <button type="button" data-voice-remove-yes disabled={removing} onClick={doRemove} className="vn-yes">{removing ? "Please wait…" : "Yes, remove"}</button>
-              <button type="button" disabled={removing} onClick={() => setAskRemove(false)} className="vn-no">No, keep</button>
-            </div>
-          )}
-        </div>
-      )}
-      {phase === "error" && !att && r.current.file && (
-        <button type="button" data-voice-retry onClick={() => upload(r.current.file)} className="vn-retry">↻ Try saving again</button>
-      )}
-      {writing && <div data-voice-writing className="vn-note" style={{ color: "#2640B0" }}>{VOICE_WRITING_TEXT}</div>}
-      {err && <div data-voice-error className="vn-note" style={{ color: "#b91c1c" }}>{err}</div>}
+      {phase === "recording" && preview && <div data-voice-preview className="vn-note vn-preview">{preview}</div>}
+      {phase === "writing" && <div data-voice-writing className="vn-note vn-writing" role="status">{VOICE_WRITING_TEXT}</div>}
+      {err && phase !== "writing" && <div data-voice-error className="vn-note" style={{ color: "#b91c1c" }}>{err}</div>}
     </div>
   );
 }
@@ -18535,56 +18521,15 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
   const [raiseErr,   setRaiseErr]   = useState("");
   const [raiseBusy,  setRaiseBusy]  = useState(false);
   const [raisePart,  setRaisePart]  = useState(emptyPendingJob()); // optional missing part on a reported issue
-  const [voiceActive, setVoiceActive] = useState(false);
-  const voiceRecRef = React.useRef(null);
-  // 2026-11-03 — voice notes: the 🎤 Record button saves an audio attachment
-  // through the same upload path (and permission) as photos.
-  const canVoice = !!onUploadAttachment && canFinishTransfer(canDo);
-  const vnProps = (machineId, department) => ({ machineId, department, onUpload: onUploadAttachment, onDelete: onDeleteAttachment, canRemove: canConfigureDept(canDo) });
+  // 2026-11-04 (owner) — the 🎤 inside a text box only writes TEXT into
+  // that box (no audio saved), so it is offered wherever the box is shown.
+  const canVoice = true;
   const voiceUserName = (id) => {
     if (!id) return "";
     const u = (allUsers || []).find((x) => x.id === id);
     if (u) return u.fullName || u.username || "";
     return currentUser && currentUser.id === id ? (currentUser.fullName || currentUser.username || "") : "";
   };
-
-  // Voice input helper — Web Speech API (Hindi + English fallback)
-  // 2026-11-03 (owner) — no language picker any more: this fallback dictation
-  // (only for a login that cannot save voice notes) uses the language last
-  // remembered on this phone, else Hindi.
-  const [voiceLang, setVoiceLang] = useState(() => { try { return localStorage.getItem("erp_voice_lang") || "hi-IN"; } catch { return "hi-IN"; } });
-  useEffect(() => { const on = (e) => setVoiceLang(e.detail); window.addEventListener(VN_LANG_EVENT, on); return () => window.removeEventListener(VN_LANG_EVENT, on); }, []);
-  const voiceLangRef = React.useRef(voiceLang); voiceLangRef.current = voiceLang;
-  const toggleVoice = React.useCallback((targetSetter) => {
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) { setRaiseErr("Voice input is not supported in this browser."); return; }
-    if (voiceRecRef.current) {
-      voiceRecRef.current.stop();
-      voiceRecRef.current = null;
-      setVoiceActive(false);
-      return;
-    }
-    const rec = new SR();
-    rec.lang = voiceLangRef.current || "hi-IN";
-    rec.continuous = true;
-    rec.interimResults = false;
-    rec.onresult = (e) => {
-      let txt = "";
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        if (e.results[i].isFinal) txt += e.results[i][0].transcript;
-      }
-      if (txt) targetSetter((prev) => (prev ? prev + " " : "") + txt.trim());
-    };
-    rec.onerror = (e) => {
-      if (e.error !== "aborted") setRaiseErr("Voice error: " + e.error);
-      voiceRecRef.current = null;
-      setVoiceActive(false);
-    };
-    rec.onend = () => { voiceRecRef.current = null; setVoiceActive(false); };
-    rec.start();
-    voiceRecRef.current = rec;
-    setVoiceActive(true);
-  }, []);
 
   const [toast,    setToast]    = useState(null);
   const [issuePopup, setIssuePopup] = useState(null); // pendingHandoverItem for the detail popup
@@ -22633,7 +22578,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                 // 2026-11-03 — the 🎤 is a small icon inside the remark box.
                 return !isReceive && canVoice ? (
                   <div data-job-remark-voice>
-                    <VoiceNoteRecorder {...vnProps(p.machineId, p.assignedDepartment || m?.currentDepartment || "")} place="Work completed" item={p.description || ""}
+                    <VoiceNoteRecorder place="Work completed" item={p.description || ""}
                                        disabled={!!jobAction.busy} setText={(fn) => setJobAction((prev) => prev ? { ...prev, notes: fn(prev.notes || ""), error: "" } : prev)}>{remarkBox}</VoiceNoteRecorder>
                   </div>
                 ) : remarkBox;
@@ -22685,17 +22630,16 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
           });
           setRaiseBusy(false);
           if (r && r.success === false) { setRaiseErr(r.error || "Could not save the issue."); return; }
-          if (voiceRecRef.current) { voiceRecRef.current.stop(); voiceRecRef.current = null; setVoiceActive(false); }
           setRaiseModal(null);
           showToast(`${m.bomKey}${m.serialNo ? ` — ${m.serialNo}` : ""}`, `${raiseDept} called · issue is tracked in Pending Jobs`, "urgent");
         };
         return (
         <div className="modal-backdrop fixed inset-0 z-[70] flex items-center justify-center p-4"
              style={{ background: "rgba(17,24,39,0.45)", backdropFilter: "blur(12px)" }}
-             onClick={(e) => { if (e.target === e.currentTarget && !raiseBusy) { if (voiceRecRef.current) { voiceRecRef.current.stop(); voiceRecRef.current = null; setVoiceActive(false); } setRaiseModal(null); } }}>
+             onClick={(e) => { if (e.target === e.currentTarget && !raiseBusy) { setRaiseModal(null); } }}>
           <div className="relative w-full max-w-lg rounded-2xl p-6"
                style={{ background: "var(--surface-raised)", border: "1px solid rgba(239,68,68,0.35)", boxShadow: "0 24px 70px rgba(17,24,39,0.2)" }}>
-            <ModalX disabled={raiseBusy} onClose={() => { if (voiceRecRef.current) { voiceRecRef.current.stop(); voiceRecRef.current = null; setVoiceActive(false); } setRaiseModal(null); }} />
+            <ModalX disabled={raiseBusy} onClose={() => { setRaiseModal(null); }} />
             <h3 className="text-base font-black text-slate-800 mb-1">Report an issue</h3>
             <p className="text-[11px] text-slate-500 mb-4">
               {m.bomKey}{m.serialNo ? ` · S/N ${m.serialNo}` : ""} · in {here}
@@ -22708,29 +22652,12 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
               const issueBox = (
                 <textarea id="raise-desc" rows={3} value={raiseText} disabled={raiseBusy}
                           onChange={(e) => setRaiseText(e.target.value)}
-                          placeholder={voiceActive ? "🎙 Listening…" : "e.g. noise coming from the gearbox"}
+                          placeholder="e.g. noise coming from the gearbox"
                           className="w-full rounded-lg px-3 py-2.5 pr-12 text-[13px] text-slate-800 outline-none resize-y"
-                          style={{ background: "var(--surface-elevated)", border: voiceActive ? "2px solid #ef4444" : "1px solid rgba(17,24,39,0.12)" }} />
+                          style={{ background: "var(--surface-elevated)", border: "1px solid rgba(17,24,39,0.12)" }} />
               );
-              // 2026-11-03 — one small 🎤 inside the box, no language picker. A
-              // login that cannot save voice notes keeps browser dictation (in
-              // the phone's remembered / default language).
-              return canVoice ? (
-                <VoiceNoteRecorder {...vnProps(m.id, here)} place="Report Issue" setText={setRaiseText} disabled={raiseBusy || voiceActive}>{issueBox}</VoiceNoteRecorder>
-              ) : (
-                <div className="vn-field">
-                  {issueBox}
-                  {(window.SpeechRecognition || window.webkitSpeechRecognition) && (
-                    <button type="button" disabled={raiseBusy}
-                            onClick={() => toggleVoice(setRaiseText)}
-                            className="vn-mic" aria-label={voiceActive ? "Stop voice" : "Voice input"}
-                            title={voiceActive ? "Stop voice" : "Voice input"}
-                            style={voiceActive ? { background: "#dc2626", color: "#fff", borderColor: "#dc2626" } : undefined}>
-                      {voiceActive ? "■" : "🎤"}
-                    </button>
-                  )}
-                </div>
-              );
+              // 2026-11-04 — the same small 🎤 as every other box: writes text only.
+              return <VoiceNoteRecorder place="Report Issue" setText={setRaiseText} disabled={raiseBusy}>{issueBox}</VoiceNoteRecorder>;
             })()}
 
             {/* 2026-10-30 — optional missing part, so the job is traceable. */}
@@ -22780,7 +22707,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
             )}
 
             <div className="flex gap-2 mt-5">
-              <button type="button" onClick={() => { if (voiceRecRef.current) { voiceRecRef.current.stop(); voiceRecRef.current = null; setVoiceActive(false); } setRaiseModal(null); }} disabled={raiseBusy}
+              <button type="button" onClick={() => { setRaiseModal(null); }} disabled={raiseBusy}
                       className="mt-cancel flex-1 h-11 rounded-lg text-[13px] font-bold text-slate-600 border transition-all disabled:opacity-40"
                       style={{ borderColor: "rgba(17,24,39,0.12)" }}>
                 Cancel
@@ -23112,7 +23039,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                         />
                       );
                       return canVoice ? (
-                        <VoiceNoteRecorder {...vnProps(machine.id, fromDepartment)} place="Delay reason" disabled={transferBusy}
+                        <VoiceNoteRecorder place="Delay reason" disabled={transferBusy}
                                            setText={(fn) => setFinishModal((prev) => prev ? { ...prev, narration: fn(prev.narration || "") } : prev)}>{delayBox}</VoiceNoteRecorder>
                       ) : delayBox;
                     })()}
@@ -23138,7 +23065,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                       onToggle={(i, v) => setFinishModal((prev) => prev ? { ...prev, answers: toggleAnswer(prev.answers, i, v) } : prev)}
                       onRemark={(i, t) => setFinishModal((prev) => prev ? { ...prev, answers: setAnswerRemark(prev.answers, i, t) } : prev)}
                       voice={canVoice ? (i, a, field) => (
-                        <VoiceNoteRecorder {...vnProps(machine.id, fromDepartment)} place="Transfer checklist" item={a.label} disabled={transferBusy}
+                        <VoiceNoteRecorder place="Transfer checklist" item={a.label} disabled={transferBusy}
                                            setText={(fn) => setFinishModal((prev) => prev ? { ...prev, answers: setAnswerRemark(prev.answers, i, fn((prev.answers[i] || {}).remark || "")) } : prev)}>{field}</VoiceNoteRecorder>
                       ) : null} />
                   </div>
@@ -23154,7 +23081,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                   </div>
                   <PendingJobRows rows={finishModal.owedItems || []} inventory={inventoryFlat} disabled={transferBusy}
                                   addLabel="+ Add Pending Item" mode="item" allowComment
-                                  renderVoice={canVoice ? (i, r, setText, field) => <VoiceNoteRecorder {...vnProps(machine.id, fromDepartment)} place="Pending item" item={r.description} disabled={transferBusy} setText={setText || null}>{field}</VoiceNoteRecorder> : null}
+                                  renderVoice={canVoice ? (i, r, setText, field) => <VoiceNoteRecorder place="Pending item" item={r.description} disabled={transferBusy} setText={setText || null}>{field}</VoiceNoteRecorder> : null}
                                   onChange={(rows) => setFinishModal((prev) => prev ? { ...prev, owedItems: rows } : prev)} />
                   {pendingItemsProblem(finishModal.owedItems) && <div data-pending-item-problem className="mt-1.5 text-[11px] font-semibold" style={{ color: "#b45309" }}>{pendingItemsProblem(finishModal.owedItems)}</div>}
                 </div>
@@ -23275,7 +23202,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                   className="w-full bg-white border-2 border-red-200 rounded-lg px-3 py-2 text-[14px] text-slate-900 outline-none focus:border-red-400" />
                       );
                       return acceptModal.holdPick === "Other" && canVoice ? (
-                        <VoiceNoteRecorder {...vnProps(handover.machineId, handover.toDepartment)} place="Late reason" disabled={!!acceptModal.busy}
+                        <VoiceNoteRecorder place="Late reason" disabled={!!acceptModal.busy}
                                            setText={(fn) => setAcceptModal((prev) => prev ? { ...prev, holdReason: fn(prev.holdReason || ""), error: "" } : prev)}>{lateBox}</VoiceNoteRecorder>
                       ) : lateBox;
                     })()}
@@ -23380,7 +23307,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                           onToggle={(i, v) => setAcceptModal((prev) => prev ? { ...prev, error: "", checklistAnswers: toggleAnswer(prev.checklistAnswers, i, v) } : prev)}
                           onRemark={(i, t) => setAcceptModal((prev) => prev ? { ...prev, error: "", checklistAnswers: setAnswerRemark(prev.checklistAnswers, i, t) } : prev)}
                           voice={canVoice ? (i, a, field) => (
-                            <VoiceNoteRecorder {...vnProps(handover.machineId, handover.toDepartment)} place="Accept checklist" item={a.label} disabled={!!busy}
+                            <VoiceNoteRecorder place="Accept checklist" item={a.label} disabled={!!busy}
                                                setText={(fn) => setAcceptModal((prev) => prev ? { ...prev, error: "", checklistAnswers: setAnswerRemark(prev.checklistAnswers, i, fn(((prev.checklistAnswers || [])[i] || {}).remark || "")) } : prev)}>{field}</VoiceNoteRecorder>
                           ) : null} />
                       </div>
@@ -23391,7 +23318,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                       {stepHead(stepBase + 1 + (hasChecklist ? 1 : 0), `Anything still pending from ${handover.fromDepartment}?`, false)}
                       <PendingJobRows rows={acceptModal.pendingItemsToRaise || []} inventory={inventoryFlat} disabled={acceptModal.busy}
                                       accent="#dc2626" addLabel="+ Add Pending Item" mode="item" allowComment
-                                      renderVoice={canVoice ? (i, r, setText, field) => <VoiceNoteRecorder {...vnProps(handover.machineId, handover.toDepartment)} place="Pending item" item={r.description} disabled={!!acceptModal.busy} setText={setText || null}>{field}</VoiceNoteRecorder> : null}
+                                      renderVoice={canVoice ? (i, r, setText, field) => <VoiceNoteRecorder place="Pending item" item={r.description} disabled={!!acceptModal.busy} setText={setText || null}>{field}</VoiceNoteRecorder> : null}
                                       onChange={(rows) => setField({ pendingItemsToRaise: rows })} />
                       {pendingItemsProblem(acceptModal.pendingItemsToRaise) && <div data-pending-item-problem className="mt-1.5 text-[11px] font-semibold" style={{ color: "#b45309" }}>{pendingItemsProblem(acceptModal.pendingItemsToRaise)}</div>}
                     </div>
@@ -23512,7 +23439,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                   onToggle={(i, v) => setStartChk((prev) => prev ? { ...prev, error: "", answers: toggleAnswer(prev.answers, i, v) } : prev)}
                   onRemark={(i, t) => setRemark(i, t)}
                   voice={canVoice ? (i, a, field) => (
-                    <VoiceNoteRecorder {...vnProps(machine.id, "Assembly")} place="Assembly start checklist" item={a.label} disabled={!!busy}
+                    <VoiceNoteRecorder place="Assembly start checklist" item={a.label} disabled={!!busy}
                                        setText={(fn) => setRemark(i, fn)}>{field}</VoiceNoteRecorder>
                   ) : null} />
                 {error && (

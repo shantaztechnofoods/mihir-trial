@@ -3,6 +3,7 @@
 
 import { isSupabaseEnabled } from "../config/env.js";
 import { getSupabase } from "../supabase/client.js";
+import { fetchAllRows, readLocalJson } from "../utils/fetchAll.js";
 
 const T_LOCAL = "erp_checklist_templates";
 const R_LOCAL = "erp_checklist_responses";
@@ -70,15 +71,15 @@ function isMissingColumnError(err) {
   return /column .* does not exist|schema cache|could not find the .* column/i.test(err.message || err.details || err.hint || "");
 }
 
-const getLocalT  = () => { try { const s = localStorage.getItem(T_LOCAL); if (s) return JSON.parse(s); } catch {} return []; };
+const getLocalT  = () => readLocalJson(T_LOCAL, []);
 const setLocalT  = (a) => { try { localStorage.setItem(T_LOCAL, JSON.stringify(a)); } catch {} };
-const getLocalR  = () => { try { const s = localStorage.getItem(R_LOCAL); if (s) return JSON.parse(s); } catch {} return []; };
+const getLocalR  = () => readLocalJson(R_LOCAL, []);
 const setLocalR  = (a) => { try { localStorage.setItem(R_LOCAL, JSON.stringify(a)); } catch {} };
 
 export async function fetchTemplates() {
   if (!isSupabaseEnabled()) return getLocalT();
   const c = getSupabase(); if (!c) return getLocalT();
-  const { data, error } = await c.from("checklist_templates").select("*").order("department").order("name");
+  const { data, error } = await fetchAllRows(() => c.from("checklist_templates").select("*").order("department").order("name").order("id"), { tag: "checklists:templates" });
   if (error) { console.warn("[checklists:templates] load failed", error); return getLocalT(); }
   const out = (data || []).map(tFrom);
   setLocalT(out);
@@ -165,7 +166,7 @@ export async function deleteTemplate(id) {
 export async function fetchResponses() {
   if (!isSupabaseEnabled()) return getLocalR();
   const c = getSupabase(); if (!c) return getLocalR();
-  const { data, error } = await c.from("checklist_responses").select("*").order("submitted_at", { ascending: false });
+  const { data, error } = await fetchAllRows(() => c.from("checklist_responses").select("*").order("submitted_at", { ascending: false }).order("id", { ascending: false }), { tag: "checklists:responses" });
   if (error) { console.warn("[checklists:responses] load failed", error); return getLocalR(); }
   const out = (data || []).map(rFrom);
   setLocalR(out);

@@ -1,6 +1,7 @@
 // BOM Definitions store — public.bom_definitions
 import { isSupabaseEnabled } from "../config/env.js";
 import { getSupabase } from "../supabase/client.js";
+import { fetchAllRows, readLocalJson } from "../utils/fetchAll.js";
 
 const LOCAL_KEY = "erp_bomdefs";
 
@@ -83,7 +84,7 @@ function fromRow(r) {
   };
 }
 
-function getLocal() { try { const s = localStorage.getItem(LOCAL_KEY); if (s) return JSON.parse(s); } catch {} return {}; }
+function getLocal() { return readLocalJson(LOCAL_KEY, {}); }
 function setLocal(o) { try { localStorage.setItem(LOCAL_KEY, JSON.stringify(o)); } catch {} }
 
 export async function fetchBOMs() {
@@ -92,7 +93,7 @@ export async function fetchBOMs() {
   if (!isSupabaseEnabled()) { const g = getLocal(); console.info("[boms:load] local ok", { count: Object.keys(g).length }); return g; }
   const c = getSupabase();
   if (!c) return getLocal();
-  const { data, error } = await c.from("bom_definitions").select("*").order("key");
+  const { data, error } = await fetchAllRows(() => c.from("bom_definitions").select("*").order("key"), { tag: "boms:load", key: "key" });
   if (error) { console.error("[boms:load] failed", error); return getLocal(); }
   const out = {};
   for (const r of (data || [])) out[r.key] = fromRow(r);

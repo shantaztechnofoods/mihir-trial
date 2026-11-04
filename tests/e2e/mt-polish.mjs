@@ -112,7 +112,7 @@ ok("phone: build tag hidden while Report Issue is open", !(await badge()));
 // 2. + 11. Report Issue copy and one recorder (2026-11-03: small 🎤 in the box, no language chips)
 const rtext = await p.locator(".modal-backdrop").last().innerText();
 ok("Report Issue says it never blocks Finish & Transfer", /never blocks Finish & Transfer/.test(rtext) && !/stays blocked/.test(rtext));
-ok("Report Issue has one recorder (🎤 Record), no second small 🎤", await p.locator(".modal-backdrop [data-voice-record]").count() === 1 && await p.locator('.modal-backdrop button[title^="Voice input"]').count() === 0);
+ok("Report Issue has one small 🎤 (text only), no second mic", await p.locator(".modal-backdrop [data-voice-record]").count() === 1 && await p.locator('.modal-backdrop button[title^="Voice input"]').count() === 0);
 ok("no language chips (auto language)", await p.locator(".modal-backdrop [data-voice-lang], .modal-backdrop [data-voice-lang-cycle]").count() === 0);
 await cancel.click(); await p.waitForTimeout(300);
 

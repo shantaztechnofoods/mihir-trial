@@ -1,6 +1,7 @@
 // Vendors store — public.vendors CRUD with local fallback.
 import { isSupabaseEnabled } from "../config/env.js";
 import { getSupabase } from "../supabase/client.js";
+import { fetchAllRows, readLocalJson } from "../utils/fetchAll.js";
 
 const LOCAL_KEY = "erp_vendors";
 
@@ -45,8 +46,7 @@ function fromRow(r) {
 }
 
 function getLocal() {
-  try { const s = localStorage.getItem(LOCAL_KEY); if (s) return JSON.parse(s); } catch {}
-  return [];
+  return readLocalJson(LOCAL_KEY, []);
 }
 function setLocal(list) {
   try { localStorage.setItem(LOCAL_KEY, JSON.stringify(list)); } catch {}
@@ -62,7 +62,7 @@ export async function listVendors() {
   }
   const c = getSupabase();
   if (!c) { console.warn("[vendors:list] client null, local fallback"); return getLocal(); }
-  const { data, error } = await c.from("vendors").select("*").order("name", { ascending: true });
+  const { data, error } = await fetchAllRows(() => c.from("vendors").select("*").order("name", { ascending: true }).order("id", { ascending: true }), { tag: "vendors:list" });
   if (error) { console.error("[vendors:list] supabase error", error); return getLocal(); }
   const list = (data || []).map(fromRow);
   setLocal(list);
