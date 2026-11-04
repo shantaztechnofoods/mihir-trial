@@ -77,10 +77,11 @@ export default function LoginBrand3D({ onFail, fullBleed = false }) {
     room.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
 
     // ── materials ──
-    const gearMat = new MeshPhysicalMaterial({ color: 0x6b7280, metalness: 0.9, roughness: 0.32, clearcoat: 0.5, clearcoatRoughness: 0.25, anisotropy: 0.6, transparent: true, opacity: 0 });
-    const wheatA = new MeshPhysicalMaterial({ color: 0x2f6b1f, metalness: 0.1, roughness: 0.42, sheen: 1, sheenColor: new Color(0x9fe07c), sheenRoughness: 0.45, clearcoat: 0.3, clearcoatRoughness: 0.4 });
-    const wheatB = wheatA.clone(); wheatB.color.set(0x3d8a2a);
-    const redMat = new MeshPhysicalMaterial({ color: 0xe4002b, metalness: 0.6, roughness: 0.28, clearcoat: 1, clearcoatRoughness: 0.08 });
+    // gear: polished black gunmetal (true to the black gear in the logo); the cool rim light + bevels make it read on navy
+    const gearMat = new MeshPhysicalMaterial({ color: 0x1c1f24, metalness: 0.95, roughness: 0.26, clearcoat: 1, clearcoatRoughness: 0.12, anisotropy: 0.6, transparent: true, opacity: 0 });
+    const wheatA = new MeshPhysicalMaterial({ color: 0x2a641c, metalness: 0.1, roughness: 0.42, sheen: 1, sheenColor: new Color(0x9fe07c), sheenRoughness: 0.45, clearcoat: 0.3, clearcoatRoughness: 0.4 });
+    const wheatB = wheatA.clone(); wheatB.color.set(0x30701f);
+    const redMat = new MeshPhysicalMaterial({ color: 0xe20014, metalness: 0.15, roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.08, emissive: 0xe20014, emissiveIntensity: 0.12 }); // true logo red
     const tagMat = new MeshStandardMaterial({ color: 0xc3ccdb, metalness: 0.7, roughness: 0.38, transparent: true, opacity: 0 });
 
     // ── geometry from the shared logo definition ──
@@ -155,6 +156,7 @@ export default function LoginBrand3D({ onFail, fullBleed = false }) {
     scene.add(new AmbientLight(0x9fb0d0, 0.25));
     const key = new DirectionalLight(0xeef3ff, 1.4); key.position.set(-3, 4, 6); scene.add(key);
     const rim = new DirectionalLight(0xffb26b, 1.3); rim.position.set(4, 2.5, -4); scene.add(rim);
+    const coolRim = new DirectionalLight(0xa9c8ff, 3.2); coolRim.position.set(-4, 4, 1.2); scene.add(coolRim); // cool rim on the gunmetal gear's edges
     const sweep = new PointLight(0xfff4e6, 0, 0, 2); sweep.position.set(wordL, wordY + 0.2, 0.75); scene.add(sweep);
 
     // ── faint blurred reflection: the logo mirrored under the floor line,

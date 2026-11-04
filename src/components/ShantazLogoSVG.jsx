@@ -7,22 +7,23 @@ import { BRAND, partPath, shantazLogo, toPath } from "./shantazLogoGeometry.js";
 // For the sidebar/header, reports, and the login fallback (reduced motion /
 // no WebGL). Self-contained: needs no CSS.
 //   tone="light"  – real colours, for light backgrounds
-//   tone="dark"   – gear, ® and tagline in light steel so they read on navy
+//   tone="dark"   – gear stays black gunmetal with a fine cool rim line; ® and
+//                   tagline in light steel so they read on navy
 //   shine         – one soft light sweep across the logo (plays once)
 //   showTagline   – drop the tagline for tiny sizes
 export default function ShantazLogoSVG({ tone = "light", shine = false, showTagline = true, className = "", style, title = "SHANTAZ — Innovation for Life" }) {
   const L = shantazLogo();
   const uid = useId().replace(/:/g, "");
   const dark = tone === "dark";
-  const gearFill = dark ? "#AEB7C6" : BRAND.gear;
+  const gearFill = dark ? "#16181C" : BRAND.gear;
   const inkFill = dark ? "#C3CCDB" : BRAND.ink;
   const b = L.box;
   const tagTop = L.tag.baseline - L.tag.size * 0.75;
   const h = showTagline ? b.h : tagTop - 3 - b.y;
-  const g1 = dark ? "#2F6B1F" : BRAND.green, g2 = dark ? "#3D8A2A" : BRAND.green2;
+  const g1 = dark ? "#2C6A1E" : BRAND.green, g2 = dark ? "#327524" : BRAND.green2;
   // flat list of paths (a <clipPath> may only hold shapes, no groups)
   const parts = [
-    { d: toPath(L.gear.outer), fill: gearFill },
+    { d: toPath(L.gear.outer), fill: gearFill, rim: dark },
     ...L.wheat.flatMap((s) => [
       { d: toPath(s.stem), fill: g1 },
       ...s.grains.filter((g) => g.awn).map((g) => ({ d: toPath(g.awn), fill: g1 })),
@@ -32,7 +33,10 @@ export default function ShantazLogoSVG({ tone = "light", shine = false, showTagl
     ...L.reg.map((p) => ({ d: partPath(p), fill: inkFill })),
     ...(showTagline ? L.tag.glyphs.map((g) => ({ d: g.d, fill: inkFill })) : []),
   ];
-  const shapes = (fill) => parts.map((p, i) => <path key={i} d={p.d} fill={fill ? p.fill : undefined} fillRule="evenodd" />);
+  const shapes = (fill) => parts.map((p, i) => (
+    <path key={i} d={p.d} fill={fill ? p.fill : undefined} fillRule="evenodd"
+      {...(fill && p.rim ? { stroke: "#9FB3CF", strokeOpacity: 0.55, strokeWidth: 0.7, strokeLinejoin: "round" } : {})} />
+  ));
   const sweepW = 60;
   return (
     <svg
