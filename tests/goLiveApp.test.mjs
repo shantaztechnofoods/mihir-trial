@@ -22,7 +22,10 @@ test("H: no user-supplied SVG is injected as markup — signatures render throug
     }
   }
   assert.match(app, /const svgDataUri = \(svg\) => `data:image\/svg\+xml;charset=utf-8,\$\{encodeURIComponent\(String\(svg \|\| ""\)\)\}`;/);
-  assert.match(app, /<div className="mr-sig"><img src=\{svgDataUri\(h\.mainEmployeeSignatureSvg\)\} alt="Main Employee signature" \/><\/div>/);
+  // 2026-11-04 — every signature prints once, in the signature register, as an <img> data URI.
+  assert.match(app, /src: svgDataUri\(h\.mainEmployeeSignatureSvg\)/);
+  assert.match(app, /src: svgDataUri\(h\.acceptedSignatureSvg\)/);
+  assert.match(app, /<img src=\{r\.src\} alt=\{`Signature: \$\{r\.name \|\| r\.role\}`\} \/>/);
 });
 
 test("K: Remove From Rack goes through rack_remove_machine in Supabase mode, audits after success, local path intact", () => {

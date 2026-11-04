@@ -412,7 +412,7 @@ test("App: trial certificate confirmation-only gate, edit-later path, On Hold fi
   assert.match(app, /const incomplete = \[\];\n  if \(!String\(cert\.trialByName/);
   assert.match(app, /const missing = \[\];\n/, "nothing is mandatory on the certificate");
   assert.match(app, /data-cert-submit\n\s+disabled=\{busy \|\| !confirmed\}/);
-  assert.match(app, /function TrialCertificateModal\(\{ machine, nowTick, workflow, busy, onClose, onSubmit, initialCert = null, editOnly = false \}\)/);
+  assert.match(app, /function TrialCertificateModal\(\{ machine, nowTick, workflow, busy, onClose, onSubmit, initialCert = null, editOnly = false, company = null \}\)/);
   assert.match(app, /onSubmit=\{trialCertModal\.editOnly \? saveTrialCertificate : submitTrialCertificate\}/);
   assert.match(app, /const handleUpdateTrialCertificate = async \(machineId, cert\) => \{/);
   assert.match(app, /data-cert-edit onClick=\{\(\) => setTrialCertModal\(\{ machine, editOnly: true \}\)\}/);
@@ -764,7 +764,9 @@ test("App: machine report, reachable from the card, and popups that always close
   const rep = app.slice(app.indexOf("function AtoZMachineReport("), app.indexOf("function ReportCenterPage("));
 
   // report: letterhead, facts, at-a-glance, numbered sections, red open issues, sign-off
-  assert.match(rep, /<div className="mr-doctitle">Machine production report<\/div>/);  // D1: sentence case, no capitals
+  // D1: sentence case, no capitals (2026-11-04: through the shared title block)
+  assert.match(rep, /<RptTitleBlock title="Machine production report"/);
+  assert.match(rep, /<div className="mr-doctitle rpt-doctitle"/);
   assert.match(rep, /getActiveCompany\(settings\)/);
   assert.match(rep, /data-report-glance/);
   // 2026-11-01 (D1–D10) — engineering-document layout; numbered sections
@@ -774,7 +776,7 @@ test("App: machine report, reachable from the card, and popups that always close
   assert.match(rep, /Appendix A · Checklist answers/);
   assert.match(rep, /const jobs = \[\.\.\.openJobs\.slice\(\)\.sort\(byTime\), \.\.\.resolvedJobs\.slice\(\)\.sort\(byTime\)\];/);
   assert.match(rep, /data-report-issue=\{open \? "open" : "resolved"\} className=\{`mr-issue \$\{open \? "is-open" : "is-done"\}`\}/);
-  assert.match(rep, /<JobHistory item=\{p\} users=\{allUsers\} compact \/>/, "how and when each issue was resolved");
+  assert.match(rep, /<JobHistory item=\{p\} users=\{allUsers\} compact reportDates \/>/, "how and when each issue was resolved");
   // every evidence section is still composed, plus the checklist appendix
   for (const s of ["<Hdr />", "<CriticalParts />", "<Journey />", "<TrialCertificate />", "<PendingJobsHistory />", "<StageHistory />", "<AttachmentsList />", "<SignOff />", "<ChecklistAppendix />"])
     assert.ok(rep.includes(s), s);
@@ -828,7 +830,9 @@ test("Machine report: every recorded field is still printed, and the A4 rules ho
     "p.description", "p.itemCode", "p.itemName", "p.qty", "p.partSerialNo", "p.critical", "p.raisedInDepartment",
     "p.raisedAt", "p.assignedDepartment", "p.raisedInHandoverId", "<JobHistory item={p}",
     // trial certificate, stage history, attachments
-    "<TrialCertificateSheet machine={machine} cert={machine.trialCertificate} />", "h.stage", "h.note", "h.date",
+    "<TrialCertificateSheet machine={machine} cert={machine.trialCertificate} embedded />", "h.stage", "h.note", "h.date",
+    // 2026-11-04 — every captured signature, the Trial Certificate's included
+    "h.acceptedSignatureSvg", "trialCertSignatureRows(machine", "c.trialBySignature", "c.checkBySignature", "c.trialByName", "c.checkByName",
     "a.name", "a.department", "a.createdAt",
   ];
   for (const f of mustRead) assert.ok(rep.includes(f), `report still reads ${f}`);
@@ -836,8 +840,10 @@ test("Machine report: every recorded field is still printed, and the A4 rules ho
   for (const t of ["show.showEmployees", "show.showChecklists", "show.showRatings", "show.showPendingJobs"]) assert.ok(rep.includes(t), t);
 
   // D10: one date style, durations in words, ratings as numbers
-  assert.match(rep, /hour12: false/);
-  assert.match(rep, /\{dur\(h\.actualDurationMinutes\)\} of \{dur\(h\.expectedDurationMinutes\)\}/);
+  // 2026-11-04 — one shared style for every report: "04 Nov 2026, 09:32" (24 h).
+  assert.match(rep, /const fmtDT = rptFmtDT;/);
+  assert.match(rep, /const rptFmtDT = .*\$\{rpt2\(d\.getHours\(\)\)\}:\$\{rpt2\(d\.getMinutes\(\)\)\}/);
+  assert.match(rep, /\$\{dur\(h\.actualDurationMinutes\)\} of \$\{dur\(h\.expectedDurationMinutes\)\}/);
   assert.match(rep, /const rate = \(r\) =>/);
   assert.doesNotMatch(rep, /formatRatingBadge\(/, "no star badges");
   // D7: every captured signature at one size
