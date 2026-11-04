@@ -1,6 +1,7 @@
 // Department ratings store — public.department_ratings
 import { isSupabaseEnabled } from "../config/env.js";
 import { getSupabase } from "../supabase/client.js";
+import { fetchAllRows, readLocalJson } from "../utils/fetchAll.js";
 
 const LOCAL_KEY = "erp_dept_ratings";
 
@@ -24,13 +25,13 @@ const fromRow = (r) => ({
   createdAt:       r.created_at || null,
 });
 
-const getLocal = () => { try { const s = localStorage.getItem(LOCAL_KEY); if (s) return JSON.parse(s); } catch {} return []; };
+const getLocal = () => readLocalJson(LOCAL_KEY, []);
 const setLocal = (a) => { try { localStorage.setItem(LOCAL_KEY, JSON.stringify(a)); } catch {} };
 
 export async function fetchRatings() {
   if (!isSupabaseEnabled()) return getLocal();
   const c = getSupabase(); if (!c) return getLocal();
-  const { data, error } = await c.from("department_ratings").select("*").order("created_at", { ascending: false });
+  const { data, error } = await fetchAllRows(() => c.from("department_ratings").select("*").order("created_at", { ascending: false }).order("id", { ascending: false }), { tag: "ratings:load" });
   if (error) { console.warn("[ratings] load failed", error); return getLocal(); }
   const out = (data || []).map(fromRow);
   setLocal(out);
