@@ -20,8 +20,8 @@ import taglineFont from "../assets/shantaz-tagline-cinzel.typeface.json";
 
 export const BRAND = {
   red: "#E20014",    // measured on the logo file
-  green: "#24661E",
-  green2: "#2E7526",
+  green: "#1E5213",  // measured on the logo file (deep wheat green)
+  green2: "#235C17",
   gear: "#191816",
   ink: "#191817",
 };
@@ -36,7 +36,7 @@ const TEETH = [298, 273, 248, 223, 198, 172, 147, 122, 97, 72];
 function gearOutline() {
   const [cx, cy] = GEAR_C;
   const TIP = 62, ROOT = 55.5, IN = 45.5;
-  const A0 = 314, A1 = 38, TAPER = 64;   // SVG degrees (y down): top-right end → left → bottom-right tail
+  const A0 = 318, A1 = 38, TAPER = 64, TOP = 268;   // SVG degrees (y down): top-right end → left → bottom-right tail
   const tooth = (a) => {
     let r = 0;
     for (const t of TEETH) {
@@ -45,7 +45,10 @@ function gearOutline() {
     }
     return r;
   };
-  const inner = (a) => (a >= TAPER ? IN : IN + (ROOT - 0.7 - IN) * Math.pow((TAPER - a) / (TAPER - A1), 1.2));
+  const inner = (a) => {
+    if (a > TOP) return IN + (ROOT - 0.5 - IN) * Math.pow((a - TOP) / (A0 - TOP), 0.6);   // top-right swoosh
+    return a >= TAPER ? IN : IN + (ROOT - 0.7 - IN) * Math.pow((TAPER - a) / (TAPER - A1), 1.2);  // bottom-right tail
+  };
   const out = [], inn = [];
   const N = 552;
   for (let i = 0; i <= N; i++) {
@@ -58,9 +61,9 @@ function gearOutline() {
 
 // ── Wheat: tall stalk + two shorter ones leaning right ───────────────────
 const STALKS = [
-  { p0: [121, 308], p1: [124, 236], p2: [118, 172], pairs: 8, len: 16.5, wid: 6.6, awn: 16 }, // tall
-  { p0: [124, 308], p1: [136, 258], p2: [161, 222], pairs: 6, len: 13.5, wid: 5.6, awn: 12 },  // right
-  { p0: [122, 308], p1: [136, 274], p2: [138, 236], pairs: 5, len: 13, wid: 5.4, awn: 11 },     // middle
+  { p0: [124.5, 298], p1: [104, 230], p2: [119.5, 166], pairs: 8, len: 15, wid: 6, awn: 26, spread: 36, t0: 0.12 }, // tall
+  { p0: [125, 298], p1: [133, 246], p2: [157, 209], pairs: 6, len: 13, wid: 5.2, awn: 20, spread: 38, t0: 0.3 },     // right
+  { p0: [124.5, 298], p1: [121, 268], p2: [124, 240], pairs: 4, len: 12, wid: 4.8, awn: 16, spread: 38, t0: 0.3 },     // middle
 ];
 const qb = (p0, p1, p2, t) => {
   const u = 1 - t;
@@ -77,7 +80,7 @@ function stemPoly({ p0, p1, p2 }) {
     const [x, y] = qb(p0, p1, p2, t);
     const [dx, dy] = qd(p0, p1, p2, t);
     const len = Math.hypot(dx, dy) || 1;
-    const w = (1.1 * (1 - t) + 0.5 * t) / 2;
+    const w = (0.9 * (1 - t) + 0.45 * t) / 2;
     const nx = -dy / len, ny = dx / len;
     L.push([x + nx * w, y + ny * w]);
     R.push([x - nx * w, y - ny * w]);
@@ -98,20 +101,20 @@ function grainPoly(ax, ay, angleDeg, len, wid) {
 }
 // a fine awn (whisker) continuing from the grain tip
 function awnPoly(ax, ay, angleDeg, from, len) {
-  return [[from, -0.28], [from + len, -0.04], [from + len, 0.04], [from, 0.28]].map(rot(ax, ay, angleDeg));
+  return [[from, -0.2], [from + len, -0.03], [from + len, 0.03], [from, 0.2]].map(rot(ax, ay, angleDeg));
 }
 function stalk(def, index) {
   const grains = [];
   const { pairs } = def;
   for (let k = 0; k < pairs; k++) {
-    const t = 0.34 + (0.6 * k) / pairs;
+    const t = def.t0 + ((0.95 - def.t0) * k) / pairs;
     const [x, y] = qb(def.p0, def.p1, def.p2, t);
     const [dx, dy] = qd(def.p0, def.p1, def.p2, t);
     const a = (Math.atan2(dy, dx) * 180) / Math.PI;
     const len = def.len * (1 - 0.18 * (k / pairs)), wid = def.wid * (1 - 0.15 * (k / pairs));
     [-1, 1].forEach((side) => {
-      const ga = a + side * 38;
-      grains.push({ pts: grainPoly(x, y, ga, len, wid), awn: awnPoly(x, y, ga - side * 6, len * 0.85, def.awn), at: [x, y], tone: (k + (side > 0 ? 1 : 0) + index) % 2 });
+      const ga = a + side * def.spread;
+      grains.push({ pts: grainPoly(x, y, ga, len, wid), awn: awnPoly(x, y, ga - side * 9, len * 0.6, def.awn), at: [x, y], tone: (k + (side > 0 ? 1 : 0) + index) % 2 });
     });
   }
   const [tx, ty] = def.p2;
