@@ -1,7 +1,7 @@
 import React, { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { Eye, EyeOff, LogIn } from "lucide-react";
 import { useAuth } from "../auth/AuthContext.jsx";
-import BrandLogo from "../components/BrandLogo.jsx";
+import ShantazLogoSVG from "../components/ShantazLogoSVG.jsx";
 
 // Login (rewritten 2026-10-31 — login field bug).
 //
@@ -28,11 +28,11 @@ import BrandLogo from "../components/BrandLogo.jsx";
 // screen").
 // 2026-11-04 (world UI) — new look only. The logic above the return (fields,
 // autofill guard, submit, error handling) is unchanged. The 3D scene is a
-// separate lazy chunk that starts only after the form has painted: the SHANTAZ
-// wordmark in 3D on capable devices; the real 2D logo with a soft shine for
-// reduced motion / low-end phones (deviceMemory <= 2, Save-Data) / no WebGL.
-const LoginBrand3D = lazy(() => import("./LoginBrand3D.jsx"));
-const TAGLINE = "INNOVATION FOR LIFE";
+// separate lazy chunk that starts only after the form has painted: the full
+// SHANTAZ logo (gear, wheat, wordmark, tagline) in 3D on capable devices; the
+// same logo as a 2D SVG with one soft shine for reduced motion / low-end
+// phones (deviceMemory <= 2, Save-Data) / no WebGL. Same for every user.
+const LoginBrand3D = lazy(() => import("../components/LoginBrand3D.jsx"));
 
 const heroMode = () => {
   try {
@@ -100,7 +100,7 @@ export default function LoginPage({ notice = "", onRetry = null }) {
 
   return (
     <div data-login-screen className="lg-root">
-      {/* Stage: static steel + amber light paints at once; the 3D rack fades in over it. */}
+      {/* Stage: static steel + amber light paints at once; the 3D logo fades in over it. */}
       <div className="lg-stage" aria-hidden="true">
         <div className="lg-grid" />
         <div className="lg-light" />
@@ -111,10 +111,7 @@ export default function LoginPage({ notice = "", onRetry = null }) {
         )}
         {(hero === "still" || hero === "css") && (
           <div className="lg-brand2d">
-            <span className="lg-shine"><BrandLogo size={112} rounded={24} /></span>
-            <div className="lg-tagline is-on">
-              {TAGLINE.split("").map((c, i) => <span key={i} style={{ transitionDelay: `${i * 35}ms` }}>{c === " " ? "\u00a0" : c}</span>)}
-            </div>
+            <ShantazLogoSVG tone="dark" shine className="lg-logo2d" />
           </div>
         )}
         <div className="lg-vignette" />
