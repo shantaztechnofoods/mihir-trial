@@ -24,6 +24,39 @@ import { makeCoalescer } from "./coalesce.js";
 export const REALTIME_DEBOUNCE_MS = 300;
 export const REALTIME_MAX_WAIT_MS = 1500;
 
+// 2026-11-04 (fix/live-sync) — the subscription map. Every table the client
+// reads is either here (live: a realtime event refetches it on every screen)
+// or in REALTIME_STATIC_TABLES with the reason it is not. Unit-tested against
+// every `.from("…")` in src/ so a new table cannot quietly go stale.
+export const REALTIME_TABLE_CALLBACKS = Object.freeze({
+  items:                  "onItemsChange",
+  stock_movements:        "onMovementsChange",
+  purchase_orders:        "onPosChange",
+  inward_log:             "onInwardChange",
+  outward_log:            "onOutwardChange",
+  machine_log:            "onMachinesChange",
+  pending_log:            "onPendingChange",
+  handover_events:        "onHandoversChange",
+  pending_handover_items: "onPendingItemsChange",
+  pending_item_receipts:  "onPendingItemsChange",   // folded into fetchPendingItems()
+  checklist_responses:    "onChecklistResponsesChange",
+  department_ratings:     "onRatingsChange",
+  machine_attachments:    "onAttachmentsChange",
+  bom_definitions:        "onBomsChange",
+  checklist_templates:    "onChecklistTemplatesChange",
+  settings:               "onSettingsChange",
+  vendors:                "onVendorsChange",
+  follow_ups:             "onFollowUpsChange",
+});
+export const REALTIME_STATIC_TABLES = Object.freeze({
+  audit_log:           "not in the realtime publication; Audit Trail refetches itself (subscribeAudit)",
+  users:               "login / users area — not in the publication (off-limits)",
+  roles:               "login / users area — not in the publication (off-limits)",
+  v_dept_roster:       "view over users — read once at mount",
+  item_history:        "loaded on demand when an item's history is opened",
+  employee_signatures: "the signed-in user's own signature only",
+});
+
 export function useRealtimeTables({
   onItemsChange,
   onMovementsChange,
@@ -40,6 +73,14 @@ export function useRealtimeTables({
   onChecklistResponsesChange,
   onRatingsChange,
   onAttachmentsChange,
+  // 2026-11-04 (fix/live-sync) — added to the publication in production:
+  // BOM definitions (incl. photos), checklist templates, the org settings row
+  // (company name / logo / employees), vendors and PO follow-ups.
+  onBomsChange,
+  onChecklistTemplatesChange,
+  onSettingsChange,
+  onVendorsChange,
+  onFollowUpsChange,
 } = {}) {
   // Catch-up refetch. A tablet that slept through a shift, or dropped off
   // WiFi, missed every realtime event in between and the channel does not
@@ -50,7 +91,7 @@ export function useRealtimeTables({
   // Set by the channel effect below; lets the subscribe callback trigger the
   // same catch-up refetch after the channel recovers from an error.
   const catchUpRef = useRef(null);
-  cbRef.current = { onItemsChange, onMovementsChange, onPosChange, onInwardChange, onOutwardChange, onMachinesChange, onPendingChange, onHandoversChange, onPendingItemsChange, onChecklistResponsesChange, onRatingsChange, onAttachmentsChange };
+  cbRef.current = { onItemsChange, onMovementsChange, onPosChange, onInwardChange, onOutwardChange, onMachinesChange, onPendingChange, onHandoversChange, onPendingItemsChange, onChecklistResponsesChange, onRatingsChange, onAttachmentsChange, onBomsChange, onChecklistTemplatesChange, onSettingsChange, onVendorsChange, onFollowUpsChange };
   useEffect(() => {
     if (!isSupabaseEnabled()) return;
     if (typeof document === "undefined" || typeof window === "undefined") return;
@@ -124,6 +165,14 @@ export function useRealtimeTables({
     wire("checklist_responses",    onChecklistResponsesChange);
     wire("department_ratings",     onRatingsChange);
     wire("machine_attachments",    onAttachmentsChange);
+    // Part receipts are folded into the pending-items list (fetchPendingItems).
+    wire("pending_item_receipts",  onPendingItemsChange);
+    // 2026-11-04 (fix/live-sync) — the five tables added to the publication.
+    wire("bom_definitions",        onBomsChange);
+    wire("checklist_templates",    onChecklistTemplatesChange);
+    wire("settings",               onSettingsChange);
+    wire("vendors",                onVendorsChange);
+    wire("follow_ups",             onFollowUpsChange);
 
     // supabase-js rejoins a dropped channel by itself, but events sent while
     // it was down are not replayed — refetch once when it comes back.
@@ -140,5 +189,5 @@ export function useRealtimeTables({
       for (const r of coalescers) { try { r.cancel(); } catch {} }
       try { c.removeChannel(ch); } catch {}
     };
-  }, [onItemsChange, onMovementsChange, onPosChange, onInwardChange, onOutwardChange, onAuditChange, onMachinesChange, onPendingChange, onHandoversChange, onPendingItemsChange, onChecklistResponsesChange, onRatingsChange, onAttachmentsChange]);
+  }, [onItemsChange, onMovementsChange, onPosChange, onInwardChange, onOutwardChange, onAuditChange, onMachinesChange, onPendingChange, onHandoversChange, onPendingItemsChange, onChecklistResponsesChange, onRatingsChange, onAttachmentsChange, onBomsChange, onChecklistTemplatesChange, onSettingsChange, onVendorsChange, onFollowUpsChange]);
 }
