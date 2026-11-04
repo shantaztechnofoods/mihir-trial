@@ -27190,7 +27190,7 @@ export default function App() {
     if (isSupabaseEnabled()) followupUpdate(id, { lastFollowUp: dateStr, nextFollowUp: nextDateStr, frequency: freq }).then((r) => { if (!r.success) console.warn("[App] FollowUp update Supabase failed:", r.error); });
   };
 
-  const handleInwardComplete = (code, category, inwardQty) => {
+  const handleInwardComplete = async (code, category, inwardQty) => {
     // Auto-fulfill pending entries for this item with the newly received stock
     if (category && inwardQty > 0) {
       const pendingForCode = pendingLog.filter((p) => p.code === code && p.pendingQty > 0);
@@ -27206,7 +27206,10 @@ export default function App() {
           fulfillments.push({ entry: p, canFulfill });
         }
         if (totalToDeduct > 0) {
-          handleUpdateStock(category, code, -totalToDeduct, "Auto-fulfill pending");
+          // Wait for the move: if it is refused (Supabase), the stock stays in
+          // the store, so the shortfalls must stay open too.
+          const mv = await handleUpdateStock(category, code, -totalToDeduct, "Auto-fulfill pending");
+          if (mv && mv.success === false) return;
           // Batch all fulfillments in one setPendingLog to avoid stale-closure overwrites
           const fulfillMap = new Map(fulfillments.map(({ entry, canFulfill }) => {
             const key = entry.issueId ? `${entry.issueId}::${entry.code}` : `${entry.code}::${entry.bomKey}::${entry.date}`;
@@ -29851,7 +29854,10 @@ export default function App() {
     uploadAttachment:  G.guard((a) => `attach:${a?.machineId}:${a?.file?.name}:${a?.file?.size}:${a?.file?.lastModified}`, handleUploadAttachment),
     deleteAttachment:  G.guard((id) => `attach-del:${id}`, handleDeleteAttachment),
     overrideRating:    G.guard((id) => `rating:${id}`, handleOverrideRating),
-    fulfillPending:    G.guard((e) => `fulfill:${e?.id}`, handleFulfillPending),
+    // Rows saved in local mode (and new rows before Postgres answers) have no
+    // id yet — fall back to the row's natural key so two different rows never
+    // share "fulfill:undefined" and block each other.
+    fulfillPending:    G.guard((e) => `fulfill:${e?.id ?? `${e?.issueId ?? ""}:${e?.code}:${e?.bomKey}:${e?.date}`}`, handleFulfillPending),
     deleteItemRow:     G.guard((cat, code) => `item-del:${cat}:${code}`, handleDeleteItemRow),
     deleteVendor:      G.guard((id) => `vendor-del:${id}`, handleDeleteVendor),
     deleteBOM:         G.guard((key) => `bom-del:${key}`, handleDeleteBOM),

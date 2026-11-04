@@ -66,7 +66,7 @@ const addRows = (await audit()).filter((a) => a.ref === "NUT-M8");
 ok("exactly one audit row for the new item (was two)", addRows.length === 1 && addRows[0].type === "item_created", JSON.stringify(addRows.map((a) => a.type)));
 
 // ── Export button downloads ──
-const [dl1] = await Promise.all([p.waitForEvent("download", { timeout: 5000 }).catch(() => null), p.getByRole("button", { name: /^⬇️?\s*Export$/ }).first().click()]);
+const [dl1] = await Promise.all([p.waitForEvent("download", { timeout: 5000 }).catch(() => null), p.getByRole("button", { name: "Export", exact: true }).first().click()]);
 ok("Item Master Export downloads a file", !!dl1 && /item-master/.test(dl1.suggestedFilename()), dl1 ? dl1.suggestedFilename() : "no download");
 
 // ── Inward: decimal qty + auto-fulfill audit ──
