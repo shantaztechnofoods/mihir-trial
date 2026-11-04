@@ -1082,7 +1082,7 @@ function DashboardPage({ items = {}, pos = [], vendorList = [], machineLog = [],
                   const cfg = (m.deptDurations && m.deptDurations[dept]) || (readDeptWorkflowSettings(settings).dept_durations || {})[dept];
                   const t = computeOverrun(m.departmentEnteredAt, (cfg && cfg.minutes) || 0, Date.now());
                   return (
-                    <div key={m.id} className="flex items-center gap-3 px-3 py-2 rounded-lg" style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.2)" }}>
+                    <div key={m.id} className="wu-delayrow flex items-center gap-3 px-3 py-2 rounded-lg" style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.2)" }}>
                       <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: "#dc2626" }} />
                       <div className="min-w-0 flex-1">
                         <span className="text-[11px] font-bold" style={{ color: "var(--text-strong)" }}>{m.bomLabel || m.bomKey}</span>
@@ -17033,7 +17033,7 @@ function SignaturePad({ onSave, onCancel, initialSvg = "", light = false }) {
           </button>
         )}
         <button type="button" onClick={save}
-                className="text-[11px] font-black text-white px-4 py-1.5 rounded-lg transition-all"
+                className="wu-sig-save text-[11px] font-black text-white px-4 py-1.5 rounded-lg transition-all"
                 style={{ background: "#2640B0", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
           Save Signature
         </button>
@@ -18593,7 +18593,7 @@ function PendingJobRows({ rows, onChange, inventory = [], accent = "#b45309", ad
           </div>
         ))}
         <button type="button" disabled={disabled} onClick={() => onChange([...list, emptyPendingJob()])}
-                className={`${allowComment ? "text-[13px] px-4" : "text-[11px] px-3 py-1.5"} font-bold rounded-lg border transition-all disabled:opacity-50`}
+                className={`wu-addrow ${allowComment ? "text-[13px] px-4" : "text-[11px] px-3 py-1.5"} font-bold rounded-lg border transition-all disabled:opacity-50`}
                 style={{ background: `${accent}14`, border: `1px solid ${accent}66`, color: accent, ...(allowComment ? { minHeight: 44 } : {}) }}>
           {addLabel}
         </button>
@@ -20310,7 +20310,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
             <div className="wu-section" data-staff-section={title}>
               <div className="wu-section-head">
                 <h2 className="wu-section-title">{title}</h2>
-                <span className={`wu-count${count ? " is-on" : ""}`}>({count})</span>
+                <span className={`wu-count${count ? " is-on" : ""}`} aria-label={`${count} machines`}>{count}</span>
                 {hint && <span className="wu-section-hint">{hint}</span>}
               </div>
               {children}

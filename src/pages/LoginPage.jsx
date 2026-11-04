@@ -117,17 +117,25 @@ export default function LoginPage({ notice = "", onRetry = null }) {
     window.addEventListener("shantaz:sweep", onSweep);
     return () => window.removeEventListener("shantaz:sweep", onSweep);
   }, []);
+  // Flat logo (no WebGL): its single SVG shine starts 0.35 s after mount and
+  // runs 1.3 s — give the card the same one pass.
+  useEffect(() => {
+    if (hero !== "css") return undefined;
+    const id = setTimeout(() => {
+      try { window.dispatchEvent(new CustomEvent("shantaz:sweep", { detail: { duration: 1300, intro: true } })); } catch { /* old browser */ }
+    }, 350);
+    return () => clearTimeout(id);
+  }, [hero]);
   const company = cachedCompany();
   const line = "Purchase, stock and production, on one floor.";
 
   return (
     <div data-login-screen className="lg-root">
-      {/* Stage: navy scene + soft light paint at once; the real logo sits on it
-          from the first frame (data-hero tells the coming 3D layer what this
-          device can run). */}
+      {/* Stage: one dark studio scene (spotlight, floor glow, film grain) paints
+          at once; the real logo (3D, or flat on low-end / reduced motion) sits on it. */}
       <div className="lg-stage" aria-hidden="true">
-        <div className="lg-grid" />
-        <div className="lg-light" />
+        <div className="lg-spot" />
+        <div className="lg-floor" />
         {hero === "webgl" && (
           <Suspense fallback={null}>
             <LoginBrand3D fullBleed onFail={onHeroFail} />
@@ -135,10 +143,10 @@ export default function LoginPage({ notice = "", onRetry = null }) {
         )}
         {(hero === "still" || hero === "css") && (
           <div className="lg-brand2d" data-hero={hero}>
-            <ShantazLogoSVG tone="dark" shine className="lg-logo2d" />
+            <ShantazLogoSVG tone="dark" shine={hero === "css"} className="lg-logo2d" />
           </div>
         )}
-        {company && <div className="lg-company-line">{company}</div>}
+        <div className="lg-grain" />
         <div className="lg-vignette" />
       </div>
 
@@ -148,6 +156,7 @@ export default function LoginPage({ notice = "", onRetry = null }) {
       <main className="lg-panel">
         <div className="lg-card" ref={cardRef}>
           <div className="lg-card-head">
+            {company && <p className="lg-eyebrow">{company}</p>}
             <h2 className="lg-title">Sign in</h2>
             <p className="lg-sub">Use the login your admin gave you.</p>
           </div>
@@ -233,9 +242,9 @@ export default function LoginPage({ notice = "", onRetry = null }) {
           </form>
 
           <p className="lg-foot">Forgot password? Ask your admin.</p>
-          <MadeInIndia className="lg-india" />
         </div>
       </main>
+      <footer className="lg-made"><MadeInIndia className="lg-india" /></footer>
     </div>
   );
 }
