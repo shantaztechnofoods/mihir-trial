@@ -73,6 +73,7 @@ import { reconcileTeam, pickRememberedMain, readTeamMemory, writeTeamMemory } fr
 import { useRealtimeTables } from "./realtime/useRealtimeTables.js";
 import { reconcileOpenRecord, mergeRemoteSettings, parseLocalSync } from "./realtime/liveRecord.js";
 import { monthIndex, parseDisplayDate } from "./utils/parseDate.js";
+import { isoToDisplayDate } from "./utils/parseDate.js";
 import { fetchRecentMovements, MOVEMENT_META } from "./stores/stockMovementsStore.js";
 import { sendPOWhatsApp, openVendorWhatsApp, waErrorToast } from "./utils/whatsapp.js";
 import { uploadItemMedia, MAX_UPLOAD_BYTES } from "./utils/storage.js";
@@ -80,7 +81,7 @@ import POSettings from "./components/POSettings.jsx";
 import SearchableSelect from "./components/SearchableSelect.jsx";
 import {
   PURCHASE_TYPES, PURCHASE_TYPE_BY_KEY, ITEM_GST_RATES, DEFAULT_PURCHASE_TYPE_KEY,
-  getPurchaseType, calculateGSTBreakdown, filterPurchaseTypes, todayIso,
+  getPurchaseType, calculateGSTBreakdown, filterPurchaseTypes, todayIso, poTaxLines,
 } from "./utils/gst.js";
 import { mapRow as vendorMapRow, parseRows as vendorParseRows } from "./utils/vendorImport.js";
 import { parseRows as itemParseRows, generateItemCode, buildRowsFromSheet as itemBuildRowsFromSheet } from "./utils/itemImport.js";
@@ -894,7 +895,9 @@ function DashboardPage({ items = {}, pos = [], vendorList = [], machineLog = [],
   }, [moveSignal]);
 
   const pendingPOs  = pos.filter((p) => ["pending","review","draft"].includes(p.status));
-  const openPOValue = pos.filter((p) => p.status !== "received").reduce((s, p) => s + p.amount, 0);
+  // Open = not received and not rejected (a rejected PO will never be paid).
+  const openPOs     = pos.filter((p) => !["received", "rejected"].includes(p.status));
+  const openPOValue = openPOs.reduce((s, p) => s + (Number(p.amount) || 0), 0);
 
   const curr    = getCurrSymbol(settings.currency);
   const fmtVal  = (v) =>
@@ -954,7 +957,7 @@ function DashboardPage({ items = {}, pos = [], vendorList = [], machineLog = [],
     { label: "Total SKUs",        value: totalSKUs,                                              Icon: Boxes,        color: "#2E50D6", nav: "inventory",  sub: `${safeItems.length} safe` },
     { label: "Critical Stock",    value: criticalN,                                              Icon: AlertOctagon, color: "#b91c1c", nav: "inventory",  sub: `${warningItems.length} warning`,  alert: criticalN > 0 },
     { label: "Pending POs",       value: pendingPOs.length,                                      Icon: AlertTriangle,color: "#b45309", nav: "pipeline",   sub: "awaiting approval",               alert: pendingPOs.length > 0 },
-    { label: "Open PO Value",     value: fmtVal(openPOValue),                                    Icon: Wallet,       color: "#15803d", nav: "pipeline",   sub: `${pos.filter(p=>p.status!=="received").length} open` },
+    { label: "Open PO Value",     value: fmtVal(openPOValue),                                    Icon: Wallet,       color: "#15803d", nav: "pipeline",   sub: `${openPOs.length} open` },
     { label: "In Production",     value: machineLog.filter((m) => m.status === "active" && m.stage !== "BOM Issued").length, Icon: Cog, color: "#2640B0", nav: "machines",   sub: "machines active" },
     { label: "Machines Ready",    value: machineLog.filter((m) => m.status === "completed").length, Icon: CircleCheckBig, color: "#15803d", nav: "machines", sub: "completed" },
     { label: "Pending Materials", value: pendingLog.length,                                      Icon: Hourglass,    color: "#b45309", nav: "pending",    sub: "items pending",                   alert: pendingLog.length > 0 },
@@ -4683,7 +4686,7 @@ function PODetailModal({ po, onClose, onApprove, onMarkOrdered, onMarkReceived, 
                 </table>
               </div>
               <div className="mt-2 px-3 flex justify-between text-[10px]">
-                <span className="text-slate-500">GST (18%): ₹{(po.gst || 0).toLocaleString("en-IN")}</span>
+                <span className="text-slate-500">{poTaxLines(po).map((t) => `${t.label}: ₹${t.amount.toLocaleString("en-IN")}`).join(" · ")}</span>
                 <span className="font-bold text-green-700">Total: ₹{po.amount.toLocaleString("en-IN")}</span>
               </div>
             </div>
@@ -4764,12 +4767,12 @@ function PurchasePage({ pos, vendorList, items, onCreatePO, onUpdatePO, onReceiv
 
   const filtered = pos.filter((po) => {
     const q = search.toLowerCase();
-    const matchSearch = po.id.toLowerCase().includes(q) || po.vendor.toLowerCase().includes(q);
+    const matchSearch = String(po.id || "").toLowerCase().includes(q) || String(po.vendor || "").toLowerCase().includes(q);
     const matchFilter = filter === "all" || po.status === filter;
     return matchSearch && matchFilter;
   });
 
-  const totalAmt  = pos.filter((p) => !["received"].includes(p.status)).reduce((s, p) => s + p.amount, 0);
+  const totalAmt  = pos.filter((p) => !["received", "rejected"].includes(p.status)).reduce((s, p) => s + (Number(p.amount) || 0), 0);
   const overdueN  = pos.filter((p) => p.status === "overdue").length;
   const receivedN = pos.filter((p) => p.status === "received").length;
   const pendingN  = pos.filter((p) => ["pending","review","draft"].includes(p.status)).length;
@@ -5124,7 +5127,7 @@ function VendorImportModal({ vendorList, onImport, onClose }) {
 
 // ─── VENDOR MODAL ─────────────────────────────────────────────────────────────
 
-function VendorModal({ initialVendor, onSave, onClose }) {
+function VendorModal({ initialVendor, onSave, onClose, existingNames = [] }) {
   const isEdit = Boolean(initialVendor);
   useEffect(() => {
     const h = (e) => { if (e.key === "Escape") onClose(); };
@@ -5143,6 +5146,14 @@ function VendorModal({ initialVendor, onSave, onClose }) {
   const handleSave = () => {
     const e = {};
     if (!form.name.trim())  e.name  = "Required";
+    // POs, item links and vendor stats find a vendor by its NAME, so two
+    // vendors with the same name got their POs and totals mixed together.
+    else {
+      const key = (s) => String(s || "").trim().replace(/\s+/g, " ").toLowerCase();
+      const own = isEdit ? key(initialVendor.name) : null;
+      if (key(form.name) !== own && existingNames.some((n) => key(n) === key(form.name)))
+        e.name = `A vendor named "${form.name.trim()}" already exists`;
+    }
     setErrors(e);
     if (Object.keys(e).length) return;
     const id = initialVendor?.id || `V${String(Date.now()).slice(-4)}`;
@@ -5342,6 +5353,7 @@ function VendorsPage({ vendorList, pos, items, onAddVendor, onEditVendor, onDele
       {showModal && (
         <VendorModal
           initialVendor={editingVendor}
+          existingNames={vendorList.map((v) => v.name)}
           onSave={(data) => {
             if (editingVendor) { onEditVendor(data); showToast(`${data.name} updated`); }
             else               { onAddVendor(data);  showToast(`${data.name} added`);   }
@@ -9928,7 +9940,8 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
   const receivedPOs  = pos.filter(p => p.status === "received").sort((a, b) => parseDate(b.receivedDate||b.date) - parseDate(a.receivedDate||a.date));
 
   const enrichedFU    = followUps.map(f => {
-    const diff  = Math.floor((parseDate(f.nextFollowUp) - today) / 86400000);
+    // isoToDisplayDate heals rows saved with a raw "yyyy-mm-dd" custom date.
+    const diff  = Math.floor((parseDate(isoToDisplayDate(f.nextFollowUp)) - today) / 86400000);
     return { ...f, daysRemaining: diff, fstat: diff < 0 ? "fu-overdue" : diff === 0 ? "fu-due" : "fu-pending" };
   }).sort((a,b) => a.daysRemaining - b.daysRemaining);
 
@@ -9941,12 +9954,12 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
   const handleConfirm = () => {
     if (!eta) return;
     const d = new Date(); d.setDate(d.getDate() + +eta);
-    onConfirmOrder(moModal.id, eta === "custom" ? etaCustom : fmtDate(d));
+    onConfirmOrder(moModal.id, eta === "custom" ? isoToDisplayDate(etaCustom) : fmtDate(d));
     setMoModal(null); setEta(""); setEtaCustom("");
   };
   const handleFuDone = () => {
     const d = new Date(); d.setDate(d.getDate() + (fuFreq === "custom" ? 0 : fuFreq));
-    onFollowUpDone(fuModal.id, fuFreq, fuFreq === "custom" ? fuCustom : fmtDate(d));
+    onFollowUpDone(fuModal.id, fuFreq, fuFreq === "custom" ? isoToDisplayDate(fuCustom) : fmtDate(d));
     setFuModal(null); setFuFreq(1); setFuCustom("");
   };
   const handleReceive = (poId) => {
@@ -10302,11 +10315,11 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
                       </div>
                       <div>
                         <div className="text-slate-600 mb-0.5">ETA</div>
-                        <div className="font-bold text-slate-500">{f.eta||"—"}</div>
+                        <div className="font-bold text-slate-500">{isoToDisplayDate(f.eta)||"—"}</div>
                       </div>
                       <div>
                         <div className="text-slate-600 mb-0.5">Next Follow-up</div>
-                        <div className="font-bold text-purple-300">{f.nextFollowUp}</div>
+                        <div className="font-bold text-purple-300">{isoToDisplayDate(f.nextFollowUp)}</div>
                       </div>
                       {f.lastFollowUp && (
                         <div>
@@ -10535,7 +10548,7 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
                   <div className="grid gap-y-1.5 text-[10.5px]" style={{ gridTemplateColumns:"auto 1fr" }}>
                     <span className="text-slate-500 pr-3">PO Number</span><span className="font-mono font-bold text-slate-900">{viewPO.id}</span>
                     <span className="text-slate-500 pr-3">Date</span><span className="font-semibold text-slate-500">{viewPO.date}</span>
-                    <span className="text-slate-500 pr-3">ETA</span><span className="font-semibold text-slate-500">{viewPO.eta || viewPO.delivery || "—"}</span>
+                    <span className="text-slate-500 pr-3">ETA</span><span className="font-semibold text-slate-500">{isoToDisplayDate(viewPO.eta) || viewPO.delivery || "—"}</span>
                     <span className="text-slate-500 pr-3">Priority</span>
                     <span className={`font-bold uppercase text-[9px] ${viewPO.priority==="urgent"?"text-red-400":viewPO.priority==="high"?"text-amber-700":"text-slate-400"}`}>{viewPO.priority||"normal"}</span>
                     <span className="text-slate-500 pr-3">Items</span><span className="font-semibold text-slate-500">{viewPO.lineItems?.length||0} line items</span>
@@ -10582,10 +10595,12 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
                         <span className="text-slate-500">Subtotal</span>
                         <span className="font-mono font-semibold text-slate-500">₹{subtotal.toLocaleString("en-IN")}</span>
                       </div>
-                      <div className="flex justify-between px-3 py-1.5 text-[10px]">
-                        <span className="text-slate-500">GST (18%)</span>
-                        <span className="font-mono font-semibold text-amber-700">₹{poGst.toLocaleString("en-IN")}</span>
-                      </div>
+                      {poTaxLines(viewPO).map((t) => (
+                        <div key={t.key} data-po-tax={t.key} className="flex justify-between px-3 py-1.5 text-[10px]">
+                          <span className="text-slate-500">{t.label}</span>
+                          <span className="font-mono font-semibold text-amber-700">₹{t.amount.toLocaleString("en-IN")}</span>
+                        </div>
+                      ))}
                       <div className="flex justify-between px-3 py-2.5" style={{ borderTop:"1px solid rgba(17,24,39,0.06)" }}>
                         <span className="text-[12px] font-bold text-slate-900">Grand Total</span>
                         <span className="text-[13px] font-black font-mono text-green-400">₹{poTotal.toLocaleString("en-IN")}</span>
@@ -19954,10 +19969,10 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
   // 2026-11-01 — Escape closes the top-most popup, in the same order they
   // stack on screen; a popup that is saving ignores it, like its Cancel.
   // Declared after every popup's state so its dependency list is initialised.
-  useEffect(() => {
-    const onKey = (e) => {
-      if (e.key !== "Escape") return;
-      const steps = [
+  // 2026-11-04 (MT audit) — the same list closes the top-most popup on the
+  // phone's Back button (below), so Back never throws a worker out of the
+  // ERP with a half-filled Accept / Finish screen.
+  const popupSteps = () => [
         [startChk,           () => !startChk?.busy && setStartChk(null)],
         [jobAction,          () => !jobAction?.busy && setJobAction(null)],
         [reportMachineId,    () => setReportMachineId(null)],
@@ -19971,19 +19986,40 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
         [removeRackConfirm,  () => setRemoveRackConfirm(null)],
         [pullBack,           () => !pullBack?.busy && setPullBack(null)],
         [undoAsk,            () => !undoAsk?.busy && setUndoAsk(null)],
+        [holdModal,          () => !holdModal?.busy && setHoldModal(null)],
+        [deleteModal,        () => !deleteModal?.busy && setDeleteModal(null)],
         [raiseModal,        () => !raiseBusy && setRaiseModal(null)],
         [jobsDrawer,         () => setJobsDrawer(null)],
         [rackPanel,          () => setRackPanel(null)],
         [issuePopup,         () => setIssuePopup(null)],
         [showCalled,         () => setShowCalled(false)],
+        [myDashOpen,         () => setMyDashOpen(false)],
       ];
-      const top = steps.find(([open]) => !!open);
-      if (top) { e.stopPropagation(); top[1](); }
+  const closeTopPopupRef = useRef(null);
+  closeTopPopupRef.current = () => { const top = popupSteps().find(([open]) => !!open); if (top) top[1](); return !!top; };
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key !== "Escape") return;
+      if (closeTopPopupRef.current()) e.stopPropagation();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [jobAction, reportMachineId, reportDoc, reportsMenu, trialCertModal, trialCertViewModal, finishModal, transferBusy, acceptModal, duringWorkModal, startChk,
-      removeRackConfirm, pullBack, undoAsk, raiseModal, raiseBusy, jobsDrawer, rackPanel, issuePopup, showCalled]);
+  }, []);
+  // Back button: while a popup is open there is one extra history entry; Back
+  // pops it and closes the top popup (a popup that is saving stays, and the
+  // entry is pushed again). No URL change, nothing else in history.
+  const anyPopupOpen = popupSteps().some(([open]) => !!open);
+  const [backArmed, setBackArmed] = useState(false);
+  useEffect(() => {
+    if (!anyPopupOpen || backArmed) return;
+    try { window.history.pushState({ erpPopup: 1 }, ""); } catch { /* ignore */ }
+    setBackArmed(true);
+  }, [anyPopupOpen, backArmed]);
+  useEffect(() => {
+    const onPop = () => { setBackArmed(false); closeTopPopupRef.current(); };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
   // 2026-11-04 (fix/live-sync) — an open popup holds the machine / hand-over /
   // pending job it was opened for. When someone else changes that record (live
   // update), the popup shows the fresh copy; if the change makes the popup's
@@ -27045,7 +27081,7 @@ export default function App() {
     ...safeFollowUps.map((f) => ({
       id: `followup-${f?.id}`, type: "followup",
       title: `Follow-Up Due: ${f?.poId || ""}`,
-      desc:  `${f?.vendor || ""} · Next: ${f?.nextFollowUp || ""}`,
+      desc:  `${f?.vendor || ""} · Next: ${isoToDisplayDate(f?.nextFollowUp) || ""}`,
     })),
     ...(safePending.length > 0 ? [{
       id: "pending_alert-all", type: "pending_alert",
@@ -27381,6 +27417,10 @@ export default function App() {
     const wasReceived  = po?.status === "received";
     setPos((prev) => prev.filter((p) => p.id !== id));
     if (isSupabaseEnabled()) poDelete(id).then((r) => { if (!r.success) console.warn("[App] PO delete Supabase failed:", r.error); });
+    // Its follow-ups go too (same as Receive): left behind they kept showing
+    // on Order Pipeline and in notifications for a PO that no longer exists.
+    setFollowUps((prev) => prev.filter((f) => f.poId !== id));
+    if (isSupabaseEnabled()) deleteFollowUpsByPO(id).then((r) => { if (!r.success) console.warn("[App] FollowUp delete Supabase failed:", r.error); });
     logAudit({
       type: wasReceived ? "po_deleted_received" : "po_deleted",
       module: "Purchase",
