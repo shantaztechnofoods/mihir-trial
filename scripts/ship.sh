@@ -6,7 +6,9 @@
 #   pr "<title>" <body-file>   commit everything, push, open the PR (body file = markdown; attribution is appended)
 #   wait [pr#]            poll CI until every check finishes (exit 1 on failure)
 #   merge <pr#>           refuse unless CI is green, then merge (merge commit)
-#   all "<title>" <body-file> <tag>   bump -> check -> pr -> wait   (+ merge when SHIP_AUTOMERGE=1 and CI is green)
+#   reviewed <pr#>        AFTER code-review:code-review found no open issue: write the marker for the PR's current head
+#   all "<title>" <body-file> <tag>   bump -> check -> pr -> wait   (+ merge when SHIP_AUTOMERGE=1, CI is green AND
+#                         code-review:code-review has passed for that exact commit — see "Code-review gate" below)
 # Rules baked in (CLAUDE.md): never on main, never force-push, never commit secrets, stop if >200 lines are
 # removed from src/App.jsx, tests + build must be green, build tags must match. Migrations/prod DB are NOT
 # touched here — apply those by hand (shantaz-erp-database) before `merge`.
@@ -14,7 +16,13 @@
 # ONE vite build reused for every browser suite and cached by source hash, longest suites first,
 # E2E_PAR = CPU count, node_modules reused from the main checkout, CI polled with back-off.
 # Env: E2E_PAR, E2E_ONLY, E2E_PORT, E2E_DIST, SHIP_AUTOMERGE=1, SHIP_NO_CACHE=1, SHIP_NO_LOCK=1,
-#      SHIP_LOCK=<file>, SHIP_CACHE_DIR=<dir>, SHIP_WAIT_MAX=<seconds>, SHIP_REMOVAL_REASON, SHIP_MODEL.
+#      SHIP_LOCK=<file>, SHIP_CACHE_DIR=<dir>, SHIP_WAIT_MAX=<seconds>, SHIP_REMOVAL_REASON, SHIP_MODEL,
+#      SHIP_REVIEW_DIR=<dir> (default /tmp/aud/review-ok).
+# Code-review gate: SHIP_AUTOMERGE=1 NEVER skips code review. It merges only when the file
+#   $SHIP_REVIEW_DIR/<full 40-char head sha> exists — written after code-review:code-review passed on
+#   that exact commit. Any new push changes the sha, so the review (and marker) must be redone.
+#   Without the marker, `all` stops after CI and says what is missing. Plain `merge <pr#>` stays a
+#   deliberate, separate step that is run only after code review.
 set -uo pipefail
 cd "$(dirname "$0")/.."
 REPO="shantaztechnofoods/purchase_inventory_os"
@@ -107,7 +115,7 @@ cached_build(){   # cached_build <mode> <cmd…> — builds into the cache dir f
   local tmp="$DIST.tmp.$$"; rm -rf "$tmp"
   "$@" --outDir "$tmp" --emptyOutDir || { rm -rf "$tmp"; return 1; }
   touch "$tmp/.ok"; rm -rf "$DIST"; mv -T "$tmp" "$DIST" 2>/dev/null || rm -rf "$tmp"
-  ls -1dt "$CACHE"/dist/*/ 2>/dev/null | tail -n +16 | xargs -r rm -rf   # keep the newest 15 builds
+  ls -1dt "$CACHE"/dist/*/ 2>/dev/null | tail -n +6 | xargs -r rm -rf   # keep the newest 5 builds
 }
 
 job(){ local name=$1; shift; ( local s; s=$(now); "$@" >"$LOGS/$name.log" 2>&1; echo $? >"$LOGS/$name.rc"; echo "$name $(since "$s")" >>"$LOGS/times" ) & }
@@ -230,6 +238,20 @@ cmd_wait(){
     sleep "$d"; d=$(( d < 10 ? d + 2 : 10 ))   # 3,5,7,9,10,10… s
   done
 }
+REVIEW_DIR="${SHIP_REVIEW_DIR:-/tmp/aud/review-ok}"
+review_ok(){   # review_ok <pr#> — true only if code-review passed on the PR's CURRENT head commit
+  local n=$1 sha; sha=$(gh api "repos/$REPO/pulls/$n" --jq .head.sha 2>/dev/null) || return 1
+  [ ${#sha} = 40 ] || return 1
+  [ "$sha" = "$(git rev-parse HEAD)" ] || { say "${c_bad}PR #$n head ${sha:0:7} is not the local HEAD $(git rev-parse --short HEAD)${c_off}"; return 1; }
+  [ -f "$REVIEW_DIR/$sha" ] || { say "${c_bad}no code-review marker for ${sha:0:7}: $REVIEW_DIR/$sha is missing${c_off}"; return 1; }
+  say "${c_ok}✓ code-review marker found for ${sha:0:7}${c_off}"
+}
+cmd_reviewed(){
+  local n=${1:-}; [ -n "$n" ] || die "usage: reviewed <pr#>   (only after code-review:code-review found no open issue on the PR's current head)"
+  local sha; sha=$(gh api "repos/$REPO/pulls/$n" --jq .head.sha) && [ ${#sha} = 40 ] || die "cannot read PR #$n"
+  mkdir -p "$REVIEW_DIR" && touch "$REVIEW_DIR/$sha" || die "cannot write $REVIEW_DIR/$sha"
+  say "${c_ok}✓ code-review recorded for PR #$n at ${sha:0:7}${c_off} — automerge allowed for this exact commit only"
+}
 cmd_merge(){
   local n=${1:-}; [ -n "$n" ] || die "usage: merge <pr#>"
   local sha; sha=$(gh api "repos/$REPO/pulls/$n" --jq .head.sha); local r
@@ -240,8 +262,11 @@ cmd_merge(){
   say "next: verify the live site (new build tag + the changed screen) from a browser tab"
 }
 case "${1:-help}" in
-  check) cmd_check;; bump) shift; cmd_bump "$@";; pr) shift; cmd_pr "$@";; wait) shift; cmd_wait "$@";; merge) shift; cmd_merge "$@";;
+  check) cmd_check;; reviewed) shift; cmd_reviewed "$@";; bump) shift; cmd_bump "$@";; pr) shift; cmd_pr "$@";; wait) shift; cmd_wait "$@";; merge) shift; cmd_merge "$@";;
   all) shift; cmd_bump "${3:?tag}"; cmd_check; cmd_pr "$1" "$2"; cmd_wait
-       if [ "${SHIP_AUTOMERGE:-}" = 1 ]; then cmd_merge "$PR_NUM"; else say "merge when ready: scripts/ship.sh merge $PR_NUM   (or set SHIP_AUTOMERGE=1)"; fi;;
-  *) sed -n '2,17p' "$0";;
+       if [ "${SHIP_AUTOMERGE:-}" = 1 ]; then
+         review_ok "$PR_NUM" || die "SHIP_AUTOMERGE refused: run code-review:code-review on PR #$PR_NUM, then: scripts/ship.sh reviewed $PR_NUM && scripts/ship.sh merge $PR_NUM"
+         cmd_merge "$PR_NUM"
+       else say "next: code-review:code-review on PR #$PR_NUM, then: scripts/ship.sh reviewed $PR_NUM && scripts/ship.sh merge $PR_NUM"; fi;;
+  *) sed -n '2,25p' "$0";;
 esac
