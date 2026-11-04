@@ -1148,6 +1148,19 @@ export default function App() {
         )
       )];
       affectedIds.forEach((issueId) => notifyMachineComplete(issueId, newPendingLog.filter((p) => p.issueId === issueId)));
+      // The received stock went straight out to these shortfalls — record it
+      // (same as Inward), or the Audit Trail shows a receipt with no trace of
+      // where the stock went.
+      Object.entries(lineDeductions).forEach(([code, { deduct, fMap }]) => {
+        const li = (po.lineItems || []).find((l) => l.code === code);
+        logAudit({
+          type: "pending_fulfilled", module: "Pending",
+          action: `Auto-fulfilled on PO receive ${id}: ${li?.name || code} × ${roundQty(deduct)}`,
+          ref: code, itemCode: code, itemName: li?.name || code,
+          qty: roundQty(deduct), vendor: po.vendor,
+          details: { auto: "po", po: id, items: [...fMap.entries()].map(([k, q]) => `${k}×${q}`) },
+        });
+      });
     }
 
     const newLog = [...(po.activityLog || []), { action: "Received", date: dateStr, note: "Stock updated automatically" }];

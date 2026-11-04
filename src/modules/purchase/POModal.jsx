@@ -1,7 +1,9 @@
 // src/modules/purchase/POModal.jsx — moved verbatim from the former single-file src/App.jsx
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import ItemSearchSelect from "../../shared/components/ItemSearchSelect.jsx";
+import { parseDisplayDate } from "../../utils/parseDate.js";
+import { isoToDisplayDate } from "../../utils/parseDate.js";
 import SearchableSelect from "../../shared/components/SearchableSelect.jsx";
 import { PURCHASE_TYPES, DEFAULT_PURCHASE_TYPE_KEY, getPurchaseType, calculateGSTBreakdown, filterPurchaseTypes, todayIso } from "../../utils/gst.js";
 import { normalizePOSettings, PO_TEMPLATE_OPTIONS } from "../../utils/poTemplate.js";
@@ -28,7 +30,13 @@ export function POModal({ initialPO, vendorList, items, onSave, onClose, prefill
       template:  initialPO.template  || poCfg.template,
       // ERP upgrade (migration 018) — fall back to today / 18% local for legacy POs.
       purchaseType: initialPO.purchaseType || DEFAULT_PURCHASE_TYPE_KEY,
-      poDate:       initialPO.poDate || initialPO.date || todayIso(),
+      // A legacy PO has only date = "4 Nov 2026"; the date picker needs
+      // yyyy-mm-dd or it shows an empty PO Date field.
+      poDate: (() => {
+        const v = initialPO.poDate || initialPO.date;
+        const d = parseDisplayDate(v);
+        return d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}` : (v || todayIso());
+      })(),
     };
     return {
       vendor:    prefill?.vendor || vendorList[0]?.name || "",
@@ -42,6 +50,8 @@ export function POModal({ initialPO, vendorList, items, onSave, onClose, prefill
       poDate:       prefill?.poDate || todayIso(),
     };
   });
+  // PO Date as first shown, so Save can tell whether the operator changed it.
+  const initialPoDateRef = useRef(form.poDate);
 
   const [addCode,      setAddCode]      = useState("");
   const [addQty,       setAddQty]       = useState("");
@@ -214,7 +224,12 @@ export function POModal({ initialPO, vendorList, items, onSave, onClose, prefill
       amount: total,
       status,
       gstType: purchaseTypeMeta?.gstType || null,
-      date:    form.poDate || todayIso(),
+      // Same "4 Nov 2026" form every other PO date uses. Edit used to write the
+      // raw date-picker value ("2026-11-04") into po.date, so the edited PO's
+      // date showed in a different format and could not be parsed for sorting.
+      // An unchanged PO Date keeps the stored date as is (no false "date"
+      // change in the po_edited audit row).
+      date:    isEdit && initialPO.date && form.poDate === initialPoDateRef.current ? initialPO.date : isoToDisplayDate(form.poDate || todayIso()),
     });
   };
 

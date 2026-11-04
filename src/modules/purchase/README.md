@@ -17,7 +17,7 @@ Vendors (list, add/edit, Excel import, WhatsApp link), the Order Pipeline (creat
 | `ApprovalsPage.jsx` | 121 |
 | `OrderPipelinePage.jsx` | 1103 |
 | `PODetailModal.jsx` | 177 |
-| `POModal.jsx` | 676 |
+| `POModal.jsx` | 691 |
 | `POSearchCenter.jsx` | 202 |
 | `POSettings.jsx` | 321 |
 | `PurchasePage.jsx` | 178 |
