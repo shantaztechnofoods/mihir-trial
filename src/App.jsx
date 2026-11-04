@@ -100,6 +100,7 @@ import { ChartSlot, loadCharts } from "./components/LazyCharts.jsx";
 import { importWithReload } from "./utils/lazyImport.js";
 import { useProgressiveCount } from "./components/useProgressiveCount.js";
 import MoreRowsNote from "./components/MoreRowsNote.jsx";
+import { BRAND_LOGO_DATA_URI } from "./utils/brandLogo.js";
 
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
@@ -15205,7 +15206,7 @@ function AtoZMachineReport({
         <div className="min-w-0">
           <div className="mr-label">Machine</div>
           <div className="mr-machine">{machine.bomLabel || bom.label || machine.bomKey}</div>
-          <div className="mr-mono mr-serial">Model {machine.bomKey} · Serial no. {machine.serialNo || "—"}</div>
+          <div className="mr-mono mr-serial">Model {machine.bomKey}{machine.serialNo ? ` · Serial no. ${machine.serialNo}` : ""}</div>
         </div>
         <div data-report-status className={`mr-stamp ${isReady ? "is-done" : "is-progress"}`}>
           {isReady ? "Ready for dispatch" : `In production · ${displayStageOf(machine) || machine.stage}`}
@@ -15218,8 +15219,8 @@ function AtoZMachineReport({
           ["Build time", buildDays ? `${buildDays} day${buildDays === 1 ? "" : "s"}` : ""],
           ["Rack", machine.rackSlot ? slotLabel(machine.rackSlot) : (rackCapacityFor(machine.bomKey, bom) > 0 ? "Left the rack" : "Direct production")],
           ["BOM issue ref", machine.issueId ? String(machine.issueId) : "", true],
-        ].map(([k, v, mono]) => (
-          <div key={k} className="min-w-0"><div className="mr-label">{k}</div><div className={`mr-fact ${mono ? "mr-mono" : ""}`}>{v || "—"}</div></div>
+        ].filter(([, v]) => v).map(([k, v, mono]) => (
+          <div key={k} className="min-w-0"><div className="mr-label">{k}</div><div className={`mr-fact ${mono ? "mr-mono" : ""}`}>{v}</div></div>
         ))}
       </div>
       {/* D4 — summary row */}
@@ -15230,7 +15231,7 @@ function AtoZMachineReport({
           { k: "Signatures", v: sigRows.length, attr: { "data-report-sig-count": "" } },
           { k: "Open issues", v: openJobs.length, red: openJobs.length > 0 },
           { k: "Resolved issues", v: resolvedJobs.length },
-          { k: "Average rating", v: sum.average !== null ? rate(sum.average) : "—" },
+          { k: "Average rating", v: sum.average !== null ? rate(sum.average) : "Not rated" },
         ].map((g) => (
           <div key={g.k} className={`mr-sum ${g.red ? "is-red" : ""}`}><div className="mr-sum-v" {...(g.attr || {})}>{g.v}</div><div className="mr-label">{g.k}</div></div>
         ))}
@@ -15348,7 +15349,7 @@ function AtoZMachineReport({
                     : <span className="mr-muted">—</span>)}</div>
                   <div className="mr-td" data-l="Checks">{show.showChecklists !== false && (hopResp.length ? <div>{hopResp.map((cr) => {
                       const ans = cr.answers || []; const done = ans.filter((a) => a.checked).length; const miss = ans.length - done;
-                      return <div key={cr.id}>{({ before_dispatch: "Dispatch", before_receive: "Receive", during_work: "During work" })[cr.stage] || "Checklist"} {done}/{ans.length}{miss ? <span className="mr-red"> · {miss} not done</span> : null}</div>;
+                      return <div key={cr.id} className="rpt-badges"><span className={`rpt-badge ${miss ? "is-warn" : "is-ok"}`}>{({ before_dispatch: "Dispatch", before_receive: "Receive", during_work: "During work" })[cr.stage] || "Checklist"} {done}/{ans.length}</span>{miss ? <span className="rpt-badge is-no">{miss} not done</span> : null}</div>;
                     })}<div className="mr-label">Full answers: Appendix A</div></div> : <span className="mr-muted">—</span>)}</div>
                 </div>
                 {/* The delay reason is printed once, in "Holds and late reasons" below. */}
@@ -15593,7 +15594,7 @@ function AtoZMachineReport({
 
   return (
     <div className="mr-doc" data-machine-report>
-      <RptPageStyle page="machine-report" head={`${company.name || RPT_LEGAL_NAME} · Machine production report`} refText={reportRef} foot="Machine production report · internal" />
+      <RptPageStyle page="machine-report" head={`${company.name || RPT_LEGAL_NAME} · Machine production report`} refText={reportRef} foot="Computer-generated report · Confidential, internal use only" />
       {/* D8 — the print frame (on paper the running head is a page margin box, from page 2 on). */}
       <table className="mr-frame">
         <thead><tr><td><div className="mr-runhead"><span>{company.name || RPT_LEGAL_NAME} · Machine production report</span><span className="mr-mono">{reportRef}</span></div></td></tr></thead>
@@ -15646,12 +15647,23 @@ const rptDur = (min) => {
 // Settings → Company name (active company), then the legacy settings name,
 // then the registered name below. The certificate's company box reads the same.
 const RPT_LEGAL_NAME = "SHANTA G TECHNOFOODS LLP";
+// 2026-11-04 (reports v3) — the old brand-style names ("Shantaz Technofoods",
+// "... Pvt Ltd") are not the legal name: they print as the registered name.
+// Placeholder / sample contact values (form hints, test seeds) never print.
+// The letterhead always carries the owner's real vector logo.
+const RPT_OLD_NAME = /^\s*shantaz\s*techno\s*foods\b/i;
+const RPT_SAMPLE = [/ABCDE1234/i, /AABCS1234/i, /@company\.com$/i, /\.example$/i, /^www\.company\.com$/i, /^factory \/ office address$/i, /^\+91 98765 43210$/];
+const rptClean = (v) => { const t = String(v == null ? "" : v).trim(); return t && !RPT_SAMPLE.some((re) => re.test(t)) ? t : ""; };
 const rptCompany = (settings) => {
   let c = {};
   try { c = getActiveCompany(settings) || {}; } catch { c = {}; }
-  const name = String(c.name || "").trim() || String((settings && settings.companyName) || "").trim() || RPT_LEGAL_NAME;
-  return { ...c, name };
+  const pick = (k, legacy) => rptClean(c[k]) || rptClean(settings && settings[legacy || k]);
+  let name = String(c.name || "").trim() || String((settings && settings.companyName) || "").trim();
+  if (!name || RPT_OLD_NAME.test(name)) name = RPT_LEGAL_NAME;
+  return { ...c, name, logo: BRAND_LOGO_DATA_URI, gst: pick("gst"), address: pick("address"), phone: pick("phone"), email: pick("email"), website: rptClean(c.website) };
 };
+// One contact line for every letterhead: GSTIN · phone · e-mail · website.
+const rptContactLine = (co = {}) => [co.gst ? `GSTIN ${co.gst}` : "", co.phone ? `Tel ${co.phone}` : "", co.email || "", co.website || ""].filter(Boolean).join("   ·   ");
 
 // ── Letterhead, title block and page furniture shared by every report ──────
 // 2026-11-04 — letterhead style: the logo centred and larger, the company name
@@ -15661,14 +15673,15 @@ const rptCompany = (settings) => {
 // page numbers (and, from page 2 on, a short running head).
 function RptLetterhead({ company = {}, showLogo = true, line = "" }) {
   const name = company.name || RPT_LEGAL_NAME;
-  const contact = [company.gst ? `GSTIN ${company.gst}` : "", company.phone ? `Phone ${company.phone}` : "", company.email || "", company.website || ""].filter(Boolean);
+  const contact = rptContactLine({ gst: company.gst, phone: company.phone, email: company.email, website: company.website });
   return (
     <div className="rpt-lh" data-report-letterhead>
-      {showLogo && company.logo && <img src={company.logo} alt="" className="mr-logo rpt-lh-logo" />}
+      {showLogo && <img src={company.logo || BRAND_LOGO_DATA_URI} alt="SHANTAZ" className="mr-logo rpt-lh-logo" />}
       <div className="rpt-lh-name">{name}</div>
+      <div className="rpt-lh-rule" aria-hidden="true" />
       {line && <div className="rpt-lh-line">{line}</div>}
       {company.address && <div className="rpt-lh-line">{company.address}</div>}
-      {contact.length > 0 && <div className="rpt-lh-line">{contact.join("  ·  ")}</div>}
+      {contact && <div className="rpt-lh-line">{contact}</div>}
     </div>
   );
 }
@@ -15693,7 +15706,8 @@ function RptPageStyle({ page, head = "", refText = "", foot = "" }) {
   const css = `@page ${page} { size: A4 portrait; margin: 16mm 14mm 17mm 14mm;
     @top-left { content: ${rptCssStr(head)}; font: 7.5pt Inter, Arial, sans-serif; color: #6b6b6b; vertical-align: bottom; padding-bottom: 3mm; }
     @top-right { content: ${rptCssStr(refText)}; font: 7.5pt Inter, Arial, sans-serif; color: #6b6b6b; vertical-align: bottom; padding-bottom: 3mm; }
-    @bottom-left { content: ${rptCssStr(foot)}; font: 7.5pt Inter, Arial, sans-serif; color: #6b6b6b; vertical-align: top; padding-top: 3mm; }
+    @bottom-left { content: ${rptCssStr(foot)}; font: 7pt Inter, Arial, sans-serif; color: #6b6b6b; vertical-align: top; padding-top: 3mm; }
+    @bottom-center { content: ${rptCssStr(refText)}; font: 7pt Inter, Arial, sans-serif; color: #6b6b6b; vertical-align: top; padding-top: 3mm; }
     @bottom-right { content: "Page " counter(page) " of " counter(pages); font: 7.5pt Inter, Arial, sans-serif; color: #6b6b6b; vertical-align: top; padding-top: 3mm; } }
   @page ${page}:first { @top-left { content: none; } @top-right { content: none; } }`;
   return <style>{css}</style>;
@@ -16020,7 +16034,7 @@ function ReportSheet({ kind, settings = {}, title, subtitle = "", refText = "", 
   const internal = kind !== "customer";
   return (
     <div className={`mr-doc rpt-doc rpt-${kind}`} data-report-kind={kind}>
-      <RptPageStyle page={page} head={`${company.name || RPT_LEGAL_NAME} · ${title}`} refText={refText} foot={internal ? `${title} · internal` : title} />
+      <RptPageStyle page={page} head={`${company.name || RPT_LEGAL_NAME} · ${title}`} refText={refText} foot={internal ? "Computer-generated report · Confidential, internal use only" : "Computer-generated report"} />
       <table className="mr-frame">
         <thead><tr><td><div className="mr-runhead"><span>{company.name || RPT_LEGAL_NAME} · {title}</span><span className="mr-mono">{refText}</span></div></td></tr></thead>
         <tbody><tr><td>
@@ -16090,9 +16104,9 @@ function CustomerMachineReport({ machineId, machineLog = [], bomDefs = {}, hando
           <div className="mr-label">Machine</div>
           <div className="mr-machine">{machine.bomLabel || bom.label || machine.bomKey}</div>
           <div className="mr-facts rpt-facts-3">
-            {[["Model", machine.bomKey], ["Serial no.", machine.serialNo || "—", true], ["Build started", rptFmtD(machine.createdDate) || "—"],
-              ["Ready on", rptFmtD(machine.completedDate) || "In production"], ["Build time", buildDays ? `${buildDays} day${buildDays === 1 ? "" : "s"}` : "—"],
-              ["Trial", cert ? "Passed · certificate below" : "Scheduled"]].map(([k, v, mono]) => (
+            {[["Model", machine.bomKey], ["Serial no.", machine.serialNo || "", true], ["Build started", rptFmtD(machine.createdDate) || ""],
+              ["Ready on", rptFmtD(machine.completedDate) || "In production"], ["Build time", buildDays ? `${buildDays} day${buildDays === 1 ? "" : "s"}` : ""],
+              ["Trial", cert ? "Passed · certificate below" : "Scheduled"]].filter(([, v]) => v).map(([k, v, mono]) => (
               <div key={k} className="min-w-0"><div className="mr-label">{k}</div><div className={`mr-fact ${mono ? "mr-mono" : ""}`}>{v}</div></div>
             ))}
           </div>
@@ -16101,7 +16115,7 @@ function CustomerMachineReport({ machineId, machineLog = [], bomDefs = {}, hando
       </div>
       <div className="mr-summary rpt-summary-4" data-report-glance>
         {[{ k: "Stages completed", v: `${records.filter((r) => r.state === "done").length} of ${records.length}` },
-          { k: "Check points OK", v: points ? `${passed} of ${points}` : "—" },
+          { k: "Check points OK", v: points ? `${passed} of ${points}` : "None" },
           { k: "Critical items", v: critical.length },
           { k: "Finishing work done", v: commentGroups.reduce((s, g) => s + g.rows.length, 0) }]
           .map((g) => <div key={g.k} className="mr-sum"><div className="mr-sum-v">{g.v}</div><div className="mr-label">{g.k}</div></div>)}
@@ -17563,6 +17577,32 @@ const TC_SHEET_CSS = [
   ".tc-form.tc-form input::placeholder,.tc-form.tc-form textarea::placeholder{color:#6b7280 !important}",
   ".tc-form.tc-form input:focus-visible,.tc-form.tc-form textarea:focus-visible{outline:none !important;box-shadow:0 0 0 3px #e2e8f0 !important;border-color:#334155 !important}",
   ".tc-form.tc-form input[type=date]::-webkit-calendar-picker-indicator{filter:none !important;opacity:.7;cursor:pointer}",
+  // 2026-11-04 (reports v3) — premium certificate skin: serif title and legal
+  // name, thin brand-red rules, hairline tables, a faint logo watermark and a
+  // quality seal on the stand-alone print. Layout and content are unchanged.
+  ".tc-sheet{font-family:Inter,'Helvetica Neue',Arial,sans-serif;color:#15171c;-webkit-print-color-adjust:exact;print-color-adjust:exact}",
+  ".tc-sheet>*{position:relative;z-index:1}",
+  ".tc-has-lh::before{content:'';position:absolute;inset:0;z-index:0;pointer-events:none;background:url(\"" + BRAND_LOGO_DATA_URI.replace(/"/g, "%22") + "\") center 58%/150mm auto no-repeat;opacity:.045}",
+  ".tc-lh{border-bottom:.5pt solid #cfd2d7;padding-bottom:3mm;margin-bottom:4mm}",
+  ".tc-lh-logo{width:46mm;height:auto;max-width:46mm;margin:0 auto 2.4mm}",
+  ".tc-lh-name{font-family:'Source Serif 4','Source Serif Pro',Georgia,serif;font-weight:600;font-size:15px;letter-spacing:.17em}",
+  ".tc-lh-rule{width:18mm;border-top:.9pt solid #b3141f;margin:1.8mm auto 1.6mm}",
+  ".tc-lh-line{color:#5d6470;font-size:8.6px;letter-spacing:.02em}",
+  ".tc-title{font-family:'Source Serif 4','Source Serif Pro',Georgia,serif;font-weight:600;letter-spacing:.24em;color:#15171c}",
+  ".tc-rule{border-top:.9pt solid #b3141f;width:24mm;margin:0 auto 4mm}",
+  ".tc-field-label{color:#5d6470;letter-spacing:.08em}",
+  ".tc-field-value{border-bottom:.6pt solid #15171c}",
+  ".tc-sec{background:none;border:0;border-bottom:.9pt solid #15171c;padding:0 0 .8mm;margin-top:3.6mm;margin-bottom:0;font-family:'Source Serif 4','Source Serif Pro',Georgia,serif;font-size:11px;letter-spacing:.14em;color:#15171c}",
+  ".tc-sec::before{content:'';display:inline-block;width:1.6mm;height:1.6mm;background:#b3141f;margin-right:2mm;vertical-align:.25mm}",
+  ".tc-sheet th,.tc-sheet td{border:0;border-bottom:.5pt solid #dcdfe4}",
+  ".tc-sheet th{background:#f6f6f3;color:#4a505a;font-size:8.6px;letter-spacing:.09em}",
+  ".tc-sheet tbody tr:nth-child(even) td{background:rgba(246,246,243,.6)}",
+  ".tc-note{border:0;border-bottom:.5pt solid #dcdfe4}",
+  ".tc-sigimg{border-bottom:.6pt solid #15171c}",
+  ".tc-sigcap{font-size:9px;letter-spacing:.1em;color:#15171c}",
+  ".tc-foot{border-top:.5pt solid #dcdfe4;color:#8b919b;font-size:8px;letter-spacing:.02em}",
+  ".tc-seal{position:absolute;top:9mm;right:12mm;width:25mm;height:25mm;z-index:2;color:#b3141f;opacity:.85}",
+  ".tc-seal svg{display:block;width:100%;height:100%}",
 ].join("\n");
 
 const tcGetFrq = (d, f) => (d && d[f]) || "";
@@ -17661,6 +17701,26 @@ function TcSheetSig({ title, name, sig, showName = true, date = "" }) {
   );
 }
 
+// 2026-11-04 (reports v3) — a printed quality seal (decoration only; it is
+// not a signature): double ring, "QUALITY CONTROL · TRIAL CERTIFIED" around.
+function TcSeal() {
+  return (
+    <div className="tc-seal" aria-hidden="true">
+      <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <defs><path id="tc-seal-arc" d="M50,50 m-36,0 a36,36 0 1,1 72,0 a36,36 0 1,1 -72,0" /></defs>
+        <circle cx="50" cy="50" r="47" fill="none" stroke="currentColor" strokeWidth="1.6" />
+        <circle cx="50" cy="50" r="43.5" fill="none" stroke="currentColor" strokeWidth="0.6" />
+        <circle cx="50" cy="50" r="28" fill="none" stroke="currentColor" strokeWidth="0.6" />
+        <text fill="currentColor" fontFamily="Inter, Arial, sans-serif" fontSize="7.4" fontWeight="700" letterSpacing="2.1">
+          <textPath href="#tc-seal-arc" startOffset="0">QUALITY CONTROL · TRIAL CERTIFIED ·</textPath>
+        </text>
+        <text x="50" y="47" textAnchor="middle" fill="currentColor" fontFamily="Georgia, serif" fontSize="13" fontWeight="700">✓</text>
+        <text x="50" y="59" textAnchor="middle" fill="currentColor" fontFamily="Inter, Arial, sans-serif" fontSize="6.2" fontWeight="700" letterSpacing="1">SHANTAZ</text>
+      </svg>
+    </div>
+  );
+}
+
 // The printable A4 certificate. Pure render: no hooks, no state.
 // 2026-11-04 — `embedded`: inside a machine report, which already names the
 // machine, carries the letterhead and lists every signature with name,
@@ -17708,11 +17768,13 @@ function TrialCertificateSheet({ machine, cert, remarks = "", embedded = false, 
     <div className={`tc-sheet${embedded ? " tc-embedded" : ""}${!embedded && company ? " tc-has-lh" : ""}`}>
       {!embedded && company && (
         <div className="tc-lh">
-          {company.logo && <img src={company.logo} alt="" className="tc-lh-logo" />}
+          <img src={company.logo || BRAND_LOGO_DATA_URI} alt="SHANTAZ" className="tc-lh-logo" />
           <div className="tc-lh-name">{company.name || RPT_LEGAL_NAME}</div>
-          {[company.address, [company.gst ? `GSTIN ${company.gst}` : "", company.phone ? `Phone ${company.phone}` : "", company.email || ""].filter(Boolean).join("  ·  ")].filter(Boolean).map((l, i) => <div key={i} className="tc-lh-line">{l}</div>)}
+          <div className="tc-lh-rule" aria-hidden="true" />
+          {[company.address, rptContactLine(company)].filter(Boolean).map((l, i) => <div key={i} className="tc-lh-line">{l}</div>)}
         </div>
       )}
+      {!embedded && company && <TcSeal />}
       {!embedded && <div className="tc-title">MACHINE TRIAL CERTIFICATE</div>}
       {!embedded && <div className="tc-rule" />}
 
@@ -17821,7 +17883,7 @@ function TrialCertificateSheet({ machine, cert, remarks = "", embedded = false, 
 
       {!embedded && (
         <div className="tc-foot">
-          <span>SHANTAZ ERP · Machine Trial Certificate</span>
+          <span>Machine Trial Certificate · computer-generated document</span>
           <span>{machine.bomKey}{machine.serialNo ? " · S/N " + machine.serialNo : ""}</span>
         </div>
       )}
@@ -17846,6 +17908,7 @@ function printTrialCertificate(machine, cert, remarks = "", company = null) {
     "<!DOCTYPE html><html><head><meta charset='utf-8'/>" +
     "<meta name='viewport' content='width=device-width,initial-scale=1'/>" +
     "<title>" + tcEsc(title) + "</title>" +
+    "<link rel='stylesheet' href='https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,600&display=swap'/>" +
     "<style>" + TC_SHEET_CSS +
       "@page{size:A4 portrait;margin:0}" +
       "html,body{margin:0;padding:0;background:#fff}" +
@@ -24934,23 +24997,27 @@ function hrExportPDF(title, rows, cols, company = {}) {
   };
   const co = company || {};
   const name = co.name || RPT_LEGAL_NAME;
-  const contact = [co.gst ? `GSTIN ${co.gst}` : "", co.phone ? `Phone ${co.phone}` : "", co.email || "", co.website || ""].filter(Boolean).join("  ·  ");
+  const contact = rptContactLine(co);
+  const logo = co.logo || BRAND_LOGO_DATA_URI;
   const hdr  = cols.map((c) => `<th>${esc(c.label)}</th>`).join("");
   const body = rows.map((r) => `<tr>${cols.map((c) => `<td>${cell(r[c.key])}</td>`).join("")}</tr>`).join("");
   const generated = rptFmtDT(new Date());
   const w = window.open("", "_blank");
   if (!w) { alert("Pop-up blocked. Allow pop-ups for this site to print or save the report."); return; }
   w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/><title>${esc(title)} — ${esc(rptFmtD(new Date()))}</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,600&display=swap"/>
     <style>
     *{box-sizing:border-box}
     body{font-family:Inter,'Segoe UI',Arial,sans-serif;font-size:10.5px;color:#111;margin:24px;font-variant-numeric:tabular-nums}
-    .lh{text-align:center;padding-bottom:10px;border-bottom:2.5px double #8a8a8a}
-    .lh img{display:block;margin:0 auto 6px;height:56px;width:auto;max-width:220px;object-fit:contain}
-    .lh .n{font-size:17px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
-    .lh .l{font-size:9.5px;color:#555;margin-top:2px}
-    .tb{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin:14px 0 10px}
-    h2{font-size:15px;font-weight:700;margin:0}
-    .meta{font-size:9.5px;color:#555;text-align:right}
+    .lh{text-align:center;padding-bottom:4mm;border-bottom:.5pt solid #cfd2d7;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .lh img{display:block;margin:0 auto 3mm;width:48mm;height:auto}
+    .lh .n{font-family:'Source Serif 4',Georgia,serif;font-size:14.5pt;font-weight:600;letter-spacing:.17em;text-transform:uppercase;color:#15171c}
+    .lh .r{width:18mm;border-top:.9pt solid #b3141f;margin:2.2mm auto 2mm}
+    .lh .l{font-size:7.6pt;color:#5d6470;letter-spacing:.02em;margin-top:.6mm}
+    .tb{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin:5mm 0 4mm;padding-bottom:3mm;border-bottom:1pt solid #15171c}
+    h2{font-family:'Source Serif 4',Georgia,serif;font-size:16pt;font-weight:600;margin:0}
+    .meta{font-size:8pt;color:#15171c;background:#f6f6f3;border:.5pt solid #e3e5e9;border-left:1.5pt solid #b3141f;padding:1.6mm 3mm}
+    tbody tr:nth-child(even) td{background:#f8f8f6}
     table{border-collapse:collapse;width:100%}
     thead{display:table-header-group}
     th{text-align:left;font-size:9px;font-weight:700;color:#333;text-transform:uppercase;letter-spacing:.04em;padding:6px 8px;border-top:1.2px solid #111;border-bottom:.75px solid #111}
@@ -24963,10 +25030,10 @@ function hrExportPDF(title, rows, cols, company = {}) {
       @bottom-right{content:"Page " counter(page) " of " counter(pages);font:8px Inter,Arial,sans-serif;color:#666}}
     @media print{.print-btn{display:none}body{margin:0}}</style></head><body>
     <button class="print-btn" onclick="window.print()">Print / Save as PDF</button>
-    <div class="lh">${co.logo ? `<img src="${esc(co.logo)}" alt=""/>` : ""}<div class="n">${esc(name)}</div>${co.address ? `<div class="l">${esc(co.address)}</div>` : ""}${contact ? `<div class="l">${esc(contact)}</div>` : ""}</div>
+    <div class="lh"><img src="${esc(logo)}" alt="SHANTAZ"/><div class="n">${esc(name)}</div><div class="r"></div>${co.address ? `<div class="l">${esc(co.address)}</div>` : ""}${contact ? `<div class="l">${esc(contact)}</div>` : ""}</div>
     <div class="tb"><h2>${esc(title)}</h2><div class="meta">${rows.length} record${rows.length === 1 ? "" : "s"}</div></div>
     <table><thead><tr>${hdr}</tr></thead><tbody>${body}</tbody></table>
-    <div class="foot">Generated from ERP records on ${esc(generated)}.</div>
+    <div class="foot">Generated from ERP records on ${esc(generated)}. This is a computer-generated document · Confidential, internal use only.</div>
   </body></html>`);
   w.document.close();
 }
