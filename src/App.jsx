@@ -101,7 +101,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-04-purchase-1";
+const APP_BUILD = "2026-11-04-purchase-2";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -892,7 +892,9 @@ function DashboardPage({ items = {}, pos = [], vendorList = [], machineLog = [],
   }, [moveSignal]);
 
   const pendingPOs  = pos.filter((p) => ["pending","review","draft"].includes(p.status));
-  const openPOValue = pos.filter((p) => p.status !== "received").reduce((s, p) => s + p.amount, 0);
+  // Open = not received and not rejected (a rejected PO will never be paid).
+  const openPOs     = pos.filter((p) => !["received", "rejected"].includes(p.status));
+  const openPOValue = openPOs.reduce((s, p) => s + (Number(p.amount) || 0), 0);
 
   const curr    = getCurrSymbol(settings.currency);
   const fmtVal  = (v) =>
@@ -952,7 +954,7 @@ function DashboardPage({ items = {}, pos = [], vendorList = [], machineLog = [],
     { label: "Total SKUs",        value: totalSKUs,                                              Icon: Boxes,        color: "#2E50D6", nav: "inventory",  sub: `${safeItems.length} safe` },
     { label: "Critical Stock",    value: criticalN,                                              Icon: AlertOctagon, color: "#b91c1c", nav: "inventory",  sub: `${warningItems.length} warning`,  alert: criticalN > 0 },
     { label: "Pending POs",       value: pendingPOs.length,                                      Icon: AlertTriangle,color: "#b45309", nav: "pipeline",   sub: "awaiting approval",               alert: pendingPOs.length > 0 },
-    { label: "Open PO Value",     value: fmtVal(openPOValue),                                    Icon: Wallet,       color: "#15803d", nav: "pipeline",   sub: `${pos.filter(p=>p.status!=="received").length} open` },
+    { label: "Open PO Value",     value: fmtVal(openPOValue),                                    Icon: Wallet,       color: "#15803d", nav: "pipeline",   sub: `${openPOs.length} open` },
     { label: "In Production",     value: machineLog.filter((m) => m.status === "active" && m.stage !== "BOM Issued").length, Icon: Cog, color: "#2640B0", nav: "machines",   sub: "machines active" },
     { label: "Machines Ready",    value: machineLog.filter((m) => m.status === "completed").length, Icon: CircleCheckBig, color: "#15803d", nav: "machines", sub: "completed" },
     { label: "Pending Materials", value: pendingLog.length,                                      Icon: Hourglass,    color: "#b45309", nav: "pending",    sub: "items pending",                   alert: pendingLog.length > 0 },
@@ -4762,12 +4764,12 @@ function PurchasePage({ pos, vendorList, items, onCreatePO, onUpdatePO, onReceiv
 
   const filtered = pos.filter((po) => {
     const q = search.toLowerCase();
-    const matchSearch = po.id.toLowerCase().includes(q) || po.vendor.toLowerCase().includes(q);
+    const matchSearch = String(po.id || "").toLowerCase().includes(q) || String(po.vendor || "").toLowerCase().includes(q);
     const matchFilter = filter === "all" || po.status === filter;
     return matchSearch && matchFilter;
   });
 
-  const totalAmt  = pos.filter((p) => !["received"].includes(p.status)).reduce((s, p) => s + p.amount, 0);
+  const totalAmt  = pos.filter((p) => !["received", "rejected"].includes(p.status)).reduce((s, p) => s + (Number(p.amount) || 0), 0);
   const overdueN  = pos.filter((p) => p.status === "overdue").length;
   const receivedN = pos.filter((p) => p.status === "received").length;
   const pendingN  = pos.filter((p) => ["pending","review","draft"].includes(p.status)).length;
@@ -5122,7 +5124,7 @@ function VendorImportModal({ vendorList, onImport, onClose }) {
 
 // ─── VENDOR MODAL ─────────────────────────────────────────────────────────────
 
-function VendorModal({ initialVendor, onSave, onClose }) {
+function VendorModal({ initialVendor, onSave, onClose, existingNames = [] }) {
   const isEdit = Boolean(initialVendor);
   useEffect(() => {
     const h = (e) => { if (e.key === "Escape") onClose(); };
@@ -5141,6 +5143,14 @@ function VendorModal({ initialVendor, onSave, onClose }) {
   const handleSave = () => {
     const e = {};
     if (!form.name.trim())  e.name  = "Required";
+    // POs, item links and vendor stats find a vendor by its NAME, so two
+    // vendors with the same name got their POs and totals mixed together.
+    else {
+      const key = (s) => String(s || "").trim().replace(/\s+/g, " ").toLowerCase();
+      const own = isEdit ? key(initialVendor.name) : null;
+      if (key(form.name) !== own && existingNames.some((n) => key(n) === key(form.name)))
+        e.name = `A vendor named "${form.name.trim()}" already exists`;
+    }
     setErrors(e);
     if (Object.keys(e).length) return;
     const id = initialVendor?.id || `V${String(Date.now()).slice(-4)}`;
@@ -5340,6 +5350,7 @@ function VendorsPage({ vendorList, pos, items, onAddVendor, onEditVendor, onDele
       {showModal && (
         <VendorModal
           initialVendor={editingVendor}
+          existingNames={vendorList.map((v) => v.name)}
           onSave={(data) => {
             if (editingVendor) { onEditVendor(data); showToast(`${data.name} updated`); }
             else               { onAddVendor(data);  showToast(`${data.name} added`);   }
@@ -27331,6 +27342,10 @@ export default function App() {
     const wasReceived  = po?.status === "received";
     setPos((prev) => prev.filter((p) => p.id !== id));
     if (isSupabaseEnabled()) poDelete(id).then((r) => { if (!r.success) console.warn("[App] PO delete Supabase failed:", r.error); });
+    // Its follow-ups go too (same as Receive): left behind they kept showing
+    // on Order Pipeline and in notifications for a PO that no longer exists.
+    setFollowUps((prev) => prev.filter((f) => f.poId !== id));
+    if (isSupabaseEnabled()) deleteFollowUpsByPO(id).then((r) => { if (!r.success) console.warn("[App] FollowUp delete Supabase failed:", r.error); });
     logAudit({
       type: wasReceived ? "po_deleted_received" : "po_deleted",
       module: "Purchase",
