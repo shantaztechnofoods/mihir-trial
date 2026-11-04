@@ -52,7 +52,7 @@ export function emptyCompanyProfile(seed = {}) {
 // Default PO settings block. Seeds one company from any legacy top-level settings fields.
 export function defaultPOSettings(legacy = {}) {
   const first = emptyCompanyProfile({
-    name: legacy.companyName || "Shantaz Technofoods",
+    name: legacy.companyName || "SHANTA G TECHNOFOODS LLP",
     logo: legacy.logo || "",
     gst: legacy.gst || "",
     address: legacy.address || "",
