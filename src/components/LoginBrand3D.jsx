@@ -157,6 +157,9 @@ export default function LoginBrand3D({ onFail, fullBleed = false }) {
     const key = new DirectionalLight(0xeef3ff, 1.4); key.position.set(-3, 4, 6); scene.add(key);
     const rim = new DirectionalLight(0xffb26b, 1.3); rim.position.set(4, 2.5, -4); scene.add(rim);
     const coolRim = new DirectionalLight(0xa9c8ff, 3.2); coolRim.position.set(-4, 4, 1.2); scene.add(coolRim); // cool rim on the gunmetal gear's edges
+    // the gear's top arc sits behind the wheat and went near-black on navy: a soft cool light just above it lifts that rim
+    const gearR = Math.max(...L.gear.outer.map(([x, y]) => Math.hypot(x - L.gear.center[0], y - L.gear.center[1]))) * U;
+    const gearTop = new PointLight(0xc4d6ff, 7, gearR * 3.2, 2); gearTop.position.set(gp[0] - gearR * 0.15, gp[1] + gearR * 1.15, gearR * 0.85); scene.add(gearTop);
     const sweep = new PointLight(0xfff4e6, 0, 0, 2); sweep.position.set(wordL, wordY + 0.2, 0.75); scene.add(sweep);
 
     // ── faint blurred reflection: the logo mirrored under the floor line,
