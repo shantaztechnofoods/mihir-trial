@@ -219,12 +219,12 @@
   .page-header h1 { font-size: 19px !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .page-header h1 + p { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12.5px !important; }
   .page-header .nav-menu-btn { width: 40px !important; height: 40px !important; border-radius: 12px !important; color: var(--ink) !important; background: var(--paper) !important; border: 0 !important; box-shadow: var(--e1); }
-  .page-header .page-header-actions { flex-wrap: nowrap !important; flex-shrink: 0; }
+  .page-header .page-header-actions { flex-wrap: nowrap !important; flex: 0 0 auto !important; width: auto !important; }
   .page-header .page-header-actions button, .page-header .page-header-actions > a { min-height: 40px; white-space: nowrap; }
   .page-header .page-header-actions button[aria-label^="Departments called"] { min-width: 40px; }
   /* Three or more actions (Machine Tracker): they take their own row below the title */
   .page-header:has(.page-header-actions > :nth-child(3)) { flex-wrap: wrap !important; }
-  .page-header:has(.page-header-actions > :nth-child(3)) .page-header-actions { width: 100%; }
+  .page-header:has(.page-header-actions > :nth-child(3)) .page-header-actions { flex: 1 0 100% !important; width: 100% !important; }
   .page-header:has(.page-header-actions > :nth-child(3)) .page-header-actions > button:not([aria-label^="Departments called"]) { flex: 1 1 0; justify-content: center; }
   .app-shell .p-6 { padding: 16px !important; }
   .hero-tile, .kpi-tile { min-height: 0 !important; }
@@ -654,4 +654,20 @@
   .wu-delayrow { background: var(--paper) !important; border: 1px solid var(--line) !important; border-radius: 12px !important; }
   .wu-delayrow > span:last-child { background: var(--bad-wash) !important; letter-spacing: .01em; }
   .wu-tile-sm { background: var(--sunk) !important; border-color: transparent !important; }
+}
+
+/* ═══ Item Master: a calm table — colour only where stock is short ═══════ */
+@media screen {
+  .wu-imrow > td:first-child { color: var(--ink) !important; font-weight: 600 !important; }
+  .wu-imrow.bg-red-500\/\[0\.025\] { background: transparent; }
+  .wu-cat { background: transparent !important; border: 1px solid var(--line) !important; color: var(--ink-2) !important; font-weight: 500 !important; font-size: 11.5px !important; border-radius: 999px !important; }
+  .wu-status { background: transparent !important; border: 0 !important; box-shadow: none !important; padding-left: 0 !important; font-size: 12px !important; font-weight: 500 !important; letter-spacing: 0 !important; text-transform: capitalize; color: var(--ink-2) !important; }
+  .wu-status[data-status="critical"] { color: var(--bad) !important; font-weight: 600 !important; }
+  .wu-status[data-status="warning"] { color: var(--wait) !important; }
+  .wu-rowbtn { width: 30px !important; height: 30px !important; border-radius: 8px !important; background: var(--paper) !important; border: 1px solid var(--line-strong) !important; color: var(--ink-2) !important; }
+  @media (hover: hover) and (pointer: fine) { .wu-rowbtn:hover { border-color: var(--action) !important; color: var(--action) !important; } }
+  .wu-rowflag { display: none !important; }
+  .wu-attn { background: var(--paper) !important; border: 0 !important; box-shadow: var(--e1); }
+  .wu-attn-chip { background: var(--sunk) !important; border: 0 !important; color: var(--ink-2) !important; font-family: var(--font-ui) !important; font-weight: 500 !important; font-size: 11.5px !important; border-radius: 999px !important; }
+  .wu-attn-chip[data-status="critical"] { color: var(--bad) !important; }
 }

@@ -484,7 +484,7 @@ const statusConfig = {
 const StatusBadge = ({ status }) => {
   const cfg = statusConfig[status] || statusConfig.safe;
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold"
+    <span className="wu-status inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold" data-status={status}
           style={{ letterSpacing: "0.05em", ...cfg.style }}>
       {cfg.dot && <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: cfg.dot }} />}
       {cfg.label}
@@ -3711,7 +3711,7 @@ function InventoryPage({ items, setItems, handleUpdateStock, pos = [], inwardLog
             </button>
           );
           return (
-            <div className="rounded-xl"
+            <div className="wu-attn rounded-xl"
                  style={{ background: "rgba(239,68,68,0.04)", border: "1px solid rgba(239,68,68,0.18)" }}>
               {/* Header row — clickable, ~60px tall. Always visible. */}
               <button
@@ -3728,7 +3728,7 @@ function InventoryPage({ items, setItems, handleUpdateStock, pos = [], inwardLog
                     {/* Preview chips are labels, not buttons: they sit inside the
                         header toggle and a <button> may not contain a <button>. */}
                     {alerts.slice(0, 10).map((i) => (
-                      <span key={i.code} className="text-[10px] font-bold font-mono px-2 py-0.5 rounded-lg flex-shrink-0"
+                      <span key={i.code} className="wu-attn-chip text-[10px] font-bold font-mono px-2 py-0.5 rounded-lg flex-shrink-0" data-status={i.status}
                             style={{ background: i.status === "critical" ? "rgba(220,38,38,0.08)" : "rgba(217,119,6,0.08)", border: i.status === "critical" ? "1px solid rgba(220,38,38,0.22)" : "1px solid rgba(217,119,6,0.22)", color: i.status === "critical" ? "#dc2626" : "#b45309" }}>
                         {i.code} · {i.stock} {i.unit}
                       </span>
@@ -3829,13 +3829,13 @@ function InventoryPage({ items, setItems, handleUpdateStock, pos = [], inwardLog
                   return (
                     <tr key={`${item.category}-${item.code}`}
                         onClick={() => setSelectedItem({ item: { ...item }, category: item.category })}
-                        className={`border-b border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors ${isCrit ? "bg-red-500/[0.025]" : ""} ${lastAddedCode === item.code ? "bg-blue-500/[0.08]" : ""}`}>
+                        className={`wu-imrow border-b border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors ${isCrit ? "bg-red-500/[0.025]" : ""} ${lastAddedCode === item.code ? "bg-blue-500/[0.08]" : ""}`}>
                       <td className="px-4 py-4 text-xs font-mono font-bold text-blue-600 whitespace-nowrap">{item.code}</td>
                       <td className="px-4 py-4 text-xs font-semibold max-w-[160px]" style={{ color: "var(--text-strong)" }}>
                         <div className="truncate">{item.name}</div>
                       </td>
                       <td className="px-4 py-4">
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md whitespace-nowrap"
+                        <span className="wu-cat text-[10px] font-bold px-2 py-0.5 rounded-md whitespace-nowrap"
                               style={{ background: `${catColor}14`, color: catColor, border: `1px solid ${catColor}28` }}>
                           {item.category}
                         </span>
@@ -3867,23 +3867,23 @@ function InventoryPage({ items, setItems, handleUpdateStock, pos = [], inwardLog
                           {canDo("inventory","adjust") && (
                             <button onClick={() => setQuickAdjust({ item: { ...item }, category: item.category, mode: "add" })}
                                     title="Add Stock"
-                                    className="w-6 h-6 rounded flex items-center justify-center text-xs font-black text-green-700 hover:text-green-900 transition-all"
+                                    className="wu-rowbtn w-6 h-6 rounded flex items-center justify-center text-xs font-black text-green-700 hover:text-green-900 transition-all"
                                     style={{ background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.22)" }}>＋</button>
                           )}
                           {canDo("inventory","adjust") && (
                             <button onClick={() => setQuickAdjust({ item: { ...item }, category: item.category, mode: "remove" })}
                                     title="Remove Stock"
-                                    className="w-6 h-6 rounded flex items-center justify-center text-xs font-black text-amber-700 hover:text-amber-900 transition-all"
+                                    className="wu-rowbtn w-6 h-6 rounded flex items-center justify-center text-xs font-black text-amber-700 hover:text-amber-900 transition-all"
                                     style={{ background: "rgba(217, 119, 6,0.1)", border: "1px solid rgba(217, 119, 6,0.22)" }}>－</button>
                           )}
                           {canDo("inventory","edit") && (
                             <button onClick={() => setEditingItem({ item: { ...item }, category: item.category })}
                                     title="Edit"
-                                    className="w-6 h-6 rounded flex items-center justify-center text-[11px] text-slate-500 hover:text-slate-900 transition-all"
+                                    className="wu-rowbtn w-6 h-6 rounded flex items-center justify-center text-[11px] text-slate-500 hover:text-slate-900 transition-all"
                                     style={{ background: "rgba(17,24,39,0.04)", border: "1px solid rgba(17,24,39,0.10)" }}><Glyph e="✏" size={13} /></button>
                           )}
                           {item.status !== "safe" && (
-                            <span className="text-[9px] font-black text-red-700 px-1.5 py-0.5 rounded whitespace-nowrap"
+                            <span className="wu-rowflag text-[9px] font-black text-red-700 px-1.5 py-0.5 rounded whitespace-nowrap"
                                   style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)" }}><Glyph e="🚨" size={13} /></span>
                           )}
                         </div>
