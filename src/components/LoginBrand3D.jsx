@@ -21,6 +21,10 @@ export { default as ShantazLogoSVG } from "./ShantazLogoSVG.jsx";
 // Renders on demand only (intro, sweep, tilt settling), pauses when the tab
 // is hidden, frees every GPU resource on unmount. Decorative (aria-hidden);
 // onFail() → LoginPage shows the 2D SVG logo.
+// fullBleed: the canvas fills the whole screen (transparent, behind the
+// sign-in card); the logo sits left-of-centre on desktop, at the top on
+// phones. Each light sweep fires window event "shantaz:sweep"
+// ({ detail: { duration, intro } }) so other UI can sync its sheen.
 const U = 0.02;              // logo unit (px of the 500 px logo file) → scene unit
 const INTRO_END = 2.4;
 const SWEEP_EVERY = 7;
@@ -32,7 +36,7 @@ const outCubic = (x) => 1 - Math.pow(1 - clamp01(x), 3);
 const outBack = (x, s = 1.6) => { const k = clamp01(x) - 1; return 1 + (s + 1) * k * k * k + s * k * k; };
 const span = (t, a, d) => clamp01((t - a) / d);
 
-export default function LoginBrand3D({ onFail }) {
+export default function LoginBrand3D({ onFail, fullBleed = false }) {
   const hostRef = useRef(null);
   useEffect(() => {
     const host = hostRef.current; if (!host) return undefined;
@@ -184,10 +188,18 @@ export default function LoginBrand3D({ onFail }) {
       fsMat.uniforms.uTexel.value = [4 / (w * dpr), 4 / (h * dpr)];
       camera.aspect = w / h;
       const tan = Math.tan((camera.fov * Math.PI) / 360);
-      const frac = camera.aspect < 1.5 ? 0.88 : 0.8;
-      const d = Math.max(W / frac / (2 * tan * camera.aspect), (H * 1.75) / (2 * tan));
+      // logo region inside the canvas (px): the whole box, or — full bleed —
+      // the left part on desktop (glass card on the right) / the top on phones
+      let rw = w, rh = h, rcx = w / 2, rcy = h / 2;
+      if (fullBleed) {
+        if (w >= 1024) { const card = Math.max(400, w * 0.34) + 40; rw = (w - card) * 0.86; rh = h * 0.6; rcx = (w - card) / 2 + 12; rcy = h * 0.44; }
+        else { rw = w * 0.9; rh = Math.max(220, h * 0.34); rcx = w / 2; rcy = Math.max(250, h * 0.4) * 0.5; }
+      }
+      const fW = rw / w, fH = rh / h;
+      const d = Math.max(W / (0.94 * fW) / (2 * tan * camera.aspect), (H * 1.7) / fH / (2 * tan));
       camera.position.set(0, 0.25, d);
       camera.lookAt(0, -H * 0.2, 0);
+      if (fullBleed) camera.setViewOffset(w, h, w / 2 - rcx, h / 2 - rcy, w, h); else camera.clearViewOffset();
       camera.updateProjectionMatrix();
       kick();
     };
@@ -204,7 +216,7 @@ export default function LoginBrand3D({ onFail }) {
 
     // ── timeline ──
     let raf = 0, t0 = performance.now(), paused = 0, hiddenAt = 0, settled = false;
-    let nextSweep = 1.2;
+    let nextSweep = 1.2, sweepSent = -1;
     const clock = () => (performance.now() - t0 - paused) / 1000;
 
     const apply = (t) => {
@@ -239,6 +251,11 @@ export default function LoginBrand3D({ onFail }) {
       let st = t - nextSweep;
       if (st > SWEEP_LEN) { nextSweep += t < INTRO_END + 1 ? SWEEP_EVERY + 1 : SWEEP_EVERY; st = t - nextSweep; }
       if (st >= 0 && st <= SWEEP_LEN) {
+        if (sweepSent !== nextSweep) {
+          // let other UI (the glass card's sheen) sync to the same light pass
+          sweepSent = nextSweep;
+          try { window.dispatchEvent(new CustomEvent("shantaz:sweep", { detail: { duration: SWEEP_LEN * 1000, intro: t < INTRO_END } })); } catch { /* old browser */ }
+        }
         const k = st / SWEEP_LEN;
         sweep.position.x = wordL - 0.4 + k * (wordR - wordL + 0.8);
         sweep.intensity = Math.sin(k * Math.PI) * 5.5;
@@ -309,7 +326,7 @@ export default function LoginBrand3D({ onFail }) {
     };
   }, [onFail]);
   return (
-    <div className="lg-brand3d" aria-hidden="true">
+    <div className={`lg-brand3d${fullBleed ? " lg-brand3d--full" : ""}`} aria-hidden="true">
       <div ref={hostRef} className="lg-3d lg-3d--logo" />
     </div>
   );

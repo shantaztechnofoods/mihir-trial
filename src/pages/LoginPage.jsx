@@ -106,7 +106,7 @@ export default function LoginPage({ notice = "", onRetry = null }) {
         <div className="lg-light" />
         {hero === "webgl" && (
           <Suspense fallback={null}>
-            <LoginBrand3D onFail={() => setHero("still")} />
+            <LoginBrand3D fullBleed onFail={() => setHero("still")} />
           </Suspense>
         )}
         {(hero === "still" || hero === "css") && (

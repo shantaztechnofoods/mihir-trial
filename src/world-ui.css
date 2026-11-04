@@ -175,6 +175,8 @@
     font: 500 12px/1 var(--font-display); font-stretch: 125%; letter-spacing: .42em; padding-left: .42em; color: #C3CEDF; }
   /* 3D logo hero: the reflection fades in the shader, so no canvas mask */
   .lg-3d--logo canvas { -webkit-mask-image: none; mask-image: none; animation: lg-in 500ms ease both; opacity: 0; }
+  .lg-root .lg-brand3d--full { inset: 0; height: auto; pointer-events: none; }
+  .lg-root .lg-brand3d--full .lg-3d { inset: 0; }
   .lg-logo2d { width: min(86vw, 500px); height: auto; filter: drop-shadow(0 18px 30px rgba(0, 0, 0, .45)); }
   .lg-tagline span { display: inline-block; opacity: 0; transform: translateY(6px); transition: opacity 360ms var(--ease-enter), transform 360ms var(--ease-enter); }
   .lg-tagline.is-on span { opacity: 1; transform: none; }
