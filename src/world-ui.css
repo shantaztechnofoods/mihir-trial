@@ -758,3 +758,73 @@
   }
 }
 @media (prefers-reduced-motion: reduce) { .lg-card::before { animation: none !important; display: none; } }
+
+/* ═══ Review d37d333 fixes ═════════════════════════════════════════════════ */
+@media screen {
+  /* D2: sidebar brand = the real logo on the navy, full width; no tile, no name lines */
+  .app-sidebar .sb-brand { display: block !important; padding: 4px 2px 0; }
+  .app-sidebar .sb-brand > .brand-logo, .app-sidebar .sb-brand > .min-w-0 { display: none !important; }
+  .sb-logo-wide { display: block; width: 100%; max-width: 176px; height: auto; }
+
+  /* D3: Dashboard lists — white rows with hairlines, no tinted blocks, no coloured rules */
+  .status-strip { border-left-width: 0 !important; }
+  .section-card.status-strip { border-left: 0 !important; }
+  .status-strip-red .space-y-2\.5 > div, .status-strip-yellow .space-y-2\.5 > div {
+    background: #fff !important; border: 1px solid var(--line) !important; border-radius: 12px !important;
+  }
+  .status-strip-red .space-y-2\.5 button, .status-strip-yellow .space-y-2\.5 button {
+    min-height: 36px; padding: 0 14px !important; border-radius: 10px !important; font-size: 13px !important; font-weight: 600 !important;
+    background: #fff !important; color: var(--ink-2) !important; border: 1px solid var(--line-strong) !important; box-shadow: none !important;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .status-strip-red .space-y-2\.5 button:hover, .status-strip-yellow .space-y-2\.5 button:hover { border-color: var(--action) !important; color: var(--action) !important; }
+  }
+  .status-strip-red .space-y-2\.5 .h-1 { background: #EEF1F5 !important; }
+
+  /* P2: Finish & Transfer label never ellipsised */
+  .modal-backdrop button[data-finish-confirm] { text-overflow: clip !important; overflow: visible !important; font-size: 14px !important; padding: 0 14px !important; }
+  /* P3: one marker for the current step (top bar only) */
+  .wu-step.is-now::after { display: none !important; }
+  /* P5: no micro-text inside sheets on a phone */
+  @media (max-width: 767.98px) {
+    .modal-backdrop .text-\[10px\], .modal-backdrop .text-\[11px\], .modal-backdrop .text-\[12px\] { font-size: 13px !important; line-height: 1.4; }
+  }
+  /* P6: one input style in sheets */
+  .modal-backdrop input.font-mono { font-family: var(--font-body) !important; }
+  /* P10: a single header action sits in the header row on a phone */
+  @media (max-width: 767.98px) {
+    .page-header:has(.page-header-actions > :only-child) { flex-wrap: nowrap !important; }
+    .page-header:has(.page-header-actions > :only-child) .page-header-actions > * { min-height: 40px; white-space: nowrap; }
+    .hero-tile { min-height: 112px; }
+    .kpi-tile { min-height: 112px; }
+  }
+
+  /* L12 / L14: Login — legible tagline line, company under the logo, centred logo */
+  .lg-company-line { color: #C9D1DE !important; }
+  .lg-brand2d { padding: 0 24px !important; }
+  @media (min-width: 1024px) {
+    .lg-brand2d { inset: 0 34vw 0 0 !important; height: auto !important; flex-direction: column; justify-content: center; }
+    .lg-company-line { top: calc(50% + 140px) !important; bottom: auto !important; right: 34vw !important; }
+  }
+
+  /* D4: staff cards size to content; the action row sits at the bottom with a hairline */
+  @media (min-width: 1024px) {
+    [data-staff-section] .grid { align-items: start; }
+  }
+}
+
+/* ═══ ShantazLogo2D — traced artwork + real-text tagline ═══════════════════ */
+@media screen {
+  .shz-logo { position: relative; display: block; container-type: inline-size; }
+  .shz-logo > img { display: block; width: 100%; height: auto; }
+  .shz-tag { position: absolute; left: 31.7%; width: 60.1%; top: 83.6%; display: flex; justify-content: space-between;
+    font: 500 4.05cqw/1 "Cinzel", "Trajan Pro", Georgia, serif; color: #C9D1DE; letter-spacing: 0; white-space: nowrap; }
+  .shz-shine::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(110deg, transparent 38%, rgba(255, 255, 255, .75) 50%, transparent 62%) no-repeat; background-size: 250% 100%; background-position: 130% 0;
+    -webkit-mask: var(--logo) center / contain no-repeat; mask: var(--logo) center / contain no-repeat; animation: lg-shine2 1.3s var(--ease-enter) .5s 1 forwards; }
+  .lg-logo2d.shz-logo > img { filter: drop-shadow(0 18px 30px rgba(0, 0, 0, .45)); }
+  .lg-logo2d::after { display: none; }
+  .lg-logo2d.shz-shine::after { display: block; }
+  .sb-logo-wide .shz-tag { color: #AEB8C8; }
+}
+@media (prefers-reduced-motion: reduce) { .shz-shine::after { animation: none !important; display: none !important; } }

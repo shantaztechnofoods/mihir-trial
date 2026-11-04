@@ -74,7 +74,7 @@ await b.close();
     await gotoMachineTracker(pd); await pd.waitForTimeout(900); };
   await reopen();
   const chip = pd.locator("[data-staff-timer='1']");
-  ok("at 86% the timer chip turns amber: '⏳ 1h 40m left'", (await chip.innerText()).includes("⏳ 1h 40m left") && (await chip.getAttribute("data-timer-level")) === "80", await chip.innerText());
+  ok("at 86% the timer chip turns amber: '⏳ 1h 40m left'", (await chip.innerText()).includes("1h 40m left") && (await chip.getAttribute("data-timer-level")) === "80", await chip.innerText());
   const bn = pd.locator("[data-arrival-banner]");
   ok("near-deadline banner shows", (await bn.count()) === 1 && /M-10 · SN-101 — 1h 40m left in Mechanical/.test(await bn.innerText()));
   let a = await pd.evaluate(() => window.__alerts);
@@ -84,7 +84,7 @@ await b.close();
   a = await pd.evaluate(() => window.__alerts);
   ok("after a refresh the 80% alert does not repeat", a.vibrate.length === 0 && a.speak.length === 0 && (await bn.count()) === 0);
   await pd.clock.setFixedTime(new Date("2026-11-02T16:00:00")); await reopen();
-  ok("over 100%: red chip 'Late by 20m'", (await chip.innerText()).includes("⏰ Late by 20m") && (await chip.getAttribute("data-timer-level")) === "100", await chip.innerText());
+  ok("over 100%: red chip 'Late by 20m'", (await chip.innerText()).includes("Late by 20m") && (await chip.getAttribute("data-timer-level")) === "100", await chip.innerText());
   // The page re-opened straight on Machine Tracker with no touch yet: the browser blocks sound
   // until the first touch, so the chime + speech wait for it.
   a = await pd.evaluate(() => window.__alerts);

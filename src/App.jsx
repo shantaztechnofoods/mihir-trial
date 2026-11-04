@@ -21,7 +21,7 @@ import { useAuth } from "./auth/AuthContext.jsx";
 import { fetchDeptRoster, updateUserDepartments } from "./auth/authStore.js";
 import LoginPage from "./pages/LoginPage.jsx";
 import { celebrate } from "./utils/worldMotion.js";
-import { MadeInIndia } from "./components/IndiaFlag.jsx";
+import ShantazLogo2D from "./components/ShantazLogo2D.jsx";
 import BrandLogo from "./components/BrandLogo.jsx";
 import { LeadIcon, LeadLabel, Glyph } from "./components/LeadIcon.jsx";
 import UserManagementPage from "./pages/UserManagementPage.jsx";
@@ -564,6 +564,7 @@ function Sidebar({ activePage, setActivePage, collapsed, setCollapsed, badges = 
               const initial = name[0]?.toUpperCase() || "S";
               return (
                 <div className="sb-brand mb-3">
+                  <ShantazLogo2D className="sb-logo-wide" />
                   <BrandLogo logo={settings.logo} size={64} rounded={14} />
                   <div className="min-w-0">
                     <div className="text-[13px] font-extrabold leading-none tracking-widest truncate sb-logo-name">{line1}</div>
@@ -658,7 +659,6 @@ function Sidebar({ activePage, setActivePage, collapsed, setCollapsed, badges = 
       {/* ── User Profile Menu ── */}
       <div className="px-3 pb-3 pt-2 relative sb-divider-top">
         <UserProfileMenu collapsed={collapsed} />
-        {!collapsed && <div className="sb-india"><MadeInIndia /></div>}
         <button onClick={() => setCollapsed(!collapsed)}
           className="sb-collapse mt-1 w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg transition-all text-[9px] font-bold tracking-[0.08em] uppercase">
           {collapsed ? "▶" : <><span>◀</span><span>Collapse</span></>}
@@ -18071,7 +18071,7 @@ const saveFailed = (where, err) => {
 function ModalX({ onClose, disabled = false, label = "Close" }) {
   return (
     <button type="button" aria-label={label} title={label} data-modal-close onClick={onClose} disabled={disabled}
-            className="absolute top-2.5 right-2.5 z-10 w-9 h-9 rounded-full flex items-center justify-center text-[15px] font-black transition-colors disabled:opacity-40"
+            className="modal-x absolute top-2.5 right-2.5 z-10 w-10 h-10 rounded-full flex items-center justify-center text-[15px] font-black transition-colors disabled:opacity-40"
             style={{ background: "rgba(17,24,39,0.07)", color: "var(--text-dim)" }}>✕</button>
   );
 }
@@ -20039,7 +20039,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
             </div>
           ) : null;
           const holdBtn = (m) => (canHoldM && m) ? (
-            <button data-needs-net type="button" className={`${btn} ${m.holdActive ? "wu-soft-ok" : "wu-soft-bad"}`}
+            <button data-needs-net type="button" className={`${btn} ${m.holdActive ? "wu-soft-ok" : "wu-soft"}`}
                     {...(m.holdActive ? { "data-staff-release-hold": m.id } : { "data-staff-hold": m.id })}
                     onClick={() => setHoldModal({ machine: m, release: !!m.holdActive, reason: "", busy: false, error: "" })}>
               <LeadLabel text={m.holdActive ? "▶ Release ON HOLD" : "⏸ ON HOLD"} />
@@ -20071,7 +20071,8 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
             { key: "work",   label: "Work",   n: myWorking.length,  sec: "In your department" },
             { key: "send",   label: "Send",   n: sentOn.length,     sec: "Sent on" },
           ];
-          const nowStep = (route.find((r) => r.key !== "send" && r.n > 0) || route[3]).key;
+          const canActOn = { rack: canTakeFromRack && canAccept, accept: canAccept, work: true };
+          const nowStep = (route.find((r) => r.key !== "send" && r.n > 0 && canActOn[r.key]) || route.find((r) => r.n > 0) || route[3]).key;
           const goStep = (sec) => { try { document.querySelector(`[data-staff-section='${sec}']`)?.scrollIntoView({ behavior: "smooth", block: "start" }); } catch { /* ignore */ } };
           // No department: say so and show nothing else. A Store Manager still
           // keeps the BOM section above when the role may issue a BOM.
@@ -20177,7 +20178,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                           {withPhoto(m, h, <div>
                             <div className="wu-title">{titleOf(m, h)}</div>
                             <div className="wu-meta">
-                              {m?.bomLabel ? `${m.bomLabel} · ` : ""}{m?.rackSlot ? `Rack ${slotLabel(m.rackSlot)}` : "on the rack"}
+                              {m?.bomLabel ? `${m.bomLabel} · ` : ""}<span className="whitespace-nowrap">{m?.rackSlot ? `Rack ${slotLabel(m.rackSlot)}` : "on the rack"}</span>
                             </div>
                             {holdBadge(m)}
                           </div>)}
@@ -20262,9 +20263,9 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                               {t && (
                                 <span className={`wu-timer ${t.isOverrun ? "is-bad" : level === 80 ? "is-wait" : "is-ok"}`} data-staff-timer={m.id} data-timer-level={level}
                                       title={`⏱ ${formatDuration(t.actualMinutes)}${target ? ` / ${formatDuration(target)}` : ""}`}>
-                                  {t.isOverrun ? `⏰ Late by ${formatDuration(t.overrunMinutes)}`
+                                  <LeadLabel text={t.isOverrun ? `⏰ Late by ${formatDuration(t.overrunMinutes)}`
                                     : level === 80 ? `⏳ ${formatDuration(leftMinutes)} left`
-                                    : `⏱ ${formatDuration(t.actualMinutes)}${target ? ` / ${formatDuration(target)}` : ""}`}
+                                    : `⏱ ${formatDuration(t.actualMinutes)}${target ? ` / ${formatDuration(target)}` : ""}`} />
                                 </span>
                               )}
                               {jobs.length > 0 && (
@@ -22951,7 +22952,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
               )}
               <input value={raisePart.itemCode} disabled={raiseBusy} list={inventoryFlat.length ? "raise-part-codes" : undefined}
                      onChange={(e) => { const code = e.target.value; const hit = inventoryFlat.find((it) => it.code.toLowerCase() === code.trim().toLowerCase()); setRaisePart((p) => ({ ...p, itemCode: code, itemName: hit ? hit.name : p.itemName })); }}
-                     placeholder="Part / item code" className="min-w-0 w-full rounded-lg px-2.5 py-2 text-[12px] text-slate-800 outline-none font-mono"
+                     placeholder="Part / item code" className="min-w-0 w-full rounded-lg px-2.5 py-2 text-[12px] text-slate-800 outline-none"
                      style={{ background: "var(--surface-elevated)", border: "1px solid rgba(17,24,39,0.12)" }} />
               <input type="number" min="0" step="any" value={raisePart.qty} disabled={raiseBusy}
                      onChange={(e) => setRaisePart((p) => ({ ...p, qty: e.target.value }))}
@@ -23319,9 +23320,9 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                 </div>
                 {isOverrun && (
                   <div data-transfer-delay className="rounded-xl">
-                    <label className="text-[11px] font-bold text-red-600 block mb-1.5">
+                    <label className="text-[13px] font-bold text-slate-700 block mb-1.5">
                       Delay reason (required)
-                      <span className="text-red-500 ml-0.5">*</span>
+                      <span className="text-slate-500 ml-0.5">*</span>
                     </label>
                     {(() => {
                       const delayBox = (

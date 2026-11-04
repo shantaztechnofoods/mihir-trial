@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Eye, EyeOff, LogIn } from "lucide-react";
-import logoOnDark from "../assets/brand/shantaz-logo-on-dark.svg";
+import ShantazLogo2D from "../components/ShantazLogo2D.jsx";
 import { MadeInIndia } from "../components/IndiaFlag.jsx";
 import { useAuth } from "../auth/AuthContext.jsx";
 
@@ -115,7 +115,7 @@ export default function LoginPage({ notice = "", onRetry = null }) {
         <div className="lg-grid" />
         <div className="lg-light" />
         <div className="lg-brand2d" data-hero={hero || "pending"}>
-          <span className="lg-logo2d" style={{ "--logo": `url("${logoOnDark}")` }}><img src={logoOnDark} alt="" draggable={false} /></span>
+          <ShantazLogo2D className="lg-logo2d" shine />
         </div>
         {company && <div className="lg-company-line">{company}</div>}
         <div className="lg-vignette" />
