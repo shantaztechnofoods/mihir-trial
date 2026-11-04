@@ -69,6 +69,7 @@ import { computeDepartmentRating, formatRatingBadge, summarizeMachineRatings, bu
 import { startChecklistResponse, toggleAnswer, setAnswerRemark, validateChecklistAnswers, checklistProblemText, incompleteChecklistJobs, snapshotResponse, pickTemplate, duplicateTemplateItems, setAllAnswers, countChecked } from "./utils/checklistLogic.js";
 import { reconcileTeam, pickRememberedMain, readTeamMemory, writeTeamMemory } from "./utils/teamMemory.js";
 import { useRealtimeTables } from "./realtime/useRealtimeTables.js";
+import { reconcileOpenRecord, mergeRemoteSettings, parseLocalSync } from "./realtime/liveRecord.js";
 import { monthIndex, parseDisplayDate } from "./utils/parseDate.js";
 import { fetchRecentMovements, MOVEMENT_META } from "./stores/stockMovementsStore.js";
 import { sendPOWhatsApp, openVendorWhatsApp, waErrorToast } from "./utils/whatsapp.js";
@@ -99,7 +100,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-04-mtaudit-2";
+const APP_BUILD = "2026-11-04-live-sync";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -8839,6 +8840,22 @@ function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, onSave, i
   const lastSavedSnapshotRef = useRef(JSON.stringify(initialSettings));
   const [saveError, setSaveError] = useState("");   // surfaces Supabase upsert failures
   const [settings, setSettings] = useState(() => ({ ...SETTINGS_DEFAULTS, ...initialSettings }));
+  // 2026-11-04 (fix/live-sync) — settings saved on another screen arrive here
+  // live. The form adopts them only while it is untouched since the last value
+  // it took; an edit in progress is never overwritten.
+  const formBaseRef = useRef(JSON.stringify({ ...SETTINGS_DEFAULTS, ...initialSettings }));
+  const formNowRef = useRef(settings);
+  formNowRef.current = settings;
+  useEffect(() => {
+    const incoming = { ...SETTINGS_DEFAULTS, ...initialSettings };
+    const inJson = JSON.stringify(incoming);
+    const nowJson = JSON.stringify(formNowRef.current);
+    if (nowJson === inJson) { formBaseRef.current = inJson; return; }
+    if (nowJson !== formBaseRef.current) return;      // operator is editing
+    formBaseRef.current = inJson;
+    lastSavedSnapshotRef.current = JSON.stringify(initialSettings);
+    setSettings(incoming);
+  }, [initialSettings]);
   const [tab,      setTab]      = useState(initialTab);  // Settings tab: company | po | inventory | notifications | data
   const [saved,    setSaved]    = useState(false);
   const [backupOk, setBackupOk] = useState(false);
@@ -19646,6 +19663,36 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
     return () => window.removeEventListener("keydown", onKey);
   }, [jobAction, reportMachineId, reportDoc, reportsMenu, trialCertModal, trialCertViewModal, finishModal, transferBusy, acceptModal, duringWorkModal, startChk,
       removeRackConfirm, pullBack, undoAsk, raiseModal, raiseBusy, jobsDrawer, rackPanel, issuePopup, showCalled]);
+  // 2026-11-04 (fix/live-sync) — an open popup holds the machine / hand-over /
+  // pending job it was opened for. When someone else changes that record (live
+  // update), the popup shows the fresh copy; if the change makes the popup's
+  // question moot (moved department, hold flipped, already accepted, deleted)
+  // it closes and says so. A popup that is saving its own change is left alone.
+  useEffect(() => {
+    const MOVE = ["stage", "currentDepartment", "status", "pendingHandoverId"];
+    let note = null;
+    const sync = (modal, setModal, { key = "machine", list = machineLog, watch = MOVE, busy = false, replace = true } = {}) => {
+      if (!modal || busy || modal.busy) return;
+      const stale = key ? modal[key] : modal;
+      const r = reconcileOpenRecord(stale, list, { watch });
+      if (r.state === "gone" || r.state === "changed") { setModal(null); note = r.state; return; }
+      if (r.state === "updated" && replace) setModal((prev) => (prev && (key ? prev[key] : prev) === stale ? (key ? { ...prev, [key]: r.fresh } : r.fresh) : prev));
+    };
+    sync(finishModal, setFinishModal, { busy: transferBusy, watch: [...MOVE, "holdActive"] });
+    sync(trialCertModal, setTrialCertModal, { busy: transferBusy, replace: false });
+    sync(trialCertViewModal, setTrialCertViewModal, { key: null, watch: [] });
+    sync(duringWorkModal, setDuringWorkModal);
+    sync(holdModal, setHoldModal, { watch: ["holdActive", "status"] });
+    sync(deleteModal, setDeleteModal, { watch: [] });
+    sync(raiseModal, setRaiseModal, { busy: raiseBusy, watch: ["status"] });
+    sync(attachAsk && attachAsk.machine ? attachAsk : null, setAttachAsk, { watch: [], replace: false });
+    sync(acceptModal, setAcceptModal, { key: "handover", list: handovers, watch: ["status"], replace: false });
+    sync(pullBack, setPullBack, { key: "handover", list: handovers, watch: ["status"], replace: false });
+    sync(undoAsk, setUndoAsk, { key: "handover", list: handovers, watch: ["status"], replace: false });
+    sync(jobAction, setJobAction, { key: "item", list: pendingHandoverItems, watch: ["status", "receivedAt"] });
+    if (note) showToast("Changed by someone — refreshed", note === "gone" ? "That record was removed on another screen." : "It was updated on another screen. Please check and try again.", "warning");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [machineLog, handovers, pendingHandoverItems]);
   // Pending part awaiting "Confirm issue" in the rack panel, and the one in flight.
   const [pendIssueAsk, setPendIssueAsk] = useState(null);
   const [pendIssueBusy, setPendIssueBusy] = useState(null);
@@ -26226,7 +26273,7 @@ export default function App() {
   const inFlightRef = useRef(null);
   if (!inFlightRef.current) inFlightRef.current = makeInFlight();
   const latestRef = useRef(null);
-  if (!latestRef.current) latestRef.current = { items: makeLatest(), pos: makeLatest(), inward: makeLatest(), outward: makeLatest(), mach: makeLatest(), pending: makeLatest(), handovers: makeLatest(), pendingItems: makeLatest(), responses: makeLatest(), ratings: makeLatest(), attachments: makeLatest() };
+  if (!latestRef.current) latestRef.current = { items: makeLatest(), pos: makeLatest(), inward: makeLatest(), outward: makeLatest(), mach: makeLatest(), pending: makeLatest(), handovers: makeLatest(), pendingItems: makeLatest(), responses: makeLatest(), ratings: makeLatest(), attachments: makeLatest(), boms: makeLatest(), templates: makeLatest(), settings: makeLatest(), vendors: makeLatest(), followups: makeLatest() };
   const rtPos     = useCallback(() => { latestRef.current.pos(fetchPOs(), (p) => p && setPos(p)); }, []);
   const rtInward  = useCallback(() => { latestRef.current.inward(fetchInward(), (x) => x && setInwardLog(x)); }, []);
   const rtOutward = useCallback(() => { latestRef.current.outward(fetchOutward(), (x) => x && setOutwardLog(x)); }, []);
@@ -26235,15 +26282,39 @@ export default function App() {
   // Phase A — handovers refresh. Falls back silently if table doesn't exist
   // (store handles the error).
   const rtHandovers = useCallback(() => { latestRef.current.handovers(fetchHandovers(), (h) => { if (h) setHandovers(h); }); }, []);
+  // 2026-11-04 (fix/live-sync) — the five tables added to the realtime
+  // publication: BOM definitions (incl. photos), checklist templates, the org
+  // settings row (company name / logo / employees), vendors and follow-ups.
+  // Same refetch-whole-table, latest-wins shape as the handlers above.
+  const rtBoms      = useCallback(() => { latestRef.current.boms(fetchBOMs(), (b) => { if (b && Object.keys(b).length > 0) setBomDefs(b); }); }, []);
+  const rtTemplates = useCallback(() => { latestRef.current.templates(fetchTemplates(), (x) => { if (Array.isArray(x)) setChecklistTemplates(x); }); }, []);
+  const rtSettings  = useCallback(() => { latestRef.current.settings(loadSettings(), (x) => { if (x) setSettings((prev) => mergeRemoteSettings(prev, x)); }); }, []);
+  const rtVendors   = useCallback(() => { latestRef.current.vendors(listVendors(), (x) => { if (Array.isArray(x)) setVendorList(x); }); }, []);
+  const rtFollowUps = useCallback(() => { latestRef.current.followups(fetchFollowUps(), (x) => { if (Array.isArray(x)) setFollowUps(x); }); }, []);
   // 2026-11-03 — local (offline-dev) mode has no realtime channel: pick up a
-  // hand-over written by another tab of this browser, so the staff arrival
-  // alert works there too. Supabase mode is untouched (realtime above).
+  // write made by another tab of this browser (hand-overs first, for the staff
+  // arrival alert). 2026-11-04 (fix/live-sync) — every persisted slice now,
+  // adopted straight from the storage event. Supabase mode is untouched
+  // (realtime above).
   useEffect(() => {
     if (isSupabaseEnabled()) return;
-    const onStorage = (e) => { if (e && e.key === "erp_handovers") rtHandovers(); };
+    const setters = {
+      erp_items: setItems, erp_pos: setPos, erp_vendors: setVendorList, erp_bomdefs: setBomDefs,
+      erp_outward: setOutwardLog, erp_inward: setInwardLog, erp_pending: setPendingLog,
+      erp_followups: setFollowUps, erp_machines: setMachineLog, erp_handovers: setHandovers,
+      erp_checklist_templates: setChecklistTemplates, erp_checklist_responses: setChecklistResponses,
+      erp_pending_handover_items: setPendingHandoverItems, erp_attachments: setAttachments,
+      erp_dept_ratings: setDeptRatings,
+      erp_settings: (v) => setSettings((prev) => ({ ...SETTINGS_DEFAULTS, ...mergeRemoteSettings(prev, v) })),
+    };
+    const onStorage = (e) => {
+      if (!e || !e.key || !setters[e.key]) return;
+      const v = parseLocalSync(e.key, e.newValue);
+      if (v) setters[e.key](v);
+    };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
-  }, [rtHandovers]);
+  }, []);
   // Migration 053 — the four Machine Tracker side tables. Same shape as the
   // login hydration below; also used as the rollback path when one of these
   // writes fails after an optimistic update.
@@ -26269,6 +26340,11 @@ export default function App() {
     onChecklistResponsesChange:  rtResponses,
     onRatingsChange:             rtRatings,
     onAttachmentsChange:         rtAttachments,
+    onBomsChange:                rtBoms,
+    onChecklistTemplatesChange:  rtTemplates,
+    onSettingsChange:            rtSettings,
+    onVendorsChange:             rtVendors,
+    onFollowUpsChange:           rtFollowUps,
     // onAuditChange omitted — AuditHistoryPage re-fetches itself via subscribeAudit
   });
 
