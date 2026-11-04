@@ -483,7 +483,7 @@
   @media (max-width: 639px) {
     .wu-actions { flex-direction: row; flex-wrap: wrap; }
     .wu-actions > .wu-btn { flex: 1 1 calc(50% - 4px); min-width: 0; padding: 0 12px; }
-    .wu-actions > .wu-main, .wu-actions > :not(.wu-btn) { flex-basis: 100%; }
+    .wu-actions > .wu-main, .wu-actions > :not(.wu-btn), .wu-actions > [data-staff-release-hold] { flex-basis: 100%; }
   }
   @media (min-width: 640px) {
     .wu-actions { flex-direction: row; flex-wrap: wrap; }
