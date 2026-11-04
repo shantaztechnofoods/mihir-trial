@@ -2,7 +2,7 @@
 -- 036_rack_release_and_hold.sql
 -- Two things the shop floor does that the app had no way to record.
 --
-RELEASE FROM THE RACK
+-- RELEASE FROM THE RACK
 --    Shantaz runs a pull system, not a push one. Assembly takes material off
 --    the rack, assembles it, and puts the machine BACK on the rack — seven or
 --    eight sit there at a time. Mechanical does not start on one until the

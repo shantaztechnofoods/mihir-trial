@@ -3,7 +3,10 @@
 Permanent development & safety rules for every Claude Code session on this
 repo. Read this file before writing or editing anything.
 
-Live production: **https://purchase-inventory-os.vercel.app/**
+Live production: **https://purchase-inventory-os.vercel.app/** (original URL, kept)
+Also served at: **https://mihir-trial.vercel.app/** (same Vercel production deployment)
+GitHub repo: **`shantaztechnofoods/mihir-trial`** (renamed from `purchase_inventory_os` on 2026-11-04 — use the new name in every `gh api` call)
+Vercel project: **`mihir-trial`** · Supabase project display name: **MIHIR TRIAL** (ref `kneklzurkwayfpawtdvf`, unchanged)
 Production branch: **`main`** (auto-deploys to Vercel)
 Rollback tag: **`erp-pre-restore-32e3ffe`**
 
