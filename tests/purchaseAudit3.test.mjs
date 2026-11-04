@@ -23,7 +23,8 @@ test("PO receive logs pending_fulfilled for stock that went to shortfalls", () =
 });
 
 test("Edit PO saves po.date in display form, not the raw picker value", () => {
-  assert.match(APP, /date:\s+isoToDisplayDate\(form\.poDate \|\| todayIso\(\)\),/);
+  assert.match(APP, /date:\s+isEdit && initialPO\.date && form\.poDate === initialPoDateRef\.current \? initialPO\.date : isoToDisplayDate\(form\.poDate \|\| todayIso\(\)\),/);
+  assert.match(APP, /const initialPoDateRef = useRef\(form\.poDate\);/);
   assert.doesNotMatch(APP, /date:\s+form\.poDate \|\| todayIso\(\),/);
   assert.equal(isoToDisplayDate("2026-11-04"), "4 Nov 2026");
 });

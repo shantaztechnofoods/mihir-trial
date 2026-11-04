@@ -3969,6 +3969,8 @@ function POModal({ initialPO, vendorList, items, onSave, onClose, prefill = null
       poDate:       prefill?.poDate || todayIso(),
     };
   });
+  // PO Date as first shown, so Save can tell whether the operator changed it.
+  const initialPoDateRef = useRef(form.poDate);
 
   const [addCode,      setAddCode]      = useState("");
   const [addQty,       setAddQty]       = useState("");
@@ -4144,7 +4146,9 @@ function POModal({ initialPO, vendorList, items, onSave, onClose, prefill = null
       // Same "4 Nov 2026" form every other PO date uses. Edit used to write the
       // raw date-picker value ("2026-11-04") into po.date, so the edited PO's
       // date showed in a different format and could not be parsed for sorting.
-      date:    isoToDisplayDate(form.poDate || todayIso()),
+      // An unchanged PO Date keeps the stored date as is (no false "date"
+      // change in the po_edited audit row).
+      date:    isEdit && initialPO.date && form.poDate === initialPoDateRef.current ? initialPO.date : isoToDisplayDate(form.poDate || todayIso()),
     });
   };
 
