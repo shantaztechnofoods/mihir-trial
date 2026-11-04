@@ -30,8 +30,10 @@ COMPONENT_MAP = [
     (r"^(SettingsPage|Settings\w*|Checklist\w*)$", ["settings-bom-organised", "compact-checklist", "dept-staff-create"]),
     (r"^(Machine\w*|MT\w*|Mt\w*|Rack\w*|Trial\w*|Handover\w*|Accept\w*|Finish\w*|Hold\w*|Ready\w*|Delay\w*)$", MT + ["ready-popup", "delay-reasons", "trial-signature-report"]),
     (r"^(Voice\w*|Mic\w*)$", ["voice-note", "voice-transcribe"]),
+    (r"^(LoginPage|Login\w*|readBootShell|adoptBootAnimations|probeHero|heroMode)$", ["login-speed"]),
 ]
 PATH_MAP = [
+    (r"^(src/main\.jsx|src/app/(LoginPage|loginBoot|loadApp)|src/shared/components/(LoginBrand3D|shantazLogo)|src/auth/AuthContext|scripts/vite-login-boot|index\.html|vite\.config)", ["login-speed"] + SMOKE),
     (r"^tests/e2e/lib/", SMOKE),
     (r"^src/realtime/|liveSync", ["live-sync"]),
     (r"online|offline", ["offline"]),

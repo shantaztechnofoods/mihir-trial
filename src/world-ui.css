@@ -299,6 +299,26 @@
   .lg-logo2d { display: block; width: min(80vw, 360px); animation: lg-logo-in 900ms var(--ease-enter) 60ms backwards; }
   .lg-logo2d svg, svg.lg-logo2d { width: 100%; height: auto; display: block; filter: drop-shadow(0 22px 34px rgba(0, 0, 0, .55)); }
   @keyframes lg-logo-in { from { opacity: 0; transform: translateY(10px) scale(.97); filter: blur(4px); } to { opacity: 1; transform: none; filter: none; } }
+  /* Poster (perf/login-fast): the flat logo in the 3D logo's exact place and size from the
+     first paint, faded out when the 3D intro starts. Same layout maths as fit() in
+     shantazLogoScene.js (fullBleed): logo width = min(box width, box height / 1.2 × 397.56/187.76),
+     centred on the box, lifted by 5 % of the logo height (the camera looks slightly down). */
+  .lg-poster { transition: opacity 600ms var(--ease-enter); }
+  .lg-poster.is-off { opacity: 0; visibility: hidden; transition: opacity 600ms var(--ease-enter), visibility 0s linear 600ms; }
+  /* The slow spotlight breathe repaints the whole screen under the frosted card; on a weak
+     phone that work held the app back by seconds. It waits (at its first keyframe) while the
+     boot copy is up — the live screen starts it from the same opacity — and rests while the
+     opaque 3D canvas covers it. */
+  [data-login-boot] .lg-spot, [data-logo3d] .lg-spot { animation-play-state: paused; }
+  @supports (width: 1cqw) {
+    .lg-poster--3d { inset: 0; height: auto; padding: 0; display: block; container-type: size; }
+    .lg-poster--3d .lg-logo2d {
+      --pw: min(100cqw - 56px, max(220px, 36cqh) * 1.7645);
+      position: absolute; width: var(--pw); animation: none;
+      left: calc(50cqw - var(--pw) / 2);
+      top: calc(max(250px, 40cqh) * .55 - var(--pw) * .02361 - var(--pw) / 4.2348);
+    }
+  }
 
   /* panel + card */
   .lg-panel { position: relative; z-index: 2; grid-row: 2; display: flex; align-items: flex-start; justify-content: center; padding: 0 16px; }
@@ -363,6 +383,16 @@
     .lg-root { --sx: 33%; --sy: 44%; grid-template-columns: minmax(0, 1fr) minmax(400px, 34vw); grid-template-rows: 1fr; }
     .lg-brand2d { inset: 0 34vw 0 0; height: auto; padding: 0 48px; }
     .lg-logo2d { width: min(44vw, 540px); }
+    @supports (width: 1cqw) {
+      .lg-poster--3d { inset: 0; padding: 0; }
+      .lg-poster--3d .lg-logo2d {
+        --card: max(400px, 34cqw) + 40px;
+        --pw: min((100cqw - (var(--card))) * .86, 123.5cqh);
+        width: var(--pw);
+        left: calc((100cqw - (var(--card))) / 2 + 16px - var(--pw) / 2);
+        top: calc(47cqh - var(--pw) * .02361 - var(--pw) / 4.2348);
+      }
+    }
     .lg-panel { grid-column: 2; grid-row: 1; align-items: center; justify-content: flex-start; padding: 32px 48px 32px 0; }
     .lg-card { padding: 36px 34px 30px; border-radius: 26px; }
     .lg-title { font-size: 30px; }

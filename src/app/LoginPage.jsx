@@ -1,8 +1,9 @@
-import React, { Suspense, lazy, useEffect, useRef, useState } from "react";
+import React, { Suspense, lazy, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Eye, EyeOff, LogIn } from "lucide-react";
 import ShantazLogoSVG from "../shared/components/ShantazLogoSVG.jsx";
 import { MadeInIndia } from "../shared/components/IndiaFlag.jsx";
 import { useAuth } from "../auth/AuthContext.jsx";
+import { loadApp, prefetchApp } from "./loadApp.js";
 
 // Login (rewritten 2026-10-31 — login field bug).
 //
@@ -34,6 +35,20 @@ import { useAuth } from "../auth/AuthContext.jsx";
 // bleed behind the glass card. Reduced motion / low-end phones (deviceMemory
 // <= 2, Save-Data) / no WebGL / a lost context get the same logo flat
 // (ShantazLogoSVG) with one soft shine. Every user sees the same login.
+//
+// 2026-11-04 (perf/login-fast) — speed, same look:
+//   * index.html already holds this screen, rendered from this component at
+//     build time (src/app/loginBoot.jsx + scripts/vite-login-boot.mjs), so the
+//     card is on screen and can be typed into before any JavaScript arrives.
+//     On mount this component takes over from that copy: what was typed, which
+//     field had focus, Show, an early Sign In press, and the running entrance
+//     animations carry over (readBootShell / adoptBootShell below).
+//   * The 2D logo is a poster in the exact place of the 3D logo from the first
+//     paint; it cross-fades out when the 3D intro starts (onStart).
+//   * No WebGL probe context any more (it cost a GPU context on the main
+//     thread); a failed WebGL start still falls back to the flat logo (onFail).
+//   * The signed-in app is a separate chunk: prefetched once the intro is up,
+//     and started on Sign In in parallel with the auth call (loadApp.js).
 const LoginBrand3D = lazy(() => import("../shared/components/LoginBrand3D.jsx"));
 
 let heroModeMemo = "";
@@ -42,18 +57,59 @@ const heroMode = () => {
   heroModeMemo = probeHero();
   return heroModeMemo;
 };
+// Keep in step with heroProbe() in scripts/vite-login-boot.mjs (the boot copy).
 const probeHero = () => {
   try {
+    if (typeof window === "undefined") return "";
     const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const nav = navigator || {};
     const low = (nav.deviceMemory && nav.deviceMemory <= 2) || (nav.connection && nav.connection.saveData) || (nav.hardwareConcurrency && nav.hardwareConcurrency <= 2);
     if (reduce || low) return "still";
-    const c = document.createElement("canvas");
-    const gl = c.getContext("webgl2") || c.getContext("webgl");
-    if (!gl) return "css";
-    try { const lose = gl.getExtension("WEBGL_lose_context"); if (lose) lose.loseContext(); } catch { /* ignore */ }
+    if (typeof window.WebGLRenderingContext === "undefined") return "css";
     return "webgl";
   } catch { return "still"; }
+};
+
+// ── boot copy (index.html) → this component ─────────────────────────────────
+// Read during the first render, while the boot copy is still in the DOM (React
+// replaces it in the same task, so nothing typed in between can be lost).
+const readBootShell = () => {
+  try {
+    if (typeof document === "undefined") return null;
+    const root = document.getElementById("login-boot");
+    if (!root) return null;
+    const u = root.querySelector("#login-username"), p = root.querySelector("#login-password");
+    const act = document.activeElement;
+    const focus = act === u ? "user" : act === p ? "pass" : "";
+    const sel = (el) => { try { return [el.selectionStart, el.selectionEnd]; } catch { return null; } };
+    const anims = [];
+    try {
+      (root.getAnimations ? root.getAnimations({ subtree: true }) : []).forEach((a) => {
+        const t = a.effect && a.effect.target;
+        if (t && a.animationName && a.startTime != null) anims.push({ name: a.animationName, cls: String(t.getAttribute("class") || ""), start: a.startTime });
+      });
+    } catch { /* no Web Animations API: the entrance just plays again */ }
+    return {
+      user: u ? u.value : "", pass: p ? p.value : "", focus,
+      sel: focus === "user" && u ? sel(u) : focus === "pass" && p ? sel(p) : null,
+      showPw: !!(p && p.type === "text"), pwOpen: !!(p && !p.readOnly),
+      submitted: !!(window.__LOGIN_BOOT && window.__LOGIN_BOOT.submitted), anims,
+    };
+  } catch { return null; }
+};
+// (useEffect when rendered at build time for index.html — no DOM there)
+const useBootLayoutEffect = typeof document === "undefined" ? useEffect : useLayoutEffect;
+// Same element + same animation name → same start time: the card / logo /
+// footer entrance continues where the boot copy was instead of restarting.
+const adoptBootAnimations = (root, boot) => {
+  try {
+    if (!root || !boot || !boot.anims.length || !root.getAnimations) return;
+    root.getAnimations({ subtree: true }).forEach((a) => {
+      const t = a.effect && a.effect.target; if (!t || !a.animationName) return;
+      const m = boot.anims.find((b) => b.name === a.animationName && b.cls === String(t.getAttribute("class") || ""));
+      if (m) a.startTime = m.start;
+    });
+  } catch { /* cosmetic only */ }
 };
 
 // The company name comes from Settings (cached in this browser), never hard-coded.
@@ -72,6 +128,8 @@ export default function LoginPage({ notice = "", onRetry = null }) {
   const [pwLocked, setPwLocked] = useState(true); // read-only until focused (autofill guard)
 
   const unlockPw = () => { if (pwLocked) setPwLocked(false); };
+  const rootRef = useRef(null);
+  const [boot] = useState(readBootShell);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -79,6 +137,8 @@ export default function LoginPage({ notice = "", onRetry = null }) {
     const username = String(userRef.current?.value || "").trim();
     const password = String(passRef.current?.value || "");
     if (!username || !password) { setError("Please enter username and password."); return; }
+    // the signed-in app downloads + starts while the auth call is in flight
+    loadApp().catch(() => { /* main.jsx retries (and reloads once on a stale chunk) */ });
     setLoading(true);
     setError("");
     let result;
@@ -96,16 +156,37 @@ export default function LoginPage({ notice = "", onRetry = null }) {
   const focusOn  = (e) => { e.target.closest(".lg-field")?.classList.add("is-focus"); };
   const focusOff = (e) => { e.target.closest(".lg-field")?.classList.remove("is-focus"); };
 
-  // Visual only: which hero to draw, and when (after first paint + idle).
-  const [hero, setHero] = useState("");
-  useEffect(() => {
-    let done = false;
-    const go = () => { if (!done) { done = true; setHero(heroMode()); } };
-    const ric = window.requestIdleCallback;
-    const id = ric ? ric(go, { timeout: 900 }) : setTimeout(go, 250);
-    return () => { done = true; if (ric && window.cancelIdleCallback) window.cancelIdleCallback(id); else clearTimeout(id); };
+  // Take over from the boot copy (before paint): values, focus, Show, entrance,
+  // and a Sign In pressed before the JavaScript arrived (sent now).
+  useBootLayoutEffect(() => {
+    if (!boot) return;
+    if (userRef.current && boot.user) userRef.current.value = boot.user;
+    if (passRef.current && boot.pass) passRef.current.value = boot.pass;
+    if (boot.pwOpen) setPwLocked(false);
+    if (boot.showPw) setShowPw(true);
+    const el = boot.focus === "pass" ? passRef.current : boot.focus === "user" ? userRef.current : null;
+    if (el) { try { el.focus({ preventScroll: true }); if (boot.sel) el.setSelectionRange(boot.sel[0], boot.sel[1]); } catch { /* ignore */ } }
+    adoptBootAnimations(rootRef.current, boot);
+    if (boot.submitted && formRef.current) {
+      try { window.__LOGIN_BOOT.submitted = false; } catch { /* ignore */ }
+      try { formRef.current.requestSubmit(); } catch { formRef.current.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const onHeroFail = React.useCallback(() => setHero("still"), []);
+
+  // Visual only: which hero to draw. Decided at once (no WebGL probe); the 3D
+  // chunk starts loading with the first render (index.html already asked the
+  // browser to preload it right after first paint).
+  const [hero, setHero] = useState(() => heroMode());
+  const [logo3dOn, setLogo3dOn] = useState(false);
+  const onHeroFail = React.useCallback(() => { setLogo3dOn(false); setHero("still"); }, []);
+  const onHeroStart = React.useCallback(() => setLogo3dOn(true), []);
+  // The app chunk is fetched + parsed once the intro choreography has played
+  // (~3.4 s) — or soon when there is no 3D — so it never competes with the logo.
+  useEffect(() => {
+    const id = setTimeout(prefetchApp, logo3dOn ? 3600 : hero !== "webgl" ? 400 : 6000);
+    return () => clearTimeout(id);
+  }, [logo3dOn, hero]);
   // The glass card's sheen runs with each light sweep across the logo.
   const cardRef = useRef(null);
   useEffect(() => {
@@ -128,23 +209,24 @@ export default function LoginPage({ notice = "", onRetry = null }) {
   }, [hero]);
   const company = cachedCompany();
   const line = "Purchase, stock and production, on one floor.";
+  const flat = hero === "still" || hero === "css";
 
   return (
-    <div data-login-screen className="lg-root">
+    <div data-login-screen className="lg-root" ref={rootRef} data-logo3d={logo3dOn ? "started" : undefined}>
       {/* Stage: one dark studio scene (spotlight, film grain) paints
-          at once; the real logo (3D, or flat on low-end / reduced motion) sits on it. */}
+          at once; the real logo (3D, or flat on low-end / reduced motion) sits on it.
+          The flat logo is also the poster: in the 3D logo's exact place until the
+          3D intro starts, then it fades out under it. */}
       <div className="lg-stage" aria-hidden="true">
         <div className="lg-spot" />
         {hero === "webgl" && (
           <Suspense fallback={null}>
-            <LoginBrand3D fullBleed onFail={onHeroFail} />
+            <LoginBrand3D fullBleed onFail={onHeroFail} onStart={onHeroStart} />
           </Suspense>
         )}
-        {(hero === "still" || hero === "css") && (
-          <div className="lg-brand2d" data-hero={hero}>
-            <ShantazLogoSVG tone="dark" shine={hero === "css"} className="lg-logo2d" />
-          </div>
-        )}
+        <div className={`lg-brand2d lg-poster${flat ? "" : " lg-poster--3d"}${logo3dOn ? " is-off" : ""}`} data-hero={hero || undefined}>
+          <ShantazLogoSVG tone="dark" shine={hero === "css"} className="lg-logo2d" />
+        </div>
         <div className="lg-grain" />
         <div className="lg-vignette" />
       </div>

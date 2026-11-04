@@ -5,7 +5,9 @@ The shell every module plugs into. Full map and rules: `docs/ARCHITECTURE.md`.
 | file | what it holds |
 |---|---|
 | `App.jsx` | all app state (`useState`), data loading through `src/stores/*`, realtime, **every mutation handler** (`handleXxx`), `logAudit`, `canDo` / `canView`, toasts, the auth gate, and the `activePage → <Page …/>` routing that passes data + handlers to the module pages |
-| `LoginPage.jsx` | the login screen |
+| `LoginPage.jsx` | the login screen (also rendered into `index.html` at build time — it takes over from that copy on mount) |
+| `loadApp.js` | `loadApp()` / `prefetchApp()` — the signed-in app (`App.jsx` + every module) is one on-demand chunk; `src/main.jsx` shows the login without it |
+| `loginBoot.jsx` | build-time only: renders `LoginPage` to static HTML for `index.html` (`scripts/vite-login-boot.mjs`) |
 | `layout/navItems.js` | the sidebar nav ids (the regression test checks all 16) |
 | `layout/Sidebar.jsx`, `layout/GlobalSearch.jsx`, `layout/NotificationPanel.jsx` | the frame around every page |
 | `constants.js` | `ROLE_CONFIG` |

@@ -19,6 +19,11 @@
 //         the light pool, ±4° parallax (pointer / phone gyro). No gear spin.
 // prefers-reduced-motion: static final pose. Weak GPU (< 40 fps after the
 // intro) → onFail() (the page shows the 2D SVG logo). Returns dispose().
+// 2026-11-04 (perf/login-fast) — shaders compile in the background
+// (compileAsync: KHR_parallel_shader_compile where the GPU has it) before the
+// first frame, so building the scene does not freeze the sign-in form; no
+// frame is drawn until then. onStart() fires when the canvas fades in (the
+// login page cross-fades its 2D poster out at that moment).
 import {
   WebGLRenderer, Scene, PerspectiveCamera, OrthographicCamera, Group, Mesh, Points, Plane,
   ExtrudeGeometry, PlaneGeometry, BufferGeometry, MeshPhysicalMaterial, ShaderMaterial,
@@ -50,7 +55,7 @@ const outBack = (x, s = 1.6) => { const k = clamp01(x) - 1; return 1 + (s + 1) *
 // mechanical settle: fast approach, ~2% overshoot, damped
 const settle = (x) => { x = clamp01(x); return x >= 1 ? 1 : 1 - Math.exp(-5.2 * x) * Math.cos(6.2 * x) * (1 - x); };
 
-export function createLogoScene(host, { svgText, fullBleed = false, onFail } = {}) {
+export function createLogoScene(host, { svgText, fullBleed = false, onFail, onStart } = {}) {
   const fail = () => { try { onFail && onFail(); } catch { /* ignore */ } };
   let renderer;
   try { renderer = new WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance" }); }
@@ -374,6 +379,7 @@ export function createLogoScene(host, { svgText, fullBleed = false, onFail } = {
 
   // ── loop: continuous while there is motion; fps guard after the intro ──
   let fpsN = 0, fpsT = 0, fpsDone = reduced || window.__SHANTAZ_FPS_GUARD === false, last = 0, failed = false;
+  let warm = false, disposed = false;   // no frame before the shaders are compiled (see pre-warm below)
   const frame = (now) => {
     raf = 0;
     const t = clock(now);
@@ -386,7 +392,7 @@ export function createLogoScene(host, { svgText, fullBleed = false, onFail } = {
     const moving = !reduced || Math.abs(aim.x - cur.x) > 0.002 || Math.abs(aim.y - cur.y) > 0.002;
     if (moving && !failed) raf = requestAnimationFrame(frame);
   };
-  function kick() { if (!raf && !hiddenAt && !failed) raf = requestAnimationFrame(frame); }
+  function kick() { if (warm && !raf && !hiddenAt && !failed && !disposed) raf = requestAnimationFrame(frame); }
   const stop = () => { if (raf) cancelAnimationFrame(raf); raf = 0; last = 0; intro.pause(); };
   const onVis = () => {
     if (document.hidden) { if (!hiddenAt) hiddenAt = performance.now(); stop(); intro.hidden(); }
@@ -396,19 +402,60 @@ export function createLogoScene(host, { svgText, fullBleed = false, onFail } = {
   if (document.hidden) intro.hidden();   // opened in a background tab: show the final pose when it is viewed
   const ro = new ResizeObserver(fit); ro.observe(host);
   fit();
-  // pre-warm: compile every shader and render a few hidden frames (env map, bloom targets,
-  // clip/wind programs) at t = 0, then fade the canvas in and start the clock on a stable frame
+  // pre-warm: compile every shader (scene, background, and the bloom / copy passes) in the
+  // background, then render a few hidden frames (env map, bloom targets, clip/wind programs)
+  // at t = 0, fade the canvas in and start the clock on a stable frame
+  const post = new Scene(), quad = new PlaneGeometry(2, 2);
+  [bloom.materialHighPassFilter, ...(bloom.separableBlurMaterials || []), bloom.compositeMaterial, bloom.blendMaterial, composer.copyPass && composer.copyPass.material]
+    .filter(Boolean).forEach((m) => post.add(new Mesh(quad, m)));
+  const groups = [[scene, camera], [bgScene, bgCam], [post, bgCam]];
+  // compile for the composer's offscreen target (linear, no tone mapping — the programs the
+  // passes really use); only the final OutputPass draws to the screen
+  const offscreen = (fn) => { const prev = renderer.getRenderTarget(); renderer.setRenderTarget(composer.readBuffer); try { return fn(); } finally { renderer.setRenderTarget(prev); } };
+  // Without KHR_parallel_shader_compile the first draw waits for every program to link —
+  // one long freeze. Draw each material once on its own, yielding in between, so the
+  // sign-in form stays responsive while the logo gets ready.
+  const warmEach = async () => {
+    for (const [sc, cam] of groups) {
+      const objs = []; sc.traverse((o) => { if (o.isMesh || o.isPoints) objs.push(o); });
+      const vis = objs.map((o) => o.visible), seen = new Set();
+      try {
+        for (const o of objs) {
+          if (disposed) return;
+          if (seen.has(o.material)) continue; seen.add(o.material);
+          objs.forEach((x) => { x.visible = x === o; });
+          try { offscreen(() => renderer.render(sc, cam)); } catch { /* the real frame will compile it */ }
+          await new Promise((r) => setTimeout(r, 0));
+        }
+      } finally { objs.forEach((x, i) => { x.visible = vis[i]; }); }
+    }
+  };
+  const begin = () => {
+    quad.dispose();
+    if (disposed || failed) return;
+    try {
+      apply(3.0); render(); apply(1.6); render(); apply(0); render();   // (stays below INTRO_END: materials keep their fade)
+    } catch { /* first real frame will compile */ }
+    warm = true;
+    requestAnimationFrame(() => requestAnimationFrame((now) => {
+      if (disposed || failed) return;
+      cv.style.opacity = "1"; started = true; if (!document.hidden) intro.begin(now);
+      try { onStart && onStart(); } catch { /* ignore */ }
+      if (document.hidden) onVis(); else kick();
+    }));
+  };
+  let compiling = Promise.resolve();
   try {
     apply(0); rig.updateMatrixWorld();
-    renderer.compile(scene, camera); renderer.compile(bgScene, bgCam);
-    apply(3.0); render(); apply(1.6); render(); apply(0); render();   // (stays below INTRO_END: materials keep their fade)
+    if (typeof renderer.compileAsync === "function") {
+      compiling = offscreen(() => Promise.all(groups.map(([sc, cam]) => renderer.compileAsync(sc, cam))));
+      if (!renderer.extensions.has("KHR_parallel_shader_compile")) compiling = compiling.then(warmEach);
+    } else { renderer.compile(scene, camera); renderer.compile(bgScene, bgCam); }
   } catch { /* first real frame will compile */ }
-  requestAnimationFrame(() => requestAnimationFrame((now) => {
-    cv.style.opacity = "1"; started = true; if (!document.hidden) intro.begin(now);
-    if (document.hidden) onVis(); else kick();
-  }));
+  compiling.catch(() => {}).then(begin);
 
   return () => {
+    disposed = true;
     stop(); ro.disconnect();
     window.removeEventListener("pointermove", onMove);
     window.removeEventListener("deviceorientation", onTilt);

@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
+import loginBoot from './scripts/vite-login-boot.mjs'
 
 // 2026-11-04 (fix/perf-1) — open the connection to Supabase while the HTML is
 // still parsing (DNS + TLS ≈ 100–300 ms on a phone), so the first login / data
@@ -24,7 +25,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_');
   const supaUrl = (process.env.VITE_SUPABASE_URL || env.VITE_SUPABASE_URL || '').trim();
   return {
-    plugins: [react(), supabasePreconnect(supaUrl)],
+    plugins: [react(), supabasePreconnect(supaUrl), loginBoot()],
     esbuild: {
       // Strip noisy dev logging from production bundles. console.warn / console.error
       // are intentionally KEPT so production issues remain diagnosable.

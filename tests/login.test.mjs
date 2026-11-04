@@ -46,7 +46,16 @@ test("one login screen: signed-out auth errors render LoginPage with a notice, n
   const a = app.indexOf("if (authLoadError && !currentUser && !authLoading)");
   const b = app.indexOf("Session couldn't be restored");
   assert.ok(a > 0 && b > a, "signed-out error must be handled on the login screen first");
-  assert.equal((app.match(/return <LoginPage\b[^\/]*\/>;/g) || []).length, 2, "LoginPage rendered from exactly two auth-gate branches");
+  // 2026-11-04 (perf/login-fast): the app is a lazy chunk, so main.jsx has ONE pre-app gate
+  // that shows the same LoginPage (with the same signed-out notice + Retry) while nobody is
+  // signed in; the app's own two branches are unchanged.
+  const appJsx = fs.readFileSync(path.join(root, "src/app/App.jsx"), "utf8");
+  const mainJsx = fs.readFileSync(path.join(root, "src/main.jsx"), "utf8");
+  const gates = (src) => (src.match(/return <LoginPage\b[^\/]*\/>;/g) || []).length;
+  assert.equal(gates(appJsx), 2, "App.jsx renders LoginPage from exactly two auth-gate branches");
+  assert.equal(gates(mainJsx), 1, "main.jsx renders LoginPage from exactly one pre-app gate");
+  assert.match(mainJsx, /const notice = authLoadError && !isLoading \? authLoadError : "";\s*return <LoginPage notice=\{notice\} onRetry=\{notice \? retryAuthLoad : null\} \/>;/);
+  assert.equal(gates(app), 3, "no other file renders LoginPage from an auth gate");
 });
 
 test("phone inputs are 16px (no iOS zoom-on-focus)", () => {
