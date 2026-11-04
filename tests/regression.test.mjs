@@ -71,6 +71,8 @@ test("regression: src/App.jsx is not pathologically small on disk (>= 400 KB)", 
 // ─── Top-level App-root handlers (BOM / Rack / Machine / Item / PO) ─────────
 
 const APP_HANDLERS = [
+  // Go-live module on/off switch (Settings → Modules)
+  "handleSaveModules",
   // BOM lifecycle
   "handleCreateBOM",
   "handleDuplicateBOM",
@@ -147,6 +149,7 @@ for (const name of APP_HANDLERS) {
 // ─── Page components ────────────────────────────────────────────────────────
 
 const PAGE_COMPONENTS = [
+  "ModulesPanel",
   "DashboardPage",
   "InventoryPage",
   "InwardPage",
@@ -227,6 +230,8 @@ const AUDIT_EVENT_TYPES = [
   // company settings changes now emit audit events too.
   "item_created", "item_updated", "item_deleted",
   "settings_updated",
+  // Go-live — Settings → Modules on/off (super admin).
+  "modules_changed",
   // Phase A — Department Workflow handover events.
   "handover_sent", "handover_accepted", "handover_overrun_narrated",
   "signature_registered",
