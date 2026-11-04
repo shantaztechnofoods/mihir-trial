@@ -358,7 +358,7 @@ export function AtoZMachineReport({
                       return <div key={cr.id} className={`mr-small ${miss ? "mr-red" : ""}`} data-report-hop-checks={cr.stage || ""}><b>{STAGE_LABEL[cr.stage] || "Checklist"}:</b> {rptChecksSentence(done, ans.length, ans.filter((a) => !a.checked).map((a) => a.label))}</div>;
                     })}<div className="mr-label">Full answers: Appendix A</div></div> : <span className="mr-muted mr-small">No checklist recorded</span>)}</div>
                 </div>
-                {/* The delay reason is printed once, in "Holds and late reasons" below. */}
+                {/* The delay reason is printed once, in "Exceptions and findings" (section 00). */}
                 {raised.length > 0 && (
                   <div className="mr-hop-note">
                     {raised.length > 0 && (() => { const o = raised.filter((p) => p.status !== "resolved").length;

@@ -536,8 +536,8 @@ export function rptCustomerReview({ machine, records = [], critical = [], pendin
   const crit = (critical || []).filter((c) => c.status !== "serial" && c.status !== "verified");
   if (ready && crit.length) out.push(`The machine is marked Ready, but ${rptCount(crit.length, "critical component")} ${crit.length === 1 ? "has" : "have"} no full serial / verification record: ${rptList(crit.map((c) => c.name || c.code))}.`);
   if (ready && !machine.trialCertificate) out.push("The machine is marked Ready, but no trial certificate is stored.");
-  const cps = (machine.trialCertificate && machine.trialCertificate.checkPoints) || null;
-  if (machine.trialCertificate && cps && !Object.values(cps).some((v) => v === true || (v != null && String(v).trim() !== "" && v !== false)))
+  const cps = (machine.trialCertificate && machine.trialCertificate.checkPoints) || {};
+  if (machine.trialCertificate && !Object.values(cps).some((v) => v === true || (v != null && String(v).trim() !== "" && v !== false)))
     out.push("The trial certificate has no check point results filled in; the customer copy will show them as not checked.");
   const openJobs = jobs.filter((p) => p.status !== "resolved");
   if (ready && openJobs.length) out.push(`${rptCount(openJobs.length, "job")} on this machine ${openJobs.length === 1 ? "is" : "are"} still open (${rptList(openJobs.map((p) => `“${p.description || p.itemName}”`))}). It is not printed on the customer copy, but it should be closed before dispatch.`);

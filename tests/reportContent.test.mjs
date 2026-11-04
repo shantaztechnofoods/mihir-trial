@@ -154,3 +154,9 @@ test("report components use the new sections and wording", () => {
   const css = read("src/index.css");
   assert.match(css, /\.rpt-precheck \{ display: none !important; \}/, "the pre-send check never prints");
 });
+
+test("customer review: a certificate with no check point object at all is flagged too", () => {
+  const m = { ...machine, trialCertificate: { trialDate: "2026-11-03" } };
+  const out = R.rptCustomerReview({ machine: m, records: [], critical: [], pendingItems: [] });
+  assert.ok(out.some((t) => /no check point results/.test(t)), out.join("\n"));
+});
