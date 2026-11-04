@@ -569,7 +569,7 @@ function Sidebar({ activePage, setActivePage, collapsed, setCollapsed, badges = 
             })()}
             <div className="flex items-center gap-1.5">
               <button onClick={onSearchOpen}
-                className="flex-1 flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-[11px] transition-all sb-search">
+                className={`flex-1 flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-[11px] transition-all sb-search${visible.length <= 1 ? " sb-search-staff" : ""}`}>
                 <Search size={14} aria-hidden="true" className="opacity-70" /><span className="flex-1 text-left">Search</span>
                 <kbd className="text-[9px] px-1.5 py-0.5 rounded sb-kbd">⌘K</kbd>
               </button>
@@ -847,7 +847,10 @@ function CountUpValue({ value, className, style }) {
 
 // ─── DASHBOARD PAGE ───────────────────────────────────────────────────────────
 
-function DashboardPage({ items = {}, pos = [], vendorList = [], machineLog = [], pendingLog = [], followUps = [], handovers = [], pendingHandoverItems = [], onNavigate, settings = SETTINGS_DEFAULTS }) {
+function DashboardPage({ items = {}, pos = [], vendorList = [], machineLog = [], pendingLog = [], followUps = [], handovers = [], pendingHandoverItems = [], onNavigate, settings = SETTINGS_DEFAULTS, canView = null }) {
+  // 2026-11-04 — a login that may not open a page (e.g. a Production Head and
+  // Order Pipeline) used to get buttons that silently did nothing.
+  const canOpen = (id) => typeof canView !== "function" || canView(id);
   const allItems = Object.entries(items).flatMap(([cat, list]) =>
     list.map((i) => ({ ...i, category: cat }))
   );
@@ -960,7 +963,7 @@ function DashboardPage({ items = {}, pos = [], vendorList = [], machineLog = [],
       <Topbar title={`${greeting} 👋`} subtitle={`${settings.companyName || "Shantaz Technofoods"} — real-time overview`}>
         {settings.whatsappAlerts && <Btn variant="wa" size="sm"><LeadIcon e="📱" />WhatsApp Alert</Btn>}
         {settings.emailAlerts    && <Btn variant="mail" size="sm"><LeadIcon e="✉️" />Send Report</Btn>}
-        <Btn variant="primary" size="sm" onClick={() => onNavigate?.("pipeline")}>+ New PO</Btn>
+        {canOpen("pipeline") && <Btn variant="primary" size="sm" onClick={() => onNavigate?.("pipeline")}>+ New PO</Btn>}
       </Topbar>
 
       <div className="p-6 space-y-6">
@@ -968,8 +971,8 @@ function DashboardPage({ items = {}, pos = [], vendorList = [], machineLog = [],
         {/* ── Hero Stats (top 3 large) ── */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {kpis.slice(0, 3).map((kpi) => (
-            <button key={kpi.label} onClick={() => onNavigate?.(kpi.nav)}
-              className="hero-tile group" style={{ "--tile": kpi.color }}>
+            <button key={kpi.label} onClick={() => canOpen(kpi.nav) && onNavigate?.(kpi.nav)} aria-disabled={!canOpen(kpi.nav) || undefined}
+              className="hero-tile group" style={{ "--tile": kpi.color, cursor: canOpen(kpi.nav) ? undefined : "default" }}>
               <div className="hero-tile-icon" style={{ background: kpi.color + "14", color: kpi.color }}>
                 <kpi.Icon size={21} strokeWidth={2} aria-hidden="true" />
               </div>
@@ -989,8 +992,8 @@ function DashboardPage({ items = {}, pos = [], vendorList = [], machineLog = [],
         {/* ── Secondary KPI Cards ── */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           {kpis.slice(3).map((kpi) => (
-            <button key={kpi.label} onClick={() => onNavigate?.(kpi.nav)}
-              className="kpi-tile group">
+            <button key={kpi.label} onClick={() => canOpen(kpi.nav) && onNavigate?.(kpi.nav)} aria-disabled={!canOpen(kpi.nav) || undefined}
+              className="kpi-tile group" style={{ cursor: canOpen(kpi.nav) ? undefined : "default" }}>
               <div className="flex items-center justify-between mb-2">
                 <span style={{ color: kpi.color }}><kpi.Icon size={17} strokeWidth={2} aria-hidden="true" /></span>
                 {kpi.alert && <span className="w-1.5 h-1.5 rounded-full" style={{ background: kpi.color }} />}
@@ -1277,8 +1280,10 @@ function DashboardPage({ items = {}, pos = [], vendorList = [], machineLog = [],
                             {m.serialNo && <span className="text-[9px] font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded flex-shrink-0">{m.serialNo}</span>}
                           </div>
                           <div className="text-[10px] text-slate-500 mt-0.5">
-                            Stage <span className="font-bold" style={{ color: "var(--text-strong)" }}>{stageN}</span>
-                            {lastStage && <span className="text-slate-400"> · {lastStage.stage || lastStage.note || "In progress"}</span>}
+                            {/* 2026-11-04 — showed "Stage 0" for every machine with no
+                                history rows; the current stage is what matters here. */}
+                            Stage <span className="font-bold" style={{ color: "var(--text-strong)" }}>{m.currentDepartment || m.stage || (stageN || "—")}</span>
+                            {lastStage && (lastStage.stage || lastStage.note) && (lastStage.stage || lastStage.note) !== (m.currentDepartment || m.stage) && <span className="text-slate-400"> · {lastStage.stage || lastStage.note}</span>}
                           </div>
                           {m.createdDate && <div className="text-[9px] text-slate-400 mt-0.5">Started {m.createdDate}</div>}
                         </div>
@@ -4086,7 +4091,7 @@ function POModal({ initialPO, vendorList, items, onSave, onClose, prefill = null
             <div className="text-[15px] font-semibold text-slate-900">{isEdit ? "Edit Purchase Order" : "Create Purchase Order"}</div>
             <div className="text-[11px] text-slate-400 mt-0.5">Select vendor · Add items · Review totals</div>
           </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-lg bg-slate-50 hover:bg-red-500/20 hover:text-red-400 text-slate-500 transition-all flex items-center justify-center text-sm font-bold">✕</button>
+          <button onClick={onClose} aria-label="Close" className="modal-x w-8 h-8 rounded-lg bg-slate-50 hover:bg-red-500/20 hover:text-red-400 text-slate-500 transition-all flex items-center justify-center text-sm font-bold">✕</button>
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-6 space-y-5">
@@ -4341,7 +4346,7 @@ function POModal({ initialPO, vendorList, items, onSave, onClose, prefill = null
 
           <div>
             <PLabel text="Line Items" req />
-            <div className="flex gap-2 mb-2">
+            <div className="po-add-row flex gap-2 mb-2">
               <div className="flex-1">
                 <ItemSearchSelect
                   items={vendorFilteredItems}
@@ -4556,7 +4561,7 @@ function PODetailModal({ po, onClose, onApprove, onMarkOrdered, onMarkReceived, 
               <span className={`text-[10px] font-bold uppercase ${po.priority === "urgent" ? "text-red-600" : po.priority === "high" ? "text-amber-700" : "text-slate-500"}`}>{po.priority}</span>
             </div>
           </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-lg bg-slate-50 hover:bg-red-500/20 hover:text-red-400 text-slate-500 transition-all flex items-center justify-center text-sm font-bold flex-shrink-0">✕</button>
+          <button onClick={onClose} aria-label="Close" className="modal-x w-8 h-8 rounded-lg bg-slate-50 hover:bg-red-500/20 hover:text-red-400 text-slate-500 transition-all flex items-center justify-center text-sm font-bold flex-shrink-0">✕</button>
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
@@ -14511,8 +14516,8 @@ function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, onCreateB
                             try { const r = e.currentTarget.getBoundingClientRect(); setActionsUp(window.innerHeight - r.bottom < 200 && r.top > 200); } catch {}
                             setActionsKey(actionsKey === bomKey ? null : bomKey);
                           }}
-                          title="BOM actions"
-                          className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition-all"
+                          title="BOM actions" aria-label="BOM actions"
+                          className="bom-kebab w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition-all"
                           aria-haspopup="menu" aria-expanded={actionsKey === bomKey}>
                           ⋮
                         </button>
@@ -24642,11 +24647,11 @@ function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, machine
   const CARD_STYLE = { background: "rgba(17,24,39,0.03)", border: "1px solid rgba(17,24,39,0.06)", borderRadius: 12 };
 
   return (
-    <div className="flex-1 overflow-y-auto flex flex-col min-h-0">
+    <div className="hr-page flex-1 overflow-y-auto flex flex-col min-h-0">
       <Topbar title="History & Reports" subtitle="Permanent audit trail — all ERP activity" />
 
       {/* ── Tabs ── */}
-      <div className="flex-shrink-0 flex items-center gap-1 px-6 pt-4 pb-0 flex-wrap" style={{ borderBottom: "1px solid rgba(17,24,39,0.06)" }}>
+      <div className="hr-tabs flex-shrink-0 flex items-center gap-1 px-6 pt-4 pb-0 flex-wrap" style={{ borderBottom: "1px solid rgba(17,24,39,0.06)" }}>
         {HR_TABS.map((t) => (
           <button key={t.id} onClick={() => setTab(t.id)}
             className="flex items-center gap-1.5 px-3.5 py-2 text-[11px] font-semibold rounded-t-lg transition-all relative"
@@ -24675,7 +24680,7 @@ function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, machine
       )}
 
       {/* ── Tab Content ── */}
-      <div className="flex-1 overflow-y-auto px-6 py-5">
+      <div className="hr-body flex-1 overflow-y-auto px-6 py-5">
 
         {/* ─── ACTIVITY LOG ─── */}
         {tab === "activity" && (
@@ -29493,7 +29498,7 @@ export default function App() {
   };
 
   const pages = {
-    dashboard: <DashboardPage items={items} pos={pos} vendorList={vendorList} machineLog={machineLog} pendingLog={pendingLog} followUps={followUps} handovers={handovers} pendingHandoverItems={pendingHandoverItems} onNavigate={setActivePage} settings={settings} />,
+    dashboard: <DashboardPage items={items} pos={pos} vendorList={vendorList} machineLog={machineLog} pendingLog={pendingLog} followUps={followUps} handovers={handovers} pendingHandoverItems={pendingHandoverItems} onNavigate={setActivePage} settings={settings} canView={canView} />,
     inventory: <InventoryPage items={items} setItems={setItems} handleUpdateStock={handleUpdateStock}
                               pos={pos} inwardLog={inwardLog} outwardLog={outwardLog}
                               pendingLog={pendingLog} bomDefs={bomDefs} machineLog={machineLog}
@@ -29830,7 +29835,12 @@ export default function App() {
       {/* ── Mobile bottom nav ── */}
       {/* 2026-10-31 — same stroked icons as the sidebar (emoji rendered
           differently on every phone), only pages this login may open, and a
-          "More" button that opens the full navigation. */}
+          "More" button that opens the full navigation.
+          2026-11-04 — a department login can open one page only (Machine
+          Tracker); its bar was just "Machines" + "More", a menu with nothing
+          more in it. No bar for such a login; the ☰ button still opens the
+          drawer (profile, sign out). */}
+      {navItems.filter((item) => canView(item.id)).length > 1 && (
       <nav aria-label="Quick navigation" className="mobile-tabbar md:hidden fixed bottom-0 left-0 right-0 z-50 flex items-stretch justify-around pt-1.5 px-1 no-print"
            style={{ background: "var(--surface-card)", borderTop: "1px solid var(--border-subtle)", boxShadow: "0 -2px 8px rgba(0,0,0,0.06)" }}>
         {[
@@ -29858,6 +29868,7 @@ export default function App() {
           <span>More</span>
         </button>
       </nav>
+      )}
     </div>
     </MobileNavContext.Provider>
   );

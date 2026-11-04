@@ -417,18 +417,18 @@ export default function AuditHistoryPage() {
         </div>
         <div className="flex items-center gap-1.5">
           <button onClick={() => setPage(0)} disabled={safePage === 0}
-            className="px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-900 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-            style={{ background: "rgba(26,31,46,0.05)" }}>⏮</button>
+            className="pager-btn px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-900 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+            style={{ background: "rgba(26,31,46,0.05)" }} aria-label="First page">⏮</button>
           <button onClick={() => setPage(Math.max(0, safePage - 1))} disabled={safePage === 0}
-            className="px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-900 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-            style={{ background: "rgba(26,31,46,0.05)" }}>◀</button>
+            className="pager-btn px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-900 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+            style={{ background: "rgba(26,31,46,0.05)" }} aria-label="Previous page">◀</button>
           <span className="px-3 py-1 text-xs text-slate-600">Page {safePage + 1} / {totalPages}</span>
           <button onClick={() => setPage(Math.min(totalPages - 1, safePage + 1))} disabled={safePage >= totalPages - 1}
-            className="px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-900 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-            style={{ background: "rgba(26,31,46,0.05)" }}>▶</button>
+            className="pager-btn px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-900 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+            style={{ background: "rgba(26,31,46,0.05)" }} aria-label="Next page">▶</button>
           <button onClick={() => setPage(totalPages - 1)} disabled={safePage >= totalPages - 1}
-            className="px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-900 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-            style={{ background: "rgba(26,31,46,0.05)" }}>⏭</button>
+            className="pager-btn px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-900 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+            style={{ background: "rgba(26,31,46,0.05)" }} aria-label="Last page">⏭</button>
         </div>
       </div>
     </div>
