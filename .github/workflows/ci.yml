@@ -80,6 +80,29 @@ jobs:
           [ $brc = 0 ] || echo "::error::npm run build failed (exit $brc)"
           [ $trc = 0 ] && [ $brc = 0 ]
 
+      - name: Bundle budget (health check on this build)
+        # Main chunk / first-download size limits from scripts/health-check.mjs,
+        # measured on the dist/ the step above just built.
+        run: node scripts/health-check.mjs --only bundle --require-dist
+
+  # ── Health guard: module-folder imports (resolve, no cycles, layer rules,
+  # index.js-only cross-module imports), named-import ↔ export wiring, the
+  # regression inventory, every Supabase table / RPC / bucket / Edge Function /
+  # realtime table named in src exists in supabase/, env vars documented.
+  # Pure node, no npm install, < 1 s. Bundle size is checked in "ci" after the build.
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+      - name: npm run health
+        run: node scripts/health-check.mjs --only imports,wiring,db,env
+
   # ── Full browser e2e (every tests/e2e/*.mjs suite) against the local-mode
   # production build, split over 4 parallel runners (balanced by
   # tests/e2e/timings.txt). Runs on every push (feature branches + main);
