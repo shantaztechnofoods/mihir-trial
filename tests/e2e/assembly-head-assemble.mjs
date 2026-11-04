@@ -17,7 +17,8 @@ const seed = new Function(`(${baseSeed.toString()})();
   localStorage.setItem("erp_machines", JSON.stringify(ms));
   localStorage.setItem("erp_checklist_templates", "[]");`);
 const { ok, done } = makeOk();
-const gotoMT = async (p) => { await p.locator("button, a").filter({ hasText: /^Machine Tracker/ }).first().click(); await p.waitForTimeout(900); };
+// Staff land on Machine Tracker (their only page); at 390px the sidebar is off-screen, so click it in the DOM.
+const gotoMT = async (p) => { await p.locator("button, a").filter({ hasText: /^Machine Tracker/ }).first().evaluate((el) => el.click()).catch(() => {}); await p.waitForTimeout(900); };
 
 // ── Electrical login: no rack view, cannot start assembly ──
 {
