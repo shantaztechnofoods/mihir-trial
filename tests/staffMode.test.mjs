@@ -79,8 +79,15 @@ test("rack release stays gated by canDo('machines','release') || isAdminUser", (
   assert.match(mp, /\{canReleaseFromRack && onReleaseHandover && \(\s*<button type="button" data-staff-release=\{h\.id\}/);
   // the staff card opens the rack panel; the release call itself stays in the Rack View only
   assert.match(mp, /data-staff-release=\{h\.id\}[\s\S]*?if \(m\.rackSlot\) \{ setRackPanel\(m\.rackSlot\); return; \}/);
-  // the rack view in staffMode is the Production Head's only; Pull Back stays admin
-  assert.match(mp, /\{\(staffMode \? isProdHead : mtTab === "production"\) && \(/);
+  // the rack view in staffMode: Production Head + (2026-11-04, owner) the Assembly
+  // floor login, who starts assembly there; Pull Back stays admin
+  assert.match(mp, /\{\(staffMode \? \(isProdHead \|\| isAssemblyFloor\) : mtTab === "production"\) && \(/);
+  assert.match(mp, /const canStartAsm = canStartAssembly\(canDo, myDepartments\);/);
+  assert.match(mp, /const isAssemblyFloor = staffMode && !isProdHead && canStartAsm;/);
+  // Assemble on a set rack unit uses the same gate; Fill / Send / Remove keep their own
+  assert.match(mp, /const assembleOk = \(sl\.status === "set" && pend\.length === 0 && crate\.state !== "pending" && canStartAsm\)/);
+  assert.match(mp, /const perm = canDo\("outward", "bom"\) && !!onFillRack;/);
+  assert.match(mp, /const canRemove = sl\.status === "set" && !!m && canDo\("outward", "delete"\) && !!onRemoveRackMachine;/);
   assert.match(mp, /\{isAdminUser && onPullBackHandover && \(/);
 });
 

@@ -5,7 +5,7 @@ import {
   DEPARTMENT_SEQUENCE, DEFAULT_DEPT_DURATIONS, DEFAULT_ACCEPT_TIMEOUT_MINUTES,
   readDeptWorkflowSettings, writeDeptWorkflowSettings,
   nextDepartment, computeElapsedMinutes, computeOverrun, isHoldOverdue, heldMinutes,
-  formatDuration, canAcceptHandover, canFinishTransfer, canConfigureDept, workerIdsOf,
+  formatDuration, canAcceptHandover, canFinishTransfer, canStartAssembly, canConfigureDept, workerIdsOf,
 } from "../src/utils/handoverLogic.js";
 
 // ─── nextDepartment ────────────────────────────────────────────────────────
@@ -270,4 +270,20 @@ test("workerIdsOf keeps the main employee in the list, not separate from it", ()
   };
   assert.ok(workerIdsOf(h).includes("uuid-head"));
   assert.equal(workerIdsOf(h).length, 2);
+});
+
+test("canStartAssembly (2026-11-04): admin, or an Assembly floor login only", async () => {
+  const { DEFAULT_ROLES } = await import("../src/auth/authStore.js");
+  const roleCanDo = (key) => (mod, act) => !!DEFAULT_ROLES[key]?.actions?.[mod]?.[act];
+  assert.equal(canStartAssembly(null, ["Assembly"]), false);
+  assert.equal(canStartAssembly(roleCanDo("Admin"), []), true);
+  assert.equal(canStartAssembly(roleCanDo("dept_staff"), ["Assembly"]), true);   // Sonu
+  assert.equal(canStartAssembly(roleCanDo("Production"), ["Assembly"]), true);
+  for (const d of ["Mechanical", "Electrical", "Trial"]) assert.equal(canStartAssembly(roleCanDo("dept_staff"), [d]), false);
+  assert.equal(canStartAssembly(roleCanDo("dept_staff"), []), false);
+  assert.equal(canStartAssembly(roleCanDo("dept_staff"), undefined), false);
+  assert.equal(canStartAssembly(roleCanDo("Production Head"), ["Assembly"]), false);
+  assert.equal(canStartAssembly(roleCanDo("Purchase Manager"), ["Assembly"]), false);
+  // the grant is NOT updateStage: dept roles keep updateStage off
+  assert.equal(DEFAULT_ROLES.dept_staff.actions.machines.updateStage, false);
 });
