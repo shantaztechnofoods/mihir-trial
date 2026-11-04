@@ -21,9 +21,10 @@ self-role changes, super-admin protection, stock movement caller identity,
 Data Cleanup being disabled, settings secrecy, and the atomic / idempotent
 `rack_remove_machine()`.
 
-Note: migration 036 has a stray comment line that is not valid SQL (the live
-database was applied from a corrected copy); the build script patches that
-one line for the local run only.
+Note: migration 036 used to have a stray comment line that was not valid SQL
+(the Trial database was applied from a corrected copy). Since 2026-11-04 the
+line is commented in the file itself, so 001 → last replays cleanly on an
+empty project (ERP LIVE); the build script's patch is now a no-op.
 
 `054_receipt_tests.sql` covers partial receiving of pending parts
 (`receive_pending_part()`): 100 pending / 50 received → 50 inwarded and 50 left,
