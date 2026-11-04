@@ -41,3 +41,11 @@ user) — run it against `build_local_db.sh 054`, not 055.
 UI e2e (not part of `npm test`, needs the local-mode preview on :5183):
 `tests/e2e/go-live-workflows.mjs` (incl. manual hold) and
 `tests/e2e/bom-unselected.mjs` (unselected BOM lines → Pending Jobs).
+
+## 063 — atomic machine history append
+
+`bash tests/db/build_local_db.sh 063` then
+`su postgres -c "psql -q -d erp_test -f tests/db/063_history_append_tests.sql"` (refusals for anon /
+disabled / no-permission / other-department users, append, compare-and-set stale, audit row) and
+`bash tests/db/063_concurrent_append.sh` (two real sessions at the same moment: Hold + stage change
+both kept; two stage changes from the same stage — one wins, the other is reported stale).

@@ -491,7 +491,7 @@ const STORE_SURFACE = [
   // bomsStore
   { file: "bomsStore.js",    exports: ["fetchBOMs", "createBOM", "updateBOM", "renameBOM", "deleteBOM"] },
   // machinesStore
-  { file: "machinesStore.js",exports: ["fetchMachines", "createMachine", "updateMachine", "updateMachineBomKey", "deleteMachine"] },
+  { file: "machinesStore.js",exports: ["fetchMachines", "createMachine", "updateMachine", "updateMachineBomKey", "deleteMachine", "appendMachineHistory", "STALE_MACHINE_MSG"] },
   // itemsStore
   { file: "itemsStore.js",   exports: ["fetchItems", "createItem", "updateItem", "deleteItem", "updateStockAndHistory", "addItemHistory"] },
   // posStore
