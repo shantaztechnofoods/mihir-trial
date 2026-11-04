@@ -65,6 +65,19 @@ ok("valid new item saved", Object.values(await ls(p, "erp_items")).flat().some((
 const addRows = (await audit()).filter((a) => a.ref === "NUT-M8");
 ok("exactly one audit row for the new item (was two)", addRows.length === 1 && addRows[0].type === "item_created", JSON.stringify(addRows.map((a) => a.type)));
 
+// ── Edit Item (store-audit-2): a code used by a BOM cannot be renamed; a free one can ──
+const allCodes = async () => Object.values(await ls(p, "erp_items")).flat().map((i) => i.code);
+await row("BOLT-M8").locator("button[title='Edit']").click(); await p.waitForTimeout(400);
+await p.locator("input[placeholder='e.g. OIL-HYD46']").fill("BOLT-X");
+await p.getByRole("button", { name: /Save Changes/ }).click(); await p.waitForTimeout(500);
+ok("renaming a code used in a BOM is refused with the reason", await p.getByText(/Code cannot change — used in BOM M-10/).isVisible());
+ok("BOLT-M8 keeps its code (BOM + shortfalls still point at it)", (await allCodes()).includes("BOLT-M8") && !(await allCodes()).includes("BOLT-X"));
+await p.keyboard.press("Escape"); await p.waitForTimeout(300);
+await row("NUT-M8").locator("button[title='Edit']").click(); await p.waitForTimeout(400);
+await p.locator("input[placeholder='e.g. OIL-HYD46']").fill("NUT-M10");
+await p.getByRole("button", { name: /Save Changes/ }).click(); await p.waitForTimeout(700);
+ok("an unused item's code can still be changed", (await allCodes()).includes("NUT-M10") && !(await allCodes()).includes("NUT-M8"));
+
 // ── Export button downloads ──
 const [dl1] = await Promise.all([p.waitForEvent("download", { timeout: 5000 }).catch(() => null), p.getByRole("button", { name: "Export", exact: true }).first().click()]);
 ok("Item Master Export downloads a file", !!dl1 && /item-master/.test(dl1.suggestedFilename()), dl1 ? dl1.suggestedFilename() : "no download");
