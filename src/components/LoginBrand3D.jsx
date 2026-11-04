@@ -45,7 +45,7 @@ export default function LoginBrand3D({ onFail, fullBleed = false }) {
     renderer.setPixelRatio(Math.min(Math.max(window.devicePixelRatio || 1, 1), 1.75));
     renderer.outputColorSpace = SRGBColorSpace;
     renderer.toneMapping = ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.0;
+    renderer.toneMappingExposure = 1.2;
     renderer.setClearColor(0x000000, 0);
     renderer.autoClear = false;
     const cv = renderer.domElement;
@@ -76,10 +76,10 @@ export default function LoginBrand3D({ onFail, fullBleed = false }) {
     room.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
 
     // ── materials ──
-    const gearMat = new MeshPhysicalMaterial({ color: 0x3a3f48, metalness: 0.9, roughness: 0.35, clearcoat: 0.5, clearcoatRoughness: 0.25, anisotropy: 0.6, transparent: true, opacity: 0 });
+    const gearMat = new MeshPhysicalMaterial({ color: 0x6b7280, metalness: 0.9, roughness: 0.32, clearcoat: 0.5, clearcoatRoughness: 0.25, anisotropy: 0.6, transparent: true, opacity: 0 });
     const wheatA = new MeshPhysicalMaterial({ color: 0x2f6b1f, metalness: 0.1, roughness: 0.42, sheen: 1, sheenColor: new Color(0x9fe07c), sheenRoughness: 0.45, clearcoat: 0.3, clearcoatRoughness: 0.4 });
     const redMat = new MeshPhysicalMaterial({ color: 0xe4002b, metalness: 0.6, roughness: 0.28, clearcoat: 1, clearcoatRoughness: 0.08 });
-    const tagMat = new MeshStandardMaterial({ color: 0x8a93a3, metalness: 0.85, roughness: 0.4, transparent: true, opacity: 0 });
+    const tagMat = new MeshStandardMaterial({ color: 0xc3ccdb, metalness: 0.7, roughness: 0.38, transparent: true, opacity: 0 });
 
     // ── geometry from the shared logo definition ──
     const L = shantazLogo();
@@ -189,11 +189,11 @@ export default function LoginBrand3D({ onFail, fullBleed = false }) {
       // the left part on desktop (glass card on the right) / the top on phones
       let rw = w, rh = h, rcx = w / 2, rcy = h / 2;
       if (fullBleed) {
-        if (w >= 1024) { const card = Math.max(400, w * 0.34) + 40; rw = (w - card) * 0.86; rh = h * 0.6; rcx = (w - card) / 2 + 12; rcy = h * 0.44; }
-        else { rw = w * 0.9; rh = Math.max(220, h * 0.34); rcx = w / 2; rcy = Math.max(250, h * 0.4) * 0.5; }
+        if (w >= 1024) { const card = Math.max(400, w * 0.34) + 40; rw = (w - card) * 0.9; rh = h * 0.7; rcx = (w - card) / 2 + 16; rcy = h * 0.45; }
+        else { rw = w * 0.92; rh = Math.max(220, h * 0.36); rcx = w / 2; rcy = Math.max(250, h * 0.4) * 0.52; }
       }
       const fW = rw / w, fH = rh / h;
-      const d = Math.max(W / (0.94 * fW) / (2 * tan * camera.aspect), (H * 1.7) / fH / (2 * tan));
+      const d = Math.max(W / fW / (2 * tan * camera.aspect), (H * 1.3) / fH / (2 * tan));
       camera.position.set(0, 0.25, d);
       camera.lookAt(0, -H * 0.2, 0);
       if (fullBleed) camera.setViewOffset(w, h, w / 2 - rcx, h / 2 - rcy, w, h); else camera.clearViewOffset();
