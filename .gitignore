@@ -1,5 +1,5 @@
 # Dependencies
-node_modules/
+node_modules
 
 # Build output
 dist/
@@ -34,3 +34,6 @@ pnpm-debug.log*
 
 # Claude agent worktrees (never commit)
 .claude/worktrees/
+
+# Supabase CLI link state (points at a specific project — never commit)
+supabase/.temp/
