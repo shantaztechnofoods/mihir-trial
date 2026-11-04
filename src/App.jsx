@@ -15698,12 +15698,16 @@ function rptCriticalItems({ machine, outwardLog = [], auditLog = [], items = {},
         when: (last && last.receivedAt) || p.receivedAt || p.raisedAt || "", by: (last && last.receivedByName) || rptUserName(allUsers, p.receivedBy) || "", via: got ? "Received on a pending job" : "Pending job · part awaited" };
     }),
   ];
-  return rows.filter((r) => { const i = inv(r.code); return (i && i.isCritical) || !!r.ci; }).map((r) => {
+  const out = rows.filter((r) => { const i = inv(r.code); return (i && i.isCritical) || !!r.ci; }).map((r) => {
     const ci = r.ci || {};
     const serials = ci.type === "serial" || Array.isArray(ci.serials) ? (ci.serials || []).filter(Boolean) : [];
     const status = ci.notIssued ? "not_issued" : serials.length ? "serial" : ci.type === "checkbox" ? (ci.confirmed ? "verified" : "unconfirmed") : "none";
     return { ...r, serials, status, remark: ci.remark || "" };
   });
+  // A part left out at BOM Outward and fitted later (pending job or Pending
+  // Stock) prints once, as fitted — not also as "Not issued".
+  const fitted = new Set(out.filter((r) => r.status === "serial" || r.status === "verified").map((r) => r.code));
+  return out.filter((r) => !(r.status === "not_issued" && fitted.has(r.code)));
 }
 const rptCriticalSummary = (rows) => {
   const n = rows.length; if (!n) return "No critical items recorded for this machine.";

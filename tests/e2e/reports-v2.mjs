@@ -27,6 +27,7 @@ const v2 = () => {
       { code: "MTR-2HP", name: "Main motor 2 HP", unit: "Nos", issueQty: 2, criticalInput: { type: "serial", serials: ["MTR-A1001", "MTR-A1002"] } },
       { code: "BRG-6204", name: "Bearing 6204", unit: "Nos", issueQty: 4, criticalInput: { type: "checkbox", confirmed: true } },
       { code: "N-1", name: "Nut", unit: "Nos", issueQty: 4 },
+      { code: "SNS-1", name: "Proximity sensor", unit: "Nos", issueQty: 0, criticalInput: { type: "serial", confirmed: false, notIssued: true, remark: "not in stock", requiredQty: 1 } },
     ] }]);
   const ms = J("erp_machines"); ms.find((m) => m.id === 5).issueId = 7001; S("erp_machines", ms);
   const au = J("erp_audit");
@@ -46,6 +47,8 @@ const v2 = () => {
     { id: 31, machineId: 5, description: "Side cover not painted", assignedDepartment: "Mechanical", raisedInDepartment: "Mechanical", raisedBy: "super_admin_001", kind: "owed", status: "resolved", raisedAt: iso(6.5), resolvedAt: iso(6), resolvedBy: "super_admin_001", resolvedInDepartment: "Mechanical", resolutionNotes: "Painted and dried", receivedQty: 0, receipts: [] },
     { id: 32, machineId: 5, description: "Cable tie loose near motor", assignedDepartment: "Electrical", raisedInDepartment: "Electrical", raisedBy: "super_admin_001", kind: "owed", status: "resolved", raisedAt: iso(4.5), resolvedAt: iso(4.2), resolvedBy: "super_admin_001", resolvedInDepartment: "Electrical", resolutionNotes: "Re-tied with clamp", receivedQty: 0, receipts: [] },
     { id: 34, machineId: 5, description: "Checklist not completed (Before Transfer): Panel gland sealed", assignedDepartment: "Electrical", raisedInDepartment: "Electrical", raisedBy: "super_admin_001", kind: "owed", status: "resolved", raisedAt: iso(4.1), resolvedAt: iso(3.9), resolvedBy: "super_admin_001", resolvedInDepartment: "Electrical", resolutionNotes: "Gland fitted", receivedQty: 0, receipts: [] },
+    { id: 35, machineId: 5, description: "Part not issued at BOM Outward: Proximity sensor", itemCode: "SNS-1", itemName: "Proximity sensor", qty: 1, critical: true, source: "not_issued", assignedDepartment: "Stores", raisedInDepartment: "Stores", kind: "owed", status: "resolved", raisedAt: iso(9), receivedAt: iso(5), resolvedAt: iso(5), receivedQty: 1,
+      receipts: [{ id: 1, qtyReceived: 1, receivedAt: iso(5), receivedByName: "Store Keeper", verification: { kind: "serial", critical: true, serials: ["SNS-77"] } }] },
     { id: 33, machineId: 5, description: "Warning label to be stuck", assignedDepartment: "Electrical", raisedInDepartment: "Electrical", raisedBy: "super_admin_001", kind: "owed", status: "open", raisedAt: iso(4.4), receivedQty: 0, receipts: [] },
   );
   S("erp_pending_handover_items", pj);
@@ -84,7 +87,8 @@ ok("customer: acceptance signatures printed per department", await p.locator("[d
 const crit = await p.locator("[data-report-critical]").innerText();
 ok("customer: critical motor with both serial numbers", crit.includes("Main motor 2 HP") && crit.includes("MTR-A1001") && crit.includes("MTR-A1002"), crit.replace(/\n/g, " | ").slice(0, 300));
 ok("customer: critical bearing verified", crit.includes("Bearing 6204"));
-ok("customer: critical summary line", /2 critical items, all serials recorded/.test(await p.locator("[data-report-critical-summary]").first().innerText()));
+ok("customer: a part not issued at BOM Outward and fitted later prints once, with its serial", (crit.match(/Proximity sensor/g) || []).length === 1 && crit.includes("SNS-77") && !/To be fitted/.test(crit), crit.replace(/\n/g, " | ").slice(0, 400));
+ok("customer: critical summary line", /3 critical items, all serials recorded/.test(await p.locator("[data-report-critical-summary]").first().innerText()));
 ok("customer: completed comments under their departments",
   (await p.locator('[data-report-dept-comments="Mechanical"]').innerText()).includes("Side cover not painted")
   && (await p.locator('[data-report-dept-comments="Electrical"]').innerText()).includes("Cable tie loose near motor"));
@@ -102,7 +106,7 @@ ok("company: letterhead carries the legal name", (await p.locator("[data-report-
 ok("company: BOM photo beside the machine details", await p.locator("[data-report-header] [data-report-photo]").count() === 1);
 const ccrit = await p.locator("[data-report-critical]").innerText();
 ok("company: critical serials and who issued them", ccrit.includes("MTR-A1001") && ccrit.includes("MTR-A1002") && ccrit.includes("Store Keeper"), ccrit.replace(/\n/g, " | ").slice(0, 300));
-ok("company: critical summary", /2 critical items, all serials recorded/.test(await p.locator("[data-report-critical-summary]").first().innerText()));
+ok("company: critical summary", /3 critical items, all serials recorded/.test(await p.locator("[data-report-critical-summary]").first().innerText()));
 ok("company: comment groups are titled by the department that raised them", (await p.locator('[data-report-comments-dept="Electrical"]').innerText()).includes("Comments raised in Electrical"));
 ok("company: checklist remark kept verbatim on the internal copy", doc.includes("gland on order") && /target/.test(doc));
 ok("company: comments grouped by department (Mechanical, Electrical)",
