@@ -118,7 +118,7 @@ await cancel.click(); await p.waitForTimeout(300);
 
 // ── 9. Machine Tracker ⚙️ Settings opens the Machine Tracker settings ──
 await p.setViewportSize({ width: 1280, height: 800 }); await p.waitForTimeout(300);
-await p.locator("button", { hasText: "⚙️ Settings" }).first().click(); await p.waitForTimeout(700);
+await p.locator("button[data-mt-settings]", { hasText: /^Settings$/ }).first().click(); await p.waitForTimeout(700);
 ok("⚙️ Settings opens Machine Tracker Settings (not Company)", /Machine Tracker Settings/.test(await p.locator("body").innerText()) && await p.locator("button", { hasText: /^Company$/ }).count() === 0);
 
 ok("no page errors", errs.length === 0, errs.join(" | "));

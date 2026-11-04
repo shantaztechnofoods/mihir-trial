@@ -121,7 +121,7 @@ await pa.reload({ waitUntil: "networkidle" }); await pa.waitForTimeout(600); awa
 if (await pa.locator("#login-username").count()) await loginAdmin(pa);
 await gotoMachineTracker(pa);
 const late = (await today.innerText()).replace(/\s+/g, " ");
-ok("a late machine shows '🔴 1 late'", /🔴 1 late/.test(late), late);
+ok("a late machine shows a red dot + '1 late'", /1 late/.test(late) && await pa.locator("[data-mt-today-chip='hold'] .lead-dot").count() === 1, late);
 await pa.locator("[data-mt-today-chip='hold']").click(); await pa.waitForTimeout(500);
 ok("tapping 'late' applies the On HOLD filter", await pa.locator("[data-summary-card='hold'][aria-current='page']").count() === 1);
 if (SHOTS) {
