@@ -31,6 +31,7 @@ import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
+import { createIntroClock } from "./logoIntroClock.js";
 
 const U = 0.02;                 // logo unit (0.5 mm of the CDR master) → scene unit
 const INTRO_END = 3.4;
@@ -283,17 +284,17 @@ export function createLogoScene(host, { svgText, fullBleed = false, onFail } = {
   window.addEventListener("deviceorientation", onTilt, { passive: true });
 
   // ── timeline ──
-  // the timeline is an accumulator of clamped frame deltas (≤ 1/30 s), so a slow frame never makes the intro jump;
-  // it only starts after the pre-warm (shaders compiled, first frames rendered)
-  let raf = 0, tAcc = 0, prevNow = 0, started = false, hiddenAt = 0, settled = false;
+  // the timeline follows real elapsed time (logoIntroClock.js): only a single huge jump is clamped (no gear
+  // teleport), the intro is complete by ~4 s of wall clock at any frame rate, and a hidden page skips to the
+  // final pose; it only starts after the pre-warm (shaders compiled, first frames rendered)
+  const intro = createIntroClock(INTRO_END);
+  let raf = 0, started = false, hiddenAt = 0, settled = false;
   let nextSweep = SWEEP_AT, sweepSent = -1;
   // window.__SHANTAZ_T (seconds) freezes the timeline — used only by the frame-capture scripts
   const clock = (now) => {
     if (typeof window.__SHANTAZ_T === "number") return window.__SHANTAZ_T;
     if (reduced) return INTRO_END + 1;
-    if (started && prevNow) tAcc += Math.min(Math.max(0, (now - prevNow) / 1000), 1 / 30);
-    prevNow = now;
-    return tAcc;
+    return started ? intro.tick(now) : intro.t;
   };
   const ROLL_D = 3.4;                                     // roll-in distance (scene units)
   const easeIn = (u) => u * u * (3 - 2 * u);                 // no linear start
@@ -341,7 +342,7 @@ export function createLogoScene(host, { svgText, fullBleed = false, onFail } = {
     let st = t - nextSweep;
     if (st > SWEEP_LEN) { nextSweep += SWEEP_EVERY; st = t - nextSweep; }
     if (!reduced && st >= 0 && st <= SWEEP_LEN) {
-      if (sweepSent !== nextSweep) {
+      if (started && sweepSent !== nextSweep) {   // (not from the pre-warm poses)
         sweepSent = nextSweep;
         try { window.dispatchEvent(new CustomEvent("shantaz:sweep", { detail: { duration: SWEEP_LEN * 1000, intro: t < INTRO_END } })); } catch { /* old browser */ }
       }
@@ -386,12 +387,13 @@ export function createLogoScene(host, { svgText, fullBleed = false, onFail } = {
     if (moving && !failed) raf = requestAnimationFrame(frame);
   };
   function kick() { if (!raf && !hiddenAt && !failed) raf = requestAnimationFrame(frame); }
-  const stop = () => { if (raf) cancelAnimationFrame(raf); raf = 0; last = 0; prevNow = 0; };
+  const stop = () => { if (raf) cancelAnimationFrame(raf); raf = 0; last = 0; intro.pause(); };
   const onVis = () => {
-    if (document.hidden) { if (!hiddenAt) hiddenAt = performance.now(); stop(); }
+    if (document.hidden) { if (!hiddenAt) hiddenAt = performance.now(); stop(); intro.hidden(); }
     else { hiddenAt = 0; kick(); }
   };
   document.addEventListener("visibilitychange", onVis);
+  if (document.hidden) intro.hidden();   // opened in a background tab: show the final pose when it is viewed
   const ro = new ResizeObserver(fit); ro.observe(host);
   fit();
   // pre-warm: compile every shader and render a few hidden frames (env map, bloom targets,
@@ -401,8 +403,8 @@ export function createLogoScene(host, { svgText, fullBleed = false, onFail } = {
     renderer.compile(scene, camera); renderer.compile(bgScene, bgCam);
     apply(3.0); render(); apply(1.6); render(); apply(0); render();   // (stays below INTRO_END: materials keep their fade)
   } catch { /* first real frame will compile */ }
-  requestAnimationFrame(() => requestAnimationFrame(() => {
-    cv.style.opacity = "1"; started = true; prevNow = 0;
+  requestAnimationFrame(() => requestAnimationFrame((now) => {
+    cv.style.opacity = "1"; started = true; if (!document.hidden) intro.begin(now);
     if (document.hidden) onVis(); else kick();
   }));
 
