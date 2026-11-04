@@ -99,7 +99,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-04-hist-photo";
+const APP_BUILD = "2026-11-04-mtaudit-2";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -19956,6 +19956,31 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
             if (!vs.length) return null;
             return <span data-staff-voice={m.id} className="inline-flex" title="Play the latest voice note"><VoicePlayButton attachment={vs[0]} label={`🎤 ${vs.length}`} /></span>;
           };
+          // 2026-11-04 (MT audit) — a manual ON HOLD shows here exactly as on
+          // the admin card: red badge with the reason, no Finish / Accept /
+          // Take (the handlers refuse them anyway), and the same Hold /
+          // Release button for the same permission.
+          const canHoldM = !!onSetMachineHold && (isAdminUser || canFinishTransfer(canDo) || canDo("machines", "updateStage"));
+          const holdBadge = (m) => (m && m.holdActive) ? (
+            <div data-staff-hold-badge={m.id} className="text-[13px] font-black mt-1.5 px-2.5 py-1.5 rounded-lg break-words"
+                 style={{ background: "rgba(239,68,68,0.12)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.45)" }}>
+              🛑 ON HOLD{m.holdReason ? ` · ${m.holdReason}` : ""}
+            </div>
+          ) : null;
+          const holdBtn = (m) => (canHoldM && m) ? (
+            <button data-needs-net type="button" className={btn}
+                    {...(m.holdActive ? { "data-staff-release-hold": m.id } : { "data-staff-hold": m.id })}
+                    onClick={() => setHoldModal({ machine: m, release: !!m.holdActive, reason: "", busy: false, error: "" })}
+                    style={m.holdActive ? { background: "rgba(21,128,61,0.10)", border: "1px solid rgba(21,128,61,0.4)", color: "#15803d" }
+                                        : { background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.35)", color: "#b91c1c" }}>
+              {m.holdActive ? "▶ Release ON HOLD" : "⏸ ON HOLD"}
+            </button>
+          ) : null;
+          const heldNote = (m, what) => (
+            <div data-staff-held={m.id} className="min-h-[48px] flex items-center text-[14px] font-bold" style={{ color: "#dc2626" }}>
+              🛑 On hold — release the hold to {what}
+            </div>
+          );
           // Migration 061 — the BOM's machine photo (64px) at the left of the
           // card's title block, so workers recognise the machine at a glance.
           const withPhoto  = (m, h, body) => {
@@ -20060,8 +20085,9 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                             <div className="text-[13px] mt-0.5" style={{ color: "var(--text-dim)" }}>
                               {m?.bomLabel ? `${m.bomLabel} · ` : ""}{m?.rackSlot ? slotLabel(m.rackSlot) : "on the rack"} → {h.toDepartment}
                             </div>
+                            {holdBadge(m)}
                           </div>)}
-                          {canTakeFromRack && canAccept ? (
+                          {m && m.holdActive ? heldNote(m, "take it") : canTakeFromRack && canAccept ? (
                             <button data-needs-net type="button" data-staff-take={h.id} className={btn} style={{ background: "#4338ca", color: "#fff" }}
                                     disabled={!!acceptModal || rackTakeBusy === h.id}
                                     onClick={async () => {
@@ -20077,6 +20103,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                           ) : (
                             <div className="text-[13px] font-bold" style={{ color: "#4338ca" }}>Waiting for your head to take it</div>
                           )}
+                          {m && m.holdActive && holdBtn(m)}
                         </Card>
                       );
                     })}
@@ -20101,9 +20128,12 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                               {m?.bomLabel ? `${m.bomLabel} · ` : ""}from {h.fromDepartment} → {h.toDepartment}{waited ? ` · waiting ${waited}` : ""}
                             </div>
                             {late && <div className="text-[13px] font-black mt-1" style={{ color: "#dc2626" }}><LeadIcon e="🚦" />ON HOLD — accept deadline passed</div>}
+                            {holdBadge(m)}
                             {voiceBadge(m) && <div className="mt-2">{voiceBadge(m)}</div>}
                           </div>)}
-                          {canAccept && (
+                          {canAccept && m && m.holdActive && heldNote(m, "accept it")}
+                          {m && m.holdActive && holdBtn(m)}
+                          {canAccept && !(m && m.holdActive) && (
                             <button data-needs-net type="button" data-staff-accept={h.id} className={btn} style={{ background: "#15803d", color: "#fff" }}
                                     disabled={!!acceptModal} onClick={() => { if (!acceptModal) openAcceptModal(h); }}>
                               ✓ Accept into {h.toDepartment}
@@ -20153,6 +20183,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                               )}
                               {voiceBadge(m)}
                             </div>
+                            {holdBadge(m)}
                           </div>)}
                           <div className="flex flex-col sm:flex-row gap-2 sm:flex-wrap">
                             {during && (
@@ -20173,11 +20204,13 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                 ✎ Certificate
                               </button>
                             )}
-                            {next && canFinish && (
+                            {next && canFinish && m.holdActive && heldNote(m, "finish it")}
+                            {next && canFinish && !m.holdActive && (
                               <button data-needs-net type="button" data-staff-finish={m.id} className={btn} style={{ background: "#15803d", color: "#fff" }} onClick={() => openFinishModal(m)}>
                                 ✓ Finish → {next}
                               </button>
                             )}
+                            {holdBtn(m)}
                           </div>
                         </Card>
                       );
