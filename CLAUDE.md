@@ -13,9 +13,32 @@ Rollback tag: **`erp-pre-restore-32e3ffe`**
 ## 1. What this repo is
 
 A single-tenant purchase-and-inventory ERP for Shantaz Technofoods. One
-monolithic React 18 + Vite app in `src/App.jsx` (~13k lines, intentionally
-one file — do not split it without explicit authorization) backed by
-Supabase (Postgres + Auth + Edge Functions + Storage).
+React 18 + Vite app backed by Supabase (Postgres + Auth + Edge Functions +
+Storage).
+
+**Code layout (since 2026-11-04, PR #136 — the old single-file
+`src/App.jsx` was split into module folders as a pure move):**
+
+* `src/app/` — the app shell: `App.jsx` (all state, every `handle*`
+  handler, `logAudit`, `canDo`, routing), `LoginPage.jsx`, `layout/`
+  (Sidebar, GlobalSearch, NotificationPanel, navItems).
+* `src/modules/<module>/` — one folder per module (dashboard, inventory,
+  bom, purchase, machine-tracker, pending-jobs, trial-certificate,
+  reports, settings, whatsapp, analytics, ai-assistant, audit-trail,
+  users-roles). Each has a `README.md` and an `index.js` that holds only
+  re-exports; import another module only through its `index.js`.
+* `src/shared/` — UI pieces used by several modules (`components/`, `ui/`,
+  `printFormat.js`, `buildInfo.js`). `shared/` never imports `app/` or
+  `modules/`; `modules/` never import `app/`.
+* `src/stores/`, `src/utils/`, `src/auth/`, `src/realtime/`, `src/config/`
+  — unchanged data/logic layers.
+* Map + rules: `docs/ARCHITECTURE.md`, `docs/MODULE-PROMOTION.md`
+  (a module folder alone is not a deploy unit: write-path changes also
+  touch the named handlers in `src/app/App.jsx`), `docs/SPLIT-ACCOUNTING.md`.
+* Do not re-merge folders or move code between them in a feature PR. A
+  move is its own PR, proven a pure move with
+  `node scripts/split-accounting.mjs <base>` (see the
+  shantaz-erp-module-safety skill).
 
 Modules (all live, all critical): Dashboard, Item Master, Inward, Outward,
 Pending Stock, Order Pipeline, Machine Tracker (incl. Production Rack
@@ -36,14 +59,16 @@ offline dev.
 2. **Understand the existing implementation before changing it.** Grep
    for the symbol you're about to touch. Read the handler. Read its
    callers. The ERP is dense but internally consistent — mimic the
-   pattern already in the file.
+   pattern already in the module (handlers live in `src/app/App.jsx`,
+   screens in `src/modules/<module>/`).
 
 3. **Make focused, minimal changes.** A bug fix fixes the bug.
    Refactors need to be their own PR.
 
 4. **Never overwrite the whole ERP or a large component "to fix one
-   bug".** If a change removes >200 lines from `src/App.jsx`, stop and
-   justify every removal. See the post-mortem below.
+   bug".** If a change removes >200 lines from the screen code
+   (`src/app`, `src/modules`, `src/shared` — `scripts/ship.sh` guards
+   this), stop and justify every removal. See the post-mortem below.
 
 5. **Review `git diff` before every commit.** If you see unexpected
    deletions, investigate — do not commit.
@@ -97,20 +122,25 @@ the deletion.
 `tests/regression.test.mjs` was written to catch the next version of
 this. It verifies every top-level handler, page component, nav id,
 audit event type, user-visible string, and store export is still
-present in `src/App.jsx` + stores. If you intentionally remove or
-rename one of those symbols, update the test's inventory in the same
-PR. **Do not weaken the test to make it pass.**
+present in the screen code (`src/app` + `src/modules` + `src/shared`,
+read via `tests/helpers/source.mjs`) + store exports, plus per-folder
+size floors. If you intentionally remove or rename one of those symbols,
+update the test's inventory in the same PR. **Do not weaken the test to
+make it pass.**
 
 ## 4. What the deployment pipeline guarantees
 
-1. Push to any branch → GitHub Actions `ci` workflow runs: `npm ci →
-   npm test → npm run build`. Red build blocks merge once branch
-   protection is enabled (see external action items in README/the
-   deployment report).
+1. Push to any branch → GitHub Actions `ci` workflow runs: job `ci`
+   (`npm ci → npm test → npm run build` + bundle budget), job `health`,
+   and the full browser e2e (`e2e shard 1/4..4/4` + gate job `e2e`).
+   `scripts/ship.sh merge` requires `ci` AND `e2e` green on the PR head.
+   Red build blocks merge once branch protection is enabled (see
+   external action items in README/the deployment report).
 2. Merge to `main` → Vercel auto-deploys to
    https://purchase-inventory-os.vercel.app/.
-3. `APP_BUILD` in `src/App.jsx` and `APP_BUILD_TAG` in `src/main.jsx`
-   must match (enforced by the regression test). Bump BOTH when you
+3. `APP_BUILD` in `src/shared/buildInfo.js` and `APP_BUILD_TAG` in
+   `src/main.jsx` must match (enforced by the regression test;
+   `scripts/ship.sh bump <tag>` sets both). Bump BOTH when you
    want the deployment to be observable; the string surfaces in the
    browser console banner and the Settings-page build badge.
 
