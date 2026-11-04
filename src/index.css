@@ -3872,3 +3872,105 @@ button.rack-btn:disabled { background: #e5e7eb !important; color: #6b7280 !impor
   }
   .modal-x { width: 44px !important; height: 44px !important; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PRO POLISH (2026-11-04) — one calm token system, applied on screen only.
+   Visual only: no layout, order, words or logic change. Printed reports
+   (.mr-*, .rpt-*, trial certificate) are not touched by anything below.
+   Type   12 / 13 / 14 / 15 / 16 / 18 / 22   (phone body 15–16)
+   Space  4 / 8 / 12 / 16 / 24 / 32
+   Radius chip 6 · control 10 · card 14 · sheet 16 · pill 999
+   Shadow 1 = resting card · 2 = dialog / menu (nothing else)
+   Colour neutral ink + slate lines; colour only for meaning:
+          green ok · amber waiting · violet rack · red problem · grey done
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root {
+  --fs-12: 12px; --fs-13: 13px; --fs-14: 14px; --fs-15: 15px; --fs-16: 16px; --fs-18: 18px; --fs-22: 22px;
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-6: 24px; --sp-8: 32px;
+  --r-chip: 6px; --r-ctl: 10px; --r-card: 14px; --r-sheet: 16px; --r-pill: 999px;
+  --sh-1: 0 1px 2px rgba(15, 23, 42, .05), 0 1px 1px rgba(15, 23, 42, .03);
+  --sh-2: 0 24px 56px -16px rgba(15, 23, 42, .30), 0 0 0 1px rgba(15, 23, 42, .06);
+  --ink-900: #0F172A; --ink-700: #334155; --ink-500: #64748B; --ink-400: #94A3B8;
+  --line: #E2E8F0; --line-strong: #CBD5E1;
+  --ok: #15803D; --wait: #B45309; --rack: #6D28D9; --bad: #B91C1C; --done: #64748B;
+  --ring: 0 0 0 3px rgba(46, 80, 214, .22);
+  --v2-grid: rgba(46, 80, 214, 0.022);          /* blueprint grid: half as loud */
+  --v2-lift: var(--sh-1);
+}
+
+@media screen {
+  /* Icons: one line set, one stroke, sitting on the text baseline */
+  .lead-icon, .glyph-icon { flex-shrink: 0; }
+  .glyph-icon { display: inline-block; vertical-align: middle; }
+  .lead-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: .5em; vertical-align: .08em; flex-shrink: 0; }
+  .lead-dot-solo { margin-right: 0; }
+  .empty-state-icon, .empty-state-icon .glyph-icon { color: var(--ink-400); opacity: 1; }
+
+  /* Cards: one radius, one resting shadow, no hover jump */
+  body .section-card, .kpi-tile, .hero-tile, .premium-card { border-radius: var(--r-card); box-shadow: var(--sh-1); }
+  .kpi-tile:hover, .hero-tile:hover, .section-card:hover { transform: none !important; box-shadow: var(--sh-1); }
+  button.kpi-tile:hover, .hero-tile:hover { border-color: var(--line-strong); }
+  .hero-tile::before { background: #2E50D6; }
+  .rounded-3xl:not(.mr-paper *):not(.mr-doc *) { border-radius: var(--r-sheet); }
+
+  /* Dialogs: one deep shadow */
+  .modal-panel, .modal-backdrop > div { box-shadow: var(--sh-2); }
+
+  /* Weight: 900 shouts in Inter; 800 keeps the same hierarchy */
+  .font-black:not(.mr-paper *):not(.mr-doc *):not(.tc-form *) { font-weight: 800; }
+
+  /* KPI labels: sentence case, readable ink — the dot carries the colour */
+  .kpi-tile .uppercase.tracking-\[0\.08em\], .mt-kpis .mt-kpi-label {
+    text-transform: none; letter-spacing: 0; font-size: var(--fs-13) !important; font-weight: 600; color: var(--ink-500) !important;
+  }
+  .mt-kpis .mt-kpi-value { color: var(--ink-900) !important; }
+  .mt-kpis .mt-kpi-sub { font-size: var(--fs-12) !important; color: var(--ink-500) !important; }
+
+  /* Tables: quiet header */
+  table:not(.mr-table) thead th { letter-spacing: .04em; color: var(--ink-500); font-weight: 600; }
+
+  /* Focus: one ring everywhere */
+  input:focus-visible, select:focus-visible, textarea:focus-visible { outline: none; box-shadow: var(--ring); border-color: #5A78EA; }
+
+  /* Machine Tracker header: Reports / Settings are secondary buttons */
+  [data-reports-menu], [data-mt-settings] {
+    background: var(--surface-card, #fff) !important; color: var(--ink-900) !important;
+    border: 1px solid var(--line-strong) !important; font-weight: 600 !important; box-shadow: var(--sh-1);
+  }
+  [data-reports-menu]:hover, [data-mt-settings]:hover { background: #F8FAFC !important; }
+
+  /* "Today" line: white chips; the dot carries the meaning */
+  [data-mt-today-chip] {
+    background: var(--surface-card, #fff) !important; color: var(--ink-900) !important;
+    border: 1px solid var(--line-strong) !important; font-size: var(--fs-14) !important; font-weight: 600 !important;
+    box-shadow: var(--sh-1);
+  }
+  [data-mt-today-chip][aria-pressed="true"] { border-color: #2E50D6 !important; box-shadow: var(--ring); }
+  [data-mt-today] > span:first-child { font-size: var(--fs-15) !important; font-weight: 700 !important; }
+  [data-mt-today-ok] { font-size: var(--fs-15) !important; font-weight: 600 !important; }
+
+  /* Delay card period switch: a calm segmented control */
+  .delay-card [role="group"][aria-label="Period"] { background: #F1F5F9; padding: 3px; border-radius: var(--r-ctl); gap: 2px; max-width: 460px; }
+  .delay-card [data-delay-period] { min-height: 40px !important; border: 0 !important; border-radius: 8px !important; background: transparent !important; color: var(--ink-700) !important; }
+  .delay-card [data-delay-period][aria-pressed="true"] { background: #fff !important; color: var(--ink-900) !important; box-shadow: var(--sh-1); }
+
+  /* Staff: My Dashboard is a way in, not the main action */
+  [data-my-dashboard-open] {
+    min-height: 52px !important; font-size: var(--fs-16) !important; font-weight: 700 !important; border-radius: var(--r-card) !important;
+    background: var(--surface-card, #fff) !important; color: #1D3187 !important;
+    border: 1px solid var(--line-strong) !important; box-shadow: var(--sh-1) !important;
+  }
+
+  /* Form fields in dialogs: one height, one radius */
+  .modal-backdrop select,
+  .modal-backdrop input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]) {
+    height: 42px !important; min-height: 42px !important; border-radius: var(--r-ctl) !important;
+  }
+}
+@media screen and (max-width: 767px) {
+  .delay-card [data-delay-period] { min-height: 44px !important; }
+  .modal-backdrop select,
+  .modal-backdrop input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]) {
+    height: 44px !important; min-height: 44px !important; font-size: 16px;
+  }
+}

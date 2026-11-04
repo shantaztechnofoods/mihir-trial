@@ -10,7 +10,7 @@ const { b, p, errs } = await launch(seed);
 await loginAdmin(p); await gotoMachineTracker(p);
 
 // ── Machine Tracker → ⚙️ Settings ──────────────────────────────────────────
-await p.locator("button", { hasText: "Settings" }).filter({ hasText: "⚙️" }).first().click(); await p.waitForTimeout(800);
+await p.locator("button[data-mt-settings]", { hasText: /^Settings$/ }).first().click(); await p.waitForTimeout(800);
 const groups = await p.locator("[data-org-group] .org-group-title").allInnerTexts();
 ok("settings groups in order", JSON.stringify(groups) === JSON.stringify(["Deadlines & HOLD rules", "Employees per department", "Working calendar", "Advanced"]), JSON.stringify(groups));
 ok("every group has a one-line helper", await p.locator("[data-org-group] .org-group-hint").count() === 4);

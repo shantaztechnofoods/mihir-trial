@@ -29,7 +29,7 @@ const isRed = (sel) => p.evaluate((s) => !!document.querySelector(s)?.classList.
 const tapSave = async () => { await p.locator("[data-job-submit]").evaluate((x) => x.parentElement.click()); await p.waitForTimeout(150); };
 
 // ── part job: one main action, no Work completed ──
-ok("part job (gearbox) shows 📦 Part received", await btnIn(3, /^📦 Part received$/).count() === 1);
+ok("part job (gearbox) shows 📦 Part received", await btnIn(3, /^Part received$/).count() === 1);
 ok("part job has NO Work completed button", await btnIn(3, /Work completed/).count() === 0 && await btnIn(2, /Work completed/).count() === 0);
 ok("fault/work job keeps ✓ Work completed and has NO Part received", await btnIn(1, /Work completed/).count() === 1 && await btnIn(1, /Part received/).count() === 0);
 await p.screenshot({ path: `${SHOTS}/part-received-staff-390.png`, fullPage: true });

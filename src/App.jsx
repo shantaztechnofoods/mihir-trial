@@ -21,7 +21,7 @@ import { useAuth } from "./auth/AuthContext.jsx";
 import { fetchDeptRoster, updateUserDepartments } from "./auth/authStore.js";
 import LoginPage from "./pages/LoginPage.jsx";
 import BrandLogo from "./components/BrandLogo.jsx";
-import { LeadIcon, LeadLabel } from "./components/LeadIcon.jsx";
+import { LeadIcon, LeadLabel, Glyph } from "./components/LeadIcon.jsx";
 import UserManagementPage from "./pages/UserManagementPage.jsx";
 import RoleManagementPage from "./pages/RoleManagementPage.jsx";
 import AccessDeniedPage from "./components/AccessDeniedPage.jsx";
@@ -99,7 +99,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-04-rc-fix";
+const APP_BUILD = "2026-11-04-world-ui";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -757,7 +757,7 @@ function MetricCard({ label, value, delta, deltaUp, icon, barPct, barColor, valu
         {icon && (
           <div className="w-9 h-9 rounded-xl flex items-center justify-center text-base flex-shrink-0 -mt-0.5 -mr-0.5"
                style={{ background: color + "14", color }}>
-            {icon}
+            <Glyph e={icon} size={18} />
           </div>
         )}
       </div>
@@ -949,7 +949,7 @@ function DashboardPage({ items = {}, pos = [], vendorList = [], machineLog = [],
 
   const EmptyState = ({ icon, title, sub, action, actionLabel }) => (
     <div className="empty-state py-10">
-      <div className="empty-state-icon text-4xl">{icon}</div>
+      <div className="empty-state-icon text-4xl"><Glyph e={icon} size={30} /></div>
       <div className="empty-state-title">{title}</div>
       <div className="empty-state-desc">{sub}</div>
       {action && actionLabel && (
@@ -967,7 +967,7 @@ function DashboardPage({ items = {}, pos = [], vendorList = [], machineLog = [],
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <Topbar title={`${greeting} 👋`} subtitle={`${settings.companyName || "Shantaz Technofoods"} — real-time overview`}>
+      <Topbar title={greeting} subtitle={`${settings.companyName || "Shantaz Technofoods"} — real-time overview`}>
         {settings.whatsappAlerts && <Btn variant="wa" size="sm"><LeadIcon e="📱" />WhatsApp Alert</Btn>}
         {settings.emailAlerts    && <Btn variant="mail" size="sm"><LeadIcon e="✉️" />Send Report</Btn>}
         {canOpen("pipeline") && <Btn variant="primary" size="sm" onClick={() => onNavigate?.("pipeline")}>+ New PO</Btn>}
@@ -1556,7 +1556,7 @@ function ItemDetailModal({ item, category, onClose, onDelete, onUpdateStock, onE
                 {item.designFile && (
                   <a href={item.designFile} target="_blank" rel="noreferrer" title={item.designName || "Open design"}
                      className="text-[10px] font-bold text-violet-300 bg-violet-500/10 border border-violet-500/30 px-2 py-0.5 rounded-full hover:bg-violet-500/20 transition-all">
-                    📐 View Design
+                    <LeadIcon e="📐" />View Design
                   </a>
                 )}
               </div>
@@ -1682,10 +1682,10 @@ function ItemDetailModal({ item, category, onClose, onDelete, onUpdateStock, onE
                           </div>
                           {v && (
                             <div className="text-[9px] text-slate-500 flex flex-wrap gap-2 mt-0.5">
-                              {v.contactPerson && <span>👤 {v.contactPerson}</span>}
-                              {v.phone && <span>📞 {v.phone}</span>}
-                              {v.leadDays ? <span>🕐 {v.leadDays}d lead</span> : null}
-                              {v.paymentTerms && <span>💳 {v.paymentTerms}</span>}
+                              {v.contactPerson && <span><LeadIcon e="👤" />{v.contactPerson}</span>}
+                              {v.phone && <span><LeadIcon e="📞" />{v.phone}</span>}
+                              {v.leadDays ? <span><LeadIcon e="🕐" />{v.leadDays}d lead</span> : null}
+                              {v.paymentTerms && <span><LeadIcon e="💳" />{v.paymentTerms}</span>}
                             </div>
                           )}
                         </div>
@@ -2573,7 +2573,7 @@ function AddItemModal({ machines, onSave, onClose, initialValues = null, vendorL
           <button type="button" onClick={() => setShowAdvanced((v) => !v)}
                   className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-[12px] font-bold text-slate-700 transition-all"
                   style={{ background: "rgba(17,24,39,0.03)", border: "1px solid rgba(17,24,39,0.12)" }}>
-            <span>⚙️ Purchase / Vendor / Media details {showAdvanced ? "" : "(optional)"}</span>
+            <span><LeadIcon e="⚙️" />Purchase / Vendor / Media details {showAdvanced ? "" : "(optional)"}</span>
             <span className="text-[10px]">{showAdvanced ? "▲ Hide" : "▼ Show"}</span>
           </button>
 
@@ -2686,8 +2686,8 @@ function AddItemModal({ machines, onSave, onClose, initialValues = null, vendorL
                             <div className="text-xs font-semibold text-slate-900 truncate">{v.name}</div>
                             {(v.contactPerson || v.leadDays) && (
                               <div className="text-[9px] text-slate-500 flex gap-2 mt-0.5">
-                                {v.contactPerson && <span>👤 {v.contactPerson}</span>}
-                                {v.leadDays ? <span>🕐 {v.leadDays}d lead</span> : null}
+                                {v.contactPerson && <span><LeadIcon e="👤" />{v.contactPerson}</span>}
+                                {v.leadDays ? <span><LeadIcon e="🕐" />{v.leadDays}d lead</span> : null}
                               </div>
                             )}
                           </div>
@@ -2727,9 +2727,9 @@ function AddItemModal({ machines, onSave, onClose, initialValues = null, vendorL
                         <div className="text-xs font-semibold text-slate-900 truncate">{link.vendorName}</div>
                         {v && (
                           <div className="text-[9px] text-slate-500 flex gap-2 mt-0.5">
-                            {v.contactPerson && <span>👤 {v.contactPerson}</span>}
-                            {v.phone && <span>📞 {v.phone}</span>}
-                            {v.leadDays ? <span>🕐 {v.leadDays}d</span> : null}
+                            {v.contactPerson && <span><LeadIcon e="👤" />{v.contactPerson}</span>}
+                            {v.phone && <span><LeadIcon e="📞" />{v.phone}</span>}
+                            {v.leadDays ? <span><LeadIcon e="🕐" />{v.leadDays}d</span> : null}
                           </div>
                         )}
                       </div>
@@ -2738,9 +2738,9 @@ function AddItemModal({ machines, onSave, onClose, initialValues = null, vendorL
                         onChange={(e) => changeRole(link.vendorId, e.target.value)}
                         className="text-[10px] font-bold rounded-lg px-2 py-1 outline-none border flex-shrink-0"
                         style={{ background: `${rc}14`, color: rc, borderColor: `${rc}40`, fontFamily: "'Inter',system-ui,sans-serif" }}>
-                        <option value="Preferred">⭐ Preferred</option>
-                        <option value="Approved">✅ Approved</option>
-                        <option value="Backup">🔘 Backup</option>
+                        <option value="Preferred">Preferred</option>
+                        <option value="Approved">Approved</option>
+                        <option value="Backup">Backup</option>
                       </select>
                       <button onClick={() => removeVendorLink(link.vendorId)}
                               className="w-5 h-5 flex-shrink-0 flex items-center justify-center rounded text-slate-600 hover:text-red-400 hover:bg-red-500/10 transition-all text-xs">
@@ -2820,7 +2820,7 @@ function AddItemModal({ machines, onSave, onClose, initialValues = null, vendorL
                     {designFile && !designBusy && <button onClick={() => { setDesignFile(""); setDesignName(""); }}
                             className="text-[10px] font-bold px-2.5 py-1 rounded-lg border border-red-500/20 text-red-400 hover:bg-red-500/10 transition-all">Remove</button>}
                   </div>
-                  {designName && <div className="text-[9px] text-slate-500 mt-1 truncate" title={designName}>📎 {designName}</div>}
+                  {designName && <div className="text-[9px] text-slate-500 mt-1 truncate" title={designName}><LeadIcon e="📎" />{designName}</div>}
                   <div className="text-[9px] text-slate-600 mt-0.5">PNG/JPG/PDF, up to {MAX_MB} MB · stored in Supabase Storage</div>
                 </div>
               </div>
@@ -2828,7 +2828,7 @@ function AddItemModal({ machines, onSave, onClose, initialValues = null, vendorL
             {mediaErr && (
               <div className="mt-2 px-3 py-2 rounded-lg text-[11px] text-red-300 break-words"
                    style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)" }}>
-                ⚠️ {mediaErr}
+                <LeadIcon e="⚠️" />{mediaErr}
               </div>
             )}
           </div>
@@ -2859,7 +2859,7 @@ function AddItemModal({ machines, onSave, onClose, initialValues = null, vendorL
                       e.currentTarget.style.boxShadow = "0 0 12px rgba(46, 80, 214,0.45), 0 2px 8px rgba(17,24,39,0.08)";
                       e.currentTarget.style.borderColor = "rgba(38, 64, 176,0.5)";
                     }}>
-              {isEdit ? "💾 Save Changes" : "💾 Save Item"}
+              <LeadLabel text={isEdit ? "💾 Save Changes" : "💾 Save Item"} />
             </button>
           </div>
         </div>
@@ -3589,7 +3589,7 @@ function InventoryPage({ items, setItems, handleUpdateStock, pos = [], inwardLog
               <button onClick={() => handleConfirmDelete(deleteModal.category, deleteModal.item.code)}
                       className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-lg px-4 py-1.5 text-white border transition-all"
                       style={{ background: "#b91c1c", borderColor: "rgba(239,68,68,0.5)", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
-                🗑️ Delete
+                <LeadIcon e="🗑️" />Delete
               </button>
             </div>
           </div>
@@ -3614,7 +3614,7 @@ function InventoryPage({ items, setItems, handleUpdateStock, pos = [], inwardLog
         {canDo("inventory","add") && (
           <button onClick={() => setShowImport(true)}
                   className="text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-900 hover:border-slate-300 transition-all flex items-center gap-1.5">
-            ⬆ Import Items
+            <LeadIcon e="⬆" />Import Items
           </button>
         )}
         {canDo("inventory","delete") && (
@@ -3622,7 +3622,7 @@ function InventoryPage({ items, setItems, handleUpdateStock, pos = [], inwardLog
                   title="Delete demo items and BOMs together"
                   className="text-xs font-bold px-3 py-1.5 rounded-lg border transition-all flex items-center gap-1.5"
                   style={{ borderColor: "rgba(239,68,68,0.35)", color: "#dc2626" }}>
-            🧹 Clear Demo Data
+            <LeadIcon e="🧹" />Clear Demo Data
           </button>
         )}
         {canDo("inventory","add") && <Btn variant="primary" size="sm" onClick={() => setShowModal(true)}>+ Add Item</Btn>}
@@ -3736,7 +3736,7 @@ function InventoryPage({ items, setItems, handleUpdateStock, pos = [], inwardLog
           </select>
 
           <div className="relative ml-auto">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 text-[11px] pointer-events-none">🔍</span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 text-[11px] pointer-events-none"><Glyph e="🔍" size={13} /></span>
             <input ref={searchRef} value={search} onChange={(e) => setSearch(e.target.value)}
                    placeholder="Search code, name, vendor, location..."
                    className="bg-slate-50 border border-slate-200 rounded-lg pl-7 pr-3 py-1.5 text-xs placeholder-slate-400 outline-none focus:border-blue-500/40 w-72 transition-all"
@@ -3834,11 +3834,11 @@ function InventoryPage({ items, setItems, handleUpdateStock, pos = [], inwardLog
                             <button onClick={() => setEditingItem({ item: { ...item }, category: item.category })}
                                     title="Edit"
                                     className="w-6 h-6 rounded flex items-center justify-center text-[11px] text-slate-500 hover:text-slate-900 transition-all"
-                                    style={{ background: "rgba(17,24,39,0.04)", border: "1px solid rgba(17,24,39,0.10)" }}>✏</button>
+                                    style={{ background: "rgba(17,24,39,0.04)", border: "1px solid rgba(17,24,39,0.10)" }}><Glyph e="✏" size={13} /></button>
                           )}
                           {item.status !== "safe" && (
                             <span className="text-[9px] font-black text-red-700 px-1.5 py-0.5 rounded whitespace-nowrap"
-                                  style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)" }}>🚨</span>
+                                  style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)" }}><Glyph e="🚨" size={13} /></span>
                           )}
                         </div>
                       </td>
@@ -4166,7 +4166,7 @@ function POModal({ initialPO, vendorList, items, onSave, onClose, prefill = null
                           {isSelected && <span className="ml-auto text-[8px] font-black text-blue-700">✓ SELECTED</span>}
                         </div>
                         <div className="text-[11px] font-bold text-slate-900 truncate max-w-[130px] mb-1" title={v.name}>{v.name}</div>
-                        {v.contactPerson && <div className="text-[9px] text-slate-500 mb-1">👤 {v.contactPerson}</div>}
+                        {v.contactPerson && <div className="text-[9px] text-slate-500 mb-1"><LeadIcon e="👤" />{v.contactPerson}</div>}
                         <div className="text-[9px] text-slate-400 font-mono font-bold">
                           {v.lastRate ? `₹${v.lastRate.toLocaleString("en-IN")} / unit` : <span className="text-slate-600">No rate history</span>}
                         </div>
@@ -4322,7 +4322,7 @@ function POModal({ initialPO, vendorList, items, onSave, onClose, prefill = null
                    style={{ background: "rgba(34,197,94,0.05)", border: "1px solid rgba(34,197,94,0.25)" }}>
                 <div className="flex items-center justify-between mb-2">
                   <div>
-                    <div className="text-[11px] font-bold text-emerald-300">📦 Low Stock for {form.vendor}</div>
+                    <div className="text-[11px] font-bold text-emerald-300"><LeadIcon e="📦" />Low Stock for {form.vendor}</div>
                     <div className="text-[10px] text-slate-500 mt-0.5">{lowItems.length} preferred low-stock item{lowItems.length !== 1 ? "s" : ""} · tap to add to PO</div>
                   </div>
                   <button onClick={addAllLowStockItems}
@@ -4407,7 +4407,7 @@ function POModal({ initialPO, vendorList, items, onSave, onClose, prefill = null
               );
             })()}
 
-            {addErr && <div className="text-[10px] text-red-600 mb-2">⚠ {addErr}</div>}
+            {addErr && <div className="text-[10px] text-red-600 mb-2"><LeadIcon e="⚠" />{addErr}</div>}
 
             {form.lineItems.length > 0 ? (
               <div className="rounded-xl overflow-hidden border border-slate-200">
@@ -4519,12 +4519,12 @@ function POModal({ initialPO, vendorList, items, onSave, onClose, prefill = null
             <Btn variant="ghost" size="sm" onClick={onClose}>Cancel</Btn>
             <button onClick={() => handleSave("draft")}
                     className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-lg px-3 py-1.5 text-slate-500 border border-slate-200 bg-slate-50 hover:bg-slate-100 transition-all">
-              💾 Save Draft
+              <LeadIcon e="💾" />Save Draft
             </button>
             <button onClick={() => handleSave("pending")}
                     className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-lg px-3 py-1.5 text-white border transition-all"
                     style={{ background: "#2640B0", borderColor: "rgba(38, 64, 176,0.5)", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
-              📤 Submit for Approval
+              <LeadIcon e="📤" />Submit for Approval
             </button>
           </div>
         </div>
@@ -4695,7 +4695,7 @@ function PODetailModal({ po, onClose, onApprove, onMarkOrdered, onMarkReceived, 
             <button onClick={() => { setConfirmReceive(true); setConfirmDelete(false); }}
                     className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-lg px-3 py-1.5 text-slate-900 border transition-all"
                     style={{ background: "#15803d", borderColor: "rgba(34,197,94,0.5)", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
-              ✅ Mark Received
+              <LeadIcon e="✅" />Mark Received
             </button>
           )}
         </div>
@@ -4815,7 +4815,7 @@ function PurchasePage({ pos, vendorList, items, onCreatePO, onUpdatePO, onReceiv
               ))}
             </div>
             <input value={search} onChange={(e) => setSearch(e.target.value)}
-              placeholder="🔍 Search PO / vendor..."
+              placeholder="Search PO / vendor..."
               className="ml-auto bg-slate-50 border border-white/10 rounded-lg px-3 py-1.5 text-xs placeholder-slate-400 outline-none focus:border-blue-500/40 w-52" />
           </div>
 
@@ -5146,9 +5146,9 @@ function VendorModal({ initialVendor, onSave, onClose }) {
             <div>
               <ILabel text="Vendor Priority" />
               <select value={form.priority} onChange={upd("priority")} className={inpCls(false)} style={selStyle}>
-                <option value="Preferred">⭐ Preferred</option>
-                <option value="Approved">✅ Approved</option>
-                <option value="Backup">🔘 Backup</option>
+                <option value="Preferred">Preferred</option>
+                <option value="Approved">Approved</option>
+                <option value="Backup">Backup</option>
               </select>
             </div>
             <div>
@@ -5290,7 +5290,7 @@ function VendorsPage({ vendorList, pos, items, onAddVendor, onEditVendor, onDele
       {toast && (
         <div className="fixed bottom-6 right-6 z-[60] flex items-center gap-3 px-5 py-3.5 rounded-2xl"
              style={{ background: "var(--surface-raised)", border: "1px solid rgba(46, 80, 214,0.45)", boxShadow: "0 20px 60px rgba(17,24,39,0.14)", animation: "slideUp 0.3s ease both" }}>
-          <span className="text-lg">🏭</span>
+          <span className="text-lg"><Glyph e="🏭" size={18} /></span>
           <div className="text-xs font-black text-slate-900">{toast}</div>
           <button onClick={() => setToast(null)} className="ml-2 text-slate-600 hover:text-slate-500 text-xs">✕</button>
         </div>
@@ -5397,7 +5397,7 @@ function VendorsPage({ vendorList, pos, items, onAddVendor, onEditVendor, onDele
         {canDo("vendors","add") && (
           <button onClick={() => setShowImport(true)}
                   className="text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-900 hover:border-slate-300 transition-all flex items-center gap-1.5">
-            ⬆ Import
+            <LeadIcon e="⬆" />Import
           </button>
         )}
         {canDo("vendors","add") && <Btn variant="primary" size="sm" onClick={() => { setEditingVendor(null); setShowModal(true); }}>+ Add Vendor</Btn>}
@@ -5427,8 +5427,8 @@ function VendorsPage({ vendorList, pos, items, onAddVendor, onEditVendor, onDele
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1 min-w-0 mr-3">
                       <div className="text-[14px] font-bold text-[#111827] truncate leading-tight mb-0.5">{v.name}</div>
-                      <div className="text-[11px] text-slate-500">📍 {v.location || "—"}{v.years != null ? ` · ${v.years} yr${v.years !== 1 ? "s" : ""}` : ""}</div>
-                      {v.contactPerson && <div className="text-[10px] text-slate-400 mt-0.5">👤 {v.contactPerson}</div>}
+                      <div className="text-[11px] text-slate-500"><LeadIcon e="📍" />{v.location || "—"}{v.years != null ? ` · ${v.years} yr${v.years !== 1 ? "s" : ""}` : ""}</div>
+                      {v.contactPerson && <div className="text-[10px] text-slate-400 mt-0.5"><LeadIcon e="👤" />{v.contactPerson}</div>}
                     </div>
                     <div className="flex flex-col items-end gap-1 shrink-0">
                       <StatusBadge status={v.status} />
@@ -5476,9 +5476,9 @@ function VendorsPage({ vendorList, pos, items, onAddVendor, onEditVendor, onDele
                   {/* Action buttons */}
                   <div className="flex gap-1.5 pt-2.5 border-t border-slate-100" onClick={(e) => e.stopPropagation()}>
                     <Btn variant="wa"    size="xs" onClick={() => { const r = openVendorWhatsApp(v); if (!r.ok) showToast(waErrorToast(r.error)); }}><LeadIcon e="📱" />WA</Btn>
-                    <Btn variant="mail"  size="xs">✉️</Btn>
-                    {canDo("vendors","edit")   && <Btn variant="ghost" size="xs" onClick={() => { setEditingVendor(v); setShowModal(true); }}>✏️</Btn>}
-                    {canDo("vendors","delete") && <Btn variant="red"   size="xs" onClick={() => setConfirmDelete(v)}>🗑</Btn>}
+                    <Btn variant="mail"  size="xs"><Glyph e="✉️" size={14} /></Btn>
+                    {canDo("vendors","edit")   && <Btn variant="ghost" size="xs" onClick={() => { setEditingVendor(v); setShowModal(true); }}><Glyph e="✏️" size={14} /></Btn>}
+                    {canDo("vendors","delete") && <Btn variant="red"   size="xs" onClick={() => setConfirmDelete(v)}><Glyph e="🗑" size={14} /></Btn>}
                   </div>
                 </div>
               </div>
@@ -5562,11 +5562,11 @@ function VendorsPage({ vendorList, pos, items, onAddVendor, onEditVendor, onDele
                 {/* Contact */}
                 <div className="space-y-1.5">
                   <div className="text-[10px] font-medium text-slate-500 uppercase tracking-[0.08em]">Contact</div>
-                  {v.contactPerson && <div className="text-[11px] text-slate-500">👤 {v.contactPerson}</div>}
-                  <div className="text-[11px] text-slate-500">📞 {v.phone}</div>
-                  <div className="text-[11px] text-slate-500">✉️ {v.email}</div>
+                  {v.contactPerson && <div className="text-[11px] text-slate-500"><LeadIcon e="👤" />{v.contactPerson}</div>}
+                  <div className="text-[11px] text-slate-500"><LeadIcon e="📞" />{v.phone}</div>
+                  <div className="text-[11px] text-slate-500"><LeadIcon e="✉️" />{v.email}</div>
                   {v.gst     && <div className="text-[11px] text-slate-500">GST: <span className="font-mono text-slate-600">{v.gst}</span></div>}
-                  {v.address && <div className="text-[11px] text-slate-500">📍 {v.address}</div>}
+                  {v.address && <div className="text-[11px] text-slate-500"><LeadIcon e="📍" />{v.address}</div>}
                 </div>
 
                 {/* Terms */}
@@ -6008,7 +6008,7 @@ function AnalyticsPage({ items, pos, vendorList, settings = SETTINGS_DEFAULTS })
               </ResponsiveContainer>
             ) : (
               <div className="h-[220px] flex flex-col items-center justify-center gap-1 text-center">
-                <div className="text-2xl" style={{ opacity: 0.45 }}>🏭</div>
+                <div className="text-2xl" style={{ opacity: 0.45 }}><Glyph e="🏭" size={26} /></div>
                 <div className="text-xs font-semibold" style={{ color: "var(--text-muted)" }}>No PO data yet</div>
               </div>
             )}
@@ -8224,7 +8224,7 @@ const Section = ({ icon, title, children }) => (
   <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
     <div className="flex items-center gap-3 px-6 py-4 border-b border-slate-200"
          style={{ background: "rgba(17,24,39,0.03)" }}>
-      <span className="text-base">{icon}</span>
+      <span className="text-base"><Glyph e={icon} size={17} /></span>
       <span className="text-[14px] font-bold text-slate-900">{title}</span>
     </div>
     <div className="px-6 py-5">{children}</div>
@@ -8239,7 +8239,7 @@ function OrgGroup({ id, icon, title, hint, badge = null, defaultOpen = true, chi
   return (
     <section data-org-group={id} className="org-group" data-open={open ? "1" : "0"}>
       <button type="button" className="org-group-head" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
-        <span className="org-group-icon" aria-hidden="true">{icon}</span>
+        <span className="org-group-icon" aria-hidden="true"><Glyph e={icon} size={18} /></span>
         <span className="org-group-text">
           <span className="org-group-title">{title}</span>
           {hint && <span className="org-group-hint">{hint}</span>}
@@ -8522,7 +8522,7 @@ function ChecklistAdminPanel({ templates = [], canConfig = false, onCreate, onUp
               </button>
             )}
           </div>
-          {err && <div className="text-[11px] font-semibold text-red-300">⚠ {err}</div>}
+          {err && <div className="text-[11px] font-semibold text-red-300"><LeadIcon e="⚠" />{err}</div>}
         </div>
       )}
     </Section>
@@ -8604,7 +8604,7 @@ function DeptEmployeesRow({ dept, assigned, notAssigned, canConfig, onSaveUserDe
           </button>
         </div>
       )}
-      {err && <div className="text-[10px] text-red-600 mt-1">⚠ {err}</div>}
+      {err && <div className="text-[10px] text-red-600 mt-1"><LeadIcon e="⚠" />{err}</div>}
     </div>
   );
 }
@@ -8677,7 +8677,7 @@ function EmployeeMembersPanel({ members = [], canConfig = false, onSave }) {
       {!editing && err && (
         <div className="text-[11px] mb-3 px-3 py-2 rounded-lg"
              style={{ background: "rgba(239,68,68,0.08)", color: "#b91c1c", border: "1px solid rgba(239,68,68,0.3)" }}>
-          ⚠ {err}
+          <LeadIcon e="⚠" />{err}
         </div>
       )}
       <div className="flex items-center justify-between mb-3">
@@ -8735,7 +8735,7 @@ function EmployeeMembersPanel({ members = [], canConfig = false, onSave }) {
           {err && (
             <div className="text-[11px] px-3 py-2 rounded-lg"
                  style={{ background: "rgba(239,68,68,0.08)", color: "#b91c1c", border: "1px solid rgba(239,68,68,0.3)" }}>
-              ⚠ {err}
+              <LeadIcon e="⚠" />{err}
             </div>
           )}
           <div className="flex gap-2">
@@ -8973,7 +8973,7 @@ function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, onSave, i
         <button onClick={() => handleSave()}
                 className="inline-flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-xl transition-all duration-200"
                 style={{ background: saved ? "rgba(22,163,74,0.12)" : "#2640B0", color: saved ? "#15803d" : "#fff", border: saved ? "1px solid rgba(22,163,74,0.35)" : "1px solid rgba(38, 64, 176,0.45)", boxShadow: saved ? "none" : "0 0 12px rgba(46, 80, 214,0.3)" }}>
-          {saved ? "✅ Saved!" : "💾 Save Changes"}
+          <LeadLabel text={saved ? "✅ Saved!" : "💾 Save Changes"} />
         </button>
       </Topbar>
 
@@ -9553,7 +9553,7 @@ function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, onSave, i
                 </div>
                 <button onClick={handleExportExcel}
                         className="flex-shrink-0 text-[12px] font-bold px-4 py-2 rounded-xl border transition-all text-green-400 hover:bg-green-500/10 border-green-500/20 hover:border-green-500/40">
-                  ⬇ Export Excel
+                  <LeadIcon e="⬇" />Export Excel
                 </button>
               </div>
             </div>
@@ -9962,7 +9962,7 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
     <div className="flex items-center justify-between mb-3">
       <div className="flex items-center gap-2">
         <div className="w-1 h-5 rounded-full" style={{ background: color }} />
-        <span className="text-[12px] font-semibold text-slate-900">{icon} {title}</span>
+        <span className="text-[12px] font-semibold text-slate-900"><LeadLabel text={`${icon} ${title}`} /></span>
       </div>
       <span className="text-[11px] font-semibold text-slate-900 px-2 py-0.5 rounded-full" style={{ background: color+"22", border:`1px solid ${color}44` }}>{count}</span>
     </div>
@@ -9974,7 +9974,7 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
   const ViewBtn = ({ po }) => (
     <button onClick={() => setViewPO(po)}
             className="flex-1 text-[9px] font-bold py-1 rounded-lg text-slate-400 border border-slate-200 bg-slate-50 hover:text-slate-900 hover:bg-slate-100 transition-all">
-      📄 View PO
+      <LeadIcon e="📄" />View PO
     </button>
   );
   const card = "rounded-xl p-3.5 border transition-all hover:scale-[1.005]";
@@ -10022,7 +10022,7 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
           <button onClick={openVendorWizard}
                   className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-lg px-3 py-1.5 text-slate-900 border transition-all"
                   style={{ background: "#15803d", borderColor: "rgba(34,197,94,0.5)", color: "#ffffff" }}>
-            📦 Create Vendor PO
+            <LeadIcon e="📦" />Create Vendor PO
           </button>
         )}
         {canDo("pipeline","create") && (
@@ -10107,10 +10107,10 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
                       return (
                         <div className="mb-1.5">
                           {links.length === 1 ? (
-                            <div className="text-[9px] text-slate-500 truncate">🏭 {links[0].vendorName}</div>
+                            <div className="text-[9px] text-slate-500 truncate"><LeadIcon e="🏭" />{links[0].vendorName}</div>
                           ) : (
                             <div className="flex flex-wrap items-center gap-1 mb-0.5">
-                              <span className="text-[9px] text-slate-600">🏭</span>
+                              <span className="text-[9px] text-slate-600"><Glyph e="🏭" size={11} /></span>
                               {links.slice(0, 2).map((l, i) => (
                                 <span key={i} className="text-[8px] font-bold px-1.5 py-0.5 rounded-full truncate max-w-[80px]"
                                       style={{ color: roleCol(l.role), background: `${roleCol(l.role)}14`, border: `1px solid ${roleCol(l.role)}28` }}>
@@ -10163,9 +10163,9 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
                   </div>
                   <div className="text-[11px] font-bold text-slate-900 truncate mb-0.5">{po.vendor}</div>
                   <div className="text-[9px] text-slate-500 mb-0.5">₹{(po.amount||0).toLocaleString("en-IN")} · {po.lineItems?.length||0} items · {po.date}</div>
-                  {po.priority && <div className={`text-[9px] font-bold mb-2 ${po.priority==="urgent"?"text-red-400":po.priority==="high"?"text-amber-700":"text-slate-600"}`}>⚡ {po.priority.toUpperCase()}</div>}
+                  {po.priority && <div className={`text-[9px] font-bold mb-2 ${po.priority==="urgent"?"text-red-400":po.priority==="high"?"text-amber-700":"text-slate-600"}`}><LeadIcon e="⚡" />{po.priority.toUpperCase()}</div>}
                   {po.notes && <div className="text-[9px] text-slate-500 mb-2 truncate italic">"{po.notes}"</div>}
-                  {po.rejectReason && <div className="text-[9px] text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-2 py-1.5 mb-2">❌ {po.rejectReason}</div>}
+                  {po.rejectReason && <div className="text-[9px] text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-2 py-1.5 mb-2"><LeadIcon e="❌" />{po.rejectReason}</div>}
                   <div className="flex gap-1 mb-1.5">
                     {canDo("pipeline","approve") && (
                       <button onClick={() => onUpdatePO(po.id, { status:"approved", rejectReason:null })}
@@ -10205,7 +10205,7 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
                     {canDo("pipeline","ordered") && (
                       <button onClick={() => { setMoModal(po); setEta(""); setEtaCustom(""); }}
                               className="w-full text-[10px] font-bold py-1.5 rounded-lg text-slate-900 border border-blue-500/40 bg-blue-600/20 hover:bg-blue-600/30 transition-all mb-1.5">
-                        📋 Confirm Order + ETA
+                        <LeadIcon e="📋" />Confirm Order + ETA
                       </button>
                     )}
                     <ViewBtn po={po} />
@@ -10268,7 +10268,7 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
                       {canDo("pipeline","receive") && (
                         <button onClick={() => handleReceive(f.poId)}
                                 className="flex-1 text-[9px] font-bold py-1.5 rounded-lg text-green-400 border border-green-500/30 bg-green-500/10 hover:bg-green-500/20 transition-all">
-                          📦 Mark Received
+                          <LeadIcon e="📦" />Mark Received
                         </button>
                       )}
                       {po && <ViewBtn po={po} />}
@@ -10436,7 +10436,7 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
                   <button onClick={() => sendWA(viewPO)} className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg text-green-400 border border-green-500/30 bg-green-500/10 hover:bg-green-500/20 transition-all"><LeadIcon e="💬" />WhatsApp</button>
                   <button onClick={() => generatePOPdf(viewPO, vnd, settings)}
                           className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg text-amber-700 border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 transition-all">
-                    📄 PDF
+                    <LeadIcon e="📄" />PDF
                   </button>
                   <button onClick={() => setViewPO(null)} className="w-7 h-7 rounded-lg bg-slate-50 hover:bg-red-500/20 hover:text-red-400 text-slate-500 transition-all flex items-center justify-center text-sm font-bold ml-0.5">✕</button>
                 </div>
@@ -10465,8 +10465,8 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
                 <div className="p-3.5 rounded-xl" style={{ background:"rgba(17,24,39,0.03)", border:"1px solid rgba(17,24,39,0.08)" }}>
                   <div className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.12em] mb-2">Vendor</div>
                   <div className="text-[13px] font-black text-slate-900 mb-2">{viewPO.vendor}</div>
-                  {vnd?.contactPerson && <div className="flex items-center gap-1.5 text-[10.5px] text-slate-400 mb-1">👤 {vnd.contactPerson}</div>}
-                  {vnd?.phone && <div className="flex items-center gap-1.5 text-[10.5px] text-slate-400 mb-1">📱 {vnd.phone}</div>}
+                  {vnd?.contactPerson && <div className="flex items-center gap-1.5 text-[10.5px] text-slate-400 mb-1"><LeadIcon e="👤" />{vnd.contactPerson}</div>}
+                  {vnd?.phone && <div className="flex items-center gap-1.5 text-[10.5px] text-slate-400 mb-1"><LeadIcon e="📱" />{vnd.phone}</div>}
                   {vnd?.gst && <div className="text-[10px] font-mono text-slate-500 mb-1">GSTIN: {vnd.gst}</div>}
                   {vnd?.address && <div className="text-[10px] text-slate-500 leading-relaxed">{vnd.address}</div>}
                   {!vnd && <div className="text-[10px] text-slate-600 italic">Vendor details not on file</div>}
@@ -10600,7 +10600,7 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
                 <button onClick={() => { setMoModal(viewPO); setViewPO(null); setEta(""); setEtaCustom(""); }}
                         className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-lg px-3 py-1.5 text-white border transition-all"
                         style={{ background:"#2640B0", borderColor:"rgba(38, 64, 176,0.5)", color: "#ffffff" }}>
-                  📋 Confirm Order + ETA
+                  <LeadIcon e="📋" />Confirm Order + ETA
                 </button>
               )}
               {["ordered","overdue"].includes(viewPO.status) && (() => {
@@ -10609,7 +10609,7 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
                   <button onClick={() => { setFuModal(fu); setViewPO(null); setFuFreq(1); setFuCustom(""); }}
                           className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-lg px-3 py-1.5 text-white border transition-all"
                           style={{ background:"#6d28d9", borderColor:"rgba(167,139,250,0.5)", color: "#ffffff" }}>
-                    🔔 Follow-Up Done
+                    <LeadIcon e="🔔" />Follow-Up Done
                   </button>
                 ) : null;
               })()}
@@ -10617,7 +10617,7 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
                 <button onClick={() => { handleReceive(viewPO.id); setViewPO(null); }}
                         className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-lg px-3 py-1.5 text-slate-900 border transition-all"
                         style={{ background:"#15803d", borderColor:"rgba(34,197,94,0.5)", color: "#ffffff" }}>
-                  📦 Mark Received
+                  <LeadIcon e="📦" />Mark Received
                 </button>
               )}
               {viewPO.status === "received" && isSuperAdmin && onReverseReceive && (
@@ -10633,7 +10633,7 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
                         className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-lg px-3 py-1.5 text-red-400 border transition-all"
                         style={{ background:"rgba(239,68,68,0.1)", borderColor:"rgba(239,68,68,0.35)" }}
                         title="Super Admin only: delete test/incorrect record">
-                  🗑️ Delete Record
+                  <LeadIcon e="🗑️" />Delete Record
                 </button>
               )}
             </div>
@@ -10657,7 +10657,7 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
             </div>
             <div className="px-3 py-2.5 rounded-lg text-[10.5px] text-amber-300 leading-relaxed"
                  style={{ background:"rgba(245,158,11,0.08)", border:"1px solid rgba(245,158,11,0.25)" }}>
-              ⚠️ This will subtract the received quantities from inventory and revert the PO status. Action will be logged in audit history.
+              <LeadIcon e="⚠️" />This will subtract the received quantities from inventory and revert the PO status. Action will be logged in audit history.
             </div>
             <div>
               <div className="text-[10px] font-medium text-slate-500 uppercase tracking-[0.08em] mb-1.5">Reason <span className="text-red-600">*</span></div>
@@ -10725,7 +10725,7 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
               </div>
               <button onClick={()=>setEta("custom")}
                       className={`w-full py-2 rounded-lg text-xs font-bold border transition-all mb-2 ${eta==="custom"?"bg-purple-500/20 text-purple-400 border-purple-500/40":"bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100"}`}>
-                📅 Custom Date
+                <LeadIcon e="📅" />Custom Date
               </button>
               {eta==="custom" && <input type="date" value={etaCustom} onChange={e=>setEtaCustom(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-900 outline-none modal-input" />}
               {!eta && <div className="text-[10px] text-amber-700 mt-1">Select an ETA to confirm</div>}
@@ -10735,7 +10735,7 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
               <button onClick={handleConfirm} disabled={!eta||(eta==="custom"&&!etaCustom)}
                       className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-lg px-4 py-1.5 text-white border transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                       style={{ background:"#2640B0", borderColor:"rgba(38, 64, 176,0.5)", color: "#ffffff" }}>
-                ✅ Confirm & Start Follow-Up
+                <LeadIcon e="✅" />Confirm & Start Follow-Up
               </button>
             </div>
           </div>
@@ -10762,7 +10762,7 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
               </div>
               <button onClick={()=>setFuFreq("custom")}
                       className={`w-full py-2 rounded-lg text-xs font-bold border transition-all mb-2 ${fuFreq==="custom"?"bg-purple-500/20 text-purple-400 border-purple-500/40":"bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100"}`}>
-                📅 Custom Date
+                <LeadIcon e="📅" />Custom Date
               </button>
               {fuFreq==="custom" && <input type="date" value={fuCustom} onChange={e=>setFuCustom(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-900 outline-none modal-input" />}
             </div>
@@ -10839,7 +10839,7 @@ function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdatePO, onCr
                   onClick={() => { openCreatePO(item, parsedQty); setQtyModal(null); }}
                   className="flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-semibold rounded-lg px-3 py-1.5 text-white border transition-all disabled:opacity-40"
                   style={{ background: "linear-gradient(135deg,#2E50D6,#2640B0)", borderColor: "rgba(38, 64, 176,0.5)" }}>
-                  📋 Create PO →
+                  <LeadIcon e="📋" />Create PO →
                 </button>
               </div>
             </div>
@@ -10912,7 +10912,7 @@ function InwardPage({ items, handleUpdateStock, vendorList, onInwardComplete, on
       {toast && (
         <div className="fixed bottom-6 right-6 z-[60] flex items-center gap-3 px-5 py-3.5 rounded-2xl"
              style={{ background: "var(--surface-raised)", border: "1px solid rgba(34,197,94,0.45)", boxShadow: "0 20px 60px rgba(17,24,39,0.14)", animation: "slideUp 0.3s ease both" }}>
-          <span className="text-lg">📥</span>
+          <span className="text-lg"><Glyph e="📥" size={18} /></span>
           <div>
             <div className="text-xs font-black text-slate-900">+{toast.qty} {toast.unit} — {toast.item}</div>
             <div className="text-[10px] text-slate-500 mt-0.5">From: {toast.vendor}</div>
@@ -10929,7 +10929,7 @@ function InwardPage({ items, handleUpdateStock, vendorList, onInwardComplete, on
         {/* ── Entry Form ── */}
         <div className="section-card p-6" style={{ animation: "slideUp 0.4s ease both" }}>
           <div className="flex items-center gap-2.5 mb-5">
-            <div className="sec-icon" style={{ background: "rgba(5,150,105,0.1)", color: "#059669" }}>📥</div>
+            <div className="sec-icon" style={{ background: "rgba(5,150,105,0.1)", color: "#059669" }}><Glyph e="📥" size={16} /></div>
             <h2 className="text-[14px] font-bold" style={{ color: "var(--text-strong)" }}>New Inward Entry</h2>
             <span className="sp-pill sp-pill-green">GRN</span>
           </div>
@@ -11047,7 +11047,7 @@ function InwardPage({ items, handleUpdateStock, vendorList, onInwardComplete, on
               <button onClick={handleSubmit} disabled={submitting}
                       className="inline-flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-bold text-slate-900 border transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                       style={{ background: "#15803d", borderColor: "rgba(34,197,94,0.5)", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
-                {submitting ? "⏳ Submitting…" : "📥 Submit Inward"}
+                <LeadLabel text={submitting ? "⏳ Submitting…" : "📥 Submit Inward"} />
               </button>
             )}
           </div>
@@ -11197,7 +11197,7 @@ function BomPhotoField({ value, onChange }) {
   };
   return (
     <div data-bom-photo-field className="rounded-xl p-4" style={{ background: "rgba(17,24,39,0.03)", border: "1px solid rgba(17,24,39,0.08)" }}>
-      <div className="text-[11px] font-bold text-slate-900">📷 Machine photo</div>
+      <div className="text-[11px] font-bold text-slate-900"><LeadIcon e="📷" />Machine photo</div>
       <div className="text-[10px] text-slate-500 mt-0.5 mb-3">Shown on every machine card of this model so workers recognise it. PNG or JPG.</div>
       <div className="flex items-center gap-4 flex-wrap">
         <div className="w-32 h-32 sm:w-40 sm:h-40 rounded-xl overflow-hidden flex items-center justify-center flex-shrink-0"
@@ -11220,7 +11220,7 @@ function BomPhotoField({ value, onChange }) {
           )}
         </div>
       </div>
-      {err && <div className="text-[10px] text-red-500 font-bold mt-2">⚠ {err}</div>}
+      {err && <div className="text-[10px] text-red-500 font-bold mt-2"><LeadIcon e="⚠" />{err}</div>}
     </div>
   );
 }
@@ -11516,7 +11516,7 @@ function BomChecklistSlots({
             <div className="px-5 py-3 border-b border-slate-200 flex items-start justify-between flex-shrink-0"
                  style={{ background: "linear-gradient(90deg,rgba(46, 80, 214,0.14),rgba(38, 64, 176,0.06))" }}>
               <div>
-                <div className="text-sm font-black text-slate-900">📋 Checklist · {editing.dept}</div>
+                <div className="text-sm font-black text-slate-900"><LeadIcon e="📋" />Checklist · {editing.dept}</div>
                 <div className="text-[11px] text-slate-400 mt-0.5">{CHECKLIST_STAGES.find((s) => s.key === editing.stage).long}</div>
                 <div className="text-[10px] text-slate-500 mt-0.5">{CHECKLIST_STAGES.find((s) => s.key === editing.stage).hint}</div>
               </div>
@@ -11600,7 +11600,7 @@ function BomChecklistSlots({
               {editErr && (
                 <div className="text-[11px] font-bold px-3 py-2 rounded-md"
                      style={{ background: "rgba(239,68,68,0.08)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.3)" }}>
-                  ⚠ {editErr}
+                  <LeadIcon e="⚠" />{editErr}
                 </div>
               )}
             </div>
@@ -12655,7 +12655,7 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
                       className="text-[11px] font-bold px-3 py-1.5 rounded-lg border transition-all"
                       style={showCostPanel ? { background: "rgba(21,128,61,0.10)", color: "#15803d", borderColor: "rgba(21,128,61,0.35)" }
                                            : { background: "var(--surface-card)", color: cs.complete ? "#15803d" : "#b91c1c", borderColor: "var(--border-rim)" }}>
-                💰 {formatINR(cs.knownTotal)}{cs.complete ? "" : ` · ${cs.missingRate + cs.missingItem} missing`}
+                <LeadIcon e="💰" />{formatINR(cs.knownTotal)}{cs.complete ? "" : ` · ${cs.missingRate + cs.missingItem} missing`}
               </button>
             );
           })()}
@@ -12678,7 +12678,7 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
         {!editMode && (
           <div className="flex items-center gap-2 px-4 sm:px-6 pb-4 flex-wrap">
             <div className="relative flex-1 min-w-[180px]">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 text-xs">🔍</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 text-xs"><Glyph e="🔍" size={14} /></span>
               <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search items, codes..."
                      className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-7 pr-3 py-1.5 text-xs text-slate-700 placeholder-slate-400 outline-none focus:border-blue-500/30" />
             </div>
@@ -12704,7 +12704,7 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
           /* ── Edit Mode — full width, unchanged ── */
           <div className="flex-1 overflow-y-auto"><div className="org-bom-edit p-4 sm:p-6 space-y-4 max-w-3xl">
             <div className="text-[10px] font-bold text-amber-700 bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-3">
-              ✏️ Edit Mode — Modify items, quantities, then Save BOM to apply changes permanently.
+              <LeadIcon e="✏️" />Edit Mode — Modify items, quantities, then Save BOM to apply changes permanently.
             </div>
 
             {/* 2026-11-03 — Edit BOM organised into numbered steps. Same
@@ -12716,7 +12716,7 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
             {/* Rename — BOM Key + Machine Model Name */}
             <div className="rounded-xl p-4" style={{ background: "rgba(139,92,246,0.05)", border: "1px solid rgba(139,92,246,0.22)" }}>
               <div className="flex items-center gap-2 mb-3">
-                <span className="text-base">✏️</span>
+                <span className="text-base"><Glyph e="✏️" size={15} /></span>
                 <div className="text-[11px] font-bold text-slate-900">BOM Identity</div>
                 <span className="text-[9px] text-purple-300 px-1.5 py-0.5 rounded-full" style={{ background: "rgba(139,92,246,0.15)" }}>Rename safe</span>
               </div>
@@ -12737,7 +12737,7 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
               <div className="text-[10px] text-slate-500 mt-2">
                 Renaming updates Machine Tracker, Outward log and Pending entries to match. Existing audit history is preserved.
               </div>
-              {renameErr && <div className="text-[10px] text-red-400 mt-2">⚠ {renameErr}</div>}
+              {renameErr && <div className="text-[10px] text-red-400 mt-2"><LeadIcon e="⚠" />{renameErr}</div>}
             </div>
 
             {/* Production rack — fixed floor racks only (2026-10-30). */}
@@ -12877,7 +12877,7 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
                                       color:      pts.length ? "#b45309" : "#64748b",
                                       border:     `1px solid ${pts.length ? "rgba(217,119,6,0.3)" : "rgba(17,24,39,0.12)"}`,
                                     }}>
-                              ✅ {pts.length || "+"}
+                              <LeadIcon e="✅" />{pts.length || "+"}
                             </button>
                           );
                         })()}
@@ -12926,7 +12926,7 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
                           style={{ background: "#2640B0", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>Add</button>
                 </div>
               </div>
-              {addErr && <div className="text-[10px] text-red-400 mt-2">⚠ {addErr}</div>}
+              {addErr && <div className="text-[10px] text-red-400 mt-2"><LeadIcon e="⚠" />{addErr}</div>}
             </div>
               </div>
             </OrgStep>
@@ -12939,7 +12939,7 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
             <div data-org-durations>
               <div className="text-[11px] font-bold text-slate-500 mb-2">Department Durations <span className="font-medium">· days + hours</span></div>
               <DeptDurationFields value={editDurations} onChange={(v) => { setEditDurations(v); setEditDurErr(""); }} />
-              {editDurErr && <div className="text-[10px] text-red-500 font-bold mt-2">⚠ {editDurErr}</div>}
+              {editDurErr && <div className="text-[10px] text-red-500 font-bold mt-2"><LeadIcon e="⚠" />{editDurErr}</div>}
             </div>
             </OrgStep>
 
@@ -13027,10 +13027,10 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
             </OrgStep>
 
             {editValidationErr && (
-              <div className="text-[11px] font-semibold rounded-xl px-4 py-2.5" style={{ background: "rgba(185,28,28,0.08)", color: "#b91c1c", border: "1px solid rgba(185,28,28,0.25)" }}>⚠ {editValidationErr}</div>
+              <div className="text-[11px] font-semibold rounded-xl px-4 py-2.5" style={{ background: "rgba(185,28,28,0.08)", color: "#b91c1c", border: "1px solid rgba(185,28,28,0.25)" }}><LeadIcon e="⚠" />{editValidationErr}</div>
             )}
             {(() => { const w = validateBomLines(editItems, findInv).warnings; return w.length ? (
-              <div className="text-[10px] rounded-xl px-4 py-2" style={{ background: "rgba(180,83,9,0.08)", color: "#b45309", border: "1px solid rgba(180,83,9,0.25)" }}>{w.map((x, i) => <div key={i}>⚠ {x}</div>)}</div>
+              <div className="text-[10px] rounded-xl px-4 py-2" style={{ background: "rgba(180,83,9,0.08)", color: "#b45309", border: "1px solid rgba(180,83,9,0.25)" }}>{w.map((x, i) => <div key={i}><LeadIcon e="⚠" />{x}</div>)}</div>
             ) : null; })()}
             <div className="org-edit-footer">
               <button onClick={() => { setEditMode(false); resetEditState(); }}
@@ -13133,11 +13133,11 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
               <span className="text-slate-400">Issuing <span className="font-black text-green-400">{totalIssuing}</span> units</span>
               {totalPending > 0 && (
                 <><span className="text-slate-700">·</span>
-                <span className="font-bold text-amber-700">⚠ {totalPending} units pending</span></>
+                <span className="font-bold text-amber-700"><LeadIcon e="⚠" />{totalPending} units pending</span></>
               )}
               {hasOverIssue && (
                 <><span className="text-slate-700">·</span>
-                <span className="font-bold" style={{color:"#b45309"}}>⚠ {totalOverIssue} over-issued</span></>
+                <span className="font-bold" style={{color:"#b45309"}}><LeadIcon e="⚠" />{totalOverIssue} over-issued</span></>
               )}
               {missingN > 0 && (
                 <><span className="text-slate-700">·</span>
@@ -13160,7 +13160,7 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
                       disabled={!canSubmit}
                       className="text-xs font-black px-6 py-2.5 rounded-xl border transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                       style={{ background: canSubmit ? "#2640B0" : "#9ca3af", color: "#ffffff", boxShadow: canSubmit ? "0 1px 2px rgba(17,24,39,0.14)" : "none", borderColor: "transparent" }}>
-                📤 Issue Stock
+                <LeadIcon e="📤" />Issue Stock
               </button>
             ) : (
               <div className="flex items-center gap-2">
@@ -13368,7 +13368,7 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
               {criticalErr && (
                 <div className="text-[11px] font-bold px-3 py-2 rounded-md whitespace-pre-line"
                      style={{ background: "rgba(239,68,68,0.08)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.3)" }}>
-                  ⚠ {criticalErr}
+                  <LeadIcon e="⚠" />{criticalErr}
                 </div>
               )}
             </div>
@@ -13450,7 +13450,7 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
             {destError && (
               <div className="mx-5 mt-4 px-3 py-2 rounded-lg text-[11px] font-semibold"
                    style={{ background: "rgba(239,68,68,0.08)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.3)" }}>
-                ⚠ {destError}
+                <LeadIcon e="⚠" />{destError}
               </div>
             )}
             <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -13513,7 +13513,7 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
                  style={{ background: "linear-gradient(90deg,rgba(46, 80, 214,0.14),rgba(38, 64, 176,0.06))" }}>
               <div>
                 <div className="text-sm font-black text-slate-900 flex items-center gap-2">
-                  ⏱️ Department Durations
+                  <LeadIcon e="⏱️" />Department Durations
                 </div>
                 <div className="text-[11px] text-slate-400 mt-0.5">
                   {bomKey}{serialNo ? ` · S/N ${serialNo}` : ""} · lock-in deadlines for this machine
@@ -13566,7 +13566,7 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
               {durationErr && (
                 <div className="text-[11px] font-bold px-3 py-2 rounded-md"
                      style={{ background: "rgba(239,68,68,0.08)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.3)" }}>
-                  ⚠ {durationErr}
+                  <LeadIcon e="⚠" />{durationErr}
                 </div>
               )}
             </div>
@@ -14183,7 +14183,7 @@ function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, onCreateB
                           }}
                         className="inline-flex items-center gap-1.5 text-[11px] font-bold rounded-lg px-4 py-1.5 text-white border transition-all"
                         style={{ background: "#b91c1c", borderColor: "rgba(239,68,68,0.5)", color: "#ffffff" }}>
-                  🗑 Delete BOM
+                  <LeadIcon e="🗑" />Delete BOM
                 </button>
               )}
             </div>
@@ -14237,7 +14237,7 @@ function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, onCreateB
                         }}
                       className="inline-flex items-center gap-1.5 text-[11px] font-bold rounded-lg px-4 py-1.5 text-white border transition-all"
                       style={{ background: "#b91c1c", borderColor: "rgba(239,68,68,0.5)", color: "#ffffff" }}>
-                🗑 Remove
+                <LeadIcon e="🗑" />Remove
               </button>
             </div>
           </div>
@@ -14367,7 +14367,7 @@ function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, onCreateB
                                         color:      (ci.checkPoints || []).length ? "#b45309" : "#64748b",
                                         border:     `1px solid ${(ci.checkPoints || []).length ? "rgba(217,119,6,0.3)" : "rgba(17,24,39,0.12)"}`,
                                       }}>
-                                ✅ {(ci.checkPoints || []).length || "+"}
+                                <LeadIcon e="✅" />{(ci.checkPoints || []).length || "+"}
                               </button>
                             </div>
                           </div>
@@ -14453,7 +14453,7 @@ function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, onCreateB
               {createErr && (
                 <div className="px-3 py-2 rounded-lg text-[11px] text-red-300"
                      style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)" }}>
-                  ⚠ {createErr}
+                  <LeadIcon e="⚠" />{createErr}
                 </div>
               )}
             </div>
@@ -14538,7 +14538,7 @@ function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, onCreateB
                             </button>
                             <button onClick={() => { setActionsKey(null); setOpenBOM(bomKey); }}
                                     className="w-full text-left px-3 py-2 text-[11px] font-bold text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-all flex items-center gap-2">
-                              <span>✏️</span>Edit BOM
+                              <span><Glyph e="✏️" size={14} /></span>Edit BOM
                             </button>
                             {onDuplicateBOM && canDo("outward","bom") && (
                               <button onClick={() => {
@@ -14575,7 +14575,7 @@ function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, onCreateB
                                         setConfirmDeleteBOM({ key: bomKey, label: bom.label, info });
                                       }}
                                       className="w-full text-left px-3 py-2 text-[11px] font-bold text-red-400 hover:bg-red-500/10 transition-all flex items-center gap-2 border-t border-slate-200">
-                                <span>🗑</span>Delete BOM
+                                <span><Glyph e="🗑" size={14} /></span>Delete BOM
                               </button>
                             )}
                           </div>
@@ -14752,7 +14752,7 @@ function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, onCreateB
           {manualError && (
             <div className="mt-3 p-3 rounded-xl text-[10px] text-red-400 font-bold"
                  style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.3)" }}>
-              ⚠ {manualError}
+              <LeadIcon e="⚠" />{manualError}
             </div>
           )}
 
@@ -14806,7 +14806,7 @@ function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, onCreateB
                             <span title={title}
                                   className="ml-2 text-[9px] font-bold px-1.5 py-0.5 rounded-full"
                                   style={{ background: "rgba(217, 119, 6,0.1)", color: "#B45309", border: "1px solid rgba(217, 119, 6,0.3)" }}>
-                              🔒 {crit.length} critical
+                              <LeadIcon e="🔒" />{crit.length} critical
                             </span>
                           );
                         })()}
@@ -17503,7 +17503,7 @@ function TrialCertificateModal({ machine, nowTick, workflow, busy, onClose, onSu
     }
     return (
       <button type="button" onClick={() => setOpen(true)} className={TC_BTN_GHOST + " !py-1.5"}>
-        ✍ Draw signature
+        <LeadIcon e="✍" />Draw signature
       </button>
     );
   };
@@ -17637,7 +17637,7 @@ function TrialCertificateModal({ machine, nowTick, workflow, busy, onClose, onSu
       {isOverrun && (
         <section className="rounded-xl border border-amber-300 bg-amber-50 p-4 md:p-5">
           <div className="text-[12px] font-bold text-amber-900 mb-2">
-            ⚠ Overrun by {formatDuration(overrunMinutes)} — explanation required
+            <LeadIcon e="⚠" />Overrun by {formatDuration(overrunMinutes)} — explanation required
           </div>
           <textarea value={narration} onChange={(e) => setNarration(e.target.value)} rows={2}
                     placeholder="Briefly explain why the Trial took longer than expected…"
@@ -17671,7 +17671,7 @@ function TrialCertificateModal({ machine, nowTick, workflow, busy, onClose, onSu
 
       {formError && (
         <div className="rounded-lg border border-red-300 bg-red-50 px-4 py-2.5 text-[12px] font-semibold text-red-700">
-          ⚠ {formError}
+          <LeadIcon e="⚠" />{formError}
         </div>
       )}
     </>
@@ -17733,7 +17733,7 @@ function TrialCertificateModal({ machine, nowTick, workflow, busy, onClose, onSu
               ← Back to Edit
             </button>
             <button type="button" onClick={() => printTrialCertificate(machine, cert, narration.trim(), company)} className={TC_BTN_GHOST}>
-              🖨 Print / Save as PDF
+              <LeadIcon e="🖨" />Print / Save as PDF
             </button>
             <div className="ml-auto flex flex-wrap items-center gap-3">
               {incomplete.length > 0 && (
@@ -17776,7 +17776,7 @@ function TrialCertificatePrintModal({ machine, onClose, company = null }) {
             </div>
           </div>
           <button type="button" onClick={() => printTrialCertificate(machine, cert, "", company)} className={TC_BTN_PRIMARY} style={{ color: "#fff" }}>
-            🖨 Print / Save as PDF
+            <LeadIcon e="🖨" />Print / Save as PDF
           </button>
           <button type="button" aria-label="Close" onClick={onClose}
                   className="text-slate-600 hover:text-slate-900 text-xl leading-none px-1 transition-colors">✕</button>
@@ -18491,7 +18491,7 @@ function StaffMyDashboard({ departments = [], handovers = [], deptRatings = [], 
            style={{ background: "var(--surface-raised, #f8fafc)", boxShadow: "0 24px 70px rgba(17,24,39,0.3)" }}>
         <div className="flex items-center gap-3 px-4 sm:px-6 py-3 flex-shrink-0" style={{ background: "#2640B0", color: "#fff" }}>
           <div className="flex-1 min-w-0">
-            <div className="text-[20px] sm:text-[22px] font-black leading-tight">📊 My Dashboard</div>
+            <div className="text-[20px] sm:text-[22px] font-black leading-tight"><LeadIcon e="📊" />My Dashboard</div>
             <div className="text-[14px] font-bold opacity-90 truncate">{departments.join(", ")}</div>
           </div>
           <button type="button" data-my-dashboard-close aria-label="Close My Dashboard" onClick={onClose}
@@ -18503,7 +18503,7 @@ function StaffMyDashboard({ departments = [], handovers = [], deptRatings = [], 
         <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-3 sm:space-y-4">
           {/* 1. Stars */}
           <div data-my-dash-stars className="rounded-2xl p-4 sm:p-5 text-center" style={card}>
-            <div className="text-[15px] font-black uppercase tracking-[0.06em]" style={{ color: "var(--text-dim)" }}>⭐ Stars</div>
+            <div className="text-[15px] font-black uppercase tracking-[0.06em]" style={{ color: "var(--text-dim)" }}><LeadIcon e="⭐" />Stars</div>
             <div className="text-[40px] sm:text-[48px] leading-none mt-2 tracking-[0.04em]" aria-label={avg === null ? "No stars yet" : `${avg} out of 5 stars`}>
               <span style={{ color: "#f59e0b" }}>{"★".repeat(full)}</span><span style={{ color: "#d1d5db" }}>{"★".repeat(5 - full)}</span>
             </div>
@@ -18516,7 +18516,7 @@ function StaffMyDashboard({ departments = [], handovers = [], deptRatings = [], 
           <div data-my-dash-finished className="grid grid-cols-2 gap-3 sm:gap-4">
             {[["This week", thisWeek, "week"], ["This month", thisMonth, "month"]].map(([label, n, k]) => (
               <div key={k} data-my-dash-count={k} className="rounded-2xl p-4 text-center" style={card}>
-                <div className="text-[15px] font-black" style={{ color: "var(--text-dim)" }}>✅ {label}</div>
+                <div className="text-[15px] font-black" style={{ color: "var(--text-dim)" }}><LeadIcon e="✅" />{label}</div>
                 <div className="text-[48px] sm:text-[56px] font-black leading-none mt-2 tabular-nums" style={{ color: "#15803d" }}>{n}</div>
                 <div className="text-[14px] font-bold mt-1" style={{ color: "var(--text-dim)" }}>machine{n === 1 ? "" : "s"} done</div>
               </div>
@@ -18524,7 +18524,7 @@ function StaffMyDashboard({ departments = [], handovers = [], deptRatings = [], 
           </div>
           {/* 2. Time per machine */}
           <div data-my-dash-times className="rounded-2xl p-4 sm:p-5" style={card}>
-            <div className="text-[15px] font-black uppercase tracking-[0.06em] mb-3" style={{ color: "var(--text-dim)" }}>⏱ Time per machine</div>
+            <div className="text-[15px] font-black uppercase tracking-[0.06em] mb-3" style={{ color: "var(--text-dim)" }}><LeadIcon e="⏱" />Time per machine</div>
             {done.length === 0 && <div className="text-[16px] font-bold py-2" style={{ color: "var(--text-dim)" }}>No machine finished yet.</div>}
             <div className="flex flex-col gap-2">
               {done.map((h) => {
@@ -18541,7 +18541,7 @@ function StaffMyDashboard({ departments = [], handovers = [], deptRatings = [], 
                         {(h.serialNo || (m && m.serialNo)) ? `S/N ${h.serialNo || m.serialNo}` : ""}{departments.length > 1 ? ` · ${h.fromDepartment}` : ""}
                       </div>
                       <div className="text-[16px] font-black tabular-nums mt-0.5" style={{ color: "var(--text-strong)" }}>
-                        ⏱ {formatDuration(actual)}{target ? <span className="font-bold" style={{ color: "var(--text-dim)" }}> / {formatDuration(target)}</span> : null}
+                        <LeadIcon e="⏱" />{formatDuration(actual)}{target ? <span className="font-bold" style={{ color: "var(--text-dim)" }}> / {formatDuration(target)}</span> : null}
                       </div>
                     </div>
                     <span data-my-dash-badge={late ? "late" : "ontime"} className="flex-shrink-0 text-[15px] font-black px-3 py-2 rounded-full text-white"
@@ -19448,7 +19448,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                 <button data-needs-net type="button" onClick={() => setJobAction({ item: p, action: "receive", notes: "", busy: false, error: "" })}
                                         className="text-[10.5px] font-bold px-2.5 py-1 rounded-lg border transition-all"
                                         style={{ background: "rgba(37,99,235,0.08)", border: "1px solid rgba(37,99,235,0.35)", color: "#1d4ed8" }}>
-                                  📦 Part received
+                                  <LeadLabel text="📦 Part received" />
                                 </button>
                               )}
                               {canAct && onResolvePendingItem && p.status === "open" && !pendingItemIsPart(p) && (
@@ -19483,7 +19483,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
     const block = (key, title, icon, tone, arr, empty) => (
       <section data-jobs-section={key} className="space-y-2">
         <div className="flex items-center gap-2">
-          <span className="text-[12.5px] font-black" style={{ color: tone }}>{icon} {title}</span>
+          <span className="text-[12.5px] font-black" style={{ color: tone }}><LeadLabel text={`${icon} ${title}`} /></span>
           <span data-jobs-count={key} className="text-[10.5px] font-black px-2 py-0.5 rounded-full" style={{ background: `${tone}1a`, color: tone }}>{arr.length}</span>
         </div>
         {arr.length === 0
@@ -19773,7 +19773,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
         <div className="fixed bottom-6 right-6 z-[60] flex items-center gap-3 px-5 py-3.5 rounded-2xl"
              style={{ background: `var(--surface-raised)`, border: `2px solid ${borderColor}`, boxShadow: `0 20px 60px rgba(17,24,39,0.14)`, animation: "slideUp 0.3s ease both" }}>
           <div className="w-8 h-8 rounded-full flex items-center justify-center text-base flex-shrink-0" style={{ background: bg }}>
-            {icon}
+            <Glyph e={icon} size={16} />
           </div>
           <div>
             <div className="text-xs font-bold text-slate-900">{toast.text}</div>
@@ -19793,7 +19793,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                   className="h-9 px-3 rounded-lg text-[12px] font-black flex items-center gap-1.5"
                   style={{ background: "rgba(46, 80, 214,0.10)", color: "#2640B0", border: "1px solid rgba(46, 80, 214,0.35)" }}
                   title="Customer, company, on hold and pending jobs reports">
-            📄 Reports
+            <LeadIcon e="📄" />Reports
           </button>
         )}
         {/* Departments Called, behind a bell. Same count and same scope as the
@@ -19821,11 +19821,11 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
             deadlines, HOLD rules, checklist templates, signature + password
             policy. Hidden from non-admin operators. */}
         {canConfigureDept(canDo) && (
-          <button onClick={() => onNavigate("machines_settings")}
+          <button data-mt-settings onClick={() => onNavigate("machines_settings")}
                   title="Open Machine Tracker settings (deadlines, HOLD rules, checklists, employees)"
                   className="h-9 px-3 rounded-lg text-[12px] font-black inline-flex items-center gap-1.5 transition-all"
                   style={{ background: "rgba(46, 80, 214,0.1)", border: "1px solid rgba(46, 80, 214,0.35)", color: "#2640B0" }}>
-            ⚙️ Settings
+            <LeadLabel text="⚙️ Settings" />
           </button>
         )}
       </Topbar>
@@ -19835,7 +19835,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
         {/* Search: type a machine name or serial number, the list shows it. */}
         {!staffMode && (
           <div className="relative" data-mt-search>
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[18px] pointer-events-none">🔍</span>
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[18px] pointer-events-none"><Glyph e="🔍" size={18} /></span>
             <input type="search" value={searchQ} data-mt-search-input
                    onChange={(e) => {
                      const v = e.target.value; setSearchQ(v); if (v.trim()) setMtTab("production");
@@ -19863,7 +19863,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
             <div className="mt-today flex items-center gap-2 flex-wrap" data-mt-today>
               <span className="text-[16px] font-black mr-1" style={{ color: "var(--text-strong)" }}>Today:</span>
               {parts.length === 0 && (
-                <span className="text-[16px] font-black" style={{ color: "#15803d" }} data-mt-today-ok>✅ All machines on time</span>
+                <span className="text-[16px] font-black" style={{ color: "#15803d" }} data-mt-today-ok><LeadIcon e="✅" />All machines on time</span>
               )}
               {isClosedDay(nowTick) && (
                 <span data-mt-closed-day className="min-h-[36px] px-3 rounded-full text-[13px] font-bold inline-flex items-center gap-1.5"
@@ -19881,7 +19881,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                           }}
                           className="min-h-[44px] px-4 rounded-full text-[15px] font-bold inline-flex items-center gap-1.5 transition-all active:scale-[0.97]"
                           style={{ background: x.bg, color: x.color, border: `${isOn ? 2 : 1}px solid ${isOn ? x.color : x.bd}` }}>
-                    <span aria-hidden="true">{x.icon}</span>
+                    <Glyph e={x.icon} />
                     <span className="tabular-nums">{x.n}</span> {x.word}
                   </button>
                 );
@@ -19985,7 +19985,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                 <button type="button" data-my-dashboard-open onClick={() => setMyDashOpen(true)}
                         className="w-full min-h-[64px] px-5 rounded-2xl text-[20px] font-black text-white flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
                         style={{ background: "#2640B0", boxShadow: "0 8px 24px rgba(38,64,176,0.25)" }}>
-                  📊 My Dashboard
+                  <LeadIcon e="📊" />My Dashboard
                 </button>
               )}
               {/* Header */}
@@ -20005,7 +20005,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                           style={arrivalOn
                             ? { background: "rgba(21,128,61,0.10)", color: "#15803d", border: "1px solid rgba(21,128,61,0.35)" }
                             : { background: "var(--surface-card)", color: "var(--text-dim)", border: "1px solid var(--border-subtle)" }}>
-                    {arrivalOn ? "🔔 On" : "🔕 Off"}
+                    <LeadLabel text={arrivalOn ? "🔔 On" : "🔕 Off"} />
                   </button>
                 )}
               </div>
@@ -20069,7 +20069,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                       if (!r || r.success === false) { showToast("Could not take", r?.error || "", "urgent"); return; }
                                       openAcceptModal({ ...h, ...(r.handover || {}), releasedAt: (r.handover && r.handover.releasedAt) || new Date().toISOString() });
                                     }}>
-                              {rackTakeBusy === h.id ? "⏳ Please wait…" : "📥 Take from Rack"}
+                              <LeadLabel text={rackTakeBusy === h.id ? "⏳ Please wait…" : "📥 Take from Rack"} />
                             </button>
                           ) : (
                             <div className="text-[13px] font-bold" style={{ color: "#4338ca" }}>Waiting for your head to take it</div>
@@ -20145,7 +20145,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                 <button type="button" data-staff-jobs={m.id} onClick={() => setJobsDrawer(m.id)}
                                         className="min-h-[44px] text-[14px] font-black px-3 rounded-xl"
                                         style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.35)", color: "#b91c1c" }}>
-                                  ⚠ {jobs.length} open job{jobs.length === 1 ? "" : "s"}
+                                  <LeadIcon e="⚠" />{jobs.length} open job{jobs.length === 1 ? "" : "s"}
                                 </button>
                               )}
                               {voiceBadge(m)}
@@ -20154,7 +20154,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                           <div className="flex flex-col sm:flex-row gap-2 sm:flex-wrap">
                             {during && (
                               <button type="button" data-staff-during={m.id} className={btn} style={{ background: "#2640B0", color: "#fff" }} onClick={() => openDuringWorkModal(m)}>
-                                📋 During-Work Checks
+                                <LeadIcon e="📋" />During-Work Checks
                               </button>
                             )}
                             {canReport && (
@@ -20167,7 +20167,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                             {m.trialCertificate && canFinish && onUpdateTrialCertificate && (
                               <button type="button" className={btn} style={{ background: "rgba(217,119,6,0.10)", border: "1px solid rgba(217,119,6,0.4)", color: "#b45309" }}
                                       onClick={() => setTrialCertModal({ machine: m, editOnly: true })}>
-                                ✎ Certificate
+                                <LeadIcon e="✎" />Certificate
                               </button>
                             )}
                             {next && canFinish && (
@@ -20230,7 +20230,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                               {onReceivePendingItem && pendingItemIsPart(p) && canReceiveJob(p) && !p.receivedAt && (
                                 <button data-needs-net type="button" className={btn} style={{ background: "rgba(37,99,235,0.08)", border: "1px solid rgba(37,99,235,0.4)", color: "#1d4ed8" }}
                                         onClick={() => setJobAction({ item: p, action: "receive", notes: "", busy: false, error: "" })}>
-                                  📦 Part received
+                                  <LeadLabel text="📦 Part received" />
                                 </button>
                               )}
                               {onResolvePendingItem && !pendingItemIsPart(p) && (
@@ -20308,7 +20308,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
               {overdueHandovers.length > 0 && (
                 <span className="text-[11px] font-black px-3 py-1 rounded-full"
                       style={{ background: "rgba(239,68,68,0.2)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.5)" }}>
-                  🚦 {overdueHandovers.length} ON HOLD
+                  <LeadIcon e="🚦" />{overdueHandovers.length} ON HOLD
                 </span>
               )}
             </div>
@@ -20883,7 +20883,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                         width, not measured progress. What is
                                         measured is the time on the bench. */}
                                     <div className="text-[9.5px] font-bold" style={{ color: st.fg }}>
-                                      ⏱ {inAssemblyFor || "just started"} on the bench
+                                      <LeadIcon e="⏱" />{inAssemblyFor || "just started"} on the bench
                                     </div>
                                   </div>
                                 )}
@@ -21030,7 +21030,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                     </div>
                     {notIssued.length > 0 && (
                       <div data-not-issued-list className="mx-4 sm:mx-5 mt-3 rounded-lg px-3 py-2.5" style={{ background: "rgba(217,119,6,0.07)", border: "1px solid rgba(217,119,6,0.3)" }}>
-                        <div className="text-[12px] font-black mb-1.5" style={{ color: "#b45309" }}>⏳ {notIssued.length} part{notIssued.length === 1 ? "" : "s"} not issued — pending for {m.serialNo || m.bomKey}</div>
+                        <div className="text-[12px] font-black mb-1.5" style={{ color: "#b45309" }}><LeadIcon e="⏳" />{notIssued.length} part{notIssued.length === 1 ? "" : "s"} not issued — pending for {m.serialNo || m.bomKey}</div>
                         <ul className="space-y-1">
                           {notIssued.map((p2) => (
                             <li key={p2.id} data-pending-item={p2.itemCode || p2.id} className="text-[11.5px] leading-snug flex items-start justify-between gap-2 flex-wrap">
@@ -21191,7 +21191,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                               onClick={() => { setRackPanel(null); setRemoveRackConfirm({ machineId: m.id, serialNo: m.serialNo, bomKey: m.bomKey }); }}
                               className="w-full rounded-lg px-3 py-2 text-[11.5px] font-bold"
                               style={{ color: "#b91c1c", border: "1px solid rgba(185,28,28,0.3)", background: "rgba(185,28,28,0.04)" }}>
-                        🗑 Remove From Rack — return both crates' stock
+                        <LeadIcon e="🗑" />Remove From Rack — return both crates' stock
                       </button>
                     )}
                   </div>
@@ -21204,7 +21204,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
               loud rather than silently dropped from view. */}
           {physicalFamilies.filter((f) => f.overflow > 0).map((f) => (
             <div key={f.id} className="mt-2 text-[10.5px] font-semibold" style={{ color: "#b45309" }}>
-              ⚠ {f.overflow} more {f.label} machine{f.overflow === 1 ? "" : "s"} than the M-{f.label} / R-{f.label} racks hold: {f.overflowMachines.map((m) => m.serialNo || m.bomKey).join(", ")} — use Fill on an empty slot to place one.
+              <LeadIcon e="⚠" />{f.overflow} more {f.label} machine{f.overflow === 1 ? "" : "s"} than the M-{f.label} / R-{f.label} racks hold: {f.overflowMachines.map((m) => m.serialNo || m.bomKey).join(", ")} — use Fill on an empty slot to place one.
             </div>
           ))}
 
@@ -21255,7 +21255,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                           <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full"
                                 title={`${rackShortCount} machine(s) on this rack are still waiting for components`}
                                 style={{ background: "rgba(217,119,6,0.16)", color: "#b45309", border: "1px solid rgba(217,119,6,0.35)" }}>
-                            ⚠ {rackShortCount} incomplete
+                            <LeadIcon e="⚠" />{rackShortCount} incomplete
                           </span>
                         )}
                         <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
@@ -21418,7 +21418,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                             <span className="text-[9px] font-bold px-2 py-0.5 rounded-full"
                                   title={arrivedItems.map((a) => `${a.itemName || a.itemCode}${a.qty ? ` ×${a.qty}` : ""}`).join(", ")}
                                   style={{ background: "rgba(21,128,61,0.10)", color: "#15803d", border: "1px solid rgba(21,128,61,0.35)" }}>
-                              📦 Material arrived ({arrivedItems.length})
+                              <LeadIcon e="📦" />Material arrived ({arrivedItems.length})
                             </span>
                           )}
                         </div>
@@ -21440,7 +21440,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                             <div className="flex items-center gap-1.5 flex-wrap mt-1 text-[10px]">
                               <span className="font-bold px-2 py-0.5 rounded-full" title={`Working time in ${dept} · target ${formatDuration(target)}${due && !t.isOverrun ? ` · due ${dueTxt}` : ""}`}
                                     style={t.isOverrun ? { background: "rgba(239,68,68,0.1)", color: "#b91c1c", border: "1px solid rgba(239,68,68,0.35)" } : { background: "rgba(21,128,61,0.08)", color: "#15803d", border: "1px solid rgba(21,128,61,0.3)" }}>
-                                ⏱ {formatDuration(t.actualMinutes)} / {formatDuration(target)}
+                                <LeadIcon e="⏱" />{formatDuration(t.actualMinutes)} / {formatDuration(target)}
                                 {t.isOverrun ? ` · DELAYED ${formatDuration(t.overrunMinutes)}` : ""}
                               </span>
                               {/* 2026-11-03 — said once, next to the Today line; kept here (hidden) as the per-card hook. */}
@@ -21553,7 +21553,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                 className="text-[11px] font-black text-white px-3 py-1.5 rounded-lg transition-all"
                                 style={{ background: "#2640B0", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}
                                 title="During-Work Checks">
-                          📋 During-Work Checks
+                          <LeadIcon e="📋" />During-Work Checks
                         </button>
                       )}
                       {/* Phase 1 — report a fault to the department responsible.
@@ -21666,12 +21666,12 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                             {machineOverdue ? (
                               <span className="text-[10px] font-black px-2 py-1 rounded-lg"
                                     style={{ background: "rgba(239,68,68,0.15)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.45)" }}>
-                                🚦 ON HOLD
+                                <LeadIcon e="🚦" />ON HOLD
                               </span>
                             ) : (
                               <span className="text-[10px] font-black px-2 py-1 rounded-lg"
                                     style={{ background: "rgba(217, 119, 6,0.12)", color: "#B45309", border: "1px solid rgba(217, 119, 6,0.35)" }}>
-                                ⏳ Awaiting accept{h ? ` · ${h.toDepartment}` : ""}
+                                <LeadIcon e="⏳" />Awaiting accept{h ? ` · ${h.toDepartment}` : ""}
                               </span>
                             )}
                             {cardCanAccept && (
@@ -21720,7 +21720,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                 className="text-[10px] font-bold px-2 py-1.5 rounded-lg border transition-all"
                                 style={{ background: "rgba(217,119,6,0.10)", border: "1px solid rgba(217,119,6,0.35)", color: "#b45309" }}
                                 title="Complete or correct the Trial Certificate">
-                          ✎ Certificate
+                          <LeadIcon e="✎" />Certificate
                         </button>
                       )}
                       {isComplete && machine.trialCertificate && (
@@ -21728,7 +21728,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                 className="text-[10px] font-bold text-slate-900 px-2 py-1.5 rounded-lg border transition-all"
                                 style={{ background: "rgba(6,182,212,0.12)", border: "1px solid rgba(6,182,212,0.35)", color: "#0e7490" }}
                                 title="View Trial Certificate">
-                          📋 Certificate
+                          <LeadIcon e="📋" />Certificate
                         </button>
                       )}
                       {isComplete && isAdminUser && (
@@ -22032,7 +22032,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                           <button data-needs-net onClick={() => setJobAction({ item: p, action: "receive", notes: "", busy: false, error: "" })}
                                                   className="text-[10px] font-bold px-2 py-0.5 rounded border"
                                                   style={{ color: "#1d4ed8", borderColor: "rgba(37,99,235,0.4)", background: "rgba(37,99,235,0.08)" }}>
-                                            📦 Part received
+                                            <LeadLabel text="📦 Part received" />
                                           </button>
                                         )}
                                         {canFinishTransfer(canDo) && onResolvePendingItem && !pendingItemIsPart(p) && (
@@ -22399,7 +22399,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
               <div className="flex gap-2 mt-4">
                 <button type="button" onClick={() => setHoldModal(null)} disabled={holdModal.busy} className="flex-1 h-11 rounded-lg text-[13px] font-bold text-slate-600 border transition-all disabled:opacity-40" style={{ borderColor: "rgba(17,24,39,0.12)" }}>Cancel</button>
                 <button data-needs-net type="button" data-hold-confirm onClick={submit} disabled={holdModal.busy} className="flex-[2] min-h-[48px] rounded-xl text-[14px] font-black text-white transition-all disabled:opacity-50" style={{ background: holdModal.release ? "#15803d" : "#dc2626", color: "#ffffff" }}>
-                  {holdModal.busy ? "Saving…" : holdModal.release ? "▶ Release ON HOLD" : "⏸ Put ON HOLD"}
+                  <LeadLabel text={holdModal.busy ? "Saving…" : holdModal.release ? "▶ Release ON HOLD" : "⏸ Put ON HOLD"} />
                 </button>
               </div>
             </div>
@@ -22528,7 +22528,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
             <div role="dialog" aria-label={`Pending jobs for ${m?.serialNo || m?.bomKey || "machine"}`} data-jobs-drawer className="rack-panel h-full w-full max-w-[640px] flex flex-col" style={{ background: "var(--surface-card)", boxShadow: "-20px 0 60px rgba(17,24,39,0.25)" }}>
               <div className="px-4 sm:px-5 py-4 flex items-center justify-between gap-3" style={{ background: "#b91c1c", color: "#fff" }}>
                 <div>
-                  <div className="text-[17px] font-black">⏳ Pending Jobs · {m?.bomKey || "Machine"}{m?.serialNo ? ` · S/N ${m.serialNo}` : ""}</div>
+                  <div className="text-[17px] font-black"><LeadIcon e="⏳" />Pending Jobs · {m?.bomKey || "Machine"}{m?.serialNo ? ` · S/N ${m.serialNo}` : ""}</div>
                   <div className="text-[11px] opacity-90">{openPartsN} part{openPartsN === 1 ? "" : "s"} · {open.length - openPartsN} work pending · {done.length} completed · now in {m?.status === "completed" ? "Ready" : (m?.currentDepartment || m?.stage || "—")}</div>
                 </div>
                 <button type="button" aria-label="Close" onClick={() => setJobsDrawer(null)} className="w-9 h-9 rounded-lg text-[18px] font-black" style={{ background: "rgba(255,255,255,0.18)", color: "#fff" }}>✕</button>
@@ -22910,7 +22910,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                 </div>
                 {famBoms.filter((b) => !b.valid).map((b) => (
                   <div key={b.key} className="text-[10px] mt-0.5 font-semibold" style={{ color: "#b45309" }}>
-                    ⚠ {b.key} also maps to these racks but {b.components === 0 ? "has no components" : `${b.missing} of ${b.components} components are not in the Item Master`} — do not use it for rack builds.
+                    <LeadIcon e="⚠" />{b.key} also maps to these racks but {b.components === 0 ? "has no components" : `${b.missing} of ${b.components} components are not in the Item Master`} — do not use it for rack builds.
                   </div>
                 ))}
               </div>
@@ -22959,7 +22959,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                         className="text-[10px] font-bold px-2.5 py-1.5 rounded-md" style={{ background: "var(--surface-card)", color: f.color, border: `1px solid ${f.color}55` }}>Reserve slot & open BOM →</button>
               </div>
             )}
-            {fillErr && <div className="text-[11px] font-semibold" style={{ color: "#b91c1c" }}>⚠ {fillErr}</div>}
+            {fillErr && <div className="text-[11px] font-semibold" style={{ color: "#b91c1c" }}><LeadIcon e="⚠" />{fillErr}</div>}
           </div>
         </div>
         );
@@ -23012,7 +23012,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                         {stillPending.length > 0 && (
                           <span className="text-[9px] font-black px-1.5 py-0.5 rounded flex-shrink-0"
                                 style={{ background: "rgba(217,119,6,0.14)", color: "#b45309", border: "1px solid rgba(217,119,6,0.3)" }}>
-                            ⚠ {stillPending.length} pending
+                            <LeadIcon e="⚠" />{stillPending.length} pending
                           </span>
                         )}
                         <span className="text-[9px] text-slate-500 flex-shrink-0">Issued {m.createdDate}</span>
@@ -23123,7 +23123,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                         }}
                       className="inline-flex items-center gap-1.5 text-[11px] font-bold rounded-lg px-4 py-1.5 text-white border transition-all"
                       style={{ background: "#b91c1c", borderColor: "rgba(239,68,68,0.5)", color: "#ffffff" }}>
-                🗑 Remove
+                <LeadIcon e="🗑" />Remove
               </button>
             </div>
           </div>
@@ -23339,7 +23339,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                 {isHoldOverdue(handover.sentAt, handover.acceptTimeoutMinutes, nowTick) && (
                   <div className="rounded-lg px-3 py-2.5" style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.35)" }}>
                     <div className="text-[10px] font-bold uppercase tracking-wide mb-1" style={{ color: "#b91c1c" }}>
-                      🚦 On hold · {formatDuration(heldMinutes(handover.sentAt, handover.acceptTimeoutMinutes, nowTick))} past the acceptance window
+                      <LeadIcon e="🚦" />On hold · {formatDuration(heldMinutes(handover.sentAt, handover.acceptTimeoutMinutes, nowTick))} past the acceptance window
                     </div>
                     <label className="text-[11px] font-bold text-slate-700 block mb-1">Reason for late acceptance <span className="text-red-500">*</span></label>
                     <div className="grid grid-cols-2 gap-2 mb-2" data-late-reasons>
@@ -23350,7 +23350,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                   onClick={() => setField({ holdPick: label, holdReason: label === "Other" ? "" : label, error: "" })}
                                   className={`rounded-xl text-[13px] font-bold flex items-center justify-center gap-1.5 px-2 transition-all ${on ? "accept-pop" : ""}`}
                                   style={{ minHeight: 48, background: on ? "#dc2626" : "#fff", color: on ? "#fff" : "#7f1d1d", border: `2px solid ${on ? "#dc2626" : "rgba(239,68,68,0.35)"}` }}>
-                            <span style={{ fontSize: 17 }}>{icon}</span>{label}
+                            <span style={{ fontSize: 17 }}><Glyph e={icon} size={17} /></span>{label}
                           </button>
                         );
                       })}
@@ -23458,7 +23458,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                       <div data-accept-checklist className="accept-step rounded-xl px-3 py-3" style={{ background: "rgba(46, 80, 214,0.05)", border: "1px solid rgba(46, 80, 214,0.3)" }}>
                         {stepHead(stepBase + 1, "Check before accepting", false)}
                         <div className="text-[12px] font-semibold text-slate-600 mb-1">
-                          📋 {acceptModal.checklistTemplate.name || "After Acceptance Checklist"}
+                          <LeadIcon e="📋" />{acceptModal.checklistTemplate.name || "After Acceptance Checklist"}
                         </div>
                         <ChecklistBulkBar
                           answers={acceptModal.checklistAnswers}
@@ -23488,7 +23488,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                 {error && error !== acceptModal.errorField && (
                   <div className="rounded-lg px-3 py-2 text-[11px] font-semibold"
                        style={{ background: "rgba(239,68,68,0.08)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.3)" }}>
-                    ⚠ {error}
+                    <LeadIcon e="⚠" />{error}
                   </div>
                 )}
               </div>
@@ -23549,7 +23549,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                 {error && (
                   <div className="rounded-lg px-3 py-2 text-[11px] font-semibold"
                        style={{ background: "rgba(239,68,68,0.08)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.3)" }}>
-                    ⚠ {error}
+                    <LeadIcon e="⚠" />{error}
                   </div>
                 )}
               </div>
@@ -23606,7 +23606,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                 {error && (
                   <div data-start-chk-error className="rounded-lg px-3 py-2 text-[12px] font-semibold"
                        style={{ background: "rgba(239,68,68,0.08)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.3)" }}>
-                    ⚠ {error}
+                    <LeadIcon e="⚠" />{error}
                   </div>
                 )}
               </div>
@@ -24072,7 +24072,7 @@ function PendingPage({ pendingLog, onClearPending, onFulfillPending, onFulfillGr
                 {cf.err && (
                   <div className="text-[11px] font-bold px-3 py-2 rounded-md"
                        style={{ background: "rgba(239,68,68,0.08)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.3)" }}>
-                    ⚠ {cf.err}
+                    <LeadIcon e="⚠" />{cf.err}
                   </div>
                 )}
               </div>
@@ -24196,7 +24196,7 @@ function PendingPage({ pendingLog, onClearPending, onFulfillPending, onFulfillGr
                             {machine && (
                               <span className="text-[9px] font-bold px-2 py-0.5 rounded-full"
                                     style={{ background: stageColor + "18", color: stageColor, border: `1px solid ${stageColor}35` }}>
-                                🔧 {machine.stage}
+                                <LeadIcon e="🔧" />{machine.stage}
                               </span>
                             )}
                           </div>
@@ -24397,7 +24397,7 @@ function HRFilterBar({ search, setSearch, dateFrom, setDateFrom, dateTo, setDate
   return (
     <div className="flex flex-wrap items-center gap-2 px-6 py-3" style={{ background: "rgba(17,24,39,0.03)", borderBottom: "1px solid rgba(17,24,39,0.04)" }}>
       <div className="relative">
-        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs">🔍</span>
+        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs"><Glyph e="🔍" size={13} /></span>
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Global search…"
           className="bg-slate-50 border border-slate-200 rounded-lg pl-7 pr-3 py-1.5 text-xs text-slate-700 placeholder-slate-400 outline-none focus:border-blue-500/40 w-52" />
       </div>
@@ -24768,7 +24768,7 @@ function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, machine
           <button key={t.id} onClick={() => setTab(t.id)}
             className="flex items-center gap-1.5 px-3.5 py-2 text-[11px] font-semibold rounded-t-lg transition-all relative"
             style={tab===t.id ? { color:"#2E50D6", background:"rgba(46, 80, 214,0.07)", borderBottom:"2px solid #2E50D6" } : { color:"#475569" }}>
-            <span>{t.icon}</span>{t.label}
+            <span><Glyph e={t.icon} size={14} /></span>{t.label}
           </button>
         ))}
       </div>
@@ -25107,7 +25107,7 @@ function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, machine
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <div className="text-sm font-black text-slate-900">{v.vendor}</div>
-                          {vd.phone && <div className="text-[10px] text-slate-500 mt-0.5">📞 {vd.phone}</div>}
+                          {vd.phone && <div className="text-[10px] text-slate-500 mt-0.5"><LeadIcon e="📞" />{vd.phone}</div>}
                           {vd.email && <div className="text-[10px] text-slate-500">✉ {vd.email}</div>}
                           {vd.category && <div className="text-[10px] text-slate-600 mt-1">{vd.category}</div>}
                         </div>
@@ -25271,7 +25271,7 @@ function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, machine
               }}
                 className="px-4 py-2.5 rounded-xl text-xs font-bold text-white transition-all hover:scale-[1.02] active:scale-[0.98]"
                 style={{ background: "#2640B0", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
-                📥 Download Report
+                <LeadIcon e="📥" />Download Report
               </button>
             </div>
 
@@ -25285,7 +25285,7 @@ function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, machine
               ].map((k) => (
                 <div key={k.label} className="rounded-xl p-4" style={CARD_STYLE}>
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="text-lg">{k.icon}</span>
+                    <span className="text-lg"><Glyph e={k.icon} size={18} /></span>
                     <span className="text-[10px] text-slate-500">{k.label}</span>
                   </div>
                   <div className="text-xl font-black" style={{color:k.color}}>{k.value}</div>
@@ -25522,7 +25522,7 @@ const ROLE_CONFIG = {
 function EmptyState({ icon = "📭", title = "Nothing here yet", desc = "", action = null }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 px-6 text-center select-none">
-      <div className="text-5xl mb-4" style={{ opacity: 0.45 }}>{icon}</div>
+      <div className="text-5xl mb-4" style={{ opacity: 0.45 }}><Glyph e={icon} size={34} /></div>
       <div className="text-sm font-semibold mb-1.5" style={{ color: "var(--text-strong)" }}>{title}</div>
       {desc && <div className="text-xs max-w-xs leading-relaxed" style={{ color: "var(--text-dim)" }}>{desc}</div>}
       {action && <div className="mt-5">{action}</div>}
@@ -25665,7 +25665,7 @@ function GlobalSearch({ items, pos, vendorList, machineLog, onClose, onNavigate 
 
         {/* Input */}
         <div className="flex items-center gap-3 px-4 py-3.5" style={{ borderBottom: "1px solid var(--border-subtle)" }}>
-          <span className="text-slate-500 text-base flex-shrink-0">🔍</span>
+          <span className="text-slate-500 text-base flex-shrink-0"><Glyph e="🔍" size={16} /></span>
           <input ref={inputRef} value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={handleKeyDown}
             placeholder="Search items, POs, vendors, machines, serial numbers…"
             className="flex-1 bg-transparent text-sm placeholder-slate-400 outline-none" />
@@ -25776,7 +25776,7 @@ function ReadyMachinesPopup({ items = [], bomDefs = {}, onOk, onView }) {
         <div className="rp-head">
           <div className="rp-seal" aria-hidden="true"><CircleCheckBig size={26} strokeWidth={2.2} /></div>
           <div className="min-w-0">
-            <h2 id="rp-title" className="rp-title" data-ready-title>🎉 {n} machine{n === 1 ? " is" : "s are"} Ready</h2>
+            <h2 id="rp-title" className="rp-title" data-ready-title><LeadIcon e="🎉" />{n} machine{n === 1 ? " is" : "s are"} Ready</h2>
             <p className="rp-sub">Finished since you last looked</p>
           </div>
         </div>

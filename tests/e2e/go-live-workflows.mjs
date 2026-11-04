@@ -134,7 +134,7 @@ ok("open pending jobs did not block the transfer", (await ls(p, "erp_pending_han
 
 // ── 1b. Part received: partial quantity, stock inward, remaining stays pending ──
 const stockOf = async () => (await ls(p, "erp_items")).Mechanical.find((i) => i.code === "GBX").stock;
-const openReceive = async (id) => { await p.locator(`[data-staff-job="${id}"] button`, { hasText: /^📦 Part received$/ }).click(); await p.waitForTimeout(500); };
+const openReceive = async (id) => { await p.locator(`[data-staff-job="${id}"] button`, { hasText: /^Part received$/ }).click(); await p.waitForTimeout(500); };
 await openReceive(3);
 ok("Part received asks for the quantity, defaulting to what is pending", (await p.locator("[data-receive-qty]").inputValue()) === "100");
 await p.locator("[data-receive-qty]").fill("120"); await p.waitForTimeout(200);
@@ -152,7 +152,7 @@ ok("second receipt defaults to the 50 still pending", (await p.locator("[data-re
 await p.locator("[data-receive-check]").check(); await p.locator("[data-job-submit]").click(); await p.waitForTimeout(1000);
 job3 = (await ls(p, "erp_pending_handover_items")).find((i) => i.id === 3);
 ok("final 50 received → stock 110, both receipts kept, receive step closed", (await stockOf()) === 110 && job3.receipts.length === 2 && !!job3.receivedAt && job3.receipts[0].qtyReceived === 50, `stock ${await stockOf()}`);
-ok("no double inward: no Part received button left on the fully received job", await p.locator('[data-staff-job="3"] button', { hasText: /^📦 Part received$/ }).count() === 0);
+ok("no double inward: no Part received button left on the fully received job", await p.locator('[data-staff-job="3"] button', { hasText: /^Part received$/ }).count() === 0);
 // critical manual item: verification required, serials optional, stock untouched
 await openReceive(2);
 ok("critical manual item shows the critical verification block", await p.locator('[data-receive-verify="checkbox"]').count() === 1 && await p.locator("text=/CRITICAL ITEM/").count() > 0);
