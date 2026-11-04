@@ -440,7 +440,7 @@ export default function UserManagementPage({ canDo }) {
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(15,20,28,0.45)", backdropFilter: "blur(4px)" }}
              onClick={(e) => e.target === e.currentTarget && setShowModal(false)}>
-          <div className="w-full max-w-md rounded-2xl p-6 mx-4" style={{ background: "#ffffff", border: "1px solid rgba(26,31,46,0.1)", boxShadow: "0 32px 80px rgba(15,20,28,0.18)" }}>
+          <div className="w-full max-w-md rounded-2xl p-6 mx-4 max-h-[92dvh] overflow-y-auto" style={{ background: "#ffffff", border: "1px solid rgba(26,31,46,0.1)", boxShadow: "0 32px 80px rgba(15,20,28,0.18)" }}>
             <div className="flex items-center justify-between mb-5">
               <h3 className="font-bold text-sm" style={{ color: "#0f141c" }}>{editUser ? "Edit User" : "Add New User"}</h3>
               <button onClick={() => setShowModal(false)} className="text-slate-600 hover:text-slate-900 transition-colors text-lg leading-none">✕</button>

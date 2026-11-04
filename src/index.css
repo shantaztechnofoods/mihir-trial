@@ -3833,3 +3833,40 @@ button.rack-btn:disabled { background: #e5e7eb !important; color: #6b7280 !impor
   /* Report Center pages: page numbers and a running head from page 2 (RptPageStyle "rc-report"). */
   .rpt-rc-paged { page: rc-report; }
 }
+
+/* ── 2026-11-04 bug sweep (phones only; desktop unchanged) ──────────────────
+   1. Small tap targets found by the sweep: ☰ (36px wide), BOM ⋮ (28px),
+      Audit pager arrows (31px), WhatsApp header icons (36px).
+   2. History & Reports: tabs + filters were pinned and the records scrolled
+      in a thin strip under them (≈40px visible at 360x640). On a phone the
+      whole page scrolls as one, and the 9 tabs sit on one swipeable row.
+   3. Department logins: no Search in the drawer; ⌘K hint is meaningless on
+      a phone. No bottom bar for them (App.jsx), so no reserved gap either. */
+@media (pointer: coarse) {
+  .nav-menu-btn { width: 44px !important; height: 44px !important; }
+  .bom-kebab { width: 44px !important; height: 44px !important; }
+  .pager-btn { min-width: 44px; min-height: 44px; }
+  .wa-icon-btn { min-width: 44px; min-height: 44px; }
+}
+@media (max-width: 767.98px) {
+  .hr-page > .hr-body { flex: none; overflow: visible; }
+  .hr-page > .hr-tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .hr-page > .hr-tabs::-webkit-scrollbar { display: none; }
+  .hr-page > .hr-tabs > button { flex-shrink: 0; white-space: nowrap; }
+  .sb-search-staff { display: none !important; }
+  .sb-kbd { display: none; }
+  .app-shell:not(:has(.mobile-tabbar)) > .flex-1,
+  .app-shell:not(:has(.mobile-tabbar)) > .flex-1 > .flex-1.overflow-y-auto { padding-bottom: env(safe-area-inset-bottom, 0px); }
+  /* New PO: the item picker was squeezed to ~45px next to Qty / Rate / Add.
+     Picker gets its own full row; Qty, Rate, Add share the next. */
+  .po-add-row { flex-wrap: wrap; }
+  .po-add-row > :first-child { flex: 1 1 100%; min-width: 0; }
+  .po-add-row > input { flex: 1 1 0; min-width: 0; width: auto; }
+}
+/* Dialog ✕ buttons drawn as a bare glyph were ~15px wide on a phone. */
+@media (pointer: coarse) {
+  .modal-backdrop button.leading-none, [role="dialog"] button.leading-none, .fixed.inset-0 button.leading-none {
+    min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center;
+  }
+  .modal-x { width: 44px !important; height: 44px !important; }
+}

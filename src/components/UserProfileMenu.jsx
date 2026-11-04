@@ -56,7 +56,7 @@ export default function UserProfileMenu({ collapsed = false }) {
   const displayName = (currentUser.fullName && String(currentUser.fullName).trim())
                    || currentUser.username
                    || "User";
-  const initials  = displayName.split(" ").map((s) => s[0]).join("").slice(0, 2).toUpperCase() || "U";
+  const initials  = displayName.split(/\s+/).map((s) => (s.match(/[A-Za-z0-9]/) || [""])[0]).join("").slice(0, 2).toUpperCase() || "U";
   const isSA      = currentUser.role === "super_admin";
 
   return (
@@ -303,7 +303,7 @@ function ProfileModal({ user, roleLabel, roleColor, onClose, onSave }) {
 
   const inputCls   = "w-full px-3 py-2.5 rounded-lg text-sm outline-none transition-all";
   const inputStyle = { background: "#ffffff", border: "1px solid rgba(15,20,28,0.14)", color: "#0f141c" };
-  const initials = (fullName || user.username || "U").split(" ").map((s) => s[0]).join("").slice(0, 2).toUpperCase() || "U";
+  const initials = (fullName || user.username || "U").split(/\s+/).map((s) => (s.match(/[A-Za-z0-9]/) || [""])[0]).join("").slice(0, 2).toUpperCase() || "U";
 
   const handleSave = () => {
     const e = {};
