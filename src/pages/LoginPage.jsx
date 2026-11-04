@@ -1,7 +1,8 @@
 import React, { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { Eye, EyeOff, LogIn } from "lucide-react";
+import logoOnDark from "../assets/brand/shantaz-logo-on-dark.svg";
+import { MadeInIndia } from "../components/IndiaFlag.jsx";
 import { useAuth } from "../auth/AuthContext.jsx";
-import BrandLogo from "../components/BrandLogo.jsx";
 
 // Login (rewritten 2026-10-31 — login field bug).
 //
@@ -28,13 +29,20 @@ import BrandLogo from "../components/BrandLogo.jsx";
 // screen").
 // 2026-11-04 (world UI) — new look only. The logic above the return (fields,
 // autofill guard, submit, error handling) is unchanged. The 3D scene is a
-// separate lazy chunk that starts only after the form has painted: the SHANTAZ
-// wordmark in 3D on capable devices; the real 2D logo with a soft shine for
-// reduced motion / low-end phones (deviceMemory <= 2, Save-Data) / no WebGL.
-const LoginBrand3D = lazy(() => import("./LoginBrand3D.jsx"));
-const TAGLINE = "INNOVATION FOR LIFE";
+// separate lazy chunk that starts only after the form has painted: the real
+// SHANTAZ logo (gear, wheat, letters, tagline — traced from the owner's
+// artwork) built in 3D on capable devices; the same logo flat, with one soft
+// shine, for reduced motion / low-end phones (deviceMemory <= 2, Save-Data) /
+// no WebGL. Every user sees the same login.
+const LoginLogo3D = lazy(() => import("./LoginLogo3D.jsx"));
 
+let heroModeMemo = "";
 const heroMode = () => {
+  if (heroModeMemo) return heroModeMemo;
+  heroModeMemo = probeHero();
+  return heroModeMemo;
+};
+const probeHero = () => {
   try {
     const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const nav = navigator || {};
@@ -42,7 +50,9 @@ const heroMode = () => {
     if (reduce || low) return "still";
     const c = document.createElement("canvas");
     const gl = c.getContext("webgl2") || c.getContext("webgl");
-    return gl ? "webgl" : "css";
+    if (!gl) return "css";
+    try { const lose = gl.getExtension("WEBGL_lose_context"); if (lose) lose.loseContext(); } catch { /* ignore */ }
+    return "webgl";
   } catch { return "still"; }
 };
 
@@ -106,34 +116,26 @@ export default function LoginPage({ notice = "", onRetry = null }) {
         <div className="lg-light" />
         {hero === "webgl" && (
           <Suspense fallback={null}>
-            <LoginBrand3D onFail={() => setHero("still")} />
+            <LoginLogo3D onFail={() => setHero("still")} />
           </Suspense>
         )}
         {(hero === "still" || hero === "css") && (
           <div className="lg-brand2d">
-            <span className="lg-shine"><BrandLogo size={112} rounded={24} /></span>
-            <div className="lg-tagline is-on">
-              {TAGLINE.split("").map((c, i) => <span key={i} style={{ transitionDelay: `${i * 35}ms` }}>{c === " " ? "\u00a0" : c}</span>)}
-            </div>
+            <span className="lg-logo2d" style={{ "--logo": `url("${logoOnDark}")` }}><img src={logoOnDark} alt="" draggable={false} /></span>
           </div>
         )}
+        {company && <div className="lg-company-line">{company}</div>}
         <div className="lg-vignette" />
       </div>
 
-      <header className="lg-brand">
-        <div className="lg-brand-text">
-          {company && <div className="lg-company">{company}</div>}
-          <p className="lg-line" aria-label={line}>
-            {line.split(" ").map((w, i) => <span key={i} style={{ animationDelay: `${180 + i * 60}ms` }}>{w} </span>)}
-          </p>
-        </div>
-      </header>
+      {/* Screen readers get the brand in words; the hero above is decorative. */}
+      <h1 className="sr-only">{company || "SHANTAZ"} — {line}</h1>
 
       <main className="lg-panel">
         <div className="lg-card">
           <div className="lg-card-head">
             <h2 className="lg-title">Sign in</h2>
-            <p className="lg-sub">Use the username and password given to you by your administrator.</p>
+            <p className="lg-sub">Use the login your admin gave you.</p>
           </div>
 
           {notice && (
@@ -216,8 +218,9 @@ export default function LoginPage({ notice = "", onRetry = null }) {
             </button>
           </form>
 
-          <p className="lg-foot">Forgot your password? Ask your administrator to reset it.</p>
+          <p className="lg-foot">Forgot password? Ask your admin.</p>
         </div>
+        <MadeInIndia className="lg-india" />
       </main>
     </div>
   );

@@ -13,8 +13,8 @@
    Colour   steel neutrals; cobalt = action; meaning only:
             green ok · amber waiting · violet rack · red problem · grey done
    Motion   120 tap · 200 ui · 450 sheet/page · 900 hero
-            enter (.23,1,.32,1) · drawer (.32,.72,0,1) · exit (.4,0,1,1) · pop (.3,1.6,.5,1)
-            UI motion ≤300ms; sheets 450ms; hero 900ms; celebration ≤1.2s
+            enter (.23,1,.32,1) · drawer (.32,.72,0,1) · pop (.3,1.6,.5,1)
+            UI motion ≤300ms; sheets 300ms (drawer curve); hero 900ms; celebration ≤1.2s
    ═══════════════════════════════════════════════════════════════════════════ */
 :root {
   --font-display: "Archivo", "Noto Sans Devanagari", "Noto Sans Gujarati", system-ui, sans-serif;
@@ -41,8 +41,8 @@
   --e2: 0 8px 20px -8px rgba(14, 23, 38, .20), 0 0 0 1px rgba(14, 23, 38, .05);
   --e3: 0 -10px 40px -10px rgba(10, 18, 32, .38), 0 0 0 1px rgba(14, 23, 38, .06);
 
-  --dur-tap: 120ms; --dur-ui: 200ms; --dur-sheet: 450ms; --dur-hero: 900ms;
-  --ease-enter: cubic-bezier(.23, 1, .32, 1); --ease-exit: cubic-bezier(.4, 0, 1, 1); --ease-pop: cubic-bezier(.3, 1.6, .5, 1);
+  --dur-tap: 120ms; --dur-ui: 200ms; --dur-sheet: 300ms; --dur-hero: 900ms;
+  --ease-enter: cubic-bezier(.23, 1, .32, 1); --ease-pop: cubic-bezier(.3, 1.6, .5, 1);
   --ease-drawer: cubic-bezier(.32, .72, 0, 1); --ease-move: cubic-bezier(.77, 0, .175, 1);
 }
 
@@ -66,7 +66,7 @@
   .app-shell a, .app-shell [role="button"] { -webkit-tap-highlight-color: transparent; }
 
   /* Page / route transition: each page mounts fresh, so the entrance runs once. */
-  .app-shell > .flex-1, .app-shell > main, .app-shell > div.flex-1 { animation: wu-page 280ms var(--ease-enter) backwards; }
+  .app-shell > .flex-1, .app-shell > main, .app-shell > div.flex-1 { animation: wu-page 200ms var(--ease-enter) backwards; }
   @keyframes wu-page { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
   /* Lists stagger in (≤40ms a step, capped at 8 steps) */
@@ -438,3 +438,277 @@
   .arrival-banner { animation: none !important; }
   .wu-progress-track i { transition: none; }
 }
+
+/* ═══ Review fixes (supervisor 9676d4f) ═══════════════════════════════════ */
+@media screen {
+  /* Disabled primary = neutral "not yet", never a washed brand colour. Tap still flags the missing box. */
+  .modal-backdrop button[data-accept-confirm]:disabled,
+  .modal-backdrop button[data-finish-confirm]:disabled,
+  .modal-backdrop button[data-hold-confirm]:disabled,
+  .modal-backdrop button[data-raise-send]:disabled,
+  .wu-btn:disabled {
+    background: #E3E7ED !important; color: #64748B !important; box-shadow: none !important; opacity: 1 !important; filter: none !important;
+  }
+  /* Finish & Transfer confirm: green = go, one line, 48px */
+  .modal-backdrop button[data-finish-confirm] {
+    background: linear-gradient(180deg, #1A9049, var(--ok)) !important; color: #fff !important; min-height: 48px; border-radius: 12px !important;
+    font-size: 15px !important; font-weight: 700 !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; padding: 0 16px !important;
+  }
+  .modal-backdrop span:has(> button[data-finish-confirm]) { flex: 1 1 auto; min-width: 0; display: flex; justify-content: flex-end; }
+  .modal-backdrop span:has(> button[data-finish-confirm]) > button { flex: 0 1 auto; }
+  [data-accept-confirm] { white-space: nowrap; }
+
+  /* Accept sheet: plain "Accepting as" line */
+  .wu-as { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--ink-2); padding: 2px 2px; }
+  .wu-as b { color: var(--ink); font-weight: 700; }
+  .wu-as svg { color: var(--steel-500); }
+
+  /* Route strip: four equal, flat, tappable cells; the current step gets a top bar */
+  .wu-step, .wu-step.is-now { background: rgba(255, 255, 255, .05) !important; box-shadow: none !important; color: var(--steel-300) !important; position: relative; border: 1px solid rgba(255, 255, 255, .08); animation: none; }
+  .wu-step::before { content: ""; position: absolute; left: 22%; right: 22%; top: 0; height: 3px; border-radius: 0 0 3px 3px; background: transparent; transition: background-color var(--dur-ui) var(--ease-enter); }
+  .wu-step.is-now::before { background: #8FA6FF; }
+  .wu-step.is-now .wu-step-n { color: #fff !important; }
+  .wu-step.is-now .wu-step-l { color: #fff; }
+  .wu-route { gap: 6px; padding: 6px; }
+  .wu-route-sep { display: none; }
+  @media (hover: hover) and (pointer: fine) { .wu-step:hover { background: rgba(255, 255, 255, .1) !important; } }
+
+  /* My Dashboard: white header, sentence case, tinted pills */
+  .wu-md-head { background: #fff; color: var(--ink); border-bottom: 1px solid var(--line); }
+  .wu-md-title { font: 700 20px/1.2 var(--font-display); font-stretch: 106%; display: flex; align-items: center; gap: 6px; }
+  .wu-md-sub { font-size: 14px; color: var(--ink-3); margin-top: 2px; }
+  .wu-md-close { background: #F3F5F8; color: var(--ink-2); border: 1px solid var(--line); font-size: 15px; font-weight: 600; }
+  .wu-md-h { font: 700 16px/1.2 var(--font-display); color: var(--ink); display: flex; align-items: center; justify-content: center; gap: 6px; }
+  [data-my-dash-times] .wu-md-h { justify-content: flex-start; }
+  .wu-md-num { font: 700 48px/1 var(--font-display); font-stretch: 108%; color: var(--ok); }
+  .wu-md-row { background: #F7F8FA; border: 1px solid var(--line); }
+  .wu-md-pill { font-size: 14px; font-weight: 700; padding: 6px 12px; border-radius: 999px; border: 1px solid transparent; }
+  .wu-md-pill.is-ok { color: var(--ok); background: var(--ok-wash); border-color: var(--ok-line); }
+  .wu-md-pill.is-bad { color: var(--bad); background: var(--bad-wash); border-color: var(--bad-line); }
+  [data-my-dashboard] > div { background: var(--porcelain) !important; }
+  [data-my-dashboard] [data-my-dash-stars], [data-my-dashboard] [data-my-dash-count], [data-my-dashboard] [data-my-dash-times] { border: 0 !important; box-shadow: var(--e1); border-radius: var(--r-card) !important; }
+
+  /* Touch sizes inside sheets: mic, close, signature buttons */
+  .modal-backdrop [data-voice-record] { min-width: 40px !important; min-height: 40px !important; }
+  .modal-backdrop .modal-x { min-width: 40px; min-height: 40px; }
+  [data-accept-signature] button { min-height: 40px !important; padding-left: 14px; padding-right: 14px; border-radius: 10px; }
+
+  /* Login: the form is there from the first frame; only the hero animates */
+  .lg-card { animation-name: lg-sheet-in !important; }
+  @keyframes lg-sheet-in { from { transform: translateY(8px); } to { transform: none; } }
+}
+@media screen and (min-width: 768px) {
+  /* Toast / arrival banner: top-right, never over the page title */
+  .arrival-banner { left: auto !important; right: 16px !important; top: 16px !important; transform: none !important; width: min(420px, calc(100vw - 32px)) !important; animation-name: wu-drop-r !important; }
+  @keyframes wu-drop-r { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: none; } }
+  .modal-backdrop .modal-x { min-width: 40px; min-height: 40px; }
+}
+@media screen and (min-width: 1024px) {
+  /* Staff header on a laptop: one row — department, route, My Dashboard */
+  .wu-staff-hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(360px, 520px) auto; align-items: center; gap: 20px; padding: 16px 20px; }
+  .wu-hero-row { align-items: center; }
+  .wu-route { margin-top: 0; }
+  .wu-mydash, .wu-staff-hero [data-my-dashboard-open] { margin-top: 0; width: auto !important; min-height: 44px !important; padding: 0 16px; }
+}
+@media screen and (min-width: 640px) {
+  /* Card primary: auto width, right aligned, quiet shadow */
+  .wu-card > .wu-btn { align-self: flex-end; width: auto; min-width: 200px; }
+  .wu-ok, .wu-rack { box-shadow: 0 1px 0 rgba(255, 255, 255, .2) inset, 0 1px 2px rgba(14, 23, 38, .16) !important; }
+}
+
+/* ═══ ADMIN PAGES — one tile anatomy, neutral surfaces, colour = meaning ══ */
+@media screen {
+  /* Dashboard hero tiles: neutral icon, no coloured rules; status is a dot + word */
+  .hero-tile { border-radius: var(--r-card) !important; background: var(--paper) !important; border: 0 !important; box-shadow: var(--e1) !important; }
+  .hero-tile::before, .hero-tile::after { display: none !important; }
+  .hero-tile-icon { background: #F3F5F8 !important; color: var(--ink-2) !important; border-radius: 12px !important; }
+  .hero-tile-value { font-family: var(--font-display) !important; font-stretch: 108%; }
+  .hero-tile-label { font-size: 13px !important; color: var(--ink-2) !important; }
+  .hero-tile-trend { background: transparent !important; padding: 0 !important; font-size: 12.5px !important; font-weight: 600 !important; display: inline-flex; align-items: center; gap: 6px; }
+  .hero-tile-trend::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  @media (hover: hover) and (pointer: fine) { .hero-tile:hover { transform: none !important; box-shadow: var(--e2) !important; } }
+  .kpi-tile > div:first-child > span:first-child { color: var(--ink-3) !important; }
+  .kpi-tile .kpi-value { font-family: var(--font-display); font-stretch: 108%; }
+  /* Production overview tiles: white, hairline; the number carries the colour */
+  .wu-tile { background: #F7F8FA; border: 1px solid var(--line); transition: box-shadow var(--dur-ui) var(--ease-enter), border-color var(--dur-ui) var(--ease-enter); }
+  .wu-tile[data-on] { background: #fff; box-shadow: inset 3px 0 0 var(--tone); }
+  @media (hover: hover) and (pointer: fine) { button.wu-tile:hover { border-color: var(--line-strong); box-shadow: var(--e2); } button.wu-tile[data-on]:hover { box-shadow: inset 3px 0 0 var(--tone), var(--e2); } }
+  .wu-tile .kpi-value { font-family: var(--font-display); font-stretch: 108%; }
+
+  /* Card-level secondary actions (ON HOLD / Release / Delete): 40px, line icon */
+  .wu-cardbtn { min-height: 40px; padding: 0 14px; border-radius: 10px; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; border: 1px solid var(--line-strong); background: #fff; color: var(--ink-2); }
+  .wu-cardbtn-bad { color: var(--bad); border-color: var(--bad-line); }
+  .wu-cardbtn-ok { color: var(--ok); border-color: var(--ok-line); }
+  @media (hover: hover) and (pointer: fine) { .wu-cardbtn-bad:hover { background: var(--bad-wash); } .wu-cardbtn-ok:hover { background: var(--ok-wash); } }
+
+  /* Machine Tracker admin search: a 44px field, not the biggest thing on the page */
+  [data-mt-search-input] { min-height: 44px !important; height: 44px; border-width: 1px !important; border-color: var(--line-strong) !important; border-radius: var(--r-ctl) !important; font-size: 15px !important; font-weight: 500 !important; box-shadow: var(--e1); }
+
+  /* Tables: sticky quiet header, hairlines, tabular numbers */
+  .app-shell table:not(.mr-table):not(.rpt-table) { font-variant-numeric: tabular-nums; }
+  .app-shell table:not(.mr-table):not(.rpt-table) thead th { position: sticky; top: 0; z-index: 1; background: #F7F8FA; font-size: 12px; text-transform: none; letter-spacing: 0; color: var(--ink-3); font-weight: 600; border-bottom: 1px solid var(--line); }
+  .app-shell table:not(.mr-table):not(.rpt-table) tbody tr { transition: background-color var(--dur-ui) var(--ease-enter); }
+  @media (hover: hover) and (pointer: fine) { .app-shell table:not(.mr-table):not(.rpt-table) tbody tr:hover { background: #F7F9FC; } }
+
+  /* Forms across the ERP: 40-44px controls, one radius, one focus ring */
+  .app-shell input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]):not(.lg-input),
+  .app-shell select { border-radius: 10px; }
+  .app-shell input:focus-visible, .app-shell select:focus-visible, .app-shell textarea:focus-visible { outline: none !important; box-shadow: 0 0 0 4px var(--action-ring) !important; border-color: var(--action) !important; }
+
+  /* Primary / secondary buttons (shared Btn) */
+  .btn-primary-brand { background: linear-gradient(180deg, #3558E0, var(--action-strong)) !important; color: #fff !important; border-radius: 10px !important; box-shadow: 0 1px 0 rgba(255, 255, 255, .2) inset, 0 1px 2px rgba(14, 23, 38, .18) !important; }
+  .btn-ghost, .btn-secondary { border-radius: 10px !important; }
+
+  /* Settings / page tab bars: segmented, calm */
+  .app-shell [role="tablist"] { gap: 4px; }
+  .app-shell [role="tab"][aria-selected="true"] { color: var(--action) !important; }
+
+  /* Empty states: quiet, with one next step */
+  .empty-state-icon { color: var(--steel-400) !important; }
+}
+@media screen and (max-width: 767.98px) {
+  /* Dark phone header: header buttons are dark tiles too */
+  .page-header .page-header-actions > button:not([data-reports-menu]):not([data-mt-settings]),
+  .page-header .page-header-actions > a { background: rgba(255, 255, 255, .08) !important; color: #fff !important; border: 1px solid rgba(255, 255, 255, .16) !important; box-shadow: none !important; }
+  .page-header .page-header-actions > button:not([data-reports-menu]):not([data-mt-settings]).btn-primary-brand { background: var(--action) !important; border-color: transparent !important; }
+  .page-header .page-header-actions button[aria-label^="Departments called"] { min-width: 44px; min-height: 44px; }
+  /* Dashboard grid padding on a phone */
+  .app-shell .p-6 { padding: 16px !important; }
+}
+
+/* ═══ Motion across the ERP (owner 11:58) ═════════════════════════════════ */
+@media screen {
+  /* Scroll reveal: only for cards that start below the fold (JS adds .wu-reveal) */
+  .wu-reveal { opacity: 0; transform: translateY(10px); transition: opacity 320ms var(--ease-enter), transform 320ms var(--ease-enter); }
+  .wu-reveal.wu-in { opacity: 1; transform: none; }
+
+  /* Sticky header compacts once the page scrolls */
+  .page-header { transition: padding var(--dur-ui) var(--ease-enter), box-shadow var(--dur-ui) var(--ease-enter); }
+  .page-header.is-compact { padding-top: 8px !important; padding-bottom: 8px !important; box-shadow: 0 6px 20px -14px rgba(14, 23, 38, .45); }
+  .page-header.is-compact p { display: none; }
+
+  /* Sidebar: active indicator grows in; hover is quiet */
+  .app-sidebar .sb-indicator { animation: wu-ind 260ms var(--ease-enter) backwards; transform-origin: center; }
+  @keyframes wu-ind { from { transform: scaleY(.2); opacity: 0; } to { transform: none; opacity: 1; } }
+
+  /* Machine cards: hover lift on laptop, press on phone */
+  @media (hover: hover) and (pointer: fine) {
+    .mt-card.wu-card, .mt-card:not(.no-lift) { transition: transform var(--dur-ui) var(--ease-enter), box-shadow var(--dur-ui) var(--ease-enter); }
+    .mt-card.wu-card:hover { transform: translateY(-2px); box-shadow: var(--e2) !important; }
+  }
+  .wu-card:active:not(:has(button:active)) { transform: scale(.995); }
+
+  /* Route: the current step carries a soft moving dot */
+  .wu-step.is-now::after { content: ""; position: absolute; top: 7px; right: 9px; width: 6px; height: 6px; border-radius: 50%; background: #8FA6FF; box-shadow: 0 0 0 0 rgba(143, 166, 255, .6); animation: wu-dot 2.4s var(--ease-enter) infinite; }
+  @keyframes wu-dot { 0% { box-shadow: 0 0 0 0 rgba(143, 166, 255, .55); } 70% { box-shadow: 0 0 0 8px rgba(143, 166, 255, 0); } 100% { box-shadow: 0 0 0 0 rgba(143, 166, 255, 0); } }
+
+  /* Rack: a crate settles into its slot when a machine is placed */
+  .rack-crate { animation: wu-crate 380ms var(--ease-pop) backwards; }
+  @keyframes wu-crate { from { opacity: 0; transform: translateY(-8px) scale(.94); } to { opacity: 1; transform: none; } }
+
+  /* Ready popup: the seal turns once like a medal, then catches the light */
+  .rp-seal { perspective: 400px; }
+  .rp-seal svg { animation: wu-medal 1.1s var(--ease-enter) 120ms backwards; }
+  @keyframes wu-medal { from { transform: rotateY(-200deg) scale(.7); opacity: 0; } 60% { opacity: 1; } to { transform: none; opacity: 1; } }
+  .rp-seal { position: relative; overflow: hidden; }
+  .rp-seal::after { content: ""; position: absolute; inset: -30%; background: linear-gradient(115deg, transparent 40%, rgba(255, 255, 255, .7) 50%, transparent 60%); transform: translateX(-120%); animation: lg-shine 900ms var(--ease-enter) 900ms 1 forwards; pointer-events: none; }
+
+  /* Boot skeleton (session restore) */
+  .wu-boot { min-height: 100vh; min-height: 100dvh; display: flex; background: var(--porcelain); }
+  .wu-boot-side { width: 240px; background: var(--steel-900); padding: 18px 14px; display: flex; flex-direction: column; gap: 12px; }
+  .wu-boot-side .wu-sk { background: linear-gradient(90deg, #1E2C45 0%, #2A3B5A 40%, #1E2C45 80%) !important; background-size: 240% 100% !important; height: 14px; border-radius: 6px; }
+  .wu-boot-main { flex: 1; padding: 24px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .wu-boot-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .wu-boot-note { font-size: 13px; color: var(--ink-3); font-weight: 600; }
+  @media (max-width: 767.98px) { .wu-boot-side { display: none; } .wu-boot-row { grid-template-columns: 1fr; } .wu-boot-main { padding: 16px; } }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wu-reveal { opacity: 1 !important; transform: none !important; }
+  .wu-step.is-now::after, .rack-crate, .rp-seal svg, .rp-seal::after, .app-sidebar .sb-indicator { animation: none !important; }
+}
+
+@media screen {
+  /* Sidebar section names in sentence case (data is "OVERVIEW") */
+  .app-sidebar .sb-section { text-transform: lowercase !important; }
+  .app-sidebar .sb-section::first-letter { text-transform: uppercase; }
+}
+
+/* ═══ Login review L1-L9 ═══════════════════════════════════════════════════ */
+@media screen {
+  .lg-root { grid-template-rows: minmax(250px, 40dvh) 1fr !important; }
+  .lg-panel { grid-row: 2 !important; }
+  .lg-brand { display: none !important; }
+  /* the intro itself is the entrance: no extra fade hiding the sparks */
+  .lg-3d { opacity: 1 !important; animation: none !important; }
+  .lg-3d canvas { -webkit-mask-image: none !important; mask-image: none !important; }
+  /* soft floor light under the letters (no geometry, no banding) */
+  .lg-brand3d::after, .lg-brand2d::after { content: ""; position: absolute; left: 15%; right: 15%; top: 56%; height: 22%; pointer-events: none;
+    background: radial-gradient(50% 50% at 50% 0%, rgba(232, 150, 46, .10), transparent 70%); }
+  .lg-tagline .lg-company, .lg-brand2d .lg-company { display: block; margin-top: 12px; font: 600 11px/1.2 var(--font-body) !important; letter-spacing: .18em !important; color: #8D9AB0 !important; text-transform: uppercase; animation: none !important; }
+  /* Flat wordmark (reduced motion / low-end / no WebGL): red enamel, steel edge, one light sweep */
+  .lg-wordmark { position: relative; font: 900 clamp(48px, 15vw, 96px)/1 var(--font-display); font-stretch: 112%; letter-spacing: .01em;
+    color: #B3121D; filter: drop-shadow(0 1px 0 #D9DEE6) drop-shadow(0 2px 0 #6E7787) drop-shadow(0 14px 22px rgba(0, 0, 0, .45));
+    background: linear-gradient(110deg, #B3121D 0%, #B3121D 42%, #F06A72 50%, #B3121D 58%, #B3121D 100%); background-size: 260% 100%; background-position: 100% 0;
+    -webkit-background-clip: text; background-clip: text; animation: lg-sweep 1.4s var(--ease-enter) .4s 1 forwards; }
+  @supports (-webkit-background-clip: text) { .lg-wordmark { -webkit-text-fill-color: transparent; } }
+  @keyframes lg-sweep { to { background-position: 0 0; } }
+  .lg-brand2d { gap: 16px; }
+  @media (min-width: 1024px) { .lg-wordmark { font-size: 104px; } }
+  /* Laptop card: pure white, hairline, radius 20 */
+  @media (min-width: 1024px) {
+    .lg-root { grid-template-rows: 1fr !important; }
+    .lg-panel { grid-row: 1 !important; }
+    .lg-card { background: #fff !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; border-radius: 20px !important;
+      box-shadow: 0 40px 90px -30px rgba(0, 0, 0, .7), 0 0 0 1px rgba(14, 23, 38, .08) !important; }
+  }
+  /* Short phones (360x640): smaller hero so the whole form fits without scrolling */
+  @media (max-width: 1023px) and (max-height: 700px) {
+    .lg-root { grid-template-rows: minmax(180px, 30dvh) 1fr !important; }
+    .lg-brand3d, .lg-brand2d { height: max(180px, 30dvh) !important; }
+    .lg-card { padding-top: 20px !important; }
+    .lg-card-head { margin-bottom: 14px; }
+    .lg-title { font-size: 22px; }
+    .lg-form { gap: 10px; }
+    .lg-foot { margin-top: 12px; }
+    .lg-wordmark { font-size: 52px; }
+  }
+}
+@media (prefers-reduced-motion: reduce) { .lg-wordmark { animation: none !important; background-position: 50% 0; } }
+
+/* ═══ Login: the real SHANTAZ logo + Made in India ════════════════════════ */
+@media screen {
+  .lg-brand3d::after { display: none; }
+  .lg-3d { inset: 4% 0 6% 0 !important; }
+  .lg-company-line { position: absolute; z-index: 2; left: 0; right: 0; top: calc(max(250px, 40dvh) - 30px); text-align: center;
+    font: 600 11px/1 var(--font-body); letter-spacing: .2em; text-transform: uppercase; color: #7F8CA3; pointer-events: none; }
+  /* flat logo (reduced motion / low-end): same artwork, one soft shine across it */
+  .lg-brand2d { padding: 0 6%; }
+  .lg-logo2d { position: relative; display: block; width: min(86vw, 420px); }
+  .lg-logo2d img { display: block; width: 100%; height: auto; filter: drop-shadow(0 18px 30px rgba(0, 0, 0, .45)); animation: wu-fade 500ms var(--ease-enter) backwards; }
+  .lg-logo2d::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(110deg, transparent 38%, rgba(255, 255, 255, .75) 50%, transparent 62%) no-repeat; background-size: 250% 100%; background-position: 130% 0;
+    -webkit-mask: var(--logo) center / contain no-repeat; mask: var(--logo) center / contain no-repeat; animation: lg-shine2 1.3s var(--ease-enter) .5s 1 forwards; }
+  @keyframes lg-shine2 { to { background-position: -30% 0; } }
+
+  /* Made in India: small, calm, under the card */
+  .made-in-india { display: inline-flex; align-items: center; gap: 8px; font: 600 12px/1 var(--font-body); letter-spacing: .02em; }
+  .made-in-india .india-flag { flex-shrink: 0; border-radius: 2px; box-shadow: 0 0 0 1px rgba(14, 23, 38, .12); }
+  .lg-panel { flex-direction: column; }
+  .lg-india { justify-content: center; color: var(--ink-3); background: #fff; padding: 0 20px calc(16px + env(safe-area-inset-bottom)); width: 100%; }
+  .lg-card { padding-bottom: 14px !important; flex: 1 1 auto; }
+  @media (min-width: 1024px) {
+    .lg-panel { justify-content: center; align-items: flex-end; }
+    .lg-card { flex: 0 0 auto; width: 100%; max-width: 420px; padding-bottom: 30px !important; }
+    .lg-india { background: transparent; color: #8D9AB0; width: 100%; max-width: 420px; margin-top: 16px; padding: 0; }
+    .lg-india .india-flag { box-shadow: 0 0 0 1px rgba(255, 255, 255, .18); }
+    .lg-company-line { top: auto; bottom: 48px; right: 34vw; }
+    .lg-logo2d { width: min(46vw, 560px); }
+  }
+  @media (max-width: 1023px) and (max-height: 700px) { .lg-company-line { top: calc(max(180px, 30dvh) - 24px); } }
+
+  /* Desktop sidebar footer: Made in India under the profile */
+  .sb-india { display: flex; justify-content: center; padding: 8px 0 2px; color: #7F8CA3; }
+  .sb-india .made-in-india { font-size: 11px; }
+  @media (max-width: 767.98px) { .sb-india { display: none; } }
+}
+@media (prefers-reduced-motion: reduce) { .lg-logo2d::after { animation: none !important; display: none; } }

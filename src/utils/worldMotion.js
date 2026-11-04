@@ -80,3 +80,59 @@ export function installSheetGestures() {
   document.addEventListener("pointerup", end, { passive: true });
   document.addEventListener("pointercancel", end, { passive: true });
 }
+
+// installScrollReveal()  cards below the fold rise in once as they scroll into
+//                    view (≤40ms stagger per batch). Anything already on screen
+//                    is left alone, so nothing a worker can see is ever hidden,
+//                    and a click is never delayed. Reduced motion: off.
+// installHeaderCompact()  the sticky page header tightens once the page scrolls.
+const REVEAL = ".section-card, .kpi-tile, .hero-tile, .wu-card, .wu-tile, .rack-crate, .wu-sent";
+export function installScrollReveal() {
+  if (typeof window === "undefined" || window.__wuReveal || !("IntersectionObserver" in window) || reduced()) return;
+  window.__wuReveal = true;
+  let batch = [];
+  let flushT = 0;
+  const flush = () => {
+    flushT = 0;
+    batch.sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top)
+      .forEach((el, i) => { el.style.transitionDelay = `${Math.min(i, 8) * 40}ms`; el.classList.add("wu-in"); });
+    batch = [];
+  };
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach((e) => {
+      if (!e.isIntersecting) return;
+      io.unobserve(e.target); batch.push(e.target);
+      if (!flushT) flushT = requestAnimationFrame(flush);
+    });
+  }, { rootMargin: "0px 0px -6% 0px", threshold: 0.01 });
+  const consider = (el) => {
+    if (el.__wuSeen || el.closest(".modal-backdrop, [data-my-dashboard], .rp-backdrop, .tc-form, .app-sidebar, .mr-paper, .rpt-sheet")) return;
+    el.__wuSeen = true;
+    const r = el.getBoundingClientRect();
+    if (r.top < window.innerHeight && r.bottom > 0) return;   // already visible: never hide it
+    el.classList.add("wu-reveal"); io.observe(el);
+  };
+  const scan = (root) => {
+    if (!root || root.nodeType !== 1) return;
+    if (root.matches && root.matches(REVEAL)) consider(root);
+    root.querySelectorAll && root.querySelectorAll(REVEAL).forEach(consider);
+  };
+  const mo = new MutationObserver((muts) => muts.forEach((m) => m.addedNodes.forEach(scan)));
+  const start = () => { scan(document.body); mo.observe(document.body, { childList: true, subtree: true }); };
+  if (document.body) start(); else document.addEventListener("DOMContentLoaded", start);
+}
+
+export function installHeaderCompact() {
+  if (typeof window === "undefined" || window.__wuHeader) return;
+  window.__wuHeader = true;
+  let raf = 0;
+  document.addEventListener("scroll", (e) => {
+    const el = e.target;
+    if (raf || !el || el.nodeType !== 1) return;
+    raf = requestAnimationFrame(() => {
+      raf = 0;
+      const head = el.querySelector && el.querySelector(":scope > .page-header");
+      if (head) head.classList.toggle("is-compact", el.scrollTop > 24);
+    });
+  }, { capture: true, passive: true });
+}

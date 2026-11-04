@@ -21,6 +21,7 @@ import { useAuth } from "./auth/AuthContext.jsx";
 import { fetchDeptRoster, updateUserDepartments } from "./auth/authStore.js";
 import LoginPage from "./pages/LoginPage.jsx";
 import { celebrate } from "./utils/worldMotion.js";
+import { MadeInIndia } from "./components/IndiaFlag.jsx";
 import BrandLogo from "./components/BrandLogo.jsx";
 import { LeadIcon, LeadLabel, Glyph } from "./components/LeadIcon.jsx";
 import UserManagementPage from "./pages/UserManagementPage.jsx";
@@ -656,6 +657,7 @@ function Sidebar({ activePage, setActivePage, collapsed, setCollapsed, badges = 
       {/* ── User Profile Menu ── */}
       <div className="px-3 pb-3 pt-2 relative sb-divider-top">
         <UserProfileMenu collapsed={collapsed} />
+        {!collapsed && <div className="sb-india"><MadeInIndia /></div>}
         <button onClick={() => setCollapsed(!collapsed)}
           className="sb-collapse mt-1 w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg transition-all text-[9px] font-bold tracking-[0.08em] uppercase">
           {collapsed ? "▶" : <><span>◀</span><span>Collapse</span></>}
@@ -1006,7 +1008,7 @@ function DashboardPage({ items = {}, pos = [], vendorList = [], machineLog = [],
                 <span style={{ color: kpi.color }}><kpi.Icon size={17} strokeWidth={2} aria-hidden="true" /></span>
                 {kpi.alert && <span className="w-1.5 h-1.5 rounded-full" style={{ background: kpi.color }} />}
               </div>
-              <div className="text-[22px] font-extrabold tabular-nums leading-none tracking-[-0.02em]" style={{ color: kpi.alert ? kpi.color : "var(--text-strong)" }}>{kpi.value}</div>
+              <CountUpValue value={kpi.value} className="kpi-value block text-[22px] font-extrabold tabular-nums leading-none tracking-[-0.02em]" style={{ color: kpi.alert ? kpi.color : "var(--text-strong)" }} />
               <div className="text-[11px] font-semibold mt-2 leading-tight" style={{ color: "var(--text-muted)" }}>{kpi.label}</div>
               <div className="text-[10px] mt-1 truncate" style={{ color: "var(--text-dim)" }}>{kpi.sub}</div>
             </button>
@@ -1036,9 +1038,9 @@ function DashboardPage({ items = {}, pos = [], vendorList = [], machineLog = [],
                 { label: "Awaiting acceptance", n: production.awaiting, color: "#b45309", bg: "rgba(217,119,6,0.10)", nav: "machines", hint: production.onRack > 0 ? `Not yet accepted · ${production.onRack} on rack` : "Transferred, not yet accepted" },
                 { label: "Open pending jobs", n: production.openJobs.length, color: "#0e7490", bg: "rgba(14,116,144,0.10)", nav: "machines", hint: "Must close before Ready" },
               ].map((a) => (
-                <button key={a.label} onClick={() => onNavigate?.(a.nav)} className="text-left rounded-xl px-3.5 py-3 transition-colors"
-                        style={{ background: a.n > 0 ? a.bg : "rgba(17,24,39,0.03)", border: `1px solid ${a.n > 0 ? a.color + "40" : "rgba(17,24,39,0.06)"}` }}>
-                  <div className="text-[22px] font-extrabold tabular-nums leading-none" style={{ color: a.n > 0 ? a.color : "var(--text-strong)" }}>{a.n}</div>
+                <button key={a.label} onClick={() => onNavigate?.(a.nav)} className="wu-tile text-left rounded-xl px-3.5 py-3" data-on={a.n > 0 || undefined}
+                        style={{ "--tone": a.color }}>
+                  <CountUpValue value={a.n} className="kpi-value block text-[22px] font-extrabold tabular-nums leading-none" style={{ color: a.n > 0 ? a.color : "var(--text-strong)" }} />
                   <div className="text-[11px] font-semibold mt-1.5" style={{ color: "var(--text-muted)" }}>{a.label}</div>
                   <div className="text-[10px] mt-0.5" style={{ color: "var(--text-dim)" }}>{a.hint}</div>
                 </button>
@@ -1052,8 +1054,8 @@ function DashboardPage({ items = {}, pos = [], vendorList = [], machineLog = [],
                 <div className="text-[10px] font-semibold mb-1.5" style={{ color: "var(--text-dim)" }}>Machines by current stage</div>
                 <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
                   {Object.entries(production.byStage).map(([st, n]) => (
-                    <div key={st} className="rounded-lg px-2.5 py-2 text-center" style={{ background: n > 0 ? (STAGE_COLORS[st] || "#6b7280") + "14" : "rgba(17,24,39,0.03)", border: `1px solid ${n > 0 ? (STAGE_COLORS[st] || "#6b7280") + "40" : "rgba(17,24,39,0.06)"}` }}>
-                      <div className="text-[18px] font-extrabold tabular-nums leading-none" style={{ color: n > 0 ? (STAGE_COLORS[st] || "#374151") : "var(--text-dim)" }}>{n}</div>
+                    <div key={st} className="wu-tile wu-tile-sm rounded-lg px-2.5 py-2 text-center">
+                      <CountUpValue value={n} className="kpi-value block text-[18px] font-extrabold tabular-nums leading-none" style={{ color: n > 0 ? "var(--text-strong)" : "var(--text-dim)" }} />
                       <div className="text-[10px] font-semibold mt-1 leading-tight" style={{ color: "var(--text-muted)" }}>{st === "BOM Issued" ? "Issued" : st}</div>
                     </div>
                   ))}
@@ -18493,21 +18495,20 @@ function StaffMyDashboard({ departments = [], handovers = [], deptRatings = [], 
          onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="w-full sm:max-w-3xl h-full sm:h-auto sm:max-h-[92vh] flex flex-col sm:rounded-2xl overflow-hidden"
            style={{ background: "var(--surface-raised, #f8fafc)", boxShadow: "0 24px 70px rgba(17,24,39,0.3)" }}>
-        <div className="flex items-center gap-3 px-4 sm:px-6 py-3 flex-shrink-0" style={{ background: "#2640B0", color: "#fff" }}>
+        <div className="wu-md-head flex items-center gap-3 px-4 sm:px-6 py-3 flex-shrink-0">
           <div className="flex-1 min-w-0">
-            <div className="text-[20px] sm:text-[22px] font-black leading-tight"><LeadIcon e="📊" />My Dashboard</div>
-            <div className="text-[14px] font-bold opacity-90 truncate">{departments.join(", ")}</div>
+            <div className="wu-md-title"><LeadIcon e="📊" />My Dashboard</div>
+            <div className="wu-md-sub truncate">{departments.join(", ")}</div>
           </div>
           <button type="button" data-my-dashboard-close aria-label="Close My Dashboard" onClick={onClose}
-                  className="min-w-[52px] min-h-[52px] px-3 rounded-xl text-[18px] font-black flex items-center justify-center gap-1.5"
-                  style={{ background: "rgba(255,255,255,0.18)", color: "#fff" }}>
+                  className="wu-md-close min-w-[52px] min-h-[52px] px-3 rounded-xl flex items-center justify-center gap-1.5">
             ✕ <span className="text-[15px]">Close</span>
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-3 sm:space-y-4">
+        <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-3 sm:space-y-4 wu-stagger">
           {/* 1. Stars */}
           <div data-my-dash-stars className="rounded-2xl p-4 sm:p-5 text-center" style={card}>
-            <div className="text-[15px] font-black uppercase tracking-[0.06em]" style={{ color: "var(--text-dim)" }}><LeadIcon e="⭐" />Stars</div>
+            <div className="wu-md-h"><LeadIcon e="⭐" />Stars</div>
             <div className="text-[40px] sm:text-[48px] leading-none mt-2 tracking-[0.04em]" aria-label={avg === null ? "No stars yet" : `${avg} out of 5 stars`}>
               <span style={{ color: "#f59e0b" }}>{"★".repeat(full)}</span><span style={{ color: "#d1d5db" }}>{"★".repeat(5 - full)}</span>
             </div>
@@ -18521,14 +18522,14 @@ function StaffMyDashboard({ departments = [], handovers = [], deptRatings = [], 
             {[["This week", thisWeek, "week"], ["This month", thisMonth, "month"]].map(([label, n, k]) => (
               <div key={k} data-my-dash-count={k} className="rounded-2xl p-4 text-center" style={card}>
                 <div className="text-[15px] font-black" style={{ color: "var(--text-dim)" }}><LeadIcon e="✅" />{label}</div>
-                <div className="text-[48px] sm:text-[56px] font-black leading-none mt-2 tabular-nums" style={{ color: "#15803d" }}>{n}</div>
+                <div className="wu-md-num mt-2 tabular-nums">{n}</div>
                 <div className="text-[14px] font-bold mt-1" style={{ color: "var(--text-dim)" }}>machine{n === 1 ? "" : "s"} done</div>
               </div>
             ))}
           </div>
           {/* 2. Time per machine */}
           <div data-my-dash-times className="rounded-2xl p-4 sm:p-5" style={card}>
-            <div className="text-[15px] font-black uppercase tracking-[0.06em] mb-3" style={{ color: "var(--text-dim)" }}><LeadIcon e="⏱" />Time per machine</div>
+            <div className="wu-md-h mb-3"><LeadIcon e="⏱" />Time per machine</div>
             {done.length === 0 && <div className="text-[16px] font-bold py-2" style={{ color: "var(--text-dim)" }}>No machine finished yet.</div>}
             <div className="flex flex-col gap-2">
               {done.map((h) => {
@@ -18537,8 +18538,7 @@ function StaffMyDashboard({ departments = [], handovers = [], deptRatings = [], 
                 const target = Number(h.expectedDurationMinutes) || 0;
                 const late = (Number(h.overrunMinutes) || 0) > 0 || (target > 0 && actual > target);
                 return (
-                  <div key={h.id} data-my-dash-row={h.id} className="flex items-center gap-3 rounded-xl px-3 py-2.5 min-h-[56px]"
-                       style={{ background: late ? "rgba(239,68,68,0.06)" : "rgba(21,128,61,0.06)", border: `1px solid ${late ? "rgba(239,68,68,0.3)" : "rgba(21,128,61,0.25)"}` }}>
+                  <div key={h.id} data-my-dash-row={h.id} className="wu-md-row flex items-center gap-3 rounded-xl px-3 py-2.5 min-h-[56px]">
                     <div className="flex-1 min-w-0">
                       <div className="text-[16px] font-black truncate" style={{ color: "var(--text-strong)" }}>{(m && m.bomLabel) || h.bomKey || (m && m.bomKey) || "Machine"}</div>
                       <div className="text-[14px] font-bold" style={{ color: "var(--text-dim)" }}>
@@ -18548,8 +18548,7 @@ function StaffMyDashboard({ departments = [], handovers = [], deptRatings = [], 
                         <LeadIcon e="⏱" />{formatDuration(actual)}{target ? <span className="font-bold" style={{ color: "var(--text-dim)" }}> / {formatDuration(target)}</span> : null}
                       </div>
                     </div>
-                    <span data-my-dash-badge={late ? "late" : "ontime"} className="flex-shrink-0 text-[15px] font-black px-3 py-2 rounded-full text-white"
-                          style={{ background: late ? "#dc2626" : "#15803d" }}>
+                    <span data-my-dash-badge={late ? "late" : "ontime"} className={`wu-md-pill flex-shrink-0 ${late ? "is-bad" : "is-ok"}`}>
                       {late ? "✗ Late" : "✓ On time"}
                     </span>
                   </div>
@@ -19972,7 +19971,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
             return (
               <div className="wu-line" data-wu-stages aria-label={`Stage: ${stage}`}>
                 {LINE.map((d, i) => <span key={d} className={i < at ? "is-done" : i === at ? "is-now" : ""} title={d} />)}
-                <em>{stage}</em>
+                <em>Step {at + 1} of {LINE.length}</em>
               </div>
             );
           };
@@ -20109,7 +20108,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                           {withPhoto(m, h, <div>
                             <div className="wu-title">{titleOf(m, h)}</div>
                             <div className="wu-meta">
-                              {m?.bomLabel ? `${m.bomLabel} · ` : ""}{m?.rackSlot ? slotLabel(m.rackSlot) : "on the rack"} → {h.toDepartment}
+                              {m?.bomLabel ? `${m.bomLabel} · ` : ""}{m?.rackSlot ? `Rack ${slotLabel(m.rackSlot)}` : "on the rack"}
                             </div>
                           </div>)}
                           {canTakeFromRack && canAccept ? (
@@ -20149,7 +20148,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                           {withPhoto(m, h, <div>
                             <div className="wu-title">{titleOf(m, h)}</div>
                             <div className="wu-meta">
-                              {m?.bomLabel ? `${m.bomLabel} · ` : ""}from {h.fromDepartment} → {h.toDepartment}{waited ? ` · waiting ${waited}` : ""}
+                              {m?.bomLabel ? `${m.bomLabel} · ` : ""}from {h.fromDepartment}{waited ? ` · waiting ${waited}` : ""}
                             </div>
                             {stageLine(h.toDepartment)}
                             {late && <div className="wu-note wu-note-bad"><LeadIcon e="🚦" />ON HOLD — accept deadline passed</div>}
@@ -21640,18 +21639,16 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                         machine.holdActive ? (
                           <button data-needs-net type="button" data-card-release-hold={machine.id}
                                   onClick={() => setHoldModal({ machine, release: true, reason: "", busy: false, error: "" })}
-                                  className="text-[11px] font-black px-3 py-1.5 rounded-lg border transition-all"
-                                  style={{ background: "rgba(21,128,61,0.10)", border: "1px solid rgba(21,128,61,0.4)", color: "#15803d" }}
+                                  className="wu-cardbtn wu-cardbtn-ok"
                                   title="Release this machine from ON HOLD">
-                            ▶ Release ON HOLD
+                            <LeadIcon e="▶" />Release ON HOLD
                           </button>
                         ) : (
                           <button data-needs-net type="button" data-card-hold={machine.id}
                                   onClick={() => setHoldModal({ machine, release: false, reason: "", busy: false, error: "" })}
-                                  className="text-[11px] font-black px-3 py-1.5 rounded-lg border transition-all"
-                                  style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.4)", color: "#b91c1c" }}
+                                  className="wu-cardbtn wu-cardbtn-bad"
                                   title="Put this machine ON HOLD (a reason is required)">
-                            ⏸ ON HOLD
+                            <LeadIcon e="⏸" />ON HOLD
                           </button>
                         )
                       )}
@@ -21660,8 +21657,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
       {currentUser?.role === "super_admin" && onDeleteMachine && machine.stage !== "BOM Issued" && (
         <button type="button" data-card-delete={machine.id}
                 onClick={() => setDeleteModal({ machine, reason: "", busy: false, error: "" })}
-                className="text-[11px] font-black px-3 py-1.5 rounded-lg border transition-all"
-                style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.4)", color: "#b91c1c" }}
+                className="wu-cardbtn wu-cardbtn-bad"
                 title="Delete this machine (Super Admin only)">
           <Trash2 size={13} className="inline -mt-0.5 mr-1" aria-hidden="true" />Delete
         </button>
@@ -22436,7 +22432,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
               {holdModal.release ? (
                 <p className="text-[11px] text-slate-600 mb-3">On hold since {m.holdAt ? new Date(m.holdAt).toLocaleString() : "—"}: {m.holdReason || "no reason recorded"}. Releasing lets the machine be finished, transferred and accepted again.</p>
               ) : (
-                <p className="text-[11px] text-slate-600 mb-3">While on hold the machine cannot be transferred or accepted. Pending jobs, receiving and the checklist keep working. The hold, who set it and the reason stay in the history.</p>
+                <p className="text-[13px] text-slate-600 mb-3">Machine stops here until released.</p>
               )}
               <label className="block text-[11px] font-bold text-slate-600 mb-1">{holdModal.release ? "Note (optional)" : <>Reason <span className="text-red-500">*</span></>}</label>
               <textarea data-hold-reason rows={2} value={holdModal.reason} disabled={holdModal.busy} autoFocus
@@ -22904,7 +22900,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
             </select>
 
             <p className="text-[11px] text-slate-500 mt-3">
-              The machine stays in {here}. The issue is tracked until it is fixed — it never blocks Finish &amp; Transfer.
+              Tracked until fixed — it never blocks Finish &amp; Transfer.
             </p>
 
             {raiseErr && (
@@ -22920,9 +22916,9 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                       style={{ borderColor: "rgba(17,24,39,0.12)" }}>
                 Cancel
               </button>
-              <button type="button" onClick={submit} disabled={raiseBusy}
+              <button type="button" onClick={submit} disabled={raiseBusy} data-raise-send
                       className="flex-[2] min-h-[48px] rounded-xl text-[14px] font-black text-slate-900 transition-all disabled:opacity-50"
-                      style={{ background: "#dc2626", color: "#ffffff" }}>
+                      style={{ background: "#2E50D6", color: "#ffffff" }}>
                 {raiseBusy ? "Sending…" : (raiseDept ? `Call ${raiseDept}` : "Send")}
               </button>
             </div>
@@ -23315,7 +23311,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                   Cancel
                 </button>
                 <span onClick={() => { if ((!transferBusy && isOverrun && !narration.trim())) flagField("[data-transfer-delay]"); }}>
-                <button data-needs-net onClick={submitFinishTransfer} disabled={transferBusy || (isOverrun && !narration.trim())}
+                <button data-needs-net onClick={submitFinishTransfer} data-finish-confirm disabled={transferBusy || (isOverrun && !narration.trim())}
                         className="text-[12px] font-bold text-slate-900 bg-amber-600 hover:bg-amber-700 px-5 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed" style={{ color: "#fff", pointerEvents: (!transferBusy && isOverrun && !narration.trim()) ? "none" : undefined }}>
                   {transferBusy ? "⏳ Please wait…" : rackReturn ? `✓ Assembled · Return to ${slotLabel(machine.rackSlot)}` : `Finish & Transfer → ${toDepartment}`}
                 </button>
@@ -23386,10 +23382,9 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                style={{ background: "rgba(17,24,39,0.45)", backdropFilter: "blur(10px)" }}
                onClick={(e) => e.target === e.currentTarget && !busy && setAcceptModal(null)}>
             <div className="relative w-full max-w-md rounded-2xl overflow-hidden flex flex-col"
-                 style={{ background: "var(--surface-elevated)", border: "1px solid rgba(34,197,94,0.4)", boxShadow: "0 40px 80px rgba(17,24,39,0.22)", maxHeight: "90vh" }}>
+                 style={{ background: "var(--surface-elevated)", border: "1px solid rgba(14,23,38,0.10)", boxShadow: "0 40px 80px rgba(17,24,39,0.22)", maxHeight: "90vh" }}>
               <ModalX onClose={() => setAcceptModal(null)} disabled={!!busy} />
-              <div className="px-6 py-5 border-b border-slate-200 flex-shrink-0"
-                   style={{ background: "linear-gradient(90deg,rgba(34,197,94,0.10),rgba(22,163,74,0.05))" }}>
+              <div className="px-6 py-5 border-b border-slate-200 flex-shrink-0 bg-white" data-sheet-head>
                 <div className="text-sm font-black text-slate-900">Accept into {handover.toDepartment}</div>
                 <div className="text-[11px] text-slate-400 mt-0.5">{handover.bomKey}{handover.serialNo ? ` · S/N ${handover.serialNo}` : ""}</div>
                 {(() => {
@@ -23460,14 +23455,13 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-[12px] text-slate-900 placeholder-slate-500 outline-none focus:border-green-500/60" />
                       </div>
                     ) : (
-                      <div className="rounded-lg px-3 py-2.5" style={{ background: "rgba(34,197,94,0.07)", border: "1px solid rgba(34,197,94,0.3)" }}>
-                        <div className="text-[11px] font-bold text-emerald-200">
-                          Accepting as <span className="text-slate-900">{currentUser?.fullName || currentUser?.username || "you"}</span>
-                        </div>
+                      <div className="wu-as" data-accept-as>
+                        <User size={16} aria-hidden="true" />
+                        <span>Accepting as <b>{currentUser?.fullName || currentUser?.username || "you"}</b></span>
                       </div>
                     )}
                     {acceptDeptEmps.length > 0 && (
-                      <div data-accept-people className="accept-step rounded-xl px-3 py-3" style={{ background: "rgba(99,102,241,0.05)", border: `2px solid ${selectedTeam.length ? "rgba(34,197,94,0.45)" : "rgba(99,102,241,0.3)"}` }}>
+                      <div data-accept-people className="accept-step rounded-xl px-3 py-3" style={{ background: "#fff", border: "1px solid rgba(14,23,38,0.12)" }}>
                         {stepHead(1, "Receiving employees", selectedTeam.length > 0)}
                         <label className="text-[12px] font-bold text-slate-700 block mb-1">Main person</label>
                         <select data-accept-main value={mainName} disabled={busy}
@@ -23500,7 +23494,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                       </div>
                     )}
                     {/* 2026-11-02 — mandatory Digital Signature for every acceptance */}
-                    <div data-accept-signature className="accept-step rounded-xl px-3 py-3" style={{ background: "rgba(17,24,39,0.02)", border: `1px solid ${sigSvg ? "rgba(34,197,94,0.4)" : "rgba(17,24,39,0.15)"}` }}>
+                    <div data-accept-signature className="accept-step rounded-xl px-3 py-3" style={{ background: "#fff", border: "1px solid rgba(14,23,38,0.12)" }}>
                       {stepHead(acceptDeptEmps.length > 0 ? 2 : 1, "Sign here (Digital signature)", !!sigSvg)}
                       {sigSvg ? (
                         <div>
@@ -23534,7 +23528,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                         follow the same "unchecked needs remark" rule as
                         Finish & Transfer. */}
                     {acceptModal.checklistTemplate && (acceptModal.checklistAnswers || []).length > 0 && (
-                      <div data-accept-checklist className="accept-step rounded-xl px-3 py-3" style={{ background: "rgba(46, 80, 214,0.05)", border: "1px solid rgba(46, 80, 214,0.3)" }}>
+                      <div data-accept-checklist className="accept-step rounded-xl px-3 py-3" style={{ background: "#fff", border: "1px solid rgba(14,23,38,0.12)" }}>
                         {stepHead(stepBase + 1, "Check before accepting", false)}
                         <div className="text-[12px] font-semibold text-slate-600 mb-1">
                           <LeadIcon e="📋" />{acceptModal.checklistTemplate.name || "After Acceptance Checklist"}
@@ -23554,7 +23548,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                     )}
 
                     {/* Phase B — raise new pending items at this transfer */}
-                    <div data-accept-pending className="accept-step rounded-xl px-3 py-3" style={{ background: "rgba(17,24,39,0.03)", border: "1px solid rgba(17,24,39,0.10)" }}>
+                    <div data-accept-pending className="accept-step rounded-xl px-3 py-3" style={{ background: "#fff", border: "1px solid rgba(14,23,38,0.12)" }}>
                       {stepHead(stepBase + 1 + (hasChecklist ? 1 : 0), `Anything still pending from ${handover.fromDepartment}?`, false)}
                       <PendingJobRows rows={acceptModal.pendingItemsToRaise || []} inventory={inventoryFlat} disabled={acceptModal.busy}
                                       accent="#dc2626" addLabel="+ Add Pending Item" mode="item" allowComment
@@ -26558,12 +26552,19 @@ export default function App() {
   }
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--surface-base)", color: "var(--text)", fontFamily: "Inter, system-ui, sans-serif" }}>
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 rounded-full animate-spin" style={{ border: "3px solid rgba(38, 64, 176,0.15)", borderTopColor: "#2640B0" }} />
-          <div style={{ fontSize: 11, color: "#64748b", letterSpacing: 1.4, textTransform: "uppercase", fontWeight: 700 }}>
-            Restoring session{supabaseMode ? "" : ""}…
+      // World UI: the shape of the app while the session is restored (no spinner).
+      <div className="wu-boot" role="status" aria-live="polite">
+        <div className="wu-boot-side" aria-hidden="true">
+          <div className="wu-sk" style={{ height: 44, width: 44, borderRadius: 12 }} />
+          {[70, 55, 62, 48, 66, 52].map((w, i) => <div key={i} className="wu-sk" style={{ width: `${w}%` }} />)}
+        </div>
+        <div className="wu-boot-main">
+          <div className="wu-sk" style={{ height: 22, width: 180 }} aria-hidden="true" />
+          <div className="wu-boot-note">Restoring session{supabaseMode ? "" : ""}…</div>
+          <div className="wu-boot-row" aria-hidden="true">
+            {[0, 1, 2].map((i) => <div key={i} className="wu-sk" style={{ height: 96, borderRadius: 16 }} />)}
           </div>
+          <div className="wu-sk" style={{ height: 220, borderRadius: 16 }} aria-hidden="true" />
         </div>
       </div>
     );

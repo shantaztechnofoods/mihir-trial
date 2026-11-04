@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import './index.css'
 import './world-ui.css'
-import { installSheetGestures } from './utils/worldMotion.js'
+import { installSheetGestures, installScrollReveal, installHeaderCompact } from './utils/worldMotion.js'
 import { AuthProvider } from './auth/AuthContext.jsx'
 import RootErrorBoundary from './components/RootErrorBoundary.jsx'
 import OfflineBanner from './components/OfflineBanner.jsx'
@@ -33,7 +33,7 @@ try {
 // failure mode). The per-page PageErrorBoundary inside App is still the
 // preferred catch site — this is the last-resort safety net.
 // World UI: drag a phone sheet down by its header to close it (presses its own Close).
-installSheetGestures();
+installSheetGestures(); installScrollReveal(); installHeaderCompact();
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
