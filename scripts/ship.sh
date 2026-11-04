@@ -25,7 +25,7 @@
 #   deliberate, separate step that is run only after code review.
 set -uo pipefail
 cd "$(dirname "$0")/.."
-REPO="shantaztechnofoods/purchase_inventory_os"
+REPO="${REPO:-shantaztechnofoods/mihir-trial}"  # renamed from purchase_inventory_os 2026-11-04 (old name 403s via gh api proxy)
 SESSION_URL="${CLAUDE_SESSION_URL:-https://claude.ai/code/session_011Kbdu9cV9BoczPpaspZYws}"
 LOGS="$(mktemp -d /tmp/ship.XXXX)"
 CACHE="${SHIP_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/shantaz-ship}"; mkdir -p "$CACHE/dist"
