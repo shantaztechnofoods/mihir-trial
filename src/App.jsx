@@ -99,7 +99,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-04-rc-fix";
+const APP_BUILD = "2026-11-04-mtaudit-1";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -13084,7 +13084,9 @@ function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock
                 completed. Nothing is deducted from stock and no Item Master
                 record is created. Needs a serial — the job hangs off the
                 machine, so there must be a machine. */}
-            {serialNo && !rackSet && (
+            {/* 2026-11-04 — also on Fill Rack (owner: both BOM entry points must
+                behave the same). Hidden only for an R crate with no machine. */}
+            {serialNo && !(rackSet && rackSet.mode === "crate" && rackSet.machineId == null) && (
               <div className="mt-2" data-extra-pending>
                 {extraPending.length === 0 ? (
                   <button type="button" data-add-pending-item onClick={() => setExtraPending([emptyPendingJob()])}
@@ -13858,7 +13860,8 @@ function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, onCreateB
     onAddOutward(entry, data.pending);
     if (data.rackSet && data.rackSet.mode === "crate" && onRaiseNotIssued) {
       const notIssuedCrate = notIssuedOf(data.issued);
-      if (notIssuedCrate.length) onRaiseNotIssued({ machineId: data.rackSet.machineId, notIssued: notIssuedCrate, bomKey: data.bomKey, serialNo: data.serialNo, issueId: id, rackSlot: data.rackSet.slotId || null });
+      const extraCrate = data.extraPending || [];
+      if (notIssuedCrate.length || extraCrate.length) onRaiseNotIssued({ machineId: data.rackSet.machineId, notIssued: notIssuedCrate, bomKey: data.bomKey, serialNo: data.serialNo, issueId: id, rackSlot: data.rackSet.slotId || null, extraPending: extraCrate });
     }
     // data.machineId is set when the drawer already created the machine
     // through handleCreateMachineFirst (the normal path); this branch is the
