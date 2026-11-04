@@ -15,7 +15,13 @@
       "worktree-*": false,
       "worktree-*/**": false,
       "agent-*": false,
-      "agent-*/**": false
+      "agent-*/**": false,
+      "feature/**": false,
+      "audit/**": false,
+      "db/**": false,
+      "ui/**": false,
+      "wip/**": false,
+      "backup/**": false
     }
   }
 }
