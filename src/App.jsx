@@ -2187,7 +2187,7 @@ function ItemDetailModal({ item, category, onClose, onDelete, onUpdateStock, onE
 
 // ─── ADD ITEM MODAL ───────────────────────────────────────────────────────────
 
-function AddItemModal({ machines, onSave, onClose, initialValues = null, vendorList = [], existingCodes = [] }) {
+function AddItemModal({ machines, onSave, onClose, initialValues = null, vendorList = [], existingCodes = [], codeLockReason = "" }) {
   const isEdit = Boolean(initialValues);
   useEffect(() => {
     const h = (e) => { if (e.key === "Escape") onClose(); };
@@ -2341,6 +2341,10 @@ function AddItemModal({ machines, onSave, onClose, initialValues = null, vendorL
       const c = form.code.trim().toUpperCase();
       const own = isEdit ? String(initialValues.code || "").toUpperCase() : null;
       if (c !== own && existingCodes.includes(c)) e.code = `Code ${c} is already used by another item`;
+      // BOM lines, pending shortfalls and open POs point at an item by its
+      // code. Renaming the code left them pointing at nothing: the BOM showed
+      // the part as missing and its shortfall could never be issued again.
+      else if (isEdit && codeLockReason && c !== own) e.code = `Code cannot change — ${codeLockReason}`;
     }
     if (form.stock === "" || isNaN(Number(form.stock)))  e.stock = "Enter a valid number";
     else if (!isEdit && Number(form.stock) < 0)          e.stock = "Stock cannot be negative";
@@ -2350,13 +2354,18 @@ function AddItemModal({ machines, onSave, onClose, initialValues = null, vendorL
     return Object.keys(e).length === 0;
   };
 
+  // A second Save tap while the first write was still running created the
+  // item twice (local) or hit a duplicate-key alert (Supabase).
+  const savingRef = useRef(false);
   const handleSave = () => {
+    if (savingRef.current) return;
     if (!validate()) return;
     const stock = Number(form.stock);
     const min   = Number(form.min);
     const preferredLink = vendorLinks.find((l) => l.role === "Preferred") || vendorLinks[0];
     const primaryVendor = preferredLink ? vendorList.find((v) => v.id === preferredLink.vendorId) : null;
-    onSave(form.machine, {
+    savingRef.current = true;
+    Promise.resolve(onSave(form.machine, {
       code:             form.code.toUpperCase().trim(),
       name:             form.name.trim(),
       unit:             form.unit || "Nos",
@@ -2386,7 +2395,7 @@ function AddItemModal({ machines, onSave, onClose, initialValues = null, vendorL
         const d = cpDraft.trim();
         return d && !checkPoints.includes(d) ? [...checkPoints, d] : checkPoints;
       })(),
-    });
+    })).finally(() => { savingRef.current = false; });
   };
 
   const nameRef  = useRef(null);
@@ -3582,7 +3591,16 @@ function InventoryPage({ items, setItems, handleUpdateStock, pos = [], inwardLog
       )}
       {editingItem && canDo("inventory","edit") && (
         <AddItemModal machines={machines} onSave={handleSaveEdit} onClose={() => setEditingItem(null)}
-                      initialValues={{ ...editingItem.item, machine: editingItem.category }} vendorList={vendorList} existingCodes={allCodes} />
+                      initialValues={{ ...editingItem.item, machine: editingItem.category }} vendorList={vendorList} existingCodes={allCodes}
+                      codeLockReason={(() => {
+                        const code = editingItem.item.code;
+                        const boms = Object.entries(bomDefs).filter(([, d]) => (d.items || []).some((m) => m.code === code)).map(([k]) => k);
+                        if (boms.length) return `used in BOM ${boms.join(", ")}`;
+                        if (pendingLog.some((p) => p.code === code)) return "it has open pending stock";
+                        const po = pos.find((p) => !["rejected", "received"].includes(p.status) && (p.lineItems || []).some((li) => li.code === code));
+                        if (po) return `it is on open purchase order ${po.id}`;
+                        return "";
+                      })()} />
       )}
       {quickAdjust && (
         <QuickStockModal item={quickAdjust.item} mode={quickAdjust.mode}
