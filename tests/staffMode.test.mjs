@@ -19,7 +19,8 @@ test("staffMode is derived from isAdminUser, and admins keep the full tracker", 
   assert.match(mp, /data-staff-dashboard/);
   assert.match(mp, /\{!staffMode && \(\(\) => \{\s*const cards = \[/, "summary-box nav is admin only");
   assert.match(mp, /\{!staffMode && mtTab === "pending" && \(\(\) => \{/, "factory Pending Jobs tab is admin only");
-  assert.match(mp, /\{!staffMode && \(\s*<div className="space-y-4">\s*\{listForTab\(\)\.map\(\(machine\) => \{/, "All Machines cards are admin only");
+  // 2026-11-04 (fix/harden-2): each card renders inside its own SafeBoundary.
+  assert.match(mp, /\{!staffMode && \(\s*<div className="space-y-4">\s*\{listForTab\(\)\.map\(\(machine\) => <SafeBoundary key=\{machine\.id\} name="machine-card" label="[^"]*" render=\{\(\) => \{/, "All Machines cards are admin only");
   assert.match(mp, /\{!staffMode && \(\(\) => \{\s*const view = mtTab === "transfer"/, "screen header is admin only");
 });
 

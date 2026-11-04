@@ -1,6 +1,7 @@
-// Voice notes always become TEXT (2026-11-03): on a phone with NO browser
-// dictation (iPhone Safari / Firefox), the saved audio is sent to the
-// voice-transcribe Edge Function and the words land in the box. The server
+// Mic writes TEXT (2026-11-04): on an iPhone (Safari: MP4 recorder, browser
+// dictation not run next to the recorder) the clip is sent straight to the
+// voice-transcribe Edge Function and the words land in the box. No audio is
+// stored. The server
 // call is stubbed via window.__erpVoiceTranscribe (same shape as
 // supabase.functions.invoke). LOCAL TEST DATA ONLY.
 import fs from "fs";
@@ -26,9 +27,10 @@ const fakeMedia = () => {
     }
   }
   window.MediaRecorder = FakeRecorder;
-  // No browser dictation on this phone.
-  try { delete window.SpeechRecognition; delete window.webkitSpeechRecognition; } catch {}
-  window.SpeechRecognition = undefined; window.webkitSpeechRecognition = undefined;
+  // iPhone Safari has webkitSpeechRecognition, but it must NOT run next to the recorder.
+  window.__srStarts = 0;
+  window.webkitSpeechRecognition = function () { this.start = () => { window.__srStarts++; }; this.stop = () => {}; };
+  window.SpeechRecognition = undefined;
   HTMLMediaElement.prototype.play = function () { return Promise.resolve(); };
   HTMLMediaElement.prototype.pause = function () {};
   window.__erpVoiceTranscribe = async (name, opts) => {
@@ -40,7 +42,7 @@ const fakeMedia = () => {
 };
 
 const b = await pw.chromium.launch({ args: ["--no-sandbox", "--disable-dev-shm-usage"] });
-const ctx = await b.newContext({ viewport: { width: 1200, height: 1000 } });
+const ctx = await b.newContext({ viewport: { width: 1200, height: 1000 }, userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1" });
 await ctx.addInitScript(fakeMedia);
 const p = await ctx.newPage(); const errs = []; p.on("pageerror", (e) => errs.push(String(e).slice(0, 200)));
 await p.goto(BASE, { waitUntil: "networkidle" }); await p.evaluate(seed); await p.reload({ waitUntil: "networkidle" }); await p.waitForTimeout(600);
@@ -54,52 +56,53 @@ const rec = p.locator("[data-voice-recorder='Report Issue']");
 const box = p.locator("#raise-desc");
 const recordOnce = async () => { await rec.locator("[data-voice-record]").click(); await p.waitForTimeout(500); await rec.locator("[data-voice-stop]").click(); };
 
-// 1) Success: empty box gets the server transcript (Gujarati script, untranslated)
+// 1) Success: empty box gets the server text (Gujarati script, untranslated)
 await openIssue();
 ok("box starts empty", (await box.inputValue()) === "");
-await recordOnce(); await p.waitForTimeout(250);
-ok("while waiting: '✍️ Writing your words…' shows", (await rec.locator("[data-voice-writing]").innerText().catch(() => "")).includes("Writing your words"));
+await recordOnce(); await p.waitForTimeout(400);
+ok("while waiting: 'Writing…' shows", (await rec.locator("[data-voice-writing]").innerText().catch(() => "")).includes("Writing…"));
 await p.waitForTimeout(700);
 ok("box gets the transcript in Gujarati script", (await box.inputValue()) === "બેલ્ટ ઢીલો છે", await box.inputValue());
 ok("'Writing…' disappears, no error", await rec.locator("[data-voice-writing]").count() === 0 && await rec.locator("[data-voice-error]").count() === 0);
 const c1 = await p.evaluate(() => window.__calls);
-ok("called voice-transcribe once with the recorded audio as base64 + base mime", c1.length === 1 && c1[0].name === "voice-transcribe" && c1[0].mimeType === "audio/mp4" && c1[0].b64ok, JSON.stringify(c1));
-ok("audio was still saved as the machine attachment", (await voiceAtts()).length === 1);
+ok("called voice-transcribe once with the recorded audio as base64 + base mime (audio/mp4)", c1.length === 1 && c1[0].name === "voice-transcribe" && c1[0].mimeType === "audio/mp4" && c1[0].b64ok, JSON.stringify(c1));
+ok("iPhone: browser dictation not started next to the recorder", (await p.evaluate(() => window.__srStarts)) === 0);
+ok("no audio stored", (await voiceAtts()).length === 0);
 await box.fill(await box.inputValue() + " — edited");
-ok("transcript stays editable", (await box.inputValue()).endsWith("— edited"));
+ok("text stays editable", (await box.inputValue()).endsWith("— edited"));
 await p.locator("[data-modal-close]").first().click(); await p.waitForTimeout(400);
 
-// 2) Failure: box stays empty, worker asked to type
+// 2) Server error, no live text: red box + short message
 await p.evaluate(() => { window.__reply = { data: null, error: { message: "Edge Function returned a non-2xx status code", context: { json: async () => ({ error: "Transcription service error (500)" }) } } }; });
 await openIssue();
 await box.fill("");
 await recordOnce(); await p.waitForTimeout(1200);
-ok("failed transcription: box stays empty (still required)", (await box.inputValue()) === "");
-ok("failed transcription: 'Audio saved — now write the same in words in the box'", (await rec.locator("[data-voice-error]").innerText().catch(() => "")).includes("Audio saved — now write the same in words in the box"));
-ok("failed transcription: audio still saved", (await voiceAtts()).length === 2);
+ok("failed: box stays empty (still required)", (await box.inputValue()) === "");
+ok("failed: 'Could not hear — please type'", (await rec.locator("[data-voice-error]").innerText().catch(() => "")).includes("Could not hear — please type"));
+ok("failed: box flagged red", await box.evaluate((el) => el.classList.contains("field-bad")));
 await p.locator("[data-modal-close]").first().click(); await p.waitForTimeout(400);
 
 // 3) Network throw: same safe fallback, no page error
 await p.evaluate(() => { window.__reply = "throw"; });
 await openIssue(); await box.fill("");
 await recordOnce(); await p.waitForTimeout(1200);
-ok("network error: fallback message, box empty", (await box.inputValue()) === "" && (await rec.locator("[data-voice-error]").innerText().catch(() => "")).includes("now write the same in words"));
+ok("network error: short message, box empty", (await box.inputValue()) === "" && (await rec.locator("[data-voice-error]").innerText().catch(() => "")).includes("Could not hear"));
 await p.locator("[data-modal-close]").first().click(); await p.waitForTimeout(400);
 
-// 4) Worker typed before the answer arrived: never overwritten
-await p.evaluate(() => { window.__reply = { data: { text: "server words" }, error: null }; window.__delay = 1200; });
+// 4) Worker typed while 'Writing…': typing kept, words appended after it
+await p.evaluate(() => { window.__reply = { data: { text: "Server words." }, error: null }; window.__delay = 1200; });
 await openIssue(); await box.fill("");
 await recordOnce(); await p.waitForTimeout(300);
-await box.fill("my own words");
-await p.waitForTimeout(1500);
-ok("typing during transcription is kept (no overwrite)", (await box.inputValue()) === "my own words", await box.inputValue());
+await box.fill("My own words.");
+await p.waitForTimeout(1600);
+ok("typing during 'Writing…' is kept, words appended", (await box.inputValue()) === "My own words. Server words.", await box.inputValue());
 await p.locator("[data-modal-close]").first().click(); await p.waitForTimeout(400);
 
-// 5) Local mode without the hook (no server): current behaviour, no crash
+// 5) Local mode without the hook (no server), no live text: short message, nothing called
 await p.evaluate(() => { delete window.__erpVoiceTranscribe; window.__calls = []; });
 await openIssue(); await box.fill("");
 await recordOnce(); await p.waitForTimeout(900);
-ok("local/offline mode: fallback message, box empty, nothing called", (await box.inputValue()) === "" && (await rec.locator("[data-voice-error]").innerText().catch(() => "")).includes("now write the same in words") && (await p.evaluate(() => window.__calls.length)) === 0);
+ok("local/offline mode: short message, box empty, nothing called", (await box.inputValue()) === "" && (await rec.locator("[data-voice-error]").innerText().catch(() => "")).includes("Could not hear") && (await p.evaluate(() => window.__calls.length)) === 0);
 ok("no sideways scroll on the phone", await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
 ok("no page errors", errs.length === 0, errs.join(" | "));
 await done(b);

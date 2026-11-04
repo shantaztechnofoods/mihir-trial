@@ -1,6 +1,7 @@
 // Purchase Orders store — public.purchase_orders
 import { isSupabaseEnabled } from "../config/env.js";
 import { getSupabase } from "../supabase/client.js";
+import { fetchAllRows, readLocalJson } from "../utils/fetchAll.js";
 import { localIsoDate } from "./localDate.js";
 
 const LOCAL_KEY = "erp_pos";
@@ -68,7 +69,7 @@ function toIsoDate(s) {
   return localIsoDate(d);
 }
 
-function getLocal() { try { const s = localStorage.getItem(LOCAL_KEY); if (s) return JSON.parse(s); } catch {} return []; }
+function getLocal() { return readLocalJson(LOCAL_KEY, []); }
 function setLocal(a) { try { localStorage.setItem(LOCAL_KEY, JSON.stringify(a)); } catch {} }
 
 export async function fetchPOs() {
@@ -77,7 +78,7 @@ export async function fetchPOs() {
   if (!isSupabaseEnabled()) { const a = getLocal(); console.info("[pos:load] local ok", { count: a.length }); return a; }
   const c = getSupabase();
   if (!c) return getLocal();
-  const { data, error } = await c.from("purchase_orders").select("*").order("created_at", { ascending: false });
+  const { data, error } = await fetchAllRows(() => c.from("purchase_orders").select("*").order("created_at", { ascending: false }).order("id", { ascending: false }), { tag: "pos:load" });
   if (error) { console.error("[pos:load] failed", error); return getLocal(); }
   const out = (data || []).map(fromRow);
   setLocal(out);

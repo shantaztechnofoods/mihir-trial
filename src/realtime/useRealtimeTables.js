@@ -13,6 +13,16 @@
 import { useEffect, useRef } from "react";
 import { isSupabaseEnabled } from "../config/env.js";
 import { getSupabase } from "../supabase/client.js";
+import { makeCoalescer } from "./coalesce.js";
+
+// 2026-11-04 — every handler below refetches its WHOLE table. A single BOM
+// issue writes dozens of stock_movements / items rows; without coalescing,
+// each of ~300 open tablets fired one full refetch per row (a refetch storm
+// that hammers PostgREST and can land responses out of order). Events for one
+// table are now coalesced: one refetch REALTIME_DEBOUNCE_MS after the last
+// event, and never later than REALTIME_MAX_WAIT_MS after the first.
+export const REALTIME_DEBOUNCE_MS = 300;
+export const REALTIME_MAX_WAIT_MS = 1500;
 
 export function useRealtimeTables({
   onItemsChange,
@@ -37,6 +47,9 @@ export function useRealtimeTables({
   // back online, refetch every subscribed table once (debounced, so the two
   // events firing together — the usual case — cost one round of fetches).
   const cbRef = useRef({});
+  // Set by the channel effect below; lets the subscribe callback trigger the
+  // same catch-up refetch after the channel recovers from an error.
+  const catchUpRef = useRef(null);
   cbRef.current = { onItemsChange, onMovementsChange, onPosChange, onInwardChange, onOutwardChange, onMachinesChange, onPendingChange, onHandoversChange, onPendingItemsChange, onChecklistResponsesChange, onRatingsChange, onAttachmentsChange };
   useEffect(() => {
     if (!isSupabaseEnabled()) return;
@@ -53,12 +66,14 @@ export function useRealtimeTables({
         }
       }, 400);
     };
+    catchUpRef.current = catchUp;
     const onVis = () => { if (document.visibilityState === "visible") catchUp("visible"); };
     const onOnline = () => catchUp("online");
     document.addEventListener("visibilitychange", onVis);
     window.addEventListener("online", onOnline);
     return () => {
       if (timer) clearTimeout(timer);
+      catchUpRef.current = null;
       document.removeEventListener("visibilitychange", onVis);
       window.removeEventListener("online", onOnline);
     };
@@ -71,12 +86,17 @@ export function useRealtimeTables({
 
     const ch = c.channel("erp-realtime");
     const wired = [];
+    const coalescers = [];
     const wire = (table, cb) => {
       if (!cb) return;
       wired.push(table);
-      ch.on("postgres_changes", { event: "*", schema: "public", table }, (payload) => {
-        console.info(`[realtime:${table}]`, payload.eventType, payload.new?.id || payload.old?.id);
+      const run = makeCoalescer((payload) => {
         try { cb(payload); } catch (e) { console.error(`[realtime:${table}] handler threw`, e); }
+      }, { wait: REALTIME_DEBOUNCE_MS, maxWait: REALTIME_MAX_WAIT_MS });
+      coalescers.push(run);
+      ch.on("postgres_changes", { event: "*", schema: "public", table }, (payload) => {
+        console.info(`[realtime:${table}]`, payload?.eventType, payload?.new?.id || payload?.old?.id);
+        run(payload);
       });
     };
     // The 5 inventory-critical tables (per spec) + machine/pending for live workflow sync.
@@ -105,11 +125,20 @@ export function useRealtimeTables({
     wire("department_ratings",     onRatingsChange);
     wire("machine_attachments",    onAttachmentsChange);
 
+    // supabase-js rejoins a dropped channel by itself, but events sent while
+    // it was down are not replayed — refetch once when it comes back.
+    let hadError = false;
     ch.subscribe((status) => {
-      if (status === "SUBSCRIBED")   console.info(`[realtime] subscribed to ${wired.length} tables:`, wired.join(", "));
-      if (status === "CHANNEL_ERROR") console.error("[realtime] channel error");
+      if (status === "SUBSCRIBED") {
+        console.info(`[realtime] subscribed to ${wired.length} tables:`, wired.join(", "));
+        if (hadError) { hadError = false; try { catchUpRef.current?.("resubscribed"); } catch {} }
+      }
+      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") { hadError = true; console.error(`[realtime] channel ${status}`); }
     });
 
-    return () => { try { c.removeChannel(ch); } catch {} };
+    return () => {
+      for (const r of coalescers) { try { r.cancel(); } catch {} }
+      try { c.removeChannel(ch); } catch {}
+    };
   }, [onItemsChange, onMovementsChange, onPosChange, onInwardChange, onOutwardChange, onAuditChange, onMachinesChange, onPendingChange, onHandoversChange, onPendingItemsChange, onChecklistResponsesChange, onRatingsChange, onAttachmentsChange]);
 }

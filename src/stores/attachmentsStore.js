@@ -3,6 +3,7 @@
 
 import { isSupabaseEnabled } from "../config/env.js";
 import { getSupabase } from "../supabase/client.js";
+import { fetchAllRows, readLocalJson } from "../utils/fetchAll.js";
 
 const LOCAL_KEY = "erp_attachments";
 const BUCKET    = "machine-attachments";
@@ -24,7 +25,7 @@ const fromRow = (r) => ({
   uploadedAt:        r.uploaded_at || null,
 });
 
-const getLocal = () => { try { const s = localStorage.getItem(LOCAL_KEY); if (s) return JSON.parse(s); } catch {} return []; };
+const getLocal = () => readLocalJson(LOCAL_KEY, []);
 const setLocal = (a) => { try { localStorage.setItem(LOCAL_KEY, JSON.stringify(a)); } catch {} };
 
 // Pick a kind from the mime type if the caller didn't specify.
@@ -52,7 +53,7 @@ export async function fetchAttachmentsForMachine(machineId) {
 export async function fetchAllAttachments() {
   if (!isSupabaseEnabled()) return getLocal();
   const c = getSupabase(); if (!c) return getLocal();
-  const { data, error } = await c.from("machine_attachments").select("*").order("uploaded_at", { ascending: false });
+  const { data, error } = await fetchAllRows(() => c.from("machine_attachments").select("*").order("uploaded_at", { ascending: false }).order("id", { ascending: false }), { tag: "attachments:all" });
   if (error) { console.warn("[attachments:all] load failed", error); return getLocal(); }
   const out = (data || []).map(fromRow);
   setLocal(out);

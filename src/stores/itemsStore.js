@@ -4,6 +4,7 @@
 
 import { isSupabaseEnabled, IS_PROD } from "../config/env.js";
 import { getSupabase } from "../supabase/client.js";
+import { fetchAllRows, readLocalJson } from "../utils/fetchAll.js";
 import { recordMovement, inferMovementType } from "./stockMovementsStore.js";
 import { localIsoDate } from "./localDate.js";
 
@@ -139,10 +140,10 @@ export async function fetchItems() {
   const c = getSupabase();
   if (!c) { console.warn("[items:load] client null, local fallback"); return getLocal(); }
   // Try filtered (is_active = true) first; on column-not-found, retry without filter
-  let { data, error } = await c.from("items").select("*").eq("is_active", true).order("code", { ascending: true });
+  let { data, error } = await fetchAllRows(() => c.from("items").select("*").eq("is_active", true).order("code", { ascending: true }).order("id", { ascending: true }), { tag: "items:load" });
   if (error && (error.code === "42703" || /column .*is_active.* does not exist/i.test(error.message || ""))) {
     console.warn("[items:load] is_active column missing (migration 008 not run) — falling back to unfiltered fetch");
-    const retry = await c.from("items").select("*").order("code", { ascending: true });
+    const retry = await fetchAllRows(() => c.from("items").select("*").order("code", { ascending: true }).order("id", { ascending: true }), { tag: "items:load" });
     data = retry.data; error = retry.error;
   }
   if (error) { console.error("[items:load] supabase error", error); return getLocal(); }

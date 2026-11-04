@@ -29,7 +29,10 @@ test("store: hold columns map both ways and updateMachine writes them without st
   assert.equal(sent.hold_reason, "waiting for motor");
   assert.equal("hold_by" in sent, false, "hold_by / hold_at are stamped by the database, never sent");
   assert.equal("hold_at" in sent, false);
-  CLIENT = { from: () => ({ select: () => ({ order: async () => ({ data: [{ id: 2, bom_key: "M", stage: "Assembly", status: "active", history: [], hold_active: true, hold_reason: "qc", hold_by: "u1", hold_at: "2026-11-02T00:00:00Z" }], error: null }) }) }) };
+  // 2026-11-04 (fix/harden-1): fetchMachines pages with .order(...).order("id").range(...)
+  // so it reads past PostgREST's 1000-row cap — the fixture is chainable now.
+  const rows = [{ id: 2, bom_key: "M", stage: "Assembly", status: "active", history: [], hold_active: true, hold_reason: "qc", hold_by: "u1", hold_at: "2026-11-02T00:00:00Z" }];
+  CLIENT = { from: () => ({ select: () => { const q = { order: () => q, range: async () => ({ data: rows, error: null }) }; return q; } }) };
   const f = await fetchMachines();
   const m = f[0];
   assert.ok(m, "machine mapped");
