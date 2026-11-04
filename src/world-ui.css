@@ -173,11 +173,6 @@
     -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 54%, transparent 72%); mask-image: linear-gradient(to bottom, #000 0%, #000 54%, transparent 72%); }
   .lg-tagline { position: absolute; left: 0; right: 0; top: 62%; text-align: center; white-space: nowrap;
     font: 500 12px/1 var(--font-display); font-stretch: 125%; letter-spacing: .42em; padding-left: .42em; color: #C3CEDF; }
-  /* 3D logo hero: the reflection fades in the shader, so no canvas mask */
-  .lg-3d--logo canvas { -webkit-mask-image: none; mask-image: none; animation: lg-in 500ms ease both; opacity: 0; }
-  .lg-root .lg-brand3d--full { inset: 0; height: auto; pointer-events: none; }
-  .lg-root .lg-brand3d--full .lg-3d { inset: 0; }
-  .lg-logo2d { width: min(86vw, 500px); height: auto; filter: drop-shadow(0 18px 30px rgba(0, 0, 0, .45)); }
   .lg-tagline span { display: inline-block; opacity: 0; transform: translateY(6px); transition: opacity 360ms var(--ease-enter), transform 360ms var(--ease-enter); }
   .lg-tagline.is-on span { opacity: 1; transform: none; }
   .lg-brand2d { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; padding-bottom: 4%; }
@@ -244,7 +239,6 @@
     .lg-brand3d, .lg-brand2d { inset: 0 34vw 0 0; height: auto; }
     .lg-3d { inset: 6% 4% 26% 4%; }
     .lg-tagline { font-size: 15px; }
-    .lg-logo2d { width: min(50vw, 640px); }
     .lg-shine .brand-logo { width: 168px !important; height: 168px !important; border-radius: 32px !important; }
     .lg-brand { grid-column: 1; grid-row: 2; padding: 0 56px 52px; justify-content: flex-start; text-align: left; }
     .lg-line { display: block; }
@@ -444,8 +438,3 @@
   .arrival-banner { animation: none !important; }
   .wu-progress-track i { transition: none; }
 }
-
-/* ═══ SHANTAZ 2D logo: one soft light sweep (ShantazLogoSVG shine) ═════════ */
-.shantaz-logo { display: block; }
-.shantaz-logo__shine { animation: shz-shine 1.3s cubic-bezier(.22, 1, .36, 1) .35s 1 both; }
-@keyframes shz-shine { from { transform: translateX(0); } to { transform: translateX(var(--shx, 900px)); } }
