@@ -241,7 +241,7 @@ export default function RoleManagementPage({ canDo }) {
       {/* Edit/Add Modal */}
       {showModal && editForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(15,20,28,0.14)", backdropFilter: "blur(4px)" }}>
-          <div className="w-full max-w-2xl rounded-2xl flex flex-col mx-4" style={{ background: "#ffffff", border: "1px solid rgba(26,31,46,0.1)", boxShadow: "0 32px 80px rgba(15,20,28,0.18)", maxHeight: "90vh" }}>
+          <div className="w-full max-w-2xl rounded-2xl flex flex-col mx-4" style={{ background: "#ffffff", border: "1px solid rgba(26,31,46,0.1)", boxShadow: "0 32px 80px rgba(15,20,28,0.18)", maxHeight: "min(90vh, 90dvh)" }}>
             {/* Modal Header */}
             <div className="flex items-center justify-between px-6 py-4 flex-shrink-0" style={{ borderBottom: "1px solid rgba(26,31,46,0.07)" }}>
               <h3 className="font-bold text-sm" style={{ color: "var(--text-strong)" }}>{isNew ? "New Role" : `Edit: ${editForm.label}`}</h3>
