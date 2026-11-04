@@ -27,6 +27,13 @@ import RoleManagementPage from "./pages/RoleManagementPage.jsx";
 import AccessDeniedPage from "./components/AccessDeniedPage.jsx";
 import UserProfileMenu from "./components/UserProfileMenu.jsx";
 import PageErrorBoundary from "./components/PageErrorBoundary.jsx";
+import SafeBoundary from "./components/SafeBoundary.jsx";
+import { makeInFlight, makeLatest } from "./utils/inFlight.js";
+import { readLocalJson } from "./utils/fetchAll.js";
+// 2026-11-04 (fix/harden-2) — sentinels: "no usable local cache" for the
+// local-mode useState initialisers below (corrupt JSON / wrong shape).
+const NO_LOCAL_LIST = Object.freeze([]);
+const NO_LOCAL_MAP = Object.freeze({});
 import { MobileNavContext } from "./components/PageHeader.jsx";
 import ItemSearchSelect from "./components/ItemSearchSelect.jsx";
 import VendorSearchSelect from "./components/VendorSearchSelect.jsx";
@@ -92,7 +99,7 @@ import {
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-04-harden-1";
+const APP_BUILD = "2026-11-04-harden-2";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -19856,7 +19863,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                 <Section title="Awaiting release from rack" count={awaitingRelease.length} hint="assembled — send to the next department">
                   {awaitingRelease.length === 0 && <Empty text="Nothing is waiting on the rack." />}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                    {awaitingRelease.map((m) => {
+                    {awaitingRelease.map((m) => <SafeBoundary key={m.id} name="staff-awaiting-card" label="this machine card" render={() => {
                       const h = machineHandover(m);
                       return (
                         <Card key={m.id}>
@@ -19880,7 +19887,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                           )}
                         </Card>
                       );
-                    })}
+                    }} />)}
                   </div>
                 </Section>
               )}
@@ -19959,7 +19966,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                 <Section title="In your department" count={myWorking.length} hint="machines you are working on">
                   {myWorking.length === 0 && <Empty text="No machine is in your department right now." />}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                    {myWorking.map((m) => {
+                    {myWorking.map((m) => <SafeBoundary key={m.id} name="staff-working-card" label="this machine card" render={() => {
                       const dept   = m.currentDepartment || m.stage;
                       const next   = nextDepartment(dept);
                       const { target, t, level, leftMinutes } = deptTimerOf(m);
@@ -20019,7 +20026,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                           </div>
                         </Card>
                       );
-                    })}
+                    }} />)}
                   </div>
                 </Section>
               )}
@@ -21192,7 +21199,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
         {/* ── Machine cards ── */}
         {!staffMode && (
         <div className="space-y-4">
-          {listForTab().map((machine) => {
+          {listForTab().map((machine) => <SafeBoundary key={machine.id} name="machine-card" label="this machine card" render={() => {
             const curIdx   = stageIdx(machine.stage);
             const isComplete = machine.status === "completed";
             const isExpanded = expanded === machine.id;
@@ -21962,7 +21969,7 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
                 })()}
               </div>
             );
-          })}
+          }} />)}
         </div>
         )}
 
@@ -25818,18 +25825,18 @@ export default function App() {
     return out;
   });
 
-  const [pos,        setPos]        = useState(() => { if (SUPA) return []; try { const s = localStorage.getItem("erp_pos");        if (s) return JSON.parse(s); } catch {} return SEED_DEMO ? initialPOs : []; });
-  const [vendorList, setVendorList] = useState(() => { if (SUPA) return []; try { const s = localStorage.getItem("erp_vendors");    if (s) return JSON.parse(s); } catch {} return SEED_DEMO ? vendors : []; });
-  const [bomDefs,    setBomDefs]    = useState(() => { if (SUPA) return {}; try { const s = localStorage.getItem("erp_bomdefs");    if (s) return JSON.parse(s); } catch {} return SEED_DEMO ? bomDefinitions : {}; });
-  const [outwardLog, setOutwardLog] = useState(() => { if (SUPA) return []; try { const s = localStorage.getItem("erp_outward");   if (s) return JSON.parse(s); } catch {} return []; });
-  const [inwardLog,  setInwardLog]  = useState(() => { if (SUPA) return []; try { const s = localStorage.getItem("erp_inward");    if (s) return JSON.parse(s); } catch {} return []; });
-  const [pendingLog, setPendingLog] = useState(() => { if (SUPA) return []; try { const s = localStorage.getItem("erp_pending");   if (s) return JSON.parse(s); } catch {} return []; });
-  const [followUps,  setFollowUps]  = useState(() => { if (SUPA) return []; try { const s = localStorage.getItem("erp_followups"); if (s) return JSON.parse(s); } catch {} return SEED_DEMO ? initialFollowUps : []; });
-  const [machineLog, setMachineLog] = useState(() => { if (SUPA) return []; try { const s = localStorage.getItem("erp_machines");  if (s) return JSON.parse(s); } catch {} return []; });
+  const [pos,        setPos]        = useState(() => { if (SUPA) return []; { const v = readLocalJson("erp_pos", NO_LOCAL_LIST);        if (v !== NO_LOCAL_LIST) return v; } return SEED_DEMO ? initialPOs : []; });
+  const [vendorList, setVendorList] = useState(() => { if (SUPA) return []; { const v = readLocalJson("erp_vendors", NO_LOCAL_LIST);    if (v !== NO_LOCAL_LIST) return v; } return SEED_DEMO ? vendors : []; });
+  const [bomDefs,    setBomDefs]    = useState(() => { if (SUPA) return {}; { const v = readLocalJson("erp_bomdefs", NO_LOCAL_MAP);    if (v !== NO_LOCAL_MAP) return v; } return SEED_DEMO ? bomDefinitions : {}; });
+  const [outwardLog, setOutwardLog] = useState(() => { if (SUPA) return []; { const v = readLocalJson("erp_outward", NO_LOCAL_LIST);   if (v !== NO_LOCAL_LIST) return v; } return []; });
+  const [inwardLog,  setInwardLog]  = useState(() => { if (SUPA) return []; { const v = readLocalJson("erp_inward", NO_LOCAL_LIST);    if (v !== NO_LOCAL_LIST) return v; } return []; });
+  const [pendingLog, setPendingLog] = useState(() => { if (SUPA) return []; { const v = readLocalJson("erp_pending", NO_LOCAL_LIST);   if (v !== NO_LOCAL_LIST) return v; } return []; });
+  const [followUps,  setFollowUps]  = useState(() => { if (SUPA) return []; { const v = readLocalJson("erp_followups", NO_LOCAL_LIST); if (v !== NO_LOCAL_LIST) return v; } return SEED_DEMO ? initialFollowUps : []; });
+  const [machineLog, setMachineLog] = useState(() => { if (SUPA) return []; { const v = readLocalJson("erp_machines", NO_LOCAL_LIST);  if (v !== NO_LOCAL_LIST) return v; } return []; });
   // Phase A — handover events for the Finish & Transfer / Accept flow. Loaded on
   // mount; refreshed by realtime (new handlers in rtHandovers below). Falls back
   // gracefully to [] when migration 021 isn't applied yet.
-  const [handovers,  setHandovers]  = useState(() => { if (SUPA) return []; try { const s = localStorage.getItem("erp_handovers"); if (s) return JSON.parse(s); } catch {} return []; });
+  const [handovers,  setHandovers]  = useState(() => { if (SUPA) return []; { const v = readLocalJson("erp_handovers", NO_LOCAL_LIST); if (v !== NO_LOCAL_LIST) return v; } return []; });
   // 2026-10-31 — rack slot reserved by a Fill action: { slotId, bomKey }.
   const rackSlotReservationRef = useRef(null);
   // Pending parts being issued right now (double-click / double-submit guard).
@@ -25841,11 +25848,11 @@ export default function App() {
   const [bomOpenRequest, setBomOpenRequest] = useState(null); // { key, slotId, n }
   // Phase B — department workflow depth. Each falls back silently if its
   // migration hasn't been applied yet (the stores swallow errors to [] / {}).
-  const [checklistTemplates, setChecklistTemplates] = useState(() => { if (SUPA) return []; try { const s = localStorage.getItem("erp_checklist_templates"); if (s) return JSON.parse(s); } catch {} return []; });
-  const [checklistResponses, setChecklistResponses] = useState(() => { if (SUPA) return []; try { const s = localStorage.getItem("erp_checklist_responses"); if (s) return JSON.parse(s); } catch {} return []; });
-  const [pendingHandoverItems, setPendingHandoverItems] = useState(() => { if (SUPA) return []; try { const s = localStorage.getItem("erp_pending_handover_items"); if (s) return JSON.parse(s); } catch {} return []; });
-  const [attachments, setAttachments] = useState(() => { if (SUPA) return []; try { const s = localStorage.getItem("erp_attachments"); if (s) return JSON.parse(s); } catch {} return []; });
-  const [deptRatings, setDeptRatings] = useState(() => { if (SUPA) return []; try { const s = localStorage.getItem("erp_dept_ratings"); if (s) return JSON.parse(s); } catch {} return []; });
+  const [checklistTemplates, setChecklistTemplates] = useState(() => { if (SUPA) return []; { const v = readLocalJson("erp_checklist_templates", NO_LOCAL_LIST); if (v !== NO_LOCAL_LIST) return v; } return []; });
+  const [checklistResponses, setChecklistResponses] = useState(() => { if (SUPA) return []; { const v = readLocalJson("erp_checklist_responses", NO_LOCAL_LIST); if (v !== NO_LOCAL_LIST) return v; } return []; });
+  const [pendingHandoverItems, setPendingHandoverItems] = useState(() => { if (SUPA) return []; { const v = readLocalJson("erp_pending_handover_items", NO_LOCAL_LIST); if (v !== NO_LOCAL_LIST) return v; } return []; });
+  const [attachments, setAttachments] = useState(() => { if (SUPA) return []; { const v = readLocalJson("erp_attachments", NO_LOCAL_LIST); if (v !== NO_LOCAL_LIST) return v; } return []; });
+  const [deptRatings, setDeptRatings] = useState(() => { if (SUPA) return []; { const v = readLocalJson("erp_dept_ratings", NO_LOCAL_LIST); if (v !== NO_LOCAL_LIST) return v; } return []; });
   const [auditLog,   setAuditLog]   = useState(() => getAuditLog());
   const [settings,   setSettings]   = useState(() => { try { const s = localStorage.getItem("erp_settings"); if (s) return { ...SETTINGS_DEFAULTS, ...JSON.parse(s) }; } catch {} return { ...SETTINGS_DEFAULTS }; });
   // 2026-10-30 — working calendar (Tuesday + admin holidays) drives every
@@ -25948,7 +25955,7 @@ export default function App() {
   const reconcileItems = useCallback(() => {
     if (reconcileTimer.current) clearTimeout(reconcileTimer.current);
     reconcileTimer.current = setTimeout(() => {
-      fetchItems().then((i) => { if (i) setItems(i); });
+      latestRef.current.items(fetchItems(), (i) => { if (i) setItems(i); });
     }, 150);
   }, []);
   // Surfaced when a stock movement is rejected (e.g. insufficient stock / concurrent edit).
@@ -25994,14 +26001,21 @@ export default function App() {
   // machine.pendingHandoverId, which a fast second click reads as still-null
   // before the first write lands — creating two handovers for one machine.
   const transferringRef = useRef(new Set());
-  const rtPos     = useCallback(() => { fetchPOs().then((p) => p && setPos(p)); }, []);
-  const rtInward  = useCallback(() => { fetchInward().then((x) => x && setInwardLog(x)); }, []);
-  const rtOutward = useCallback(() => { fetchOutward().then((x) => x && setOutwardLog(x)); }, []);
-  const rtMach    = useCallback(() => { fetchMachines().then((m) => m && setMachineLog(m)); }, []);
-  const rtPending = useCallback(() => { fetchPending().then((p) => p && setPendingLog(p)); }, []);
+  // 2026-11-04 (fix/harden-2) — double-submit guard for every mutation prop
+  // handed to the pages (see `guarded` below), and "latest response wins" for
+  // overlapping refetches of one table (realtime + catch-up + a handler).
+  const inFlightRef = useRef(null);
+  if (!inFlightRef.current) inFlightRef.current = makeInFlight();
+  const latestRef = useRef(null);
+  if (!latestRef.current) latestRef.current = { items: makeLatest(), pos: makeLatest(), inward: makeLatest(), outward: makeLatest(), mach: makeLatest(), pending: makeLatest(), handovers: makeLatest(), pendingItems: makeLatest(), responses: makeLatest(), ratings: makeLatest(), attachments: makeLatest() };
+  const rtPos     = useCallback(() => { latestRef.current.pos(fetchPOs(), (p) => p && setPos(p)); }, []);
+  const rtInward  = useCallback(() => { latestRef.current.inward(fetchInward(), (x) => x && setInwardLog(x)); }, []);
+  const rtOutward = useCallback(() => { latestRef.current.outward(fetchOutward(), (x) => x && setOutwardLog(x)); }, []);
+  const rtMach    = useCallback(() => { latestRef.current.mach(fetchMachines(), (m) => m && setMachineLog(m)); }, []);
+  const rtPending = useCallback(() => { latestRef.current.pending(fetchPending(), (p) => p && setPendingLog(p)); }, []);
   // Phase A — handovers refresh. Falls back silently if table doesn't exist
   // (store handles the error).
-  const rtHandovers = useCallback(() => { fetchHandovers().then((h) => { if (h) setHandovers(h); }); }, []);
+  const rtHandovers = useCallback(() => { latestRef.current.handovers(fetchHandovers(), (h) => { if (h) setHandovers(h); }); }, []);
   // 2026-11-03 — local (offline-dev) mode has no realtime channel: pick up a
   // hand-over written by another tab of this browser, so the staff arrival
   // alert works there too. Supabase mode is untouched (realtime above).
@@ -26014,10 +26028,10 @@ export default function App() {
   // Migration 053 — the four Machine Tracker side tables. Same shape as the
   // login hydration below; also used as the rollback path when one of these
   // writes fails after an optimistic update.
-  const rtPendingItems = useCallback(() => { fetchPendingItems().then((x) => { if (x) setPendingHandoverItems(x); }); }, []);
-  const rtResponses    = useCallback(() => { fetchResponses().then((x) => { if (x) setChecklistResponses(x); }); }, []);
-  const rtRatings      = useCallback(() => { fetchRatings().then((x) => { if (x) setDeptRatings(x); }); }, []);
-  const rtAttachments  = useCallback(() => { fetchAllAttachments().then((x) => { if (x) setAttachments(x); }); }, []);
+  const rtPendingItems = useCallback(() => { latestRef.current.pendingItems(fetchPendingItems(), (x) => { if (x) setPendingHandoverItems(x); }); }, []);
+  const rtResponses    = useCallback(() => { latestRef.current.responses(fetchResponses(), (x) => { if (x) setChecklistResponses(x); }); }, []);
+  const rtRatings      = useCallback(() => { latestRef.current.ratings(fetchRatings(), (x) => { if (x) setDeptRatings(x); }); }, []);
+  const rtAttachments  = useCallback(() => { latestRef.current.attachments(fetchAllAttachments(), (x) => { if (x) setAttachments(x); }); }, []);
   useRealtimeTables({
     onItemsChange:     reconcileItems,
     onMovementsChange: reconcileItems,   // a ledger movement means stock changed → reconcile
@@ -29391,6 +29405,31 @@ export default function App() {
   // One set of props for BOM Outward, used by the Outward page and by the BOM
   // section embedded at the top of Machine Tracker — so both issue through
   // the same component, data and handlers, never a second copy.
+  // 2026-11-04 (fix/harden-2) — double-submit protection. A second tap on the
+  // SAME record while its first write is still running gets
+  // { success:false, busy:true, error:"Already saving — please wait a moment." }
+  // instead of a second write. Keys name the record, so different machines /
+  // jobs never block each other, and the key frees as soon as the first call
+  // settles (success or failure), so a real retry still works.
+  const G = inFlightRef.current;
+  const guarded = {
+    acceptHandover:    G.guard((a) => `accept:${a?.handoverId}`, handleAcceptHandover),
+    pullBackHandover:  G.guard((a) => `pullback:${a?.handoverId}`, handlePullBackHandover),
+    setMachineHold:    G.guard((a) => `hold:${a?.machineId}`, handleSetMachineHold),
+    deleteMachine:     G.guard((a) => `delete-machine:${a?.machineId}`, handleDeleteMachine),
+    removeRackMachine: G.guard((id) => `rack-remove:${id}`, handleRemoveRackMachine),
+    updateStage:       G.guard((id) => `stage:${id}`, handleUpdateMachineStage),
+    resolvePending:    G.guard((id) => `resolve:${id}`, handleResolvePendingItem),
+    raisePending:      G.guard((a) => `raise:${a?.machineId}:${a?.assignedDepartment}:${a?.itemCode || ""}:${String(a?.description || "").trim()}`, handleRaisePendingItem),
+    duringWorkCheck:   G.guard((a) => `checklist:${a?.machine?.id}:${a?.template?.id}:${a?.stage || "during_work"}`, handleSubmitDuringWorkChecklist),
+    uploadAttachment:  G.guard((a) => `attach:${a?.machineId}:${a?.file?.name}:${a?.file?.size}:${a?.file?.lastModified}`, handleUploadAttachment),
+    deleteAttachment:  G.guard((id) => `attach-del:${id}`, handleDeleteAttachment),
+    overrideRating:    G.guard((id) => `rating:${id}`, handleOverrideRating),
+    fulfillPending:    G.guard((e) => `fulfill:${e?.id}`, handleFulfillPending),
+    deleteItemRow:     G.guard((cat, code) => `item-del:${cat}:${code}`, handleDeleteItemRow),
+    deleteVendor:      G.guard((id) => `vendor-del:${id}`, handleDeleteVendor),
+    deleteBOM:         G.guard((key) => `bom-del:${key}`, handleDeleteBOM),
+  };
   const outwardPageProps = {
     items, handleUpdateStock,
     // 2026-10-31 — BOM cost panel: received-PO rates + authorized rate entry.
@@ -29404,9 +29443,9 @@ export default function App() {
     outwardLog, onAddOutward: handleAddOutward, onRaiseNotIssued: raiseNotIssuedJobs,
     pendingLog, onClearPending: handleClearPending,
     onCreateMachine: handleCreateMachine, onAbortMachine: handleAbortMachineCreate, machineLog, canDo,
-    onRemoveRackMachine: handleRemoveRackMachine,
+    onRemoveRackMachine: guarded.removeRackMachine,
     onDuplicateBOM: handleDuplicateBOM,
-    onDeleteBOM: handleDeleteBOM,
+    onDeleteBOM: guarded.deleteBOM,
     computeBOMDeletionInfo,
     settings,
     checklistTemplates,
@@ -29425,14 +29464,14 @@ export default function App() {
                               pos={pos} inwardLog={inwardLog} outwardLog={outwardLog}
                               pendingLog={pendingLog} bomDefs={bomDefs} machineLog={machineLog}
                               onLogAudit={logAudit} canDo={canDo} vendorList={vendorList} settings={settings}
-                              onCreateItem={handleCreateItemRow} onUpdateItem={handleUpdateItemRow} onDeleteItem={handleDeleteItemRow}
-                              onDeleteBOM={handleDeleteBOM}
+                              onCreateItem={handleCreateItemRow} onUpdateItem={handleUpdateItemRow} onDeleteItem={guarded.deleteItemRow}
+                              onDeleteBOM={guarded.deleteBOM}
                               onBulkAddItems={handleBulkAddItems} />,
     inward:    <InwardPage    items={items} handleUpdateStock={handleUpdateStock} vendorList={vendorList} onInwardComplete={handleInwardComplete} onAddInward={(entry) => { setInwardLog(prev => [entry, ...prev]); if (isSupabaseEnabled()) createInward(entry).then((r) => { if (!r.success) console.warn("[App] Inward create Supabase failed:", r.error); }); logAudit({ type: "inward_manual", module: "Inward", action: `Manual Inward: ${entry.item} × ${entry.qty}`, ref: entry.code, itemCode: entry.code, itemName: entry.item, vendor: entry.vendor, qty: entry.qty, details: { unit: entry.unit, notes: entry.notes } }); }} appInwardLog={inwardLog} canDo={canDo} />,
     outward:   <OutwardPage {...outwardPageProps} />,
     pending:   <PendingPage   pendingLog={pendingLog} items={items} bomDefs={bomDefs}
                               machineLog={machineLog}
-                              onFulfillPending={handleFulfillPending}
+                              onFulfillPending={guarded.fulfillPending}
                               onFulfillGroup={handleFulfillGroup}
                               handleUpdateStock={handleUpdateStock}
                               onClearPending={handleClearPending}
@@ -29443,24 +29482,24 @@ export default function App() {
                               onUpdatePO={handleUpdatePO} onCreatePO={handleCreatePO}
                               onReceivePO={handleReceivePO} onConfirmOrder={handleConfirmOrder}
                               onFollowUpDone={handleFollowUpDone} onDeletePO={handleDeletePO}
-                              pendingLog={pendingLog} onFulfillPending={handleFulfillPending}
+                              pendingLog={pendingLog} onFulfillPending={guarded.fulfillPending}
                               handleUpdateStock={handleUpdateStock} inwardLog={inwardLog} canDo={canDo}
                               settings={settings}
                               isSuperAdmin={currentUser?.role === "super_admin"}
                               onReverseReceive={handleReverseReceive}
                               onSetItemDefaultRate={handleSetItemDefaultRate} />,
-    machines:  <MachinePage   machineLog={machineLog} checklistResponses={checklistResponses} filterRequest={mtFilterReq} outwardLog={outwardLog} onUpdateTrialCertificate={handleUpdateTrialCertificate} canView={canView} onUpdateStage={handleUpdateMachineStage} onNavigate={setActivePage} canDo={canDo}
+    machines:  <MachinePage   machineLog={machineLog} checklistResponses={checklistResponses} filterRequest={mtFilterReq} outwardLog={outwardLog} onUpdateTrialCertificate={handleUpdateTrialCertificate} canView={canView} onUpdateStage={guarded.updateStage} onNavigate={setActivePage} canDo={canDo}
                               items={items}
                               /* 2026-10-30 — BOM Outward, embedded at the top. Shown
                                  only to roles that may issue a BOM, same as Outward. */
                               bomSection={canView("outward") && canDo("outward", "bom") ? <OutwardPage {...outwardPageProps} embedded /> : null}
                               pendingLog={pendingLog}
                               bomDefs={bomDefs} onStartProduction={handleStartProduction}
-                              onRemoveRackMachine={handleRemoveRackMachine}
+                              onRemoveRackMachine={guarded.removeRackMachine}
                               onUpdateBOM={handleUpdateBOM}
                               handovers={handovers} settings={settings}
                               onFinishTransfer={handleFinishTransfer}
-                              onAcceptHandover={handleAcceptHandover}
+                              onAcceptHandover={guarded.acceptHandover}
                               onRegisterSignature={handleRegisterSignature}
                               currentUser={currentUser}
                               /* Phase B props */
@@ -29469,27 +29508,27 @@ export default function App() {
                               pendingHandoverItems={pendingHandoverItems}
                               attachments={attachments}
                               deptRatings={deptRatings}
-                              onUploadAttachment={handleUploadAttachment}
-                              onDeleteAttachment={handleDeleteAttachment}
-                              onResolvePendingItem={handleResolvePendingItem}
+                              onUploadAttachment={guarded.uploadAttachment}
+                              onDeleteAttachment={guarded.deleteAttachment}
+                              onResolvePendingItem={guarded.resolvePending}
                               onReceivePendingItem={handleReceivePendingItem}
                               onIssuePendingPart={handleIssuePendingPart}
-                              onPullBackHandover={handlePullBackHandover}
-                              onDeleteMachine={handleDeleteMachine} onSetMachineHold={handleSetMachineHold}
+                              onPullBackHandover={guarded.pullBackHandover}
+                              onDeleteMachine={guarded.deleteMachine} onSetMachineHold={guarded.setMachineHold}
                               /* Phase 1 — raise a fault mid-work */
-                              onRaisePendingItem={handleRaisePendingItem}
+                              onRaisePendingItem={guarded.raisePending}
                               /* Migration 036 — release a machine off the rack */
                               onReleaseHandover={handleReleaseHandover}
                               onAssignRackSlot={handleAssignRackSlot}
                               onReserveRackSlot={handleReserveRackSlot}
                               onFillRack={handleFillRack}
                               /* Migration 028 */
-                              onSubmitDuringWorkChecklist={handleSubmitDuringWorkChecklist}
+                              onSubmitDuringWorkChecklist={guarded.duringWorkCheck}
                               /* Migration 029 */
                               allUsers={allUsers} />,
     vendors:   <VendorsPage   vendorList={vendorList} pos={pos} items={items}
                               onAddVendor={handleAddVendor} onEditVendor={handleEditVendor}
-                              onDeleteVendor={handleDeleteVendor} onBulkAddVendors={handleBulkAddVendors} canDo={canDo} />,
+                              onDeleteVendor={guarded.deleteVendor} onBulkAddVendors={handleBulkAddVendors} canDo={canDo} />,
     analytics: <AnalyticsPage items={items} pos={pos} vendorList={vendorList} settings={settings} />,
     ai:        <AIPage items={items} pos={pos} vendorList={vendorList} bomDefs={bomDefs} machineLog={machineLog} pendingLog={pendingLog} settings={settings} />,
     whatsapp:  <WhatsAppPage settings={settings} onSave={handleSaveSettings} />,
@@ -29581,13 +29620,16 @@ export default function App() {
 
       {/* ── Global overlays ── */}
       {showSearch && (
+        <SafeBoundary name="global-search" label="search" overlay onClose={() => setShowSearch(false)}>
         <GlobalSearch
           items={items} pos={pos} vendorList={vendorList} machineLog={machineLog}
           onClose={() => setShowSearch(false)}
           onNavigate={setActivePage}
         />
+        </SafeBoundary>
       )}
       {showNotifs && (
+        <SafeBoundary name="notifications" label="notifications" overlay onClose={() => setShowNotifs(false)}>
         <NotificationPanel
           notifications={notifications}
           dismissed={dismissedIds}
@@ -29596,10 +29638,12 @@ export default function App() {
           onDismiss={dismissNotif}
           onDismissAll={dismissAllNotifs}
         />
+        </SafeBoundary>
       )}
 
       {/* ── 2026-11-03 — Admin Ready popup (Dashboard / Machine Tracker) ── */}
       {readyAdmin && readyPopupItems.length > 0 && (activePage === "dashboard" || activePage === "machines") && (
+        <SafeBoundary name="ready-popup" label="ready machines popup" overlay onClose={markReadySeen}>
         <ReadyMachinesPopup
           items={readyPopupItems}
           bomDefs={bomDefs}
@@ -29610,6 +29654,7 @@ export default function App() {
             setMtFilterReq({ filter: "completed", n: Date.now() });
           }}
         />
+        </SafeBoundary>
       )}
 
       {/* ── 2026-06-05i — Keyboard shortcuts cheatsheet (press ? to open) ── */}
