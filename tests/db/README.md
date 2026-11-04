@@ -49,3 +49,12 @@ UI e2e (not part of `npm test`, needs the local-mode preview on :5183):
 disabled / no-permission / other-department users, append, compare-and-set stale, audit row) and
 `bash tests/db/063_concurrent_append.sh` (two real sessions at the same moment: Hold + stage change
 both kept; two stage changes from the same stage — one wins, the other is reported stale).
+
+## 065 — Stores read-only machine visibility
+
+`bash tests/db/build_local_db.sh 065` then
+`su postgres -c "psql -q -d erp_test -f tests/db/065_store_read_tests.sql"` (Store Manager with no
+department reads every machine + pending job; Purchase Manager, disabled / page-blocked Store Manager,
+no-department Production user and anon still see nothing; department users unchanged; Store Manager
+still cannot update / delete machines, resolve other departments' jobs or send hand-overs).
+UI e2e: `tests/e2e/store-mt-overview.mjs`.

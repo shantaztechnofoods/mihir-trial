@@ -19493,6 +19493,10 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
   // and calls the SAME handler as the admin tracker — nothing is duplicated.
   const staffMode  = !isAdminUser;
   const isProdHead = staffMode && (currentUser?.role === "Production Head" || (canDo("machines", "release") && !isFloorLogin));
+  // 2026-11-04 — Stores (Store Manager role or the stock-inward permission)
+  // with no department get a read-only overview of every machine instead of
+  // the "No department assigned" dead-end. Mirrors migration 065.
+  const isStoresViewer = staffMode && !isProdHead && (currentUser?.role === "Store Manager" || !!canDo("inward", "submit"));
   // 2026-11-03 — staff "My Dashboard" panel (read-only; see StaffMyDashboard).
   const [myDashOpen, setMyDashOpen] = useState(false);
   const canReleaseFromRack = canDo("machines", "release") || isAdminUser;
@@ -20394,6 +20398,92 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
               </div>
             );
           };
+          // 2026-11-04 — Stores overview (read-only). A Store Manager / store
+          // keeper with no department used to hit the dead-end below. Stores
+          // needs to see every machine — where it is and which parts / rack it
+          // is waiting for — so it can prepare them. Same rule as the database
+          // (migration 065 store_machine_reader): Store Manager role or the
+          // stock-inward permission. No buttons here: Finish & Transfer /
+          // Accept still need a department, exactly as before.
+          if (!isProdHead && !hasDepartments && isStoresViewer) {
+            const live = (machineLog || []).filter((m) => m.status !== "completed");
+            const openParts = (m) => openJobsOf(m).filter(pendingItemIsPart);
+            const openWork  = (m) => openJobsOf(m).filter((p) => !pendingItemIsPart(p));
+            const rows = live.map((m) => ({ m, parts: openParts(m), work: openWork(m) }))
+              .sort((a, b) => (b.parts.length - a.parts.length) || String(a.m.bomKey || "").localeCompare(String(b.m.bomKey || "")));
+            const partsTotal = rows.reduce((n, r) => n + r.parts.length, 0);
+            const onRack = rows.filter((r) => r.m.stage === "BOM Issued").length;
+            const chip = (bg, fg, text, attr) => (
+              <span {...(attr || {})} className="text-[12px] font-black px-2 py-1 rounded-lg" style={{ background: bg, color: fg }}>{text}</span>
+            );
+            return (
+              <div className="space-y-4" data-stores-overview>
+                <div className="flex items-baseline gap-2 flex-wrap px-1">
+                  <span className="text-[12px] font-bold uppercase tracking-[0.08em]" style={{ color: "var(--text-dim)" }}>Stores overview · स्टोर्स</span>
+                  <span className="text-[18px] font-black" style={{ color: "var(--text-strong)" }}>All machines (view only)</span>
+                  {currentUser?.fullName && <span className="text-[12px] ml-auto" style={{ color: "var(--text-dim)" }}>{currentUser.fullName}</span>}
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {[["Machines · मशीन", rows.length, "data-stores-count-machines"], ["On rack · रैक", onRack, "data-stores-count-rack"], ["Parts to prepare · पार्ट्स", partsTotal, "data-stores-count-parts"]].map(([label, n, attr]) => (
+                    <div key={attr} {...{ [attr]: n }} className="mt-card no-lift p-3 text-center">
+                      <div className="text-[22px] font-black tabular-nums" style={{ color: n ? "#2640B0" : "var(--text-dim)" }}>{n}</div>
+                      <div className="text-[12px] font-bold" style={{ color: "var(--text-dim)" }}>{label}</div>
+                    </div>
+                  ))}
+                </div>
+                <Section title="Machines and what they wait for" count={rows.length} hint="view only — कोई बदलाव नहीं">
+                  {rows.length === 0 && <Empty text="No machines in production right now." />}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                    {rows.map(({ m, parts, work }) => <SafeBoundary key={m.id} name="stores-overview-card" label="this machine card" render={() => {
+                      const h = machineHandover(m);
+                      const onRackNow = m.stage === "BOM Issued";
+                      const dept = onRackNow ? "Assembly" : (m.currentDepartment || m.stage || "—");
+                      return (
+                        <Card key={m.id}>
+                          {withPhoto(m, h, <div data-stores-machine={m.id}>
+                            <div className="text-[17px] font-black break-words" style={{ color: "var(--text-strong)" }}>{titleOf(m, h)}</div>
+                            {m.bomLabel && <div className="text-[13px] mt-0.5 break-words" style={{ color: "var(--text-dim)" }}>{m.bomLabel}</div>}
+                            <div className="flex flex-wrap gap-1.5 mt-2">
+                              {chip("rgba(38,64,176,0.10)", "#2640B0", `Stage: ${m.stage || "—"}`, { "data-stores-stage": m.id })}
+                              {chip("rgba(100,116,139,0.12)", "#334155", `Dept: ${dept}`)}
+                              {onRackNow && chip("rgba(67,56,202,0.10)", "#4338ca", `On rack${m.rackSlot ? ` · ${slotLabel(m.rackSlot)}` : ""}`, { "data-stores-rack": m.id })}
+                              {!onRackNow && m.rackSlot && chip("rgba(67,56,202,0.10)", "#4338ca", `Rack ${slotLabel(m.rackSlot)}`, { "data-stores-rack": m.id })}
+                              {h && chip("rgba(245,158,11,0.12)", "#b45309", isAwaitingRelease(h) ? `Waiting on rack → ${h.toDepartment}` : `Going to ${h.toDepartment}`)}
+                              {!h && m.pendingHandoverId && chip("rgba(245,158,11,0.12)", "#b45309", "Hand-over pending")}
+                            </div>
+                            {holdBadge(m)}
+                          </div>)}
+                          {parts.length > 0 ? (
+                            <div data-stores-parts={m.id}>
+                              <div className="text-[12px] font-bold uppercase tracking-[0.06em] mb-1" style={{ color: "var(--text-dim)" }}>Waiting for parts · पार्ट्स बाकी</div>
+                              <ul className="space-y-1">
+                                {parts.map((p) => {
+                                  const left = pendingItemRemaining(p);
+                                  return (
+                                    <li key={p.id} data-stores-part={p.id} className="text-[14px] break-words" style={{ color: "var(--text-strong)" }}>
+                                      <b>{p.itemName || p.itemCode}</b>{p.itemCode && p.itemName ? <span style={{ color: "var(--text-dim)" }}> ({p.itemCode})</span> : null}
+                                      {left != null ? <span> · <b>{left}</b> pending</span> : null}
+                                      {p.assignedDepartment ? <span style={{ color: "var(--text-dim)" }}> · for {p.assignedDepartment}</span> : null}
+                                      {p.critical ? <span className="ml-1 text-[12px] font-black" style={{ color: "#dc2626" }}>CRITICAL</span> : null}
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            </div>
+                          ) : (
+                            <div className="text-[13px]" style={{ color: "var(--text-dim)" }}>No parts pending · कोई पार्ट बाकी नहीं</div>
+                          )}
+                          {work.length > 0 && (
+                            <div className="text-[13px]" style={{ color: "var(--text-dim)" }}>{work.length} open work job{work.length === 1 ? "" : "s"} (not parts)</div>
+                          )}
+                        </Card>
+                      );
+                    }} />)}
+                  </div>
+                </Section>
+              </div>
+            );
+          }
           // No department: say so and show nothing else. A Store Manager still
           // keeps the BOM section above when the role may issue a BOM.
           if (!isProdHead && !hasDepartments) {
