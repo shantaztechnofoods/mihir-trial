@@ -3872,3 +3872,66 @@ button.rack-btn:disabled { background: #e5e7eb !important; color: #6b7280 !impor
   }
   .modal-x { width: 44px !important; height: 44px !important; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Reports v2 (2026-11-04)
+   Premium letterhead (name in spaced capitals, a thin double rule), the
+   department stage records, checklist ✓ / ✗ rows, critical items and the
+   BOM photo beside the machine details. Calm ink: colour only for status.
+   ═══════════════════════════════════════════════════════════════════════ */
+.rpt-lh { border-bottom: 3px double #9a9384; padding-bottom: 12px; }
+.rpt-lh-name { text-transform: uppercase; letter-spacing: 0.08em; font-size: 19px; }
+.rpt-lh-line { letter-spacing: 0.01em; }
+.mr-doc .mr-identity.has-photo { display: grid; grid-template-columns: 132px minmax(0, 1fr) auto; align-items: center; }
+.mr-doc .rpt-photo.rpt-photo-sm { width: 132px; height: 99px; }
+.mr-doc .rpt-dept { border-top: 1px solid var(--mr-rule-strong); padding: 9px 0 10px; margin-top: 10px; }
+.mr-doc .rpt-dept:first-of-type { margin-top: 4px; }
+.mr-doc .rpt-dept.is-pending { opacity: 0.72; }
+.mr-doc .rpt-dept-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.mr-doc .rpt-dept-name { font-size: 14px; font-weight: 700; color: var(--mr-ink); }
+.mr-doc .rpt-dept-state { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+.mr-doc .rpt-dept-scope { font-size: 11.5px; color: var(--mr-mute); margin-top: 1px; }
+.mr-doc .rpt-dept-grid { display: grid; grid-template-columns: 1fr 1fr 1.1fr 1.9fr; gap: 10px 16px; margin-top: 8px; }
+.mr-doc .rpt-dept-v { font-size: 12px; font-weight: 600; color: var(--mr-ink); }
+.mr-doc .rpt-dept-accrow { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; }
+.mr-doc .rpt-sigbox.rpt-sigbox-sm { width: 96px; height: 32px; flex-shrink: 0; }
+.mr-doc .rpt-sigbox.rpt-sigbox-sm img { max-height: 30px; max-width: 96px; }
+.mr-doc .rpt-dept-line { margin-top: 6px; }
+.mr-doc .rpt-dept-checks { margin-top: 8px; }
+.mr-doc .rpt-cl { margin-top: 6px; }
+.mr-doc .rpt-cl-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 4px; font-size: 11.5px; padding-bottom: 3px; border-bottom: 1px solid var(--mr-rule); }
+.mr-doc .rpt-cl-score { margin-left: auto; font-size: 11px; font-weight: 600; }
+.mr-doc .rpt-cl-row { display: grid; grid-template-columns: 18px minmax(0, 1.5fr) minmax(0, 1fr); gap: 8px; padding: 3px 0; border-bottom: 1px solid var(--mr-rule); font-size: 11.5px; }
+.mr-doc .rpt-tick { font-weight: 700; text-align: center; }
+.mr-doc .rpt-tick.is-ok { color: var(--mr-green, #1f5a37); }
+.mr-doc .rpt-tick.is-no { color: var(--mr-red, #8a1f1f); }
+.mr-doc .rpt-dept-comments { margin-top: 8px; }
+.mr-doc .rpt-dept-comments > .mr-label { margin-bottom: 2px; }
+@media (max-width: 639.98px) {
+  .mr-doc .mr-identity.has-photo { grid-template-columns: 96px minmax(0, 1fr); }
+  .mr-doc .mr-identity.has-photo > [data-report-status] { grid-column: 1 / -1; }
+  .mr-doc .rpt-photo.rpt-photo-sm { width: 96px; height: 72px; }
+  .mr-doc .rpt-dept-grid { grid-template-columns: 1fr 1fr; }
+  .mr-doc .rpt-cl-row { grid-template-columns: 18px minmax(0, 1fr); }
+  .mr-doc .rpt-cl-row > :nth-child(3) { grid-column: 2; }
+}
+@media print {
+  .rpt-lh { border-bottom: 2.2pt double #8a8a8a; }
+  .rpt-lh-name { font-size: 14pt; letter-spacing: 0.09em; }
+  .mr-doc .mr-identity.has-photo { grid-template-columns: 34mm minmax(0, 1fr) auto; }
+  .mr-doc .rpt-photo.rpt-photo-sm { width: 34mm; height: 25mm; }
+  .mr-doc .rpt-dept { padding: 4pt 0 5pt; margin-top: 6pt; border-top-width: 0.9pt; }
+  .mr-doc .rpt-dept.is-pending { opacity: 1; color: #555; }
+  .mr-doc .rpt-dept-head, .mr-doc .rpt-dept-grid, .mr-doc .rpt-cl-head { break-inside: avoid; page-break-inside: avoid; }
+  .mr-doc .rpt-dept-head, .mr-doc .rpt-dept-scope, .mr-doc .rpt-dept-grid { break-after: avoid; page-break-after: avoid; }
+  .mr-doc .rpt-dept-name { font-size: 10.5pt; }
+  .mr-doc .rpt-dept-state { font-size: 7pt; }
+  .mr-doc .rpt-dept-scope, .mr-doc .rpt-dept-v, .mr-doc .rpt-cl-head { font-size: 8.4pt; }
+  .mr-doc .rpt-dept-grid { gap: 2pt 4mm; margin-top: 3pt; }
+  .mr-doc .rpt-cl { margin-top: 3pt; }
+  .mr-doc .rpt-cl-head { border-bottom-width: 0.5pt; break-after: avoid; page-break-after: avoid; }
+  .mr-doc .rpt-cl-row { font-size: 8.2pt; padding: 1.4pt 0; border-bottom-width: 0.4pt; break-inside: avoid; page-break-inside: avoid; }
+  .mr-doc .rpt-cl-score { font-size: 7.6pt; }
+  .mr-doc .rpt-sigbox.rpt-sigbox-sm { width: 26mm; height: 9mm; }
+  .mr-doc .rpt-sigbox.rpt-sigbox-sm img { max-height: 8.5mm; max-width: 26mm; }
+}
