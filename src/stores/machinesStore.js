@@ -1,6 +1,7 @@
 // Machine Log store — public.machine_log
 import { isSupabaseEnabled } from "../config/env.js";
 import { getSupabase } from "../supabase/client.js";
+import { fetchAllRows, readLocalJson } from "../utils/fetchAll.js";
 import { localIsoDate } from "./localDate.js";
 
 const LOCAL_KEY = "erp_machines";
@@ -82,7 +83,7 @@ function toIsoDate(s) {
   return localIsoDate(d);
 }
 
-function getLocal() { try { const s = localStorage.getItem(LOCAL_KEY); if (s) return JSON.parse(s); } catch {} return []; }
+function getLocal() { return readLocalJson(LOCAL_KEY, []); }
 function setLocal(a) { try { localStorage.setItem(LOCAL_KEY, JSON.stringify(a)); } catch {} }
 
 export async function fetchMachines() {
@@ -90,7 +91,7 @@ export async function fetchMachines() {
   console.info("[machines:load] start", { mode });
   if (!isSupabaseEnabled()) return getLocal();
   const c = getSupabase(); if (!c) return getLocal();
-  const { data, error } = await c.from("machine_log").select("*").order("created_at", { ascending: false });
+  const { data, error } = await fetchAllRows(() => c.from("machine_log").select("*").order("created_at", { ascending: false }).order("id", { ascending: false }), { tag: "machines:load" });
   if (error) { console.error("[machines:load] failed", error); return getLocal(); }
   const out = (data || []).map(fromRow);
   setLocal(out);

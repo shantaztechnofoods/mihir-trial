@@ -9,6 +9,7 @@
 
 import { isSupabaseEnabled } from "../config/env.js";
 import { getSupabase } from "../supabase/client.js";
+import { fetchAllRows, readLocalJson } from "../utils/fetchAll.js";
 
 const LOCAL_KEY = "erp_handovers";
 
@@ -102,7 +103,7 @@ function isMissingColumnError(err) {
   return /column .* does not exist|schema cache|could not find the .* column/i.test(err.message || err.details || err.hint || "");
 }
 
-function getLocal() { try { const s = localStorage.getItem(LOCAL_KEY); if (s) return JSON.parse(s); } catch {} return []; }
+function getLocal() { return readLocalJson(LOCAL_KEY, []); }
 function setLocal(a) { try { localStorage.setItem(LOCAL_KEY, JSON.stringify(a)); } catch {} }
 
 // Returns all handovers, newest-first.
@@ -139,10 +140,11 @@ export async function fetchHandovers() {
   console.info("[handovers:load] start", { mode });
   if (!isSupabaseEnabled()) { const a = getLocal(); console.info("[handovers:load] local ok", { count: a.length }); return a; }
   const c = getSupabase(); if (!c) return getLocal();
-  const { data, error } = await c
+  const { data, error } = await fetchAllRows(() => c
     .from("handover_events")
     .select("*")
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false }), { tag: "handovers:load" });
   if (error) { console.error("[handovers:load] failed", error); return getLocal(); }
   const out = (data || []).map(fromRow);
   setLocal(out);
