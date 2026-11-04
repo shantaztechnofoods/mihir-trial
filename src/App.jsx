@@ -100,11 +100,12 @@ import { ChartSlot, loadCharts } from "./components/LazyCharts.jsx";
 import { importWithReload } from "./utils/lazyImport.js";
 import { useProgressiveCount } from "./components/useProgressiveCount.js";
 import MoreRowsNote from "./components/MoreRowsNote.jsx";
+import { BRAND_LOGO_DATA_URI } from "./utils/brandLogo.js";
 
 // Visible build marker — shown in the Settings header so you can confirm in PRODUCTION
 // which bundle is live. If you don't see this tag on the Settings page, the deployed
 // build is stale (redeploy on Vercel without build cache + hard-refresh the browser).
-const APP_BUILD = "2026-11-04-purchase-3";
+const APP_BUILD = "2026-11-04-reports-v3";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
@@ -15218,7 +15219,7 @@ function AtoZMachineReport({
         <div className="min-w-0">
           <div className="mr-label">Machine</div>
           <div className="mr-machine">{machine.bomLabel || bom.label || machine.bomKey}</div>
-          <div className="mr-mono mr-serial">Model {machine.bomKey} · Serial no. {machine.serialNo || "—"}</div>
+          <div className="mr-mono mr-serial">Model {machine.bomKey}{machine.serialNo ? ` · Serial no. ${machine.serialNo}` : ""}</div>
         </div>
         <div data-report-status className={`mr-stamp ${isReady ? "is-done" : "is-progress"}`}>
           {isReady ? "Ready for dispatch" : `In production · ${displayStageOf(machine) || machine.stage}`}
@@ -15231,8 +15232,8 @@ function AtoZMachineReport({
           ["Build time", buildDays ? `${buildDays} day${buildDays === 1 ? "" : "s"}` : ""],
           ["Rack", machine.rackSlot ? slotLabel(machine.rackSlot) : (rackCapacityFor(machine.bomKey, bom) > 0 ? "Left the rack" : "Direct production")],
           ["BOM issue ref", machine.issueId ? String(machine.issueId) : "", true],
-        ].map(([k, v, mono]) => (
-          <div key={k} className="min-w-0"><div className="mr-label">{k}</div><div className={`mr-fact ${mono ? "mr-mono" : ""}`}>{v || "—"}</div></div>
+        ].filter(([, v]) => v).map(([k, v, mono]) => (
+          <div key={k} className="min-w-0"><div className="mr-label">{k}</div><div className={`mr-fact ${mono ? "mr-mono" : ""}`}>{v}</div></div>
         ))}
       </div>
       {/* D4 — summary row */}
@@ -15243,7 +15244,7 @@ function AtoZMachineReport({
           { k: "Signatures", v: sigRows.length, attr: { "data-report-sig-count": "" } },
           { k: "Open issues", v: openJobs.length, red: openJobs.length > 0 },
           { k: "Resolved issues", v: resolvedJobs.length },
-          { k: "Average rating", v: sum.average !== null ? rate(sum.average) : "—" },
+          { k: "Average rating", v: sum.average !== null ? rate(sum.average) : "Not rated" },
         ].map((g) => (
           <div key={g.k} className={`mr-sum ${g.red ? "is-red" : ""}`}><div className="mr-sum-v" {...(g.attr || {})}>{g.v}</div><div className="mr-label">{g.k}</div></div>
         ))}
@@ -15294,7 +15295,7 @@ function AtoZMachineReport({
                   : r.status === "unconfirmed" ? <span className="mr-red">Not confirmed</span>
                   : <span className="mr-muted">No confirmation recorded</span>}
               </div>
-              <div className="mr-td" data-l="Issued / verified"><div><div>{fmtDT(r.when) || "—"}{r.by ? <span> · {r.by}</span> : null}</div><div className="mr-label">{r.via}</div></div></div>
+              <div className="mr-td" data-l="Issued / verified"><div><div>{fmtDT(r.when) || ""}{r.by ? <span> · {r.by}</span> : null}</div><div className="mr-label">{r.via}</div></div></div>
             </div>
           ))}
         </div>
@@ -15318,7 +15319,7 @@ function AtoZMachineReport({
       </div>
       {machineHandovers.length === 0 ? <p className="mr-empty">No hand-overs recorded yet. The machine is at {machine.stage}.</p> : (
         <div className="mr-table">
-          {/* 2026-11-04 — signatures moved to the one signature register (section 07). */}
+          {/* 2026-11-04 — signatures moved to the one signature register. */}
           <div className="mr-tr mr-th" style={{ gridTemplateColumns: "1.25fr 1.05fr 1.4fr 1.15fr 1.25fr 1fr" }}>
             <div>Hand-over</div><div>Handed over</div><div>Accepted</div><div>Time / target</div>
             <div>{show.showEmployees !== false ? "Team (lead in bold)" : ""}</div><div>{show.showChecklists !== false ? "Checks" : ""}</div>
@@ -15341,28 +15342,28 @@ function AtoZMachineReport({
                     </div>
                     {show.showRatings !== false && rating && <div className="mr-label">Rating {rate(rating.rating)}</div>}
                   </div></div>
-                  <div className="mr-td" data-l="Handed over"><div><div>{fmtDT(h.sentAt) || "—"}</div>{userName(h.sentBy) && <div className="mr-label">by {userName(h.sentBy)}</div>}</div></div>
+                  <div className="mr-td" data-l="Handed over"><div><div>{fmtDT(h.sentAt) || ""}</div>{userName(h.sentBy) && <div className="mr-label">by {userName(h.sentBy)}</div>}</div></div>
                   <div className="mr-td" data-l="Accepted"><div>
-                    <div>{h.acceptedAt ? fmtDT(h.acceptedAt) : h.status === "pending" ? "Waiting" : "—"}</div>
+                    <div>{h.acceptedAt ? fmtDT(h.acceptedAt) : h.status === "pending" ? "Waiting" : ""}</div>
                     {(h.acceptedByName || userName(h.acceptedBy)) && <div className="mr-label" data-report-accepted-by>by {h.acceptedByName || userName(h.acceptedBy)}</div>}
                     {h.acceptedAt && h.acceptedInDepartment && h.acceptedInDepartment !== h.toDepartment && <div className="mr-label">into {h.acceptedInDepartment}</div>}
                     {show.showEmployees !== false && Array.isArray(h.acceptedByTeamSnapshot) && h.acceptedByTeamSnapshot.length > 0 && (
-                      <div className="mr-label" data-report-accept-team>team: {h.acceptedByTeamSnapshot.map((x) => (x && (x.fullName || x.username || x.name)) || "").filter((n) => n && n !== (h.acceptedByName || userName(h.acceptedBy))).join(", ") || "—"}</div>
+                      <div className="mr-label" data-report-accept-team>team: {h.acceptedByTeamSnapshot.map((x) => (x && (x.fullName || x.username || x.name)) || "").filter((n) => n && n !== (h.acceptedByName || userName(h.acceptedBy))).join(", ") || "none named"}</div>
                     )}
                     <div className="mr-label">Accept window {dur(h.acceptTimeoutMinutes)}</div>
                     {h.status === "accepted" && !(h.acceptedSignatureSvg || h.mainEmployeeSignatureSvg) && <div className="mr-label">Signed on file (earlier record)</div>}
                   </div></div>
                   <div className="mr-td" data-l="Time / target"><div>
-                    <div className={`rpt-nowrap ${over ? "mr-red" : ""}`}>{!h.actualDurationMinutes && !h.expectedDurationMinutes ? "—" : `${dur(h.actualDurationMinutes)} of ${dur(h.expectedDurationMinutes)}`}</div>
+                    <div className={`rpt-nowrap ${over ? "mr-red" : ""}`}>{!h.actualDurationMinutes && !h.expectedDurationMinutes ? "" : `${dur(h.actualDurationMinutes)} of ${dur(h.expectedDurationMinutes)}`}</div>
                     {over && <div className="mr-red mr-small">Over by {dur(h.overrunMinutes)}</div>}
                   </div></div>
                   <div className="mr-td" data-l="Team">{show.showEmployees !== false && (ordered.length
                     ? <div>{ordered.map((uid) => <div key={uid} className={uid === lead ? "font-bold" : ""} title={uid === lead ? "Lead / main employee" : undefined}>{nameFromSnap(uid, h.workedBySnapshot)}</div>)}</div>
-                    : <span className="mr-muted">—</span>)}</div>
+                    : null)}</div>
                   <div className="mr-td" data-l="Checks">{show.showChecklists !== false && (hopResp.length ? <div>{hopResp.map((cr) => {
                       const ans = cr.answers || []; const done = ans.filter((a) => a.checked).length; const miss = ans.length - done;
-                      return <div key={cr.id}>{({ before_dispatch: "Dispatch", before_receive: "Receive", during_work: "During work" })[cr.stage] || "Checklist"} {done}/{ans.length}{miss ? <span className="mr-red"> · {miss} not done</span> : null}</div>;
-                    })}<div className="mr-label">Full answers: Appendix A</div></div> : <span className="mr-muted">—</span>)}</div>
+                      return <div key={cr.id} className="rpt-badges"><span className={`rpt-badge ${miss ? "is-warn" : "is-ok"}`}>{({ before_dispatch: "Dispatch", before_receive: "Receive", during_work: "During work" })[cr.stage] || "Checklist"} {done} of {ans.length}</span>{miss ? <span className="rpt-badge is-no">{miss} open</span> : null}</div>;
+                    })}<div className="mr-label">Full answers: Appendix A</div></div> : null)}</div>
                 </div>
                 {/* The delay reason is printed once, in "Holds and late reasons" below. */}
                 {raised.length > 0 && (
@@ -15373,7 +15374,7 @@ function AtoZMachineReport({
               </div>
             );
           })}
-          {machineHandovers.some((h) => h.acceptedSignatureSvg || h.mainEmployeeSignatureSvg) && <p className="mr-label rpt-table-note">Hand-over and acceptance signatures, with name, department and date, are in the signature register (section 07).</p>}
+          {machineHandovers.some((h) => h.acceptedSignatureSvg || h.mainEmployeeSignatureSvg) && <p className="mr-label rpt-table-note">Hand-over and acceptance signatures, with name, department and date, are in the signature register at the end of this report.</p>}
         </div>
       )}
       {/* 2026-11-03 — holds and late reasons for this machine (read-only). */}
@@ -15393,9 +15394,9 @@ function AtoZMachineReport({
                   <div key={r.key} className="mr-tr" style={{ gridTemplateColumns: "1.3fr 1.3fr 0.9fr 2.4fr 1.1fr" }}>
                     <div className="mr-td" data-l="What"><span className={r.open ? "mr-red font-semibold" : "mr-amber font-semibold"}>{r.label}{r.open ? " · open" : ""}</span></div>
                     <div className="mr-td" data-l="Where / when"><div><div>{r.to ? `${r.from} → ${r.to}` : r.from}</div><div className="mr-label">{fmtDT(r.startAt)}</div></div></div>
-                    <div className="mr-td md:text-right" data-l="Length">{r.minutes != null ? dur(r.minutes) : "—"}</div>
+                    <div className="mr-td md:text-right" data-l="Length">{r.minutes != null ? dur(r.minutes) : ""}</div>
                     <div className="mr-td" data-l="Reason">{r.reason || <span className="mr-muted">No reason given</span>}</div>
-                    <div className="mr-td" data-l="Who">{r.by || "—"}{r.releasedBy ? <div className="mr-label">released by {r.releasedBy}</div> : null}</div>
+                    <div className="mr-td" data-l="Who">{r.by || ""}{r.releasedBy ? <div className="mr-label">released by {r.releasedBy}</div> : null}</div>
                   </div>
                 ))}
                 {late.map((h) => (
@@ -15404,7 +15405,7 @@ function AtoZMachineReport({
                     <div className="mr-td" data-l="Where / when"><div><div>{h.fromDepartment}</div><div className="mr-label">{fmtDT(h.sentAt)}</div></div></div>
                     <div className="mr-td md:text-right" data-l="Length">{dur(h.overrunMinutes)}</div>
                     <div className="mr-td" data-l="Reason">{h.overrunNarration}</div>
-                    <div className="mr-td" data-l="Who">{userName(h.sentBy) || "—"}</div>
+                    <div className="mr-td" data-l="Who">{userName(h.sentBy) || ""}</div>
                   </div>
                 ))}
               </div>
@@ -15453,7 +15454,7 @@ function AtoZMachineReport({
               {(p.itemCode || p.itemName) && <div className="mr-label">Part {p.itemCode ? <span className="mr-mono">{p.itemCode}</span> : null}{p.itemName ? ` ${p.itemName}` : ""}{p.qty != null ? ` × ${p.qty}` : ""}{(Number(p.receivedQty) || 0) > 0 ? ` · ${p.receivedQty} received` : ""}{p.partSerialNo ? <> · part S/N <span className="mr-mono">{p.partSerialNo}</span></> : null}</div>}
               <div className="mr-label">{src}{hop ? ` · at ${hop.fromDepartment} → ${hop.toDepartment} hand-over` : ""}</div>
             </div></div>
-            <div className="mr-td" data-l="Raised"><div><div>{p.raisedInDepartment || "—"}</div><div className="mr-label">{fmtDT(p.raisedAt)}</div></div></div>
+            <div className="mr-td" data-l="Raised"><div><div>{p.raisedInDepartment || ""}</div><div className="mr-label">{fmtDT(p.raisedAt)}</div></div></div>
             <div className="mr-td" data-l="Assigned to">{p.assignedDepartment || "Unassigned"}</div>
           </div>
           <div className="mr-issue-history"><JobHistory item={p} users={allUsers} compact reportDates /></div>
@@ -15493,9 +15494,9 @@ function AtoZMachineReport({
           <div className="mr-tr mr-th" style={{ gridTemplateColumns: "1.1fr 1.1fr 4fr" }}><div>Date</div><div>Stage</div><div>Note</div></div>
           {(machine.history || []).map((h, i) => (
             <div key={i} className="mr-tr" style={{ gridTemplateColumns: "1.1fr 1.1fr 4fr" }}>
-              <div className="mr-td" data-l="Date">{fmtD(h.date) || h.date || "—"}</div>
+              <div className="mr-td" data-l="Date">{fmtD(h.date) || h.date || ""}</div>
               <div className="mr-td font-semibold" data-l="Stage">{h.stage}</div>
-              <div className="mr-td" data-l="Note">{h.note || "—"}</div>
+              <div className="mr-td" data-l="Note">{h.note || ""}</div>
             </div>
           ))}
         </div>
@@ -15516,8 +15517,8 @@ function AtoZMachineReport({
           {fileAttach.map((a) => (
             <div key={a.id} className="mr-tr" style={{ gridTemplateColumns: "3fr 1.5fr 1.2fr" }}>
               <div className="mr-td" data-l="File"><div><div>{a.caption || a.name || a.fileName || a.kind || "attachment"}</div><div className="mr-label">{a.caption && (a.fileName || a.name) ? `${a.fileName || a.name} · ` : ""}{a.kind === "image" ? "Photo" : a.kind === "video" ? "Video" : a.kind === "pdf" ? "PDF" : a.kind || "File"}{a.isCustomerVisible ? " · shown to customer" : " · internal"}</div></div></div>
-              <div className="mr-td" data-l="Department">{a.department || "—"}</div>
-              <div className="mr-td" data-l="Added">{fmtDT(a.createdAt || a.uploadedAt) || "—"}{userName(a.uploadedBy) ? <div className="mr-label">by {userName(a.uploadedBy)}</div> : null}</div>
+              <div className="mr-td" data-l="Department">{a.department || ""}</div>
+              <div className="mr-td" data-l="Added">{fmtDT(a.createdAt || a.uploadedAt) || ""}{userName(a.uploadedBy) ? <div className="mr-label">by {userName(a.uploadedBy)}</div> : null}</div>
             </div>
           ))}
         </div>
@@ -15528,7 +15529,7 @@ function AtoZMachineReport({
           {voiceAttach.map((a) => (
             <div key={`v-${a.id}`} className="mr-check-row rpt-voice-row" data-report-voice-note>
               <span className="rpt-voice-play">{isVoiceAttachment(a) ? <VoicePlayButton attachment={a} /> : <span className="mr-muted">♪</span>}</span>
-              <div className="min-w-0">{a.caption || a.fileName || a.name || "Voice note"}<span className="mr-label"> · {a.department || "—"} · {fmtDT(a.uploadedAt || a.createdAt)}{userName(a.uploadedBy) ? ` · ${userName(a.uploadedBy)}` : ""}</span></div>
+              <div className="min-w-0">{a.caption || a.fileName || a.name || "Voice note"}<span className="mr-label"> · {a.department || ""} · {fmtDT(a.uploadedAt || a.createdAt)}{userName(a.uploadedBy) ? ` · ${userName(a.uploadedBy)}` : ""}</span></div>
             </div>
           ))}
         </div>
@@ -15579,8 +15580,8 @@ function AtoZMachineReport({
       return (
         <div key={cr.id} className="mr-check mr-avoid" data-report-appendix-checklist={cr.stage || ""}>
           <div className="mr-check-head">
-            <div className="font-semibold">{cr.department || "—"} · {STAGE_LABEL[cr.stage] || cr.stage || "Checklist"}{hop ? <span className="mr-label"> · {hop.fromDepartment} → {hop.toDepartment}</span> : null}</div>
-            <div className="mr-label">{cr.templateName || "—"} v{cr.templateVersion || 1}{cr.submittedAt ? ` · ${fmtDT(cr.submittedAt)}` : ""}{userName(cr.submittedBy) ? ` · ${userName(cr.submittedBy)}` : ""} · <span className={done < ans.length ? "mr-red" : "mr-green"}>{done}/{ans.length} done</span></div>
+            <div className="font-semibold">{cr.department || ""} · {STAGE_LABEL[cr.stage] || cr.stage || "Checklist"}{hop ? <span className="mr-label"> · {hop.fromDepartment} → {hop.toDepartment}</span> : null}</div>
+            <div className="mr-label">{cr.templateName || ""} v{cr.templateVersion || 1}{cr.submittedAt ? ` · ${fmtDT(cr.submittedAt)}` : ""}{userName(cr.submittedBy) ? ` · ${userName(cr.submittedBy)}` : ""} · <span className={done < ans.length ? "mr-red" : "mr-green"}>{done} of {ans.length} done</span></div>
           </div>
           {ans.map((a, i) => (
             <div key={i} className="mr-check-row">
@@ -15606,7 +15607,7 @@ function AtoZMachineReport({
 
   return (
     <div className="mr-doc" data-machine-report>
-      <RptPageStyle page="machine-report" head={`${company.name || RPT_LEGAL_NAME} · Machine production report`} refText={reportRef} foot="Machine production report · internal" />
+      <RptPageStyle page="machine-report" head={`${company.name || RPT_LEGAL_NAME} · Machine production report`} refText={reportRef} foot="Computer-generated report · Confidential, internal use only" />
       {/* D8 — the print frame (on paper the running head is a page margin box, from page 2 on). */}
       <table className="mr-frame">
         <thead><tr><td><div className="mr-runhead"><span>{company.name || RPT_LEGAL_NAME} · Machine production report</span><span className="mr-mono">{reportRef}</span></div></td></tr></thead>
@@ -15659,12 +15660,23 @@ const rptDur = (min) => {
 // Settings → Company name (active company), then the legacy settings name,
 // then the registered name below. The certificate's company box reads the same.
 const RPT_LEGAL_NAME = "SHANTA G TECHNOFOODS LLP";
+// 2026-11-04 (reports v3) — the old brand-style names ("Shantaz Technofoods",
+// "... Pvt Ltd") are not the legal name: they print as the registered name.
+// Placeholder / sample contact values (form hints, test seeds) never print.
+// The letterhead always carries the owner's real vector logo.
+const RPT_OLD_NAME = /^\s*shantaz\s*techno\s*foods\b/i;
+const RPT_SAMPLE = [/ABCDE1234/i, /AABCS1234/i, /@company\.com$/i, /\.example$/i, /^www\.company\.com$/i, /^factory \/ office address$/i, /^\+91 98765 43210$/];
+const rptClean = (v) => { const t = String(v == null ? "" : v).trim(); return t && !RPT_SAMPLE.some((re) => re.test(t)) ? t : ""; };
 const rptCompany = (settings) => {
   let c = {};
   try { c = getActiveCompany(settings) || {}; } catch { c = {}; }
-  const name = String(c.name || "").trim() || String((settings && settings.companyName) || "").trim() || RPT_LEGAL_NAME;
-  return { ...c, name };
+  const pick = (k, legacy) => rptClean(c[k]) || rptClean(settings && settings[legacy || k]);
+  let name = String(c.name || "").trim() || String((settings && settings.companyName) || "").trim();
+  if (!name || RPT_OLD_NAME.test(name)) name = RPT_LEGAL_NAME;
+  return { ...c, name, logo: BRAND_LOGO_DATA_URI, gst: pick("gst"), address: pick("address"), phone: pick("phone"), email: pick("email"), website: rptClean(c.website) };
 };
+// One contact line for every letterhead: GSTIN · phone · e-mail · website.
+const rptContactLine = (co = {}) => [co.gst ? `GSTIN ${co.gst}` : "", co.phone ? `Tel ${co.phone}` : "", co.email || "", co.website || ""].filter(Boolean).join("   ·   ");
 
 // ── Letterhead, title block and page furniture shared by every report ──────
 // 2026-11-04 — letterhead style: the logo centred and larger, the company name
@@ -15674,14 +15686,15 @@ const rptCompany = (settings) => {
 // page numbers (and, from page 2 on, a short running head).
 function RptLetterhead({ company = {}, showLogo = true, line = "" }) {
   const name = company.name || RPT_LEGAL_NAME;
-  const contact = [company.gst ? `GSTIN ${company.gst}` : "", company.phone ? `Phone ${company.phone}` : "", company.email || "", company.website || ""].filter(Boolean);
+  const contact = rptContactLine({ gst: company.gst, phone: company.phone, email: company.email, website: company.website });
   return (
     <div className="rpt-lh" data-report-letterhead>
-      {showLogo && company.logo && <img src={company.logo} alt="" className="mr-logo rpt-lh-logo" />}
+      {showLogo && <img src={company.logo || BRAND_LOGO_DATA_URI} alt="SHANTAZ" className="mr-logo rpt-lh-logo" />}
       <div className="rpt-lh-name">{name}</div>
+      <div className="rpt-lh-rule" aria-hidden="true" />
       {line && <div className="rpt-lh-line">{line}</div>}
       {company.address && <div className="rpt-lh-line">{company.address}</div>}
-      {contact.length > 0 && <div className="rpt-lh-line">{contact.join("  ·  ")}</div>}
+      {contact && <div className="rpt-lh-line">{contact}</div>}
     </div>
   );
 }
@@ -15706,7 +15719,8 @@ function RptPageStyle({ page, head = "", refText = "", foot = "" }) {
   const css = `@page ${page} { size: A4 portrait; margin: 16mm 14mm 17mm 14mm;
     @top-left { content: ${rptCssStr(head)}; font: 7.5pt Inter, Arial, sans-serif; color: #6b6b6b; vertical-align: bottom; padding-bottom: 3mm; }
     @top-right { content: ${rptCssStr(refText)}; font: 7.5pt Inter, Arial, sans-serif; color: #6b6b6b; vertical-align: bottom; padding-bottom: 3mm; }
-    @bottom-left { content: ${rptCssStr(foot)}; font: 7.5pt Inter, Arial, sans-serif; color: #6b6b6b; vertical-align: top; padding-top: 3mm; }
+    @bottom-left { content: ${rptCssStr(foot)}; font: 7pt Inter, Arial, sans-serif; color: #6b6b6b; vertical-align: top; padding-top: 3mm; }
+    @bottom-center { content: ${rptCssStr(refText)}; font: 7pt Inter, Arial, sans-serif; color: #6b6b6b; vertical-align: top; padding-top: 3mm; }
     @bottom-right { content: "Page " counter(page) " of " counter(pages); font: 7.5pt Inter, Arial, sans-serif; color: #6b6b6b; vertical-align: top; padding-top: 3mm; } }
   @page ${page}:first { @top-left { content: none; } @top-right { content: none; } }`;
   return <style>{css}</style>;
@@ -15722,9 +15736,9 @@ function RptSignatureRegister({ rows = [] }) {
         return (
           <div key={r.k} className="mr-tr" data-report-sig-row={r.k} style={{ gridTemplateColumns: "1.7fr 1.3fr 1fr 1.25fr 128px" }}>
             <div className="mr-td" data-l="Signed for">{r.role}</div>
-            <div className="mr-td font-semibold" data-l="Name">{r.name || "—"}</div>
-            <div className="mr-td" data-l="Department">{r.dept || "—"}</div>
-            <div className="mr-td" data-l="Date">{rptFmtDT(r.when) || "—"}</div>
+            <div className="mr-td font-semibold" data-l="Name">{r.name || ""}</div>
+            <div className="mr-td" data-l="Department">{r.dept || ""}</div>
+            <div className="mr-td" data-l="Date">{rptFmtDT(r.when) || ""}</div>
             <div className="mr-td" data-l="Signature">{r.accept ? <div data-report-accept-signature>{box}</div> : box}</div>
           </div>
         );
@@ -15948,20 +15962,20 @@ const rptPointJob = (label, jobs = [], status = "resolved") => (jobs || []).some
 const rptPointFixed = (label, jobs = []) => rptPointJob(label, jobs, "resolved");
 function RptDeptRecord({ r, customer = false, comments = [], users = [], certNo = "", jobs = [] }) {
   const stateText = r.state === "done" ? "Completed" : r.state === "current" ? "In progress" : "Not started";
-  const timeText = r.actual || r.target ? `${rptDur(r.actual)}${r.target ? ` · target ${rptDur(r.target)}` : ""}` : "—";
+  const timeText = r.actual || r.target ? `${rptDur(r.actual)}${r.target ? ` · target ${rptDur(r.target)}` : ""}` : "";
   const facts = [
-    ["In", rptFmtDT(r.inAt) || "—"],
-    ["Out", r.dept === "Ready" ? (r.state === "done" ? "Released" : "—") : (rptFmtDT(r.outAt) || "—")],
-    ...(customer ? [] : [["Time taken", r.dept === "Ready" ? "—" : timeText, r.over > 0]]),
+    ["In", rptFmtDT(r.inAt) || ""],
+    ["Out", r.dept === "Ready" ? (r.state === "done" ? "Released" : "") : (rptFmtDT(r.outAt) || "")],
+    ...(customer ? [] : [["Time taken", r.dept === "Ready" ? "" : timeText, r.over > 0]]),
   ];
   const sig = r.accepted && r.accepted.sig ? svgDataUri(r.accepted.sig) : "";
   return (
     <div className={`rpt-dept is-${r.state}`} data-report-dept={r.dept}>
       <div className="rpt-dept-head">
         <div className="rpt-dept-name">{r.dept === "Ready" ? "Final inspection · Ready" : r.dept}</div>
-        <span className={`rpt-dept-state ${r.state === "done" ? "mr-green" : r.state === "current" ? "mr-amber" : "mr-muted"}`}>{stateText}</span>
+        <span className={`rpt-dept-state rpt-badge rpt-status ${r.state === "done" ? "mr-green" : r.state === "current" ? "mr-amber" : "mr-muted"}`}>{stateText}</span>
       </div>
-      <div className="rpt-dept-scope">{RPT_DEPT_SCOPE[r.dept]}{r.dept === "Trial" && certNo ? ` See section ${certNo}.` : ""}</div>
+      <div className="rpt-dept-scope">{RPT_DEPT_SCOPE[r.dept]}{r.dept === "Trial" && certNo ? " See the trial certificate below." : ""}</div>
       <div className={`rpt-dept-grid${customer ? " is-3" : ""}`}>
         {facts.map(([k, v, red]) => (
           <div key={k} className="min-w-0"><div className="mr-label">{k}</div><div className={`rpt-dept-v rpt-nowrap ${red ? "mr-red" : ""}`}>{v}</div></div>
@@ -15970,14 +15984,14 @@ function RptDeptRecord({ r, customer = false, comments = [], users = [], certNo 
           <div className="mr-label">Accepted by</div>
           {r.accepted ? (
             <div className="rpt-dept-accrow">
-              <div className="min-w-0"><div className="rpt-dept-v">{r.accepted.name || "—"}</div><div className="mr-label">{rptFmtDT(r.accepted.at)}</div></div>
+              <div className="min-w-0"><div className="rpt-dept-v">{r.accepted.name || ""}</div><div className="mr-label">{rptFmtDT(r.accepted.at)}</div></div>
               {sig ? <div className="rpt-sigbox rpt-sigbox-sm"><img src={sig} alt={`Signature: ${r.accepted.name || r.dept}`} /></div> : null}
             </div>
-          ) : <div className="rpt-dept-v mr-muted">{r.dept === "Assembly" ? "Started from BOM issue" : "—"}</div>}
+          ) : <div className="rpt-dept-v mr-muted">{r.dept === "Assembly" ? "Started from BOM issue" : ""}</div>}
         </div>
       </div>
       {!customer && r.handedOver && (
-        <div className="mr-label rpt-dept-line">Handed over by <b>{r.handedOver.name || "—"}</b>{r.handedOver.team.length ? ` · team ${r.handedOver.team.join(", ")}` : ""}{r.rating ? ` · rating ${Number(r.rating.rating).toFixed(1)} / 5` : ""}</div>
+        <div className="mr-label rpt-dept-line">Handed over by <b>{r.handedOver.name || ""}</b>{r.handedOver.team.length ? ` · team ${r.handedOver.team.join(", ")}` : ""}{r.rating ? ` · rating ${Number(r.rating.rating).toFixed(1)} / 5` : ""}</div>
       )}
       {r.notes.length > 0 && <div className="mr-label rpt-dept-line">{r.notes.map((h) => h.note).join(" · ")}</div>}
       <div className="rpt-dept-checks" data-report-quality>
@@ -16033,7 +16047,7 @@ function ReportSheet({ kind, settings = {}, title, subtitle = "", refText = "", 
   const internal = kind !== "customer";
   return (
     <div className={`mr-doc rpt-doc rpt-${kind}`} data-report-kind={kind}>
-      <RptPageStyle page={page} head={`${company.name || RPT_LEGAL_NAME} · ${title}`} refText={refText} foot={internal ? `${title} · internal` : title} />
+      <RptPageStyle page={page} head={`${company.name || RPT_LEGAL_NAME} · ${title}`} refText={refText} foot={internal ? "Computer-generated report · Confidential, internal use only" : "Computer-generated report"} />
       <table className="mr-frame">
         <thead><tr><td><div className="mr-runhead"><span>{company.name || RPT_LEGAL_NAME} · {title}</span><span className="mr-mono">{refText}</span></div></td></tr></thead>
         <tbody><tr><td>
@@ -16103,9 +16117,9 @@ function CustomerMachineReport({ machineId, machineLog = [], bomDefs = {}, hando
           <div className="mr-label">Machine</div>
           <div className="mr-machine">{machine.bomLabel || bom.label || machine.bomKey}</div>
           <div className="mr-facts rpt-facts-3">
-            {[["Model", machine.bomKey], ["Serial no.", machine.serialNo || "—", true], ["Build started", rptFmtD(machine.createdDate) || "—"],
-              ["Ready on", rptFmtD(machine.completedDate) || "In production"], ["Build time", buildDays ? `${buildDays} day${buildDays === 1 ? "" : "s"}` : "—"],
-              ["Trial", cert ? "Passed · certificate below" : "Scheduled"]].map(([k, v, mono]) => (
+            {[["Model", machine.bomKey], ["Serial no.", machine.serialNo || "", true], ["Build started", rptFmtD(machine.createdDate) || ""],
+              ["Ready on", rptFmtD(machine.completedDate) || "In production"], ["Build time", buildDays ? `${buildDays} day${buildDays === 1 ? "" : "s"}` : ""],
+              ["Trial", cert ? "Passed · certificate below" : "Scheduled"]].filter(([, v]) => v).map(([k, v, mono]) => (
               <div key={k} className="min-w-0"><div className="mr-label">{k}</div><div className={`mr-fact ${mono ? "mr-mono" : ""}`}>{v}</div></div>
             ))}
           </div>
@@ -16114,7 +16128,7 @@ function CustomerMachineReport({ machineId, machineLog = [], bomDefs = {}, hando
       </div>
       <div className="mr-summary rpt-summary-4" data-report-glance>
         {[{ k: "Stages completed", v: `${records.filter((r) => r.state === "done").length} of ${records.length}` },
-          { k: "Check points OK", v: points ? `${passed} of ${points}` : "—" },
+          { k: "Check points OK", v: points ? `${passed} of ${points}` : "None" },
           { k: "Critical items", v: critical.length },
           { k: "Finishing work done", v: commentGroups.reduce((s, g) => s + g.rows.length, 0) }]
           .map((g) => <div key={g.k} className="mr-sum"><div className="mr-sum-v">{g.v}</div><div className="mr-label">{g.k}</div></div>)}
@@ -16139,7 +16153,7 @@ function CustomerMachineReport({ machineId, machineLog = [], bomDefs = {}, hando
               <div key={`${c.code}-${i}`} className="mr-tr" data-report-critical-row={c.code} style={{ gridTemplateColumns: "2.4fr 0.6fr 3fr 1.3fr" }}>
                 <div className="mr-td" data-l="Component"><div><div className="font-semibold">{c.name || c.code}</div><div className="mr-label mr-mono">{c.code}</div></div></div>
                 <div className="mr-td mr-mono md:text-right" data-l="Qty">{c.qty}</div>
-                <div className="mr-td" data-l="Serial numbers">{c.serials.length ? <div><span className="mr-mono">{c.serials.join(", ")}</span>{c.status === "serial_partial" ? <div className="mr-amber mr-small">{c.serials.length} of {c.qty} serials recorded</div> : null}</div> : c.status === "verified" ? "Checked · no serial number" : c.status === "not_issued" ? <span className="mr-amber">To be fitted</span> : <span className="mr-muted">—</span>}</div>
+                <div className="mr-td" data-l="Serial numbers">{c.serials.length ? <div><span className="mr-mono">{c.serials.join(", ")}</span>{c.status === "serial_partial" ? <div className="mr-amber mr-small">{c.serials.length} of {c.qty} serials recorded</div> : null}</div> : c.status === "verified" ? "Checked · no serial number" : c.status === "not_issued" ? <span className="mr-amber">To be fitted</span> : null}</div>
                 <div className="mr-td" data-l="Verified">{c.status === "serial" || c.status === "verified" ? <span className="mr-green">✓ {rptFmtD(c.when) || "Yes"}</span> : <span className="mr-muted">Pending</span>}</div>
               </div>
             ))}
@@ -16154,7 +16168,7 @@ function CustomerMachineReport({ machineId, machineLog = [], bomDefs = {}, hando
               <div key={a.id} className="mr-tr" style={{ gridTemplateColumns: "3fr 1fr 1.2fr" }}>
                 <div className="mr-td" data-l="Document">{a.caption || a.fileName || a.name || "Document"}</div>
                 <div className="mr-td" data-l="Type">{a.kind === "image" ? "Photo" : a.kind === "video" ? "Video" : "Document"}</div>
-                <div className="mr-td" data-l="Date">{rptFmtD(a.uploadedAt || a.createdAt) || "—"}</div>
+                <div className="mr-td" data-l="Date">{rptFmtD(a.uploadedAt || a.createdAt) || ""}</div>
               </div>
             ))}
           </div>
@@ -16165,7 +16179,7 @@ function CustomerMachineReport({ machineId, machineLog = [], bomDefs = {}, hando
               : <p className="mr-empty">The machine is run under load at Trial; its certificate is added here when the trial is complete.</p>}
       </RptSec>
       <RptSec n="05" title="Final sign-off" cls="rpt-signoff-sec" attr={{ "data-report-customer-signoff": "" }}>
-        <p className="mr-small" style={{ marginBottom: 14 }}>We certify that the machine described above, serial no. <b className="mr-mono">{machine.serialNo || "—"}</b>, was built to its approved bill of materials, inspected at every stage{critical.length ? ", with its critical components recorded," : ""} and {cert ? "run on trial before release" : "will be run on trial before release"}.</p>
+        <p className="mr-small" style={{ marginBottom: 14 }}>We certify that the machine described above, serial no. <b className="mr-mono">{machine.serialNo || ""}</b>, was built to its approved bill of materials, inspected at every stage{critical.length ? ", with its critical components recorded," : ""} and {cert ? "run on trial before release" : "will be run on trial before release"}.</p>
         {/* 2026-11-04 — the Trial signatures already captured print here with
             name, department and date; only the lines still to sign stay blank. */}
         <RptSignatureRegister rows={certSigs} />
@@ -16190,7 +16204,7 @@ function OnHoldReport({ period = "this_month", machineLog = [], handovers = [], 
   const totalMin = rows.reduce((s, r) => s + (r.minutes || 0), 0);
   const group = (keyOf) => {
     const g = {};
-    rows.forEach((r) => { const k = keyOf(r) || "—"; g[k] = g[k] || { k, n: 0, min: 0, machines: new Set() }; g[k].n++; g[k].min += r.minutes || 0; g[k].machines.add(r.machineId); });
+    rows.forEach((r) => { const k = keyOf(r) || "Not stated"; g[k] = g[k] || { k, n: 0, min: 0, machines: new Set() }; g[k].n++; g[k].min += r.minutes || 0; g[k].machines.add(r.machineId); });
     return Object.values(g).sort((a, b) => b.n - a.n || b.min - a.min);
   };
   const byDept = group((r) => r.kind === "manual" ? r.from : r.to);
@@ -16200,7 +16214,7 @@ function OnHoldReport({ period = "this_month", machineLog = [], handovers = [], 
   return (
     <ReportSheet kind="hold" settings={settings} title="On hold report" subtitle={periodText} refText={`HOLD-${new Date(now).toISOString().slice(0, 7)}`} generatedBy={generatedBy}>
       <div className="mr-summary rpt-summary-4" data-report-glance>
-        {[{ k: "Machines held", v: machines.size }, { k: "Hold events", v: rows.length }, { k: "Still on hold", v: rows.filter((r) => r.open).length, red: rows.some((r) => r.open) }, { k: "Total time held", v: rows.length ? rptDur(totalMin) : "—" }]
+        {[{ k: "Machines held", v: machines.size }, { k: "Hold events", v: rows.length }, { k: "Still on hold", v: rows.filter((r) => r.open).length, red: rows.some((r) => r.open) }, { k: "Total time held", v: rows.length ? rptDur(totalMin) : "None" }]
           .map((g) => <div key={g.k} className={`mr-sum ${g.red ? "is-red" : ""}`}><div className="mr-sum-v">{g.v}</div><div className="mr-label">{g.k}</div></div>)}
       </div>
       <RptSec n="01" title="Holds in this period" count={rows.length} attr={{ "data-report-hold-list": "" }}>
@@ -16209,12 +16223,12 @@ function OnHoldReport({ period = "this_month", machineLog = [], handovers = [], 
             <div className="mr-tr mr-th" style={{ gridTemplateColumns: "1.3fr 1.3fr 1.55fr 0.9fr 1.85fr 1.1fr" }}><div>Machine</div><div>Where</div><div>Since</div><div className="text-right">How long</div><div>Reason</div><div>Who</div></div>
             {rows.map((r) => (
               <div key={r.key} className="mr-tr" data-report-hold-row={r.kind} style={{ gridTemplateColumns: "1.3fr 1.3fr 1.55fr 0.9fr 1.85fr 1.1fr" }}>
-                <div className="mr-td" data-l="Machine"><div><div className="font-semibold">{r.bomKey}</div><div className="mr-label mr-mono">{r.serialNo || "—"}</div></div></div>
-                <div className="mr-td" data-l="Where"><div><div>{r.to ? `${r.from} → ${r.to}` : r.from || "—"}</div><div className={`mr-label ${r.open ? "mr-red" : ""}`}>{r.label}{r.open ? " · open" : ""}</div></div></div>
-                <div className="mr-td" data-l="Since"><div><div className="rpt-nowrap">{rptFmtDT(r.startAt) || "—"}</div>{r.endAt ? <div className="mr-label rpt-nowrap">to {rptFmtDT(r.endAt)}</div> : null}</div></div>
-                <div className={`mr-td md:text-right ${r.open ? "mr-red font-semibold" : ""}`} data-l="How long">{r.minutes != null ? rptDur(r.minutes) : "—"}</div>
+                <div className="mr-td" data-l="Machine"><div><div className="font-semibold">{r.bomKey}</div><div className="mr-label mr-mono">{r.serialNo || ""}</div></div></div>
+                <div className="mr-td" data-l="Where"><div><div>{r.to ? `${r.from} → ${r.to}` : r.from || ""}</div><div className={`mr-label ${r.open ? "mr-red" : ""}`}>{r.label}{r.open ? " · open" : ""}</div></div></div>
+                <div className="mr-td" data-l="Since"><div><div className="rpt-nowrap">{rptFmtDT(r.startAt) || ""}</div>{r.endAt ? <div className="mr-label rpt-nowrap">to {rptFmtDT(r.endAt)}</div> : null}</div></div>
+                <div className={`mr-td md:text-right ${r.open ? "mr-red font-semibold" : ""}`} data-l="How long">{r.minutes != null ? rptDur(r.minutes) : ""}</div>
                 <div className="mr-td" data-l="Reason">{r.reason || <span className="mr-muted">{r.kind === "overdue" ? "Waiting for the next department" : "No reason given"}</span>}</div>
-                <div className="mr-td" data-l="Who"><div><div>{r.by || "—"}</div>{r.releasedBy ? <div className="mr-label">released by {r.releasedBy}</div> : null}</div></div>
+                <div className="mr-td" data-l="Who"><div><div>{r.by || ""}</div>{r.releasedBy ? <div className="mr-label">released by {r.releasedBy}</div> : null}</div></div>
               </div>
             ))}
           </div>
@@ -16254,7 +16268,7 @@ function PendingJobsReport({ includeDone = false, dept = "", machineLog = [], pe
   const order = (d) => { const i = DEPARTMENT_SEQUENCE.indexOf(d); return i < 0 ? 99 : i; };
   const depts = [...new Set(list.map((p) => p.assignedDepartment || "Unassigned"))].sort((a, b) => order(a) - order(b) || a.localeCompare(b));
   const counts = list.reduce((c, p) => { const s = pendingItemStage(p); c[s] = (c[s] || 0) + 1; return c; }, {});
-  const age = (p) => { const t = rptMs(p.raisedAt); if (t == null) return "—"; const end = p.status === "resolved" ? (rptMs(p.resolvedAt) || now) : now; return rptDur(Math.max(0, (end - t) / 60000)); };
+  const age = (p) => { const t = rptMs(p.raisedAt); if (t == null) return ""; const end = p.status === "resolved" ? (rptMs(p.resolvedAt) || now) : now; return rptDur(Math.max(0, (end - t) / 60000)); };
   const critOpen = list.filter((p) => p.critical && pendingItemIsOpen(p)).length;
   return (
     <ReportSheet kind="pending" settings={settings} title="Pending jobs report" subtitle={`${includeDone ? "Open and completed" : "Open"} jobs${dept ? ` · ${dept}` : " · all departments"}`} refText={`PJ-${new Date(now).toISOString().slice(0, 10)}`} generatedBy={generatedBy}>
@@ -16274,13 +16288,13 @@ function PendingJobsReport({ includeDone = false, dept = "", machineLog = [], pe
                 const isPart = !!(p.itemCode || p.itemName || p.qty != null);
                 return (
                   <div key={p.id} className="mr-tr" data-report-pending-row={st} style={{ gridTemplateColumns: "1.3fr 2.4fr 0.8fr 1.4fr 0.9fr" }}>
-                    <div className="mr-td" data-l="Machine"><div><div className="font-semibold">{m.bomKey || p.bomKey || "—"}</div><div className="mr-label mr-mono">{m.serialNo || p.serialNo || ""}</div></div></div>
+                    <div className="mr-td" data-l="Machine"><div><div className="font-semibold">{m.bomKey || p.bomKey || ""}</div><div className="mr-label mr-mono">{m.serialNo || p.serialNo || ""}</div></div></div>
                     <div className="mr-td" data-l="Part / work"><div>
                       <div>{p.critical ? <span className="mr-tag">Critical</span> : null}{p.itemName || p.description}</div>
-                      <div className="mr-label">{isPart ? "Part" : "Work"}{p.itemCode ? <> · <span className="mr-mono">{p.itemCode}</span></> : null}{p.itemName && p.description && p.description !== p.itemName ? ` · ${p.description}` : ""} · raised in {p.raisedInDepartment || "—"}, {rptFmtD(p.raisedAt)}</div>
+                      <div className="mr-label">{isPart ? "Part" : "Work"}{p.itemCode ? <> · <span className="mr-mono">{p.itemCode}</span></> : null}{p.itemName && p.description && p.description !== p.itemName ? ` · ${p.description}` : ""} · raised in {p.raisedInDepartment || ""}, {rptFmtD(p.raisedAt)}</div>
                     </div></div>
-                    <div className="mr-td md:text-right mr-mono" data-l="Qty">{p.qty != null ? <div><div>{p.qty}</div>{(Number(p.receivedQty) || 0) > 0 && <div className="mr-label">{p.receivedQty} recd</div>}</div> : "—"}</div>
-                    <div className="mr-td" data-l="Status"><div><div className={`${cls} font-semibold`}>{lbl}</div>{st === "completed" && <div className="mr-label">{rptFmtD(p.resolvedAt)}{rptUserName(allUsers, p.resolvedBy) ? ` · ${rptUserName(allUsers, p.resolvedBy)}` : ""}</div>}</div></div>
+                    <div className="mr-td md:text-right mr-mono" data-l="Qty">{p.qty != null ? <div><div>{p.qty}</div>{(Number(p.receivedQty) || 0) > 0 && <div className="mr-label">{p.receivedQty} recd</div>}</div> : ""}</div>
+                    <div className="mr-td" data-l="Status"><div><span className={`rpt-badge rpt-status ${cls}`}>{lbl}</span>{st === "completed" && <div className="mr-label">{rptFmtD(p.resolvedAt)}{rptUserName(allUsers, p.resolvedBy) ? ` · ${rptUserName(allUsers, p.resolvedBy)}` : ""}</div>}</div></div>
                     <div className="mr-td md:text-right" data-l="Age">{age(p)}</div>
                   </div>
                 );
@@ -16681,7 +16695,7 @@ function ReportCenterPage({
             title, date range and print date once. Not on the Machine journey
             tab: that report carries its own letterhead (it printed twice, with
             an empty first page). */}
-        {tab !== "machine" && <RptPageStyle page="rc-report" head={`${rptCompany(settings).name || RPT_LEGAL_NAME} · ${(tabs.find((t) => t.id === tab) || {}).label || ""} ${String(T("Report")).toLowerCase()}`} foot={`${(tabs.find((t) => t.id === tab) || {}).label || ""} ${String(T("Report")).toLowerCase()}`} />}
+        {tab !== "machine" && <RptPageStyle page="rc-report" head={`${rptCompany(settings).name || RPT_LEGAL_NAME} · ${(tabs.find((t) => t.id === tab) || {}).label || ""} ${String(T("Report")).toLowerCase()}`} foot={tab === "customer" ? "Computer-generated report" : "Computer-generated report · Confidential, internal use only"} />}
         {tab !== "machine" && (
           <div className="hidden print:block rpt-doc rpt-rc-head" data-report-center-head>
             <RptLetterhead company={rptCompany(settings)} showLogo={rc.showLogo !== false} line={rc.companyLine || ""} />
@@ -17051,7 +17065,7 @@ function ReportTable({ title, rows, t = (k) => k, users = [] }) {
             {rows.map((r, i) => (
               <tr key={i} className="border-t border-slate-200">
                 {columns.map((c) => (
-                  <td key={c} data-l={rptColLabel(t(c))} data-col={c} className={`px-3 py-1.5 text-slate-500 whitespace-nowrap${/^(Serial|Machine)$/.test(c) ? " rpt-nowrap" : ""}`}>{cellText(r[c], c)}</td>
+                  <td key={c} data-l={rptColLabel(t(c))} data-col={c} className={`px-3 py-1.5 text-slate-500 whitespace-nowrap${/^(Serial|Machine)$/.test(c) ? " rpt-nowrap" : ""}`}>{((x) => (x === "—" ? "" : x))(cellText(r[c], c))}</td>
                 ))}
               </tr>
             ))}
@@ -17576,6 +17590,34 @@ const TC_SHEET_CSS = [
   ".tc-form.tc-form input::placeholder,.tc-form.tc-form textarea::placeholder{color:#6b7280 !important}",
   ".tc-form.tc-form input:focus-visible,.tc-form.tc-form textarea:focus-visible{outline:none !important;box-shadow:0 0 0 3px #e2e8f0 !important;border-color:#334155 !important}",
   ".tc-form.tc-form input[type=date]::-webkit-calendar-picker-indicator{filter:none !important;opacity:.7;cursor:pointer}",
+  // 2026-11-04 (reports v3) — premium certificate skin: serif title and legal
+  // name, thin brand-red rules, hairline tables, a faint logo watermark and a
+  // quality seal on the stand-alone print. Layout and content are unchanged.
+  ".tc-sheet{font-family:Inter,'Helvetica Neue',Arial,sans-serif;color:#15171c;-webkit-print-color-adjust:exact;print-color-adjust:exact}",
+  ".tc-sheet>*:not(.tc-foot):not(.tc-seal){position:relative;z-index:1}",
+  ".tc-has-lh::before{content:'';position:absolute;inset:0;z-index:0;pointer-events:none;background:url(\"" + BRAND_LOGO_DATA_URI.replace(/"/g, "%22") + "\") center 58%/150mm auto no-repeat;opacity:.045}",
+  ".tc-lh{border-bottom:.5pt solid #cfd2d7;padding-bottom:3mm;margin-bottom:4mm}",
+  ".tc-lh-logo{width:46mm;height:auto;max-width:46mm;margin:0 auto 2.4mm}",
+  ".tc-lh-name{font-family:Inter,'Helvetica Neue',Arial,sans-serif;font-weight:600;font-size:15px;letter-spacing:.17em}",
+  ".tc-lh-rule{width:18mm;border-top:.9pt solid #b3141f;margin:1.8mm auto 1.6mm}",
+  ".tc-lh-line{color:#5d6470;font-size:8.6px;letter-spacing:.02em}",
+  ".tc-title{font-family:Inter,'Helvetica Neue',Arial,sans-serif;font-weight:600;letter-spacing:.24em;color:#15171c}",
+  ".tc-rule{border-top:.9pt solid #b3141f;width:24mm;margin:0 auto 4mm}",
+  ".tc-field-label{color:#5d6470;letter-spacing:.08em}",
+  ".tc-field-value{border-bottom:.6pt solid #15171c}",
+  ".tc-sec{background:none;border:0;border-bottom:.9pt solid #15171c;padding:0 0 .8mm;margin-top:3.6mm;margin-bottom:0;font-family:Inter,'Helvetica Neue',Arial,sans-serif;font-size:11px;letter-spacing:.14em;color:#15171c}",
+  ".tc-sec::before{content:'';display:inline-block;width:1.6mm;height:1.6mm;background:#b3141f;margin-right:2mm;vertical-align:.25mm}",
+  ".tc-sheet th,.tc-sheet td{border:0;border-bottom:.5pt solid #dcdfe4}",
+  ".tc-sheet th{background:#f6f6f3;color:#4a505a;font-size:8.6px;letter-spacing:.09em}",
+  ".tc-sheet tbody tr:nth-child(even) td{background:rgba(246,246,243,.6)}",
+  ".tc-note{border:0;border-bottom:.5pt solid #dcdfe4}",
+  ".tc-sigimg{border-bottom:.6pt solid #15171c}",
+  ".tc-sigcap{font-size:9px;letter-spacing:.1em;color:#15171c}",
+  ".tc-foot{border-top:.5pt solid #dcdfe4;color:#8b919b;font-size:8px;letter-spacing:.02em}",
+  ".tc-seal{position:absolute;top:9mm;right:12mm;width:25mm;height:25mm;z-index:2;color:#b3141f;opacity:.85}",
+  ".tc-seal svg{display:block;width:100%;height:100%}",
+  ".tc-has-lh .tc-sigbox{border:.5pt solid #dcdfe4;border-radius:1.2mm;padding:2mm 3mm 2.2mm;background:#fff}",
+  ".tc-has-lh .tc-foot{bottom:7mm}",
 ].join("\n");
 
 const tcGetFrq = (d, f) => (d && d[f]) || "";
@@ -17674,6 +17716,26 @@ function TcSheetSig({ title, name, sig, showName = true, date = "" }) {
   );
 }
 
+// 2026-11-04 (reports v3) — a printed quality seal (decoration only; it is
+// not a signature): double ring, "QUALITY CONTROL · TRIAL CERTIFIED" around.
+function TcSeal() {
+  return (
+    <div className="tc-seal" aria-hidden="true">
+      <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <defs><path id="tc-seal-arc" d="M50,50 m-36,0 a36,36 0 1,1 72,0 a36,36 0 1,1 -72,0" /></defs>
+        <circle cx="50" cy="50" r="47" fill="none" stroke="currentColor" strokeWidth="1.6" />
+        <circle cx="50" cy="50" r="43.5" fill="none" stroke="currentColor" strokeWidth="0.6" />
+        <circle cx="50" cy="50" r="28" fill="none" stroke="currentColor" strokeWidth="0.6" />
+        <text fill="currentColor" fontFamily="Inter, Arial, sans-serif" fontSize="7.4" fontWeight="700" letterSpacing="2.1">
+          <textPath href="#tc-seal-arc" startOffset="0">QUALITY CONTROL · TRIAL CERTIFIED ·</textPath>
+        </text>
+        <text x="50" y="47" textAnchor="middle" fill="currentColor" fontFamily="Georgia, serif" fontSize="13" fontWeight="700">✓</text>
+        <text x="50" y="59" textAnchor="middle" fill="currentColor" fontFamily="Inter, Arial, sans-serif" fontSize="6.2" fontWeight="700" letterSpacing="1">SHANTAZ</text>
+      </svg>
+    </div>
+  );
+}
+
 // The printable A4 certificate. Pure render: no hooks, no state.
 // 2026-11-04 — `embedded`: inside a machine report, which already names the
 // machine, carries the letterhead and lists every signature with name,
@@ -17721,11 +17783,13 @@ function TrialCertificateSheet({ machine, cert, remarks = "", embedded = false, 
     <div className={`tc-sheet${embedded ? " tc-embedded" : ""}${!embedded && company ? " tc-has-lh" : ""}`}>
       {!embedded && company && (
         <div className="tc-lh">
-          {company.logo && <img src={company.logo} alt="" className="tc-lh-logo" />}
+          <img src={company.logo || BRAND_LOGO_DATA_URI} alt="SHANTAZ" className="tc-lh-logo" />
           <div className="tc-lh-name">{company.name || RPT_LEGAL_NAME}</div>
-          {[company.address, [company.gst ? `GSTIN ${company.gst}` : "", company.phone ? `Phone ${company.phone}` : "", company.email || ""].filter(Boolean).join("  ·  ")].filter(Boolean).map((l, i) => <div key={i} className="tc-lh-line">{l}</div>)}
+          <div className="tc-lh-rule" aria-hidden="true" />
+          {[company.address, rptContactLine(company)].filter(Boolean).map((l, i) => <div key={i} className="tc-lh-line">{l}</div>)}
         </div>
       )}
+      {!embedded && company && <TcSeal />}
       {!embedded && <div className="tc-title">MACHINE TRIAL CERTIFICATE</div>}
       {!embedded && <div className="tc-rule" />}
 
@@ -17834,7 +17898,7 @@ function TrialCertificateSheet({ machine, cert, remarks = "", embedded = false, 
 
       {!embedded && (
         <div className="tc-foot">
-          <span>SHANTAZ ERP · Machine Trial Certificate</span>
+          <span>Machine Trial Certificate · computer-generated document</span>
           <span>{machine.bomKey}{machine.serialNo ? " · S/N " + machine.serialNo : ""}</span>
         </div>
       )}
@@ -17859,6 +17923,7 @@ function printTrialCertificate(machine, cert, remarks = "", company = null) {
     "<!DOCTYPE html><html><head><meta charset='utf-8'/>" +
     "<meta name='viewport' content='width=device-width,initial-scale=1'/>" +
     "<title>" + tcEsc(title) + "</title>" +
+    "<link rel='stylesheet' href='https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap'/>" +
     "<style>" + TC_SHEET_CSS +
       "@page{size:A4 portrait;margin:0}" +
       "html,body{margin:0;padding:0;background:#fff}" +
@@ -24947,29 +25012,33 @@ function hrExportExcel(rows, cols, filename) {
 function hrExportPDF(title, rows, cols, company = {}) {
   const esc = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]);
   const cell = (v) => {
-    if (v == null || v === "") return "—";
+    if (v == null || v === "") return "";
     if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}(T[\d:.]+(Z|[+-]\d{2}:?\d{2})?)?$/.test(v.trim())) return esc(rptFmtDT(v.trim()));
     return esc(v);
   };
   const co = company || {};
   const name = co.name || RPT_LEGAL_NAME;
-  const contact = [co.gst ? `GSTIN ${co.gst}` : "", co.phone ? `Phone ${co.phone}` : "", co.email || "", co.website || ""].filter(Boolean).join("  ·  ");
+  const contact = rptContactLine(co);
+  const logo = co.logo || BRAND_LOGO_DATA_URI;
   const hdr  = cols.map((c) => `<th>${esc(c.label)}</th>`).join("");
   const body = rows.map((r) => `<tr>${cols.map((c) => `<td>${cell(r[c.key])}</td>`).join("")}</tr>`).join("");
   const generated = rptFmtDT(new Date());
   const w = window.open("", "_blank");
   if (!w) { alert("Pop-up blocked. Allow pop-ups for this site to print or save the report."); return; }
   w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/><title>${esc(title)} — ${esc(rptFmtD(new Date()))}</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"/>
     <style>
     *{box-sizing:border-box}
     body{font-family:Inter,'Segoe UI',Arial,sans-serif;font-size:10.5px;color:#111;margin:24px;font-variant-numeric:tabular-nums}
-    .lh{text-align:center;padding-bottom:10px;border-bottom:2.5px double #8a8a8a}
-    .lh img{display:block;margin:0 auto 6px;height:56px;width:auto;max-width:220px;object-fit:contain}
-    .lh .n{font-size:17px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
-    .lh .l{font-size:9.5px;color:#555;margin-top:2px}
-    .tb{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin:14px 0 10px}
-    h2{font-size:15px;font-weight:700;margin:0}
-    .meta{font-size:9.5px;color:#555;text-align:right}
+    .lh{text-align:center;padding-bottom:4mm;border-bottom:.5pt solid #cfd2d7;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .lh img{display:block;margin:0 auto 3mm;width:48mm;height:auto}
+    .lh .n{font-family:Inter,'Helvetica Neue',Arial,sans-serif;font-size:14.5pt;font-weight:600;letter-spacing:.17em;text-transform:uppercase;color:#15171c}
+    .lh .r{width:18mm;border-top:.9pt solid #b3141f;margin:2.2mm auto 2mm}
+    .lh .l{font-size:7.6pt;color:#5d6470;letter-spacing:.02em;margin-top:.6mm}
+    .tb{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin:5mm 0 4mm;padding-bottom:3mm;border-bottom:1pt solid #15171c}
+    h2{font-family:Inter,'Helvetica Neue',Arial,sans-serif;font-size:16pt;font-weight:600;margin:0}
+    .meta{font-size:8pt;color:#15171c;background:#f6f6f3;border:.5pt solid #e3e5e9;border-left:1.5pt solid #b3141f;padding:1.6mm 3mm}
+    tbody tr:nth-child(even) td{background:#f8f8f6}
     table{border-collapse:collapse;width:100%}
     thead{display:table-header-group}
     th{text-align:left;font-size:9px;font-weight:700;color:#333;text-transform:uppercase;letter-spacing:.04em;padding:6px 8px;border-top:1.2px solid #111;border-bottom:.75px solid #111}
@@ -24982,10 +25051,10 @@ function hrExportPDF(title, rows, cols, company = {}) {
       @bottom-right{content:"Page " counter(page) " of " counter(pages);font:8px Inter,Arial,sans-serif;color:#666}}
     @media print{.print-btn{display:none}body{margin:0}}</style></head><body>
     <button class="print-btn" onclick="window.print()">Print / Save as PDF</button>
-    <div class="lh">${co.logo ? `<img src="${esc(co.logo)}" alt=""/>` : ""}<div class="n">${esc(name)}</div>${co.address ? `<div class="l">${esc(co.address)}</div>` : ""}${contact ? `<div class="l">${esc(contact)}</div>` : ""}</div>
+    <div class="lh"><img src="${esc(logo)}" alt="SHANTAZ"/><div class="n">${esc(name)}</div><div class="r"></div>${co.address ? `<div class="l">${esc(co.address)}</div>` : ""}${contact ? `<div class="l">${esc(contact)}</div>` : ""}</div>
     <div class="tb"><h2>${esc(title)}</h2><div class="meta">${rows.length} record${rows.length === 1 ? "" : "s"}</div></div>
     <table><thead><tr>${hdr}</tr></thead><tbody>${body}</tbody></table>
-    <div class="foot">Generated from ERP records on ${esc(generated)}.</div>
+    <div class="foot">Generated from ERP records on ${esc(generated)}. This is a computer-generated document · Confidential, internal use only.</div>
   </body></html>`);
   w.document.close();
 }
