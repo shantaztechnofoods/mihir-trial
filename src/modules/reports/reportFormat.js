@@ -4,7 +4,7 @@ import { heldMinutes, workerIdsOf } from "../../utils/handoverLogic.js";
 import { pendingItemIsPart } from "../../stores/pendingItemsStore.js";
 import { getActiveCompany } from "../../utils/poTemplate.js";
 import { BRAND_LOGO_DATA_URI } from "../../utils/brandLogo.js";
-import { RPT_LEGAL_NAME, rptFmtDT } from "../../shared/printFormat.js";
+import { RPT_LEGAL_NAME, rptFmtD, rptFmtDT } from "../../shared/printFormat.js";
 
 // Pilot / test records are kept out of customer and management reports unless
 // the admin switches them on. A record is a test record when its serial or
@@ -177,6 +177,16 @@ export const RPT_DEPT_SCOPE = {
   Ready: "Final inspection and release for dispatch.",
 };
 
+// The same scope for a stage that has not been completed yet (no claim that
+// the work, or the trial certificate, already happened).
+export const RPT_DEPT_SCOPE_TODO = {
+  Assembly: "The machine is assembled to its approved bill of materials.",
+  Mechanical: "Mechanical fitting, alignment and moving parts are checked.",
+  Electrical: "Wiring, control panel and electrical safety are checked.",
+  Trial: "The machine is run under load and a trial certificate is issued.",
+  Ready: "Final inspection, then release for dispatch.",
+};
+
 // A worker / login name from a hand-over's snapshot ({ fullName, username } or { type: "emp", name }).
 export const rptSnapName = (uid, snapshot) => {
   if (!uid) return "";
@@ -321,3 +331,216 @@ export const customerStagesDone = (machine) => {
 export const rptColLabel = (k) => { const t = String(k || ""); if (/\s/.test(t)) return t; const w = t.replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2"); return w.split(" ").map((x, i) => (i === 0 || /^[A-Z0-9]{2,}$/.test(x) ? x : x.toLowerCase())).join(" "); };
 
 export const rptCellText = (v) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(v) ? rptFmtDT(v) : String(v ?? ""));
+
+// ── Report content v4 (2026-11-04) — wording, findings and consistency ──
+// Plain-sentence helpers and the read-only builders behind the company
+// report's "Exceptions and findings", its per-department timeline and its
+// comments table, and the customer report's pre-send consistency check.
+// Nothing here writes; every value comes from records already loaded.
+
+// A value with a clock time prints date + time; a bare date never gets a
+// made-up "00:00" (e.g. "29 Oct 2026" or "2026-10-29").
+export const rptHasTime = (v) => v instanceof Date || typeof v === "number" || (typeof v === "string" && /\d{1,2}:\d{2}/.test(v));
+export const rptWhen = (v) => (v == null || v === "" ? "" : rptHasTime(v) ? rptFmtDT(v) : rptFmtD(v));
+
+export const rptCount = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+// ["a"] → "a" · ["a","b"] → "a and b" · ["a","b","c"] → "a, b and c"
+export const rptList = (arr = []) => { const a = (arr || []).filter(Boolean).map(String); return a.length <= 1 ? (a[0] || "") : `${a.slice(0, -1).join(", ")} and ${a[a.length - 1]}`; };
+
+// "2 of 3 checks done — 1 not done: Guard fitted." (never "2/3 · 1 not done")
+export const rptChecksSentence = (done, total, notDone = []) => {
+  if (!total) return "No check points were recorded.";
+  const miss = total - done;
+  if (!miss) return total === 1 ? "1 of 1 check done." : total === 2 ? "Both checks done." : `All ${total} checks done.`;
+  const names = (notDone || []).filter(Boolean);
+  return `${done} of ${total} checks done — ${miss} not done${names.length ? `: ${rptList(names)}` : ""}.`;
+};
+
+export const RPT_SEV = { high: "High", medium: "Medium", low: "Low" };
+const SEV_ORDER = { High: 0, Medium: 1, Low: 2 };
+
+const STAGE_WORDS = { before_receive: "before receive", during_work: "during work", before_dispatch: "before dispatch" };
+
+// What kind of job a pending row is, in the words the reports use.
+export const rptJobType = (p) => (!p ? "" : pendingItemIsPart(p) ? "Part"
+  : /^Checklist not completed/.test(String(p.description || "")) ? "Checklist follow-up"
+  : p.kind === "fault" ? "Issue" : "Comment");
+
+// Status of one job in a full phrase: "Open — assigned to Electrical",
+// "1 of 2 received — work still open", "Closed".
+export const rptJobStatus = (p) => {
+  if (!p) return "";
+  if (p.status === "resolved") return "Closed";
+  if (pendingItemIsPart(p)) {
+    if (p.receivedAt) return "Part received — work still open";
+    const got = Number(p.receivedQty) || 0;
+    if (got > 0 && p.qty != null) return `${got} of ${p.qty} received — rest awaited`;
+    return "Open — part awaited";
+  }
+  return `Open — assigned to ${p.assignedDepartment || "no department"}`;
+};
+
+// One row per comment / issue / part / checklist follow-up, grouped by the
+// department that raised it (build order), with who / when / status / closure.
+export function rptCommentTable(pendingItems = [], allUsers = []) {
+  const name = (id, fallback = "") => rptUserName(allUsers, id) || fallback;
+  const order = (d) => { const i = RPT_STAGE_DEPTS.indexOf(d); return i < 0 ? 50 : i; };
+  const rows = (pendingItems || []).slice().sort((a, b) => String(a.raisedAt || "").localeCompare(String(b.raisedAt || ""))).map((p) => {
+    const closed = p.status === "resolved";
+    const part = pendingItemIsPart(p);
+    const partText = part ? [p.itemName || p.itemCode, p.qty != null ? `× ${p.qty}` : ""].filter(Boolean).join(" ") : "";
+    return {
+      id: String(p.id), dept: p.raisedInDepartment || "Not recorded", raisedAt: p.raisedAt || "",
+      by: name(p.raisedBy, p.raisedByName || ""), type: rptJobType(p), critical: !!p.critical,
+      text: String(p.description || partText || "").trim(), part: partText, partCode: p.itemCode || "", partSerial: p.partSerialNo || "",
+      assigned: p.assignedDepartment || "", reason: p.reason || "",
+      status: rptJobStatus(p), open: !closed,
+      closedBy: closed ? name(p.resolvedBy, "") : "", closedAt: closed ? (p.resolvedAt || "") : "", closedIn: closed ? (p.resolvedInDepartment || "") : "",
+      resolution: closed ? (p.resolutionNotes || "") : "",
+    };
+  });
+  const depts = [...new Set(rows.map((r) => r.dept))].sort((a, b) => order(a) - order(b) || a.localeCompare(b));
+  return depts.map((d) => ({ dept: d, rows: rows.filter((r) => r.dept === d), open: rows.filter((r) => r.dept === d && r.open).length }));
+}
+
+// "Exceptions and findings" for one machine: every delay, hold, raised job,
+// checklist point not done, rework, missing signature and critical part
+// without a serial — each a full sentence with severity, owner, when, detail
+// and status. Severity: High = still open on a Ready machine, a hold still
+// running, a must-do point not done, a critical part without its serial, a
+// delay of half the target or more; Medium = open on a machine still in
+// production, a delay, a hold or a closed point with no reason recorded, a
+// missing signature; Low = closed and recorded for the record.
+export function rptFindings({ machine, handovers = [], checklistResponses = [], pendingItems = [], auditLog = [], critical = [], allUsers = [], nowMs = Date.now() }) {
+  if (!machine) return { groups: [], counts: { High: 0, Medium: 0, Low: 0, total: 0 }, clean: [], ready: false };
+  const id = String(machine.id);
+  const ready = machine.status === "completed";
+  const hops = (handovers || []).filter((h) => String(h.machineId) === id).slice().sort((a, b) => (rptMs(a.sentAt) || 0) - (rptMs(b.sentAt) || 0));
+  const live = hops.filter((h) => h.status !== "cancelled");
+  const jobs = (pendingItems || []).filter((p) => String(p.machineId) === id);
+  const user = (uid, fb = "") => rptUserName(allUsers, uid) || fb;
+  const groups = [];
+  const add = (key, title, note, rows) => groups.push({ key, title, note, rows: rows.slice().sort((a, b) => SEV_ORDER[a.sev] - SEV_ORDER[b.sev] || (rptMs(a.when) || 0) - (rptMs(b.when) || 0)) });
+
+  // 1. Delays against target (the sending department owns the time).
+  add("delays", "Delays against target", "Work that took longer than its department's target time.",
+    live.filter((h) => (Number(h.overrunMinutes) || 0) > 0).map((h) => {
+      const over = Number(h.overrunMinutes) || 0; const target = Number(h.expectedDurationMinutes) || 0;
+      const reason = String(h.overrunNarration || "").trim();
+      return { k: `d-${h.id}`, sev: target && over >= target / 2 ? RPT_SEV.high : RPT_SEV.medium, owner: h.fromDepartment, when: h.sentAt,
+        what: `${h.fromDepartment} took ${rptDur(h.actualDurationMinutes)} against a target of ${rptDur(target)} — ${rptDur(over)} over target.`,
+        detail: reason ? `Reason given: ${reason}` : "No reason was recorded.",
+        status: h.status === "accepted" ? `Handed over to ${h.toDepartment}` : h.status === "pending" ? `Waiting for ${h.toDepartment} to accept` : "" };
+    }));
+
+  // 2. Holds and waiting time (manual hold, accepted late, waiting now).
+  const holds = collectHoldEvents({ machineLog: [machine], handovers: hops, auditLog, allUsers, nowMs }).filter((r) => String(r.machineId) === id);
+  add("holds", "Holds and waiting time", "Manual holds, and hand-overs accepted after (or still waiting past) the accept window.",
+    holds.map((r) => {
+      const len = r.minutes != null ? rptDur(r.minutes) : "an unknown time";
+      const what = r.kind === "manual"
+        ? (r.open ? `Machine on hold in ${r.from || "its department"} since ${rptWhen(r.startAt)} — ${len} so far.` : `Machine was put on hold in ${r.from || "its department"} for ${len}.`)
+        : r.kind === "late" ? `${r.to} accepted the machine from ${r.from} ${len} after the accept window closed.`
+        : `${r.to} has not yet accepted the machine from ${r.from} — ${len} past the accept window.`;
+      const who = r.kind === "manual" ? [r.by && `Put on hold by ${r.by}`, r.releasedBy && `released by ${r.releasedBy}`].filter(Boolean).join("; ")
+        : r.kind === "late" && r.by ? `Accepted by ${r.by}` : "";
+      return { k: `h-${r.key}`, sev: r.open ? RPT_SEV.high : !r.reason ? RPT_SEV.medium : RPT_SEV.low,
+        owner: r.kind === "manual" ? r.from : r.to, when: r.startAt, what,
+        detail: [r.reason ? `Reason given: ${r.reason}` : r.kind === "overdue" ? "Not yet accepted." : "No reason was recorded.", who].filter(Boolean).join(" · "),
+        status: r.open ? "Open" : r.kind === "manual" ? `Released ${rptWhen(r.endAt)}` : `Accepted ${rptWhen(r.endAt)}` };
+    }));
+
+  // 3. Issues, comments and parts raised (checklist follow-ups are in 4).
+  const followUp = (p) => /^Checklist not completed/.test(String(p.description || ""));
+  add("issues", "Open issues, comments and parts", "Jobs raised on this machine and not yet closed. Closed jobs, with their resolution, are in section 04.",
+    jobs.filter((p) => !followUp(p) && p.status !== "resolved").map((p) => {
+      const open = p.status !== "resolved"; const type = rptJobType(p);
+      const by = user(p.raisedBy, p.raisedByName || "");
+      const text = String(p.description || p.itemName || "").trim();
+      return { k: `j-${p.id}`, sev: open ? (p.critical || ready ? RPT_SEV.high : RPT_SEV.medium) : RPT_SEV.low, owner: p.assignedDepartment || "Not assigned", when: p.raisedAt,
+        what: `${p.critical ? "Critical " + type.toLowerCase() : type} raised in ${p.raisedInDepartment || "an unrecorded department"}${by ? ` by ${by}` : ""}: “${text}”.`,
+        detail: open ? (p.reason ? `Reason given: ${p.reason}` : "") : (p.resolutionNotes ? `Resolution: ${p.resolutionNotes}` : "No completion note was recorded."),
+        status: open ? rptJobStatus(p) : `Closed ${rptWhen(p.resolvedAt)}${user(p.resolvedBy) ? ` by ${user(p.resolvedBy)}` : ""}` };
+    }));
+
+  // 4. Checklist points not done (with their follow-up job, if any).
+  const responses = (checklistResponses || []).filter((cr) => String(cr.machineId) === id);
+  add("checks", "Checklist points not done", "Points left unticked when the checklist was submitted.",
+    responses.flatMap((cr) => (cr.answers || []).filter((a) => !a.checked).map((a, i) => {
+      const fixed = rptPointFixed(a.label, jobs); const pending = rptPointJob(a.label, jobs, "open");
+      const by = user(cr.submittedBy);
+      return { k: `c-${cr.id}-${i}`, sev: fixed ? RPT_SEV.low : (ready || a.required) ? RPT_SEV.high : RPT_SEV.medium, owner: cr.department || "", when: cr.submittedAt,
+        what: `${cr.department || "A department"} (${STAGE_WORDS[cr.stage] || "checklist"}): “${a.label}” was not ticked${a.required ? " — a must-do point" : ""}.`,
+        detail: [a.remark ? `Remark: ${a.remark}` : "No remark was given.", by && `Submitted by ${by}`].filter(Boolean).join(" · "),
+        status: fixed ? "Closed — follow-up job completed" : pending ? "Follow-up job open" : "Not followed up" };
+    })));
+
+  // 5. Rework: transfers cancelled (the machine went back to the sender).
+  add("rework", "Rework and cancelled transfers", "Transfers that were cancelled, so the work returned to the sending department.",
+    hops.filter((h) => h.status === "cancelled").map((h) => ({ k: `r-${h.id}`, sev: RPT_SEV.medium, owner: h.fromDepartment, when: h.cancelledAt || h.sentAt,
+      what: `The transfer ${h.fromDepartment} → ${h.toDepartment} was cancelled; the machine stayed in ${h.fromDepartment}.`,
+      detail: h.cancellationReason ? `Reason given: ${h.cancellationReason}` : "No reason was recorded.", status: "Closed" })));
+
+  // 6. Missing signatures and documents.
+  const sig = [];
+  live.forEach((h) => {
+    if (!h.mainEmployeeSignatureSvg && !h.mainEmployeeSignatureId)
+      sig.push({ k: `s-t-${h.id}`, sev: RPT_SEV.medium, owner: h.fromDepartment, when: h.sentAt, what: `The hand-over ${h.fromDepartment} → ${h.toDepartment} was not signed by the lead employee.`, detail: "", status: "Missing" });
+    if (h.status === "accepted" && !h.acceptedSignatureSvg && !h.acceptedBySignatureId)
+      sig.push({ k: `s-a-${h.id}`, sev: RPT_SEV.medium, owner: h.toDepartment, when: h.acceptedAt, what: `${h.toDepartment} accepted the machine from ${h.fromDepartment} without a signature${h.acceptedByName ? ` (accepted by ${h.acceptedByName})` : ""}.`, detail: "", status: "Missing" });
+  });
+  const cert = machine.trialCertificate;
+  if (cert) {
+    if (!cert.trialBySignature) sig.push({ k: "s-tc-t", sev: RPT_SEV.medium, owner: "Trial", when: cert.trialDate, what: "The trial certificate is not signed by the person who set and ran the trial.", detail: "", status: "Missing" });
+    if (!cert.checkBySignature) sig.push({ k: "s-tc-c", sev: RPT_SEV.medium, owner: "Trial", when: cert.trialDate, what: "The trial certificate is not signed by the checking service engineer.", detail: "", status: "Missing" });
+    const cps = cert.checkPoints || {};
+    if (!Object.values(cps).some((v) => v === true || (v != null && v !== false && String(v).trim() !== "")))
+      sig.push({ k: "s-tc-cp", sev: ready ? RPT_SEV.high : RPT_SEV.medium, owner: "Trial", when: cert.trialDate, what: "The trial certificate has no check point results filled in.", detail: "Every check point prints as not checked, on the customer copy too.", status: "Missing" });
+  } else if (ready) sig.push({ k: "s-tc", sev: RPT_SEV.high, owner: "Trial", when: machine.completedDate, what: "The machine is marked Ready but no trial certificate is stored.", detail: "", status: "Missing" });
+  add("signatures", "Missing signatures and documents", "Hand-overs, acceptances and the trial certificate without a signature on file.", sig);
+
+  // 7. Critical parts without serial numbers / verification.
+  add("serials", "Critical parts without serial numbers", "Controlled parts whose serial numbers or verification are not fully recorded.",
+    (critical || []).filter((c) => c.status !== "serial" && c.status !== "verified").map((c, i) => ({ k: `p-${c.code}-${i}`, sev: ready ? RPT_SEV.high : RPT_SEV.medium,
+      owner: "Stores", when: c.when,
+      what: c.status === "not_issued" ? `${c.name || c.code} (${c.code}) has not been issued to this machine yet.`
+        : c.status === "serial_partial" ? `${c.name || c.code} (${c.code}): ${c.serials.length} of ${c.qty} serial numbers recorded.`
+        : c.status === "unconfirmed" ? `${c.name || c.code} (${c.code}) was issued but its verification was not confirmed.`
+        : `${c.name || c.code} (${c.code}) has no serial number or verification recorded.`,
+      detail: c.remark ? `Remark: ${c.remark}` : (c.via || ""), status: "Open" })));
+
+  const all = groups.flatMap((g) => g.rows);
+  const counts = { High: all.filter((r) => r.sev === RPT_SEV.high).length, Medium: all.filter((r) => r.sev === RPT_SEV.medium).length, Low: all.filter((r) => r.sev === RPT_SEV.low).length, total: all.length };
+  return { groups: groups.filter((g) => g.rows.length), clean: groups.filter((g) => !g.rows.length).map((g) => g.title), counts, ready };
+}
+
+// One sentence for the top of the findings: what needs attention first.
+export const rptFindingsHeadline = (f) => {
+  const c = (f && f.counts) || { total: 0 };
+  if (!c.total) return "No exceptions were found: no delays, holds, open jobs, missed check points, reworks, missing signatures or unrecorded serial numbers.";
+  const parts = [c.High && `${c.High} high`, c.Medium && `${c.Medium} medium`, c.Low && `${c.Low} low`].filter(Boolean);
+  const act = c.High ? `${rptCount(c.High, "finding")} need${c.High === 1 ? "s" : ""} action now.` : "None is high severity.";
+  return `${rptCount(c.total, "finding")} recorded (${rptList(parts)} severity). ${act}`;
+};
+
+// Customer copy — facts that contradict each other. Shown on screen before the
+// PDF is sent (never printed); the printed copy marks the point plainly.
+export function rptCustomerReview({ machine, records = [], critical = [], pendingItems = [] }) {
+  if (!machine) return [];
+  const ready = machine.status === "completed";
+  const jobs = (pendingItems || []).filter((p) => String(p.machineId) === String(machine.id));
+  const out = [];
+  const notDone = records.flatMap((r) => r.checks.flatMap((cr) => (cr.answers || []).filter((a) => !a.checked && !rptPointFixed(a.label, jobs)).map((a) => `${a.label} (${r.dept})`)));
+  if (ready && notDone.length) out.push(`The machine is marked Ready, but ${rptCount(notDone.length, "check point")} ${notDone.length === 1 ? "is" : "are"} not done: ${rptList(notDone)}. Complete ${notDone.length === 1 ? "it" : "them"} (or record the follow-up) before sending; until then the report shows "Final checks open".`);
+  const crit = (critical || []).filter((c) => c.status !== "serial" && c.status !== "verified");
+  if (ready && crit.length) out.push(`The machine is marked Ready, but ${rptCount(crit.length, "critical component")} ${crit.length === 1 ? "has" : "have"} no full serial / verification record: ${rptList(crit.map((c) => c.name || c.code))}.`);
+  if (ready && !machine.trialCertificate) out.push("The machine is marked Ready, but no trial certificate is stored.");
+  const cps = (machine.trialCertificate && machine.trialCertificate.checkPoints) || null;
+  if (machine.trialCertificate && cps && !Object.values(cps).some((v) => v === true || (v != null && String(v).trim() !== "" && v !== false)))
+    out.push("The trial certificate has no check point results filled in; the customer copy will show them as not checked.");
+  const openJobs = jobs.filter((p) => p.status !== "resolved");
+  if (ready && openJobs.length) out.push(`${rptCount(openJobs.length, "job")} on this machine ${openJobs.length === 1 ? "is" : "are"} still open (${rptList(openJobs.map((p) => `“${p.description || p.itemName}”`))}). It is not printed on the customer copy, but it should be closed before dispatch.`);
+  records.filter((r) => r.state === "done" && r.dept !== "Assembly" && !r.inAt && !r.outAt).forEach((r) => out.push(`${r.dept} is shown as completed, but no hand-over dates are recorded for it.`));
+  return out;
+}
