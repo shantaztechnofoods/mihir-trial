@@ -72,8 +72,11 @@ test("C + B: admin stage override refuses an open hand-over, is gated in the UI,
   const body = fn("const handleUpdateMachineStage = async (machineId, newStage) => {", "// SERIAL-BASED start production.");
   assert.match(body, /const openHandover = !!\(machine && machine\.pendingHandoverId\)\s*\|\| \(handovers \|\| \[\]\)\.some\(\(h\) => h && h\.status === "pending" && String\(h\.machineId\) === String\(machineId\)\);/);
   assert.match(body, /hand-over awaiting acceptance/);
-  assert.match(body, /const r = await machineUpdate\(machineId, \{/);
-  assert.ok(body.indexOf("auditStage();") > body.indexOf("const r = await machineUpdate("), "audit after the awaited update");
+  // 063: the awaited write is the append-only compare-and-set call (the store falls back to machineUpdate before 063).
+  assert.match(body, /const r = await machineAppendHistory\(machineId, \{/);
+  assert.match(body, /expectedStage: machine\.stage,/, "stage change is compare-and-set on the stage the operator saw");
+  assert.match(body, /if \(r\.stale\) \{[\s\S]*?STALE_MACHINE_MSG[\s\S]*?rtMach\(\);/, "stale answer refreshes and tells the user");
+  assert.ok(body.indexOf("auditStage(dbAudited);") > body.indexOf("const r = await machineAppendHistory("), "audit after the awaited update");
   assert.match(body, /rtMach\(\);\s*return \{ success: false, error: r\.error \|\| "Stage not saved" \};/, "optimistic row rolled back by refetch");
   assert.match(app, /isAdminUser && canDo\("machines","updateStage"\) && !machine\.pendingHandoverId\s*\n\s*&& !\(handovers \|\| \[\]\)\.some\(\(h\) => h && h\.status === "pending" && String\(h\.machineId\) === String\(machine\.id\)\) && \(/);
   assert.match(app, /const r = await onUpdateStage\(machine\.id, newStage\);/);

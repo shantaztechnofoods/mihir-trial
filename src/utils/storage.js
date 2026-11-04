@@ -6,6 +6,7 @@
 
 import { isSupabaseEnabled } from "../config/env.js";
 import { getSupabase } from "../supabase/client.js";
+import { shrinkImageFile } from "./imageResize.js";
 
 export const MEDIA_BUCKET = "item-media";
 export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;    // 25 MB cap on Storage uploads
@@ -42,6 +43,8 @@ function readAsDataURL(file) {
  */
 export async function uploadItemMedia(folder, file) {
   if (!file) return { ok: false, error: "No file selected" };
+  // Photos are shrunk to ≤ 2000 px JPEG before upload (designs keep full detail).
+  if (folder !== "designs") file = await shrinkImageFile(file);
 
   // ── Supabase Storage path ─────────────────────────────────────────────────
   if (isSupabaseEnabled()) {
