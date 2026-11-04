@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
 import {
   getUsers, saveUsers, getRoles, saveRoles,
   getSession, saveSession, clearSession,
@@ -14,7 +14,9 @@ import { isSupabaseEnabled } from "../config/env.js";
 import { getSupabase } from "../supabase/client.js";
 import { createRole, updateRole, deleteRole } from "../stores/rolesStore.js";
 
-const AuthContext = createContext(null);
+// Exported only so the build can render the login screen into index.html
+// (src/app/loginBoot.jsx); the app itself uses AuthProvider + useAuth().
+export const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   // Mode is fixed at mount — flipping VITE_USE_SUPABASE requires a reload.
@@ -33,6 +35,9 @@ export function AuthProvider({ children }) {
   // Set when session restore fails (network/RLS/etc.). Surfaces a retry UI at the app shell
   // instead of the "Invalid username or password" scenario or a silent stuck-on-loading screen.
   const [authLoadError, setAuthLoadError] = useState(null);
+  // > 0 while login() runs: it loads the profile / roles / users itself, so the
+  // SIGNED_IN event it causes must not fetch the same three tables again.
+  const loginBusy = useRef(0);
 
   // currentUser derivation:
   // - Supabase mode → supaUser state (set on login / session restore)
@@ -159,6 +164,7 @@ export function AuthProvider({ children }) {
     // real transitions: initial hydration, sign-in, sign-out.
     const { data: listener } = c.auth.onAuthStateChange((event, sess) => {
       if (event === "TOKEN_REFRESHED" || event === "USER_UPDATED" || event === "PASSWORD_RECOVERY") return;
+      if (event === "SIGNED_IN" && loginBusy.current > 0) return;   // login() below loads it (no duplicate round-trips)
       loadFromSession(sess);
     });
     unsub = () => { try { listener?.subscription?.unsubscribe(); } catch {} };
@@ -172,6 +178,8 @@ export function AuthProvider({ children }) {
       console.info("[auth] login() called", { username, mode: SUPA ? "SUPABASE" : "LOCAL" });
     }
     if (SUPA) {
+      loginBusy.current += 1;
+      try {
       const c = getSupabase();
       if (!c) {
         console.warn("[auth] login: Supabase client null, returning error");
@@ -234,8 +242,9 @@ export function AuthProvider({ children }) {
         }
         return { success: false, error: "Invalid username or password." };
       }
-      // Fetch profile
-      const profile = await fetchUserById(data.user.id);
+      // Profile, roles and all users in ONE parallel round-trip (2026-11-04
+      // perf/login-fast — was profile first, then roles + users).
+      const [profile, rolesMap, allUsers] = await Promise.all([fetchUserById(data.user.id), fetchAllRoles(), fetchAllUsers()]);
       if (!profile) {
         await c.auth.signOut();
         return { success: false, error: "User profile missing in database." };
@@ -244,12 +253,12 @@ export function AuthProvider({ children }) {
         await c.auth.signOut();
         return { success: false, error: "Account disabled." };
       }
-      // Load roles + all users for the rest of the app. If roles fail to load for a
-      // non-super-admin user, we CANNOT let the login "succeed" — the user would land
-      // in a state where canView() returns false for every module (silent lockout).
-      // Sign out and report the error so the operator sees a real failure they can act on
-      // instead of a broken "logged in but Access Denied everywhere" state.
-      const [rolesMap, allUsers] = await Promise.all([fetchAllRoles(), fetchAllUsers()]);
+      // Roles + all users (fetched above) are needed by the rest of the app. If roles
+      // failed to load for a non-super-admin user, we CANNOT let the login "succeed" —
+      // the user would land in a state where canView() returns false for every module
+      // (silent lockout). Sign out and report the error so the operator sees a real
+      // failure they can act on instead of a broken "logged in but Access Denied
+      // everywhere" state.
       if (!rolesMap && profile.role !== "super_admin") {
         try { await c.auth.signOut(); } catch {}
         return { success: false, error: "Could not load permission data. Please retry." };
@@ -268,6 +277,7 @@ export function AuthProvider({ children }) {
         role: rolesMap?.[profile.role]?.label || profile.role,
       });
       return { success: true };
+      } finally { loginBusy.current -= 1; }
     }
 
     // ── Local (localStorage) path ─ unchanged behaviour ─────────────────────

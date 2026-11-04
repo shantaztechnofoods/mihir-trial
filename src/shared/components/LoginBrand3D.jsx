@@ -15,12 +15,13 @@ export { default as ShantazLogoSVG } from "./ShantazLogoSVG.jsx";
 // WebGL, lost context, or < 40 fps after the intro).
 // fullBleed: the canvas fills the whole screen (it draws its own navy
 // background); the logo sits left-of-centre on desktop, at the top on phones.
-export default function LoginBrand3D({ onFail, fullBleed = false }) {
+// onStart() → the canvas has faded in (the login page then fades its 2D poster out).
+export default function LoginBrand3D({ onFail, onStart, fullBleed = false }) {
   const hostRef = useRef(null);
   useEffect(() => {
     const host = hostRef.current; if (!host) return undefined;
-    return createLogoScene(host, { svgText: LOGO_SVG, fullBleed, onFail });
-  }, [onFail, fullBleed]);
+    return createLogoScene(host, { svgText: LOGO_SVG, fullBleed, onFail, onStart });
+  }, [onFail, onStart, fullBleed]);
   return (
     <div className={`lg-brand3d${fullBleed ? " lg-brand3d--full" : ""}`} aria-hidden="true"
          style={fullBleed ? { position: "absolute", inset: 0, height: "auto", pointerEvents: "none" } : undefined}>

@@ -6,12 +6,16 @@
     <title>Purchase & Inventory OS</title>
     <meta name="theme-color" content="#0C1424" />
     <link rel="icon" type="image/png" href="/src/assets/brand/shantaz-logo.png" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <!-- Inter is self-hosted (src/index.css) and preloaded by the build. These fonts are
+         only used inside the app, so they load without blocking the first paint. -->
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..800&family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans+Devanagari:wght@400;600;700&family=Noto+Sans+Gujarati:wght@400;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans+Devanagari:wght@400;600;700&family=Noto+Sans+Gujarati:wght@400;600;700&display=swap" rel="stylesheet" media="print" onload="this.onload=null;this.media='all'" />
+    <noscript><link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans+Devanagari:wght@400;600;700&family=Noto+Sans+Gujarati:wght@400;600;700&display=swap" rel="stylesheet" /></noscript>
+    <!-- login boot screen: critical CSS + preloads (scripts/vite-login-boot.mjs) -->
+    <!--login-boot-head-->
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"><!--login-boot--></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

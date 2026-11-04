@@ -13,6 +13,7 @@ fill-rack-pending-item 12.5
 go-live-workflows 69.5
 harden-stress 11.7
 live-sync 14.6
+login-speed 45.0
 mobile-sweep 71.5
 mt-polish 11.8
 mt-search 4.4
