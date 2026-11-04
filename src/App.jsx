@@ -8271,7 +8271,7 @@ function OrgStep({ n, id, title, hint, status = null, children }) {
 }
 
 const SETTINGS_DEFAULTS = {
-  companyName:     "Shantaz Technofoods",
+  companyName:     "SHANTA G TECHNOFOODS LLP", // 2026-11-04 — the one legal name (reports v2)
   gst:             "",
   address:         "",
   phone:           "",
@@ -14959,7 +14959,8 @@ function AtoZMachineReport({
   // 2026-11-01 — a company-level document: who issued it, which machine,
   // where it stands, and the five numbers a reader checks first. Every value
   // comes from records already loaded; nothing is computed into the DB.
-  const company = (() => { try { return getActiveCompany(settings) || {}; } catch { return {}; } })();
+  // getActiveCompany(settings) through rptCompany: one company name on every report.
+  const company = rptCompany(settings);
   const openJobs     = machinePending.filter((p) => p.status !== "resolved");
   const resolvedJobs = machinePending.filter((p) => p.status === "resolved");
   const acceptedHops = machineHandovers.filter((h) => h.status === "accepted");
@@ -15009,7 +15010,9 @@ function AtoZMachineReport({
       <RptLetterhead company={company} />
       <RptTitleBlock title="Machine production report" sub="Company full report · internal" subAttr titleAttr={false} refText={reportRef} dateText={fmtD(new Date())} />
       {/* D3 — identity and status stamp */}
-      <div className="mr-identity">
+      <div className={`mr-identity${bom.photoUrl ? " has-photo" : ""}`}>
+        {/* 2026-11-04 (reports v2) — the BOM photo beside the machine details. */}
+        {bom.photoUrl && <div className="rpt-photo rpt-photo-sm"><img src={bom.photoUrl} alt={`${machine.bomKey} machine`} data-report-photo /></div>}
         <div className="min-w-0">
           <div className="mr-label">Machine</div>
           <div className="mr-machine">{machine.bomLabel || bom.label || machine.bomKey}</div>
@@ -15059,66 +15062,42 @@ function AtoZMachineReport({
   //   1. the BOM Outward at issue time        → outward_log.items[].criticalInput
   //   2. a later hand-out from Pending Stock  → audit_log details.criticalInput
   // Only (1) was shown before, so a part issued late read as never fitted.
-  const criticalRows = (() => {
-    const issuedFromOutward = machineOutward.flatMap((entry) =>
-      (entry.items || []).map((it) => ({
-        code: it.code, name: it.name, unit: it.unit,
-        qty: Number(it.issueQty) || 0,
-        criticalInput: it.criticalInput || null,
-        when: entry.date, via: "Issued with BOM",
-      })));
-
-    const issuedFromPending = (auditLog || [])
-      .filter((a) => a.type === "pending_fulfilled"
-                  && machine.serialNo && String(a.serialNo || "") === String(machine.serialNo))
-      .map((a) => ({
-        code: a.itemCode, name: a.itemName, unit: "",
-        qty: Number(a.qty) || 0,
-        criticalInput: (a.details && a.details.criticalInput) || null,
-        when: a.date || (a.createdAt ? String(a.createdAt).slice(0, 10) : ""),
-        via: "Given later from Pending Stock",
-      }));
-
-    const all = [...issuedFromOutward, ...issuedFromPending];
-    // A part counts as critical if the Item Master says so now, or if a
-    // confirmation was actually captured for it at the time. The second test
-    // matters for history: an item later un-flagged still had its serials
-    // recorded, and that record should not quietly vanish from old reports.
-    return all.filter((r) => {
-      const inv = findInv(r.code);
-      return (inv && inv.isCritical) || !!r.criticalInput;
-    });
-  })();
+  const criticalRows = rptCriticalItems({ machine, outwardLog, auditLog, items, pendingItems: machinePending, allUsers });
+  const critSummary = rptCriticalSummary(criticalRows);
 
   const bomLineCount  = (bom.items || []).length;
   const criticalCodes = new Set(criticalRows.map((r) => r.code));
   const otherLines    = Math.max(0, bomLineCount - criticalCodes.size);
 
+  // 2026-11-04 (reports v2) — one summary line ("3 critical items, all serials
+  // recorded") and who issued / verified each part and when.
   const CriticalParts = () => (
     <Sec n="01" title="Critical parts fitted" count={criticalRows.length}
-         extra={otherLines > 0 ? <span className="mr-count">· plus {otherLines} other part{otherLines === 1 ? "" : "s"} as per BOM {machine.bomKey}</span> : null}>
+         extra={<>
+           {criticalRows.length > 0 && <span className={`mr-count-strong ${/not yet/.test(critSummary) ? "mr-red" : "mr-green"}`} data-report-critical-summary>{critSummary}</span>}
+           {otherLines > 0 ? <span className="mr-count">· plus {otherLines} other part{otherLines === 1 ? "" : "s"} as per BOM {machine.bomKey}</span> : null}
+         </>}>
+      <div data-report-critical>
       {criticalRows.length === 0 ? <p className="mr-empty">No critical parts recorded for this machine.</p> : (
         <div className="mr-table">
-          <div className="mr-tr mr-th" style={{ gridTemplateColumns: "2.2fr 0.5fr 3fr 1.6fr" }}><div>Part</div><div className="text-right">Qty</div><div>Serial numbers / verification</div><div>Issued</div></div>
-          {criticalRows.map((r, idx) => {
-            const ci = r.criticalInput;
-            const serials = ci && ci.type === "serial" ? (ci.serials || []).filter(Boolean) : [];
-            return (
-              <div key={`${r.code}-${idx}`} className="mr-tr" style={{ gridTemplateColumns: "2.2fr 0.5fr 3fr 1.6fr" }}>
-                <div className="mr-td" data-l="Part"><div><div className="font-semibold">{r.name || r.code}</div><div className="mr-label mr-mono">{r.code}</div></div></div>
-                <div className="mr-td mr-mono md:text-right" data-l="Qty">{r.qty}</div>
-                <div className="mr-td" data-l="Serial / verification">
-                  {ci && ci.notIssued ? <span className="mr-amber">Not issued — {ci.remark || "no reason recorded"}</span>
-                    : serials.length ? <span className="mr-mono">{serials.join(", ")}</span>
-                    : ci && ci.type === "checkbox" ? (ci.confirmed ? <span className="mr-green">Physically verified, all units</span> : <span className="mr-red">Not confirmed</span>)
-                    : <span className="mr-muted">No confirmation recorded</span>}
-                </div>
-                <div className="mr-td" data-l="Issued"><div><div>{fmtD(r.when) || "—"}</div><div className="mr-label">{r.via}</div></div></div>
+          <div className="mr-tr mr-th" style={{ gridTemplateColumns: "2.1fr 0.5fr 2.8fr 1.9fr" }}><div>Part</div><div className="text-right">Qty</div><div>Serial numbers / verification</div><div>Issued / verified</div></div>
+          {criticalRows.map((r, idx) => (
+            <div key={`${r.code}-${idx}`} className="mr-tr" data-report-critical-row={r.code} style={{ gridTemplateColumns: "2.1fr 0.5fr 2.8fr 1.9fr" }}>
+              <div className="mr-td" data-l="Part"><div><div className="font-semibold">{r.name || r.code}</div><div className="mr-label mr-mono">{r.code}</div></div></div>
+              <div className="mr-td mr-mono md:text-right" data-l="Qty">{r.qty}</div>
+              <div className="mr-td" data-l="Serial / verification">
+                {r.status === "not_issued" ? <span className="mr-amber">Not issued — {r.remark || "no reason recorded"}</span>
+                  : r.serials.length ? <div><span className="mr-mono">{r.serials.join(", ")}</span>{r.qty && r.serials.length < r.qty ? <div className="mr-red mr-small">{r.qty - r.serials.length} serial{r.qty - r.serials.length === 1 ? "" : "s"} missing</div> : null}</div>
+                  : r.status === "verified" ? <span className="mr-green">Physically verified, all units</span>
+                  : r.status === "unconfirmed" ? <span className="mr-red">Not confirmed</span>
+                  : <span className="mr-muted">No confirmation recorded</span>}
               </div>
-            );
-          })}
+              <div className="mr-td" data-l="Issued / verified"><div><div>{fmtDT(r.when) || "—"}{r.by ? <span> · {r.by}</span> : null}</div><div className="mr-label">{r.via}</div></div></div>
+            </div>
+          ))}
         </div>
       )}
+      </div>
     </Sec>
   );
 
@@ -15166,7 +15145,7 @@ function AtoZMachineReport({
                     {(h.acceptedByName || userName(h.acceptedBy)) && <div className="mr-label" data-report-accepted-by>by {h.acceptedByName || userName(h.acceptedBy)}</div>}
                     {h.acceptedAt && h.acceptedInDepartment && h.acceptedInDepartment !== h.toDepartment && <div className="mr-label">into {h.acceptedInDepartment}</div>}
                     {show.showEmployees !== false && Array.isArray(h.acceptedByTeamSnapshot) && h.acceptedByTeamSnapshot.length > 0 && (
-                      <div className="mr-label" data-report-accept-team>team: {h.acceptedByTeamSnapshot.map((x) => (x && (x.fullName || x.username || x.name)) || "").filter(Boolean).join(", ")}</div>
+                      <div className="mr-label" data-report-accept-team>team: {h.acceptedByTeamSnapshot.map((x) => (x && (x.fullName || x.username || x.name)) || "").filter((n) => n && n !== (h.acceptedByName || userName(h.acceptedBy))).join(", ") || "—"}</div>
                     )}
                     <div className="mr-label">Accept window {dur(h.acceptTimeoutMinutes)}</div>
                     {h.status === "accepted" && !(h.acceptedSignatureSvg || h.mainEmployeeSignatureSvg) && <div className="mr-label">Signed on file (earlier record)</div>}
@@ -15248,35 +15227,57 @@ function AtoZMachineReport({
     if (show.showPendingJobs === false) return null;
     const byTime = (a, b) => String(a.raisedAt || "").localeCompare(String(b.raisedAt || ""));
     const jobs = [...openJobs.slice().sort(byTime), ...resolvedJobs.slice().sort(byTime)];
+    // 2026-11-04 (reports v2) — the same jobs, each printed once, in three
+    // groups: parts pending / received, 💬 comments by the department that
+    // raised them, and follow-ups from unticked checklist points.
+    const parts = jobs.filter((p) => pendingItemIsPart(p));
+    const commentGroups = rptCommentGroups(jobs.filter((p) => !pendingItemIsPart(p)));
+    const commentIds = new Set(commentGroups.flatMap((g) => g.rows.map((p) => String(p.id))));
+    const followUps = jobs.filter((p) => !pendingItemIsPart(p) && !commentIds.has(String(p.id)));
+    const PART_STAGE = { awaiting: "Awaiting part", partial: "Part received in part", received: "Part received", completed: "Completed" };
+    const Row = ({ p }) => {
+      const open = p.status !== "resolved";
+      const hop = p.raisedInHandoverId ? hopOf(p.raisedInHandoverId) : null;
+      const src = commentIds.has(String(p.id)) ? "Comment" : SOURCE[p.source] || (/^Part not issued at BOM Outward/.test(p.description || "") ? SOURCE.not_issued : p.kind === "owed" ? "Owed work" : "Reported issue");
+      const isPart = pendingItemIsPart(p);
+      const stage = isPart ? pendingItemStage(p) : (open ? "awaiting" : "completed");
+      const done = !open || (isPart && stage === "received");
+      return (
+        <div data-report-issue={open ? "open" : "resolved"} className={`mr-issue ${open ? "is-open" : "is-done"}`}>
+          <div className="mr-tr" style={{ gridTemplateColumns: "0.95fr 3fr 1.5fr 1.2fr" }}>
+            <div className="mr-td" data-l="Status"><span className={done ? "mr-green font-semibold" : "mr-red font-semibold"}>{isPart ? PART_STAGE[stage] : open ? "Open" : "Resolved"}</span></div>
+            <div className="mr-td" data-l="Issue"><div>
+              <div className={open && !done ? "mr-red" : ""}>{p.critical ? <span className="mr-tag">Critical</span> : null}{p.description}</div>
+              {(p.itemCode || p.itemName) && <div className="mr-label">Part {p.itemCode ? <span className="mr-mono">{p.itemCode}</span> : null}{p.itemName ? ` ${p.itemName}` : ""}{p.qty != null ? ` × ${p.qty}` : ""}{(Number(p.receivedQty) || 0) > 0 ? ` · ${p.receivedQty} received` : ""}{p.partSerialNo ? <> · part S/N <span className="mr-mono">{p.partSerialNo}</span></> : null}</div>}
+              <div className="mr-label">{src}{hop ? ` · at ${hop.fromDepartment} → ${hop.toDepartment} hand-over` : ""}</div>
+            </div></div>
+            <div className="mr-td" data-l="Raised"><div><div>{p.raisedInDepartment || "—"}</div><div className="mr-label">{fmtDT(p.raisedAt)}</div></div></div>
+            <div className="mr-td" data-l="Assigned to">{p.assignedDepartment || "Unassigned"}</div>
+          </div>
+          <div className="mr-issue-history"><JobHistory item={p} users={allUsers} compact reportDates /></div>
+        </div>
+      );
+    };
+    const Group = ({ title, list, attr = {} }) => (
+      <div className="rpt-sub" {...attr}>
+        <div className="rpt-subh">{title} <span className="mr-count">{list.length}</span>{list.some((p) => p.status !== "resolved") ? <span className="mr-red mr-count"> · {list.filter((p) => p.status !== "resolved").length} open</span> : null}</div>
+        <div className="mr-table">
+          <div className="mr-tr mr-th" style={{ gridTemplateColumns: "0.95fr 3fr 1.5fr 1.2fr" }}><div>Status</div><div>{attr["data-report-comments-dept"] ? "Comment" : "Issue"}</div><div>Raised</div><div>Assigned to</div></div>
+          {list.map((p) => <Row key={p.id} p={p} />)}
+        </div>
+      </div>
+    );
     return (
       <Sec n="04" title="Issues and pending jobs" count={jobs.length}
            extra={openJobs.length ? <span className="mr-red mr-count-strong">{openJobs.length} open</span> : <span className="mr-green mr-count-strong">{jobs.length ? "all resolved" : "none recorded"}</span>}>
         <div data-report-issues>
-          {jobs.length > 0 && (
-            <div className="mr-table">
-              <div className="mr-tr mr-th" style={{ gridTemplateColumns: "0.8fr 3fr 1.5fr 1.2fr" }}><div>Status</div><div>Issue</div><div>Raised</div><div>Assigned to</div></div>
-              {jobs.map((p) => {
-                const open = p.status !== "resolved";
-                const hop = p.raisedInHandoverId ? hopOf(p.raisedInHandoverId) : null;
-                const src = SOURCE[p.source] || (/^Part not issued at BOM Outward/.test(p.description || "") ? SOURCE.not_issued : p.kind === "owed" ? "Owed work" : "Reported issue");
-                return (
-                  <div key={p.id} data-report-issue={open ? "open" : "resolved"} className={`mr-issue ${open ? "is-open" : "is-done"}`}>
-                    <div className="mr-tr" style={{ gridTemplateColumns: "0.8fr 3fr 1.5fr 1.2fr" }}>
-                      <div className="mr-td" data-l="Status"><span className={open ? "mr-red font-semibold" : "mr-green font-semibold"}>{open ? "Open" : "Resolved"}</span></div>
-                      <div className="mr-td" data-l="Issue"><div>
-                        <div className={open ? "mr-red" : ""}>{p.critical ? <span className="mr-tag">Critical</span> : null}{p.description}</div>
-                        {(p.itemCode || p.itemName) && <div className="mr-label">Part {p.itemCode ? <span className="mr-mono">{p.itemCode}</span> : null}{p.itemName ? ` ${p.itemName}` : ""}{p.qty != null ? ` × ${p.qty}` : ""}{p.partSerialNo ? <> · part S/N <span className="mr-mono">{p.partSerialNo}</span></> : null}</div>}
-                        <div className="mr-label">{src}{hop ? ` · at ${hop.fromDepartment} → ${hop.toDepartment} hand-over` : ""}</div>
-                      </div></div>
-                      <div className="mr-td" data-l="Raised"><div><div>{p.raisedInDepartment || "—"}</div><div className="mr-label">{fmtDT(p.raisedAt)}</div></div></div>
-                      <div className="mr-td" data-l="Assigned to">{p.assignedDepartment || "Unassigned"}</div>
-                    </div>
-                    <div className="mr-issue-history"><JobHistory item={p} users={allUsers} compact reportDates /></div>
-                  </div>
-                );
-              })}
+          {parts.length > 0 && <Group title="Parts pending and received" list={parts} attr={{ "data-report-parts": "" }} />}
+          {commentGroups.length > 0 && (
+            <div data-report-comments>
+              {commentGroups.map((g) => <Group key={g.dept} title={`Comments raised in ${g.dept}`} list={g.rows} attr={{ "data-report-comments-dept": g.dept }} />)}
             </div>
           )}
+          {followUps.length > 0 && <Group title="Checklist follow-ups" list={followUps} attr={{ "data-report-followups": "" }} />}
           {jobs.length === 0 && <p className="mr-empty">No issues or pending jobs were recorded for this machine.</p>}
         </div>
       </Sec>
@@ -15364,37 +15365,49 @@ function AtoZMachineReport({
   // receive and during work), with who submitted it and when.
   const ChecklistAppendix = () => {
     if (show.showChecklists === false || machineResponses.length === 0) return null;
-    const list = machineResponses.slice().sort((a, b) => String(a.submittedAt || "").localeCompare(String(b.submittedAt || "")));
+    // 2026-11-04 (reports v2) — grouped by department in build order (every
+    // department appears, "none recorded" when it had no checklist), then by
+    // stage: before receive, during work, before dispatch.
+    const records = rptDeptRecords(machine, machineHandovers, machineResponses);
+    const known = new Set(RPT_STAGE_DEPTS);
+    const extra = machineResponses.filter((cr) => !known.has(cr.department));
+    const groups = [...records.map((r) => ({ d: r.dept, list: r.checks })), ...(extra.length ? [{ d: "Other", list: extra }] : [])];
+    const one = (cr) => {
+      const ans = cr.answers || []; const done = ans.filter((a) => a.checked).length; const hop = cr.handoverId ? hopOf(cr.handoverId) : null;
+      return (
+        <div key={cr.id} className="mr-check mr-avoid" data-report-appendix-checklist={cr.stage || ""}>
+          <div className="mr-check-head">
+            <div className="font-semibold">{cr.department || "—"} · {STAGE_LABEL[cr.stage] || cr.stage || "Checklist"}{hop ? <span className="mr-label"> · {hop.fromDepartment} → {hop.toDepartment}</span> : null}</div>
+            <div className="mr-label">{cr.templateName || "—"} v{cr.templateVersion || 1}{cr.submittedAt ? ` · ${fmtDT(cr.submittedAt)}` : ""}{userName(cr.submittedBy) ? ` · ${userName(cr.submittedBy)}` : ""} · <span className={done < ans.length ? "mr-red" : "mr-green"}>{done}/{ans.length} done</span></div>
+          </div>
+          {ans.map((a, i) => (
+            <div key={i} className="mr-check-row">
+              <span className={a.checked ? "mr-green" : "mr-red"}>{a.checked ? "✓" : "✗"}</span>
+              <div className="min-w-0"><span>{a.label}</span>{a.required && <span className="mr-label"> · must-do</span>}{a.remark && <div className="mr-label">Remark: {a.remark}</div>}</div>
+            </div>
+          ))}
+        </div>
+      );
+    };
     return (
       <section className="mr-sec mr-appendix">
-        <h3 className="mr-h"><span className="mr-num">A</span>Appendix A · Checklist answers<span className="mr-count">{list.length}</span></h3>
-        {list.map((cr) => {
-          const ans = cr.answers || []; const done = ans.filter((a) => a.checked).length; const hop = cr.handoverId ? hopOf(cr.handoverId) : null;
-          return (
-            <div key={cr.id} className="mr-check mr-avoid">
-              <div className="mr-check-head">
-                <div className="font-semibold">{cr.department || "—"} · {STAGE_LABEL[cr.stage] || cr.stage || "Checklist"}{hop ? <span className="mr-label"> · {hop.fromDepartment} → {hop.toDepartment}</span> : null}</div>
-                <div className="mr-label">{cr.templateName || "—"} v{cr.templateVersion || 1}{cr.submittedAt ? ` · ${fmtDT(cr.submittedAt)}` : ""}{userName(cr.submittedBy) ? ` · ${userName(cr.submittedBy)}` : ""} · <span className={done < ans.length ? "mr-red" : "mr-green"}>{done}/{ans.length} done</span></div>
-              </div>
-              {ans.map((a, i) => (
-                <div key={i} className="mr-check-row">
-                  <span className={a.checked ? "mr-green" : "mr-red"}>{a.checked ? "✓" : "✗"}</span>
-                  <div className="min-w-0"><span>{a.label}</span>{a.required && <span className="mr-label"> · must-do</span>}{a.remark && <div className="mr-label">Remark: {a.remark}</div>}</div>
-                </div>
-              ))}
-            </div>
-          );
-        })}
+        <h3 className="mr-h"><span className="mr-num">A</span>Appendix A · Checklist answers<span className="mr-count">{machineResponses.length}</span></h3>
+        {groups.map((g) => (
+          <div key={g.d} className="rpt-sub" data-report-appendix-dept={g.d}>
+            <div className="rpt-subh">{g.d} <span className="mr-count">{g.list.length ? `${g.list.length} checklist${g.list.length === 1 ? "" : "s"}` : "none recorded"}</span></div>
+            {g.list.map(one)}
+          </div>
+        ))}
       </section>
     );
   };
 
   return (
     <div className="mr-doc" data-machine-report>
-      <RptPageStyle page="machine-report" head={`${company.name || "Shantaz Technofoods"} · Machine production report`} refText={reportRef} foot="Machine production report · internal" />
+      <RptPageStyle page="machine-report" head={`${company.name || RPT_LEGAL_NAME} · Machine production report`} refText={reportRef} foot="Machine production report · internal" />
       {/* D8 — the print frame (on paper the running head is a page margin box, from page 2 on). */}
       <table className="mr-frame">
-        <thead><tr><td><div className="mr-runhead"><span>{company.name || "Shantaz Technofoods"} · Machine production report</span><span className="mr-mono">{reportRef}</span></div></td></tr></thead>
+        <thead><tr><td><div className="mr-runhead"><span>{company.name || RPT_LEGAL_NAME} · Machine production report</span><span className="mr-mono">{reportRef}</span></div></td></tr></thead>
         <tbody><tr><td>
           <Hdr />
           <CriticalParts />
@@ -15440,7 +15453,16 @@ const rptDur = (min) => {
   const d = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60);
   return `${d} day${d === 1 ? "" : "s"}${h ? ` ${h} h` : ""}`;
 };
-const rptCompany = (settings) => { try { return getActiveCompany(settings) || {}; } catch { return {}; } };
+// 2026-11-04 (reports v2) — ONE legal name on every printed document: the
+// Settings → Company name (active company), then the legacy settings name,
+// then the registered name below. The certificate's company box reads the same.
+const RPT_LEGAL_NAME = "SHANTA G TECHNOFOODS LLP";
+const rptCompany = (settings) => {
+  let c = {};
+  try { c = getActiveCompany(settings) || {}; } catch { c = {}; }
+  const name = String(c.name || "").trim() || String((settings && settings.companyName) || "").trim() || RPT_LEGAL_NAME;
+  return { ...c, name };
+};
 
 // ── Letterhead, title block and page furniture shared by every report ──────
 // 2026-11-04 — letterhead style: the logo centred and larger, the company name
@@ -15449,7 +15471,7 @@ const rptCompany = (settings) => { try { return getActiveCompany(settings) || {}
 // the closing line carries "generated on / by", the paper margins carry the
 // page numbers (and, from page 2 on, a short running head).
 function RptLetterhead({ company = {}, showLogo = true, line = "" }) {
-  const name = company.name || "Shantaz Technofoods";
+  const name = company.name || RPT_LEGAL_NAME;
   const contact = [company.gst ? `GSTIN ${company.gst}` : "", company.phone ? `Phone ${company.phone}` : "", company.email || "", company.website || ""].filter(Boolean);
   return (
     <div className="rpt-lh" data-report-letterhead>
@@ -15590,6 +15612,215 @@ function collectHoldEvents({ machineLog = [], handovers = [], auditLog = [], all
   return rows.sort((a, b) => (a.startAt || 0) - (b.startAt || 0));
 }
 
+// ── Reports v2 (2026-11-04) — shared, read-only record builders ──────────
+// Department stages, checklist answers, critical items with serials, and the
+// 💬 comments, computed from records already loaded. Nothing here writes.
+const RPT_STAGE_DEPTS = ["Assembly", "Mechanical", "Electrical", "Trial", "Ready"];
+const RPT_CL_STAGES = [["before_receive", "Before receive"], ["during_work", "During work"], ["before_dispatch", "Before dispatch"]];
+const RPT_DEPT_SCOPE = {
+  Assembly: "Machine assembled to its approved bill of materials.",
+  Mechanical: "Mechanical fitting, alignment and moving parts checked.",
+  Electrical: "Wiring, control panel and electrical safety checked.",
+  Trial: "Machine run under load; trial certificate issued.",
+  Ready: "Final inspection and release for dispatch.",
+};
+// A worker / login name from a hand-over's snapshot ({ fullName, username } or { type: "emp", name }).
+const rptSnapName = (uid, snapshot) => {
+  if (!uid) return "";
+  if (Array.isArray(snapshot)) {
+    const s = snapshot.find((x) => x && x.id === uid);
+    if (s && (s.fullName || s.username || s.name)) return s.fullName || s.username || s.name;
+  }
+  return String(uid).startsWith("emp:") ? String(uid).slice(4) : String(uid);
+};
+const rptTeamNames = (snap) => (Array.isArray(snap) ? snap : []).map((x) => (x && (x.fullName || x.username || x.name)) || "").filter(Boolean);
+// One record per department stage: in / out, time vs target, who handed over
+// and who accepted (with signature), the checklists answered there, stage notes.
+function rptDeptRecords(machine, handovers = [], checklistResponses = [], ratings = []) {
+  if (!machine) return [];
+  const hops = (handovers || []).filter((h) => String(h.machineId) === String(machine.id) && h.status !== "cancelled")
+    .slice().sort((a, b) => (rptMs(a.sentAt) || 0) - (rptMs(b.sentAt) || 0));
+  const isReady = machine.status === "completed";
+  const cur = isReady ? "Ready" : (machine.currentDepartment || machine.stage);
+  const curIdx = RPT_STAGE_DEPTS.indexOf(cur);
+  const responses = (checklistResponses || []).filter((cr) => String(cr.machineId) === String(machine.id));
+  const stageOrder = (st) => { const i = RPT_CL_STAGES.findIndex(([k]) => k === st); return i < 0 ? 9 : i; };
+  return RPT_STAGE_DEPTS.map((d, i) => {
+    const inHop = hops.filter((h) => h.toDepartment === d).pop() || null;
+    const outHop = d === "Ready" ? null : (hops.filter((h) => h.fromDepartment === d).pop() || null);
+    const state = isReady || (curIdx >= 0 && i < curIdx) ? "done" : i === curIdx ? "current" : "pending";
+    const inAt = d === "Assembly" ? ((inHop && inHop.acceptedAt) || machine.startedAt || machine.createdDate || machine.createdAt || "")
+      : d === "Ready" ? ((inHop && inHop.acceptedAt) || machine.completedDate || "") : ((inHop && inHop.acceptedAt) || "");
+    const outAt = outHop ? outHop.sentAt : "";
+    const leadName = outHop ? (rptSnapName(outHop.mainEmployeeId, outHop.workedBySnapshot) || outHop.mainEmployeeName || "") : "";
+    const team = outHop ? workerIdsOf(outHop).map((w) => rptSnapName(w, outHop.workedBySnapshot)).filter(Boolean) : [];
+    const checks = responses.filter((cr) => cr.department === d)
+      .slice().sort((a, b) => stageOrder(a.stage) - stageOrder(b.stage) || String(a.submittedAt || "").localeCompare(String(b.submittedAt || "")));
+    const answers = checks.flatMap((cr) => cr.answers || []);
+    return {
+      dept: d, state, inAt, outAt, inHop, outHop,
+      actual: outHop ? outHop.actualDurationMinutes : null,
+      target: outHop ? outHop.expectedDurationMinutes : null,
+      over: outHop ? (Number(outHop.overrunMinutes) || 0) : 0,
+      accepted: inHop && inHop.status === "accepted"
+        ? { name: inHop.acceptedByName || "", at: inHop.acceptedAt, sig: inHop.acceptedSignatureSvg || "", team: rptTeamNames(inHop.acceptedByTeamSnapshot), from: inHop.fromDepartment }
+        : null,
+      handedOver: outHop ? { name: leadName, at: outHop.sentAt, sig: outHop.mainEmployeeSignatureSvg || "", team, to: outHop.toDepartment, status: outHop.status } : null,
+      checks, points: answers.length, passed: answers.filter((a) => a.checked).length,
+      notes: (machine.history || []).filter((h) => h.stage === d && h.note),
+      rating: outHop ? (ratings || []).find((r) => String(r.handoverId) === String(outHop.id)) || null : null,
+    };
+  });
+}
+// 💬 Comments: work rows raised per department (no part named), not the
+// automatic follow-ups an unticked checklist point creates.
+const rptIsComment = (p) => !!p && !pendingItemIsPart(p) && !/^Checklist not completed/.test(String(p.description || ""));
+// by "raised" (default): the department that raised it. by "done": the
+// department that completed it (else the one asked to do it) — the customer
+// copy files finished work under the stage that did it.
+function rptCommentGroups(pendingItems = [], { completedOnly = false, by = "raised" } = {}) {
+  const keyOf = (p) => (by === "done" ? (p.resolvedInDepartment || p.assignedDepartment || p.raisedInDepartment) : p.raisedInDepartment) || "Unassigned";
+  const list = (pendingItems || []).filter(rptIsComment).filter((p) => !completedOnly || p.status === "resolved")
+    .slice().sort((a, b) => String(a.raisedAt || "").localeCompare(String(b.raisedAt || "")));
+  const order = (d) => { const i = RPT_STAGE_DEPTS.indexOf(d); return i < 0 ? 50 : i; };
+  const depts = [...new Set(list.map(keyOf))].sort((a, b) => order(a) - order(b) || a.localeCompare(b));
+  return depts.map((d) => ({ dept: d, rows: list.filter((p) => keyOf(p) === d) }));
+}
+// Critical items fitted to one machine, with the serial numbers recorded and
+// who issued / verified them. Sources: the BOM Outward (outward_log items'
+// criticalInput, issuer from the outward_bom audit row), later hand-outs from
+// Pending Stock (audit pending_fulfilled) and critical parts received on a
+// pending job (receipt verification). A part counts when the Item Master
+// flags it critical or a confirmation was captured for it.
+function rptCriticalItems({ machine, outwardLog = [], auditLog = [], items = {}, pendingItems = [], allUsers = [] }) {
+  if (!machine) return [];
+  const flat = Object.values(items || {}).flatMap((l) => (Array.isArray(l) ? l : []));
+  const inv = (code) => flat.find((i) => i && i.code === code);
+  const sn = String(machine.serialNo || "");
+  const outward = (outwardLog || []).filter((e) => (machine.issueId && String(e.id) === String(machine.issueId)) || (e.ref === machine.bomKey && sn && e.serialNo === sn));
+  const issueAudit = (auditLog || []).find((a) => a.type === "outward_bom" && a.ref === machine.bomKey && sn && String(a.serialNo || "") === sn) || null;
+  const rows = [
+    ...outward.flatMap((e) => (e.items || []).map((it) => ({ src: "outward", code: it.code, name: it.name, unit: it.unit || "", qty: Number(it.issueQty) || 0, ci: it.criticalInput || null,
+      when: (issueAudit && issueAudit.ts) || e.date || "", by: (issueAudit && issueAudit.user) || "",
+      via: it.criticalInput && it.criticalInput.notIssued ? "Not issued at BOM Outward" : "Issued with BOM" }))),
+    ...(auditLog || []).filter((a) => a.type === "pending_fulfilled" && sn && String(a.serialNo || "") === sn)
+      .map((a) => ({ code: a.itemCode, name: a.itemName, unit: "", qty: Number(a.qty) || 0, ci: (a.details && a.details.criticalInput) || null,
+        when: a.ts || a.date || "", by: a.user || "", via: "Given later from Pending Stock" })),
+    ...(pendingItems || []).filter((p) => String(p.machineId) === String(machine.id) && p.critical && pendingItemIsPart(p)).map((p) => {
+      const rc = (p.receipts || []).map((r) => r.verification).filter(Boolean);
+      const serials = [...rc.flatMap((v) => (Array.isArray(v.serials) ? v.serials : [])), p.partSerialNo].filter(Boolean);
+      const last = (p.receipts || []).slice(-1)[0];
+      const got = !!p.receivedAt || p.status === "resolved";
+      return { code: p.itemCode, name: p.itemName || p.description, unit: "", qty: Number(p.qty) || 0,
+        ci: serials.length ? { type: "serial", serials } : got ? { type: "checkbox", confirmed: true } : { notIssued: true, remark: "awaiting part" },
+        when: (last && last.receivedAt) || p.receivedAt || p.raisedAt || "", by: (last && last.receivedByName) || rptUserName(allUsers, p.receivedBy) || "", via: got ? "Received on a pending job" : "Pending job · part awaited" };
+    }),
+  ];
+  const out = rows.filter((r) => { const i = inv(r.code); return (i && i.isCritical) || !!r.ci; }).map((r) => {
+    const ci = r.ci || {};
+    const serials = ci.type === "serial" || Array.isArray(ci.serials) ? (ci.serials || []).filter(Boolean) : [];
+    // A serial-numbered part is recorded only when every unit has its serial.
+    const status = ci.notIssued ? "not_issued" : serials.length ? (r.qty > 0 && serials.length < r.qty ? "serial_partial" : "serial") : ci.type === "checkbox" ? (ci.confirmed ? "verified" : "unconfirmed") : "none";
+    return { ...r, serials, status, remark: ci.remark || "" };
+  });
+  // A part left out at BOM Outward is followed up later (pending job or
+  // Pending Stock): it prints once, with that later record's live status.
+  return out.filter((r) => !(r.src === "outward" && r.status === "not_issued" && out.some((o) => o !== r && o.code === r.code)));
+}
+const rptCriticalSummary = (rows) => {
+  const n = rows.length; if (!n) return "No critical items recorded for this machine.";
+  const missing = rows.filter((r) => r.status !== "serial" && r.status !== "verified").length;
+  const anySerial = rows.some((r) => r.status === "serial");
+  return missing === 0 ? `${n} critical item${n === 1 ? "" : "s"}, all ${anySerial ? "serials recorded" : "verified"}` : `${n} critical item${n === 1 ? "" : "s"} · ${missing} not yet recorded`;
+};
+
+// One department stage as a record block (customer and company reports).
+// `customer`: neutral wording; no delay reasons, ratings or internal team.
+// Customer copy: an unticked point never prints the worker's remark; it reads
+// "Fixed before dispatch" when its checklist follow-up job was completed.
+// The follow-up job for one point: "Checklist not completed (<stage>): <label>[ · Must do]" (exact label).
+const rptPointJob = (label, jobs = [], status = "resolved") => (jobs || []).some((p) => {
+  const m = /^Checklist not completed \([^)]*\): (.*?)(?: · Must do)?$/.exec(String(p.description || ""));
+  return m && m[1].trim() === (String(label || "").trim() || "item") && (status === "resolved" ? p.status === "resolved" : p.status !== "resolved");
+});
+const rptPointFixed = (label, jobs = []) => rptPointJob(label, jobs, "resolved");
+function RptDeptRecord({ r, customer = false, comments = [], users = [], certNo = "", jobs = [] }) {
+  const stateText = r.state === "done" ? "Completed" : r.state === "current" ? "In progress" : "Not started";
+  const timeText = r.actual || r.target ? `${rptDur(r.actual)}${r.target ? ` · target ${rptDur(r.target)}` : ""}` : "—";
+  const facts = [
+    ["In", rptFmtDT(r.inAt) || "—"],
+    ["Out", r.dept === "Ready" ? (r.state === "done" ? "Released" : "—") : (rptFmtDT(r.outAt) || "—")],
+    ...(customer ? [] : [["Time taken", r.dept === "Ready" ? "—" : timeText, r.over > 0]]),
+  ];
+  const sig = r.accepted && r.accepted.sig ? svgDataUri(r.accepted.sig) : "";
+  return (
+    <div className={`rpt-dept is-${r.state}`} data-report-dept={r.dept}>
+      <div className="rpt-dept-head">
+        <div className="rpt-dept-name">{r.dept === "Ready" ? "Final inspection · Ready" : r.dept}</div>
+        <span className={`rpt-dept-state ${r.state === "done" ? "mr-green" : r.state === "current" ? "mr-amber" : "mr-muted"}`}>{stateText}</span>
+      </div>
+      <div className="rpt-dept-scope">{RPT_DEPT_SCOPE[r.dept]}{r.dept === "Trial" && certNo ? ` See section ${certNo}.` : ""}</div>
+      <div className={`rpt-dept-grid${customer ? " is-3" : ""}`}>
+        {facts.map(([k, v, red]) => (
+          <div key={k} className="min-w-0"><div className="mr-label">{k}</div><div className={`rpt-dept-v rpt-nowrap ${red ? "mr-red" : ""}`}>{v}</div></div>
+        ))}
+        <div className="min-w-0 rpt-dept-acc" data-report-dept-accepted>
+          <div className="mr-label">Accepted by</div>
+          {r.accepted ? (
+            <div className="rpt-dept-accrow">
+              <div className="min-w-0"><div className="rpt-dept-v">{r.accepted.name || "—"}</div><div className="mr-label">{rptFmtDT(r.accepted.at)}</div></div>
+              {sig ? <div className="rpt-sigbox rpt-sigbox-sm"><img src={sig} alt={`Signature: ${r.accepted.name || r.dept}`} /></div> : null}
+            </div>
+          ) : <div className="rpt-dept-v mr-muted">{r.dept === "Assembly" ? "Started from BOM issue" : "—"}</div>}
+        </div>
+      </div>
+      {!customer && r.handedOver && (
+        <div className="mr-label rpt-dept-line">Handed over by <b>{r.handedOver.name || "—"}</b>{r.handedOver.team.length ? ` · team ${r.handedOver.team.join(", ")}` : ""}{r.rating ? ` · rating ${Number(r.rating.rating).toFixed(1)} / 5` : ""}</div>
+      )}
+      {r.notes.length > 0 && <div className="mr-label rpt-dept-line">{r.notes.map((h) => h.note).join(" · ")}</div>}
+      <div className="rpt-dept-checks" data-report-quality>
+        {r.checks.length === 0 ? <div className="mr-label">{r.state === "pending" ? "Checklists are recorded when this stage is worked." : "No checklist was set for this stage."}</div> : r.checks.map((cr) => {
+          const ans = cr.answers || [];
+          const fixed = (a) => customer && !a.checked && rptPointFixed(a.label, jobs);
+          const done = ans.filter((a) => a.checked || fixed(a)).length;
+          return (
+            <div key={cr.id} className="rpt-cl" data-report-dept-checklist={cr.stage || ""}>
+              <div className="rpt-cl-head">
+                <span className="font-semibold">{(RPT_CL_STAGES.find(([k]) => k === cr.stage) || [null, "Checklist"])[1]}</span>
+                <span className="mr-label"> · {cr.templateName || "Checklist"}{cr.submittedAt ? ` · ${rptFmtDT(cr.submittedAt)}` : ""}{!customer && rptUserName(users, cr.submittedBy) ? ` · ${rptUserName(users, cr.submittedBy)}` : ""}</span>
+                <span className={`rpt-cl-score ${done === ans.length ? "mr-green" : "mr-red"}`}>{done} of {ans.length} OK</span>
+              </div>
+              {ans.map((a, i) => {
+                const ok = a.checked || fixed(a);
+                const note = !customer ? (a.remark || "") : a.checked ? "OK" : ok ? "Fixed before dispatch" : rptPointJob(a.label, jobs, "open") ? "Follow-up in progress" : "Not ticked";
+                return (
+                  <div key={i} className="rpt-cl-row" data-report-point={a.checked ? "ok" : ok ? "fixed" : "open"}>
+                    <span className={`rpt-tick ${ok ? "is-ok" : "is-no"}`} aria-label={ok ? "OK" : "Not OK"}>{ok ? "✓" : "✗"}</span>
+                    <span className="min-w-0">{a.label}</span>
+                    <span className="mr-label min-w-0">{note}</span>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+      {comments.length > 0 && (
+        <div className="rpt-dept-comments" data-report-dept-comments={r.dept}>
+          <div className="mr-label font-semibold">{customer ? "Finishing work completed" : "Comments"}</div>
+          {comments.map((p) => (
+            <div key={p.id} className="rpt-cl-row" data-report-comment={p.status === "resolved" ? "done" : "open"}>
+              <span className={`rpt-tick ${p.status === "resolved" ? "is-ok" : "is-no"}`}>{p.status === "resolved" ? "✓" : "○"}</span>
+              <span className="min-w-0">{p.description}</span>
+              <span className="mr-label min-w-0">{p.status === "resolved" ? `${rptFmtD(p.resolvedAt)}${p.resolutionNotes ? ` · ${p.resolutionNotes}` : ""}` : "Open"}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // The common A4 frame: running header (repeats on every printed page),
 // letterhead, title block, and the closing footnote.
 function ReportSheet({ kind, settings = {}, title, subtitle = "", refText = "", generatedBy = "", children }) {
@@ -15600,9 +15831,9 @@ function ReportSheet({ kind, settings = {}, title, subtitle = "", refText = "", 
   const internal = kind !== "customer";
   return (
     <div className={`mr-doc rpt-doc rpt-${kind}`} data-report-kind={kind}>
-      <RptPageStyle page={page} head={`${company.name || "Shantaz Technofoods"} · ${title}`} refText={refText} foot={internal ? `${title} · internal` : title} />
+      <RptPageStyle page={page} head={`${company.name || RPT_LEGAL_NAME} · ${title}`} refText={refText} foot={internal ? `${title} · internal` : title} />
       <table className="mr-frame">
-        <thead><tr><td><div className="mr-runhead"><span>{company.name || "Shantaz Technofoods"} · {title}</span><span className="mr-mono">{refText}</span></div></td></tr></thead>
+        <thead><tr><td><div className="mr-runhead"><span>{company.name || RPT_LEGAL_NAME} · {title}</span><span className="mr-mono">{refText}</span></div></td></tr></thead>
         <tbody><tr><td>
           <div data-report-header className="rpt-header">
             <RptLetterhead company={company} />
@@ -15634,31 +15865,33 @@ const RptSec = ({ n, title, count, extra, children, cls = "", attr = {} }) => (
 // No employee names, delays, holds, ratings, internal remarks or pending
 // jobs. Dates per stage, quality checks as passed-point summaries, the trial
 // certificate, the files marked "show customer", and a sign-off block.
-function CustomerMachineReport({ machineId, machineLog = [], bomDefs = {}, handovers = [], checklistResponses = [], attachments = [], settings = {}, generatedBy = "" }) {
+function CustomerMachineReport({ machineId, machineLog = [], bomDefs = {}, handovers = [], checklistResponses = [], attachments = [], settings = {}, generatedBy = "",
+  // 2026-11-04 (reports v2) — critical items with serials and completed comments.
+  pendingHandoverItems = [], outwardLog = [], auditLog = [], items = {}, allUsers = [] }) {
   const machine = (machineLog || []).find((m) => String(m.id) === String(machineId)) || null;
   if (!machine) return <p className="mr-empty">Pick a machine to see its customer report.</p>;
   const bom = bomDefs[machine.bomKey] || {};
   const isReady = machine.status === "completed";
-  const hops = (handovers || []).filter((h) => String(h.machineId) === String(machine.id) && h.status === "accepted")
-    .slice().sort((a, b) => String(a.acceptedAt || "").localeCompare(String(b.acceptedAt || "")));
-  const STAGES = ["Assembly", "Mechanical", "Electrical", "Trial", "Ready"];
   const cur = isReady ? "Ready" : (machine.currentDepartment || machine.stage);
-  const curIdx = STAGES.indexOf(cur);
-  const startOf = (d) => d === "Assembly" ? machine.createdDate : d === "Ready" ? machine.completedDate : (hops.find((h) => h.toDepartment === d) || {}).acceptedAt;
-  const endOf   = (d) => d === "Ready" ? machine.completedDate : (hops.find((h) => h.fromDepartment === d) || {}).acceptedAt;
-  const stateOf = (i) => isReady || i < curIdx ? "done" : i === curIdx ? "current" : "pending";
-  const checks = (checklistResponses || []).filter((cr) => String(cr.machineId) === String(machine.id));
-  const byDept = STAGES.slice(0, 4).map((d) => {
-    const list = checks.filter((cr) => cr.department === d);
-    const ans = list.flatMap((cr) => cr.answers || []);
-    return { d, n: list.length, total: ans.length, passed: ans.filter((a) => a.checked).length };
-  }).filter((r) => r.n > 0);
+  // 2026-11-04 (reports v2) — one record per department stage: what was done,
+  // in / out, time taken vs target, who accepted (name + signature) and every
+  // checklist point (before receive / during work / before dispatch) with its
+  // remark. Neutral wording: no delay reasons, holds, ratings or worker team.
+  const records = rptDeptRecords(machine, handovers, checklistResponses);
+  const machinePending = (pendingHandoverItems || []).filter((p) => String(p.machineId) === String(machine.id));
+  const commentGroups = rptCommentGroups(machinePending, { completedOnly: true, by: "done" });
+  const commentsOf = (d) => ((commentGroups.find((g) => g.dept === d) || {}).rows || []);
+  const otherComments = commentGroups.filter((g) => !RPT_STAGE_DEPTS.includes(g.dept)).flatMap((g) => g.rows);
+  const critical = rptCriticalItems({ machine, outwardLog, auditLog, items, pendingItems: machinePending, allUsers });
+  const critSummary = rptCriticalSummary(critical);
   const docs = (attachments || []).filter((a) => String(a.machineId) === String(machine.id) && a.isCustomerVisible && a.kind !== "audio");
   const cert = machine.trialCertificate || null;
   const ref = `CR-${machine.bomKey}-${machine.serialNo || machine.id}`;
   const buildDays = (() => { const a = rptMs(machine.createdDate); const b = machine.completedDate ? rptMs(machine.completedDate) : null; return a != null && b != null && b >= a ? Math.max(1, Math.round((b - a) / 86400000)) : null; })();
   const certSigs = trialCertSignatureRows(machine, handovers);
-  const companyName = rptCompany(settings).name || "Shantaz Technofoods";
+  const companyName = rptCompany(settings).name || RPT_LEGAL_NAME;
+  const points = records.reduce((s, r) => s + r.points, 0);
+  const passed = records.reduce((s, r) => s + r.checks.flatMap((cr) => cr.answers || []).filter((a) => a.checked || rptPointFixed(a.label, machinePending)).length, 0);
   return (
     <ReportSheet kind="customer" settings={settings} title="Customer machine report" refText={ref} generatedBy={generatedBy}>
       {/* 2026-11-03 — no photo set: no empty grey box, the facts take the width. */}
@@ -15677,28 +15910,35 @@ function CustomerMachineReport({ machineId, machineLog = [], bomDefs = {}, hando
           <div className={`mr-stamp rpt-stamp ${isReady ? "is-done" : "is-progress"}`} data-report-status>{isReady ? "Ready for dispatch" : `In production · ${cur}`}</div>
         </div>
       </div>
-      <RptSec n="01" title="Build journey" attr={{ "data-report-journey": "" }}>
-        {/* 2026-11-04 — the stage strip repeated this table's dates; the table alone carries them. */}
-        <div className="mr-table">
-          <div className="mr-tr mr-th" style={{ gridTemplateColumns: "1.4fr 1.2fr 1.2fr 1fr" }}><div>Stage</div><div>Started</div><div>Completed</div><div>Status</div></div>
-          {STAGES.map((d, i) => { const st = stateOf(i); return (
-            <div key={d} className="mr-tr" style={{ gridTemplateColumns: "1.4fr 1.2fr 1.2fr 1fr" }}>
-              <div className="mr-td font-semibold" data-l="Stage">{d === "Ready" ? "Final inspection · Ready" : d}</div>
-              <div className="mr-td" data-l="Started">{st === "pending" ? "—" : rptFmtD(startOf(d)) || "—"}</div>
-              <div className="mr-td" data-l="Completed">{st === "done" ? rptFmtD(endOf(d)) || "Done" : "—"}</div>
-              <div className="mr-td" data-l="Status"><span className={st === "done" ? "mr-green" : st === "current" ? "mr-amber" : "mr-muted"}>{st === "done" ? "Completed" : st === "current" ? "In progress" : "Upcoming"}</span></div>
-            </div>); })}
-        </div>
+      <div className="mr-summary rpt-summary-4" data-report-glance>
+        {[{ k: "Stages completed", v: `${records.filter((r) => r.state === "done").length} of ${records.length}` },
+          { k: "Check points OK", v: points ? `${passed} of ${points}` : "—" },
+          { k: "Critical items", v: critical.length },
+          { k: "Finishing work done", v: commentGroups.reduce((s, g) => s + g.rows.length, 0) }]
+          .map((g) => <div key={g.k} className="mr-sum"><div className="mr-sum-v">{g.v}</div><div className="mr-label">{g.k}</div></div>)}
+      </div>
+      <RptSec n="01" title="Stage-by-stage record" count={`${records.length} stages`} attr={{ "data-report-journey": "" }}>
+        {records.map((r) => <RptDeptRecord key={r.dept} r={r} customer comments={commentsOf(r.dept)} users={allUsers} certNo="04" jobs={machinePending} />)}
+        {otherComments.length > 0 && (
+          <div className="rpt-dept-comments" data-report-dept-comments="Other">
+            <div className="mr-label font-semibold">Other finishing work completed</div>
+            {otherComments.map((p) => (
+              <div key={p.id} className="rpt-cl-row" data-report-comment="done"><span className="rpt-tick is-ok">✓</span><span className="min-w-0">{p.description}</span><span className="mr-label min-w-0">{rptFmtD(p.resolvedAt)}{p.resolutionNotes ? ` · ${p.resolutionNotes}` : ""}</span></div>
+            ))}
+          </div>
+        )}
       </RptSec>
-      <RptSec n="02" title="Quality checks" attr={{ "data-report-quality": "" }}>
-        {byDept.length === 0 ? <p className="mr-empty">Quality checks are recorded at every stage as the machine moves forward.</p> : (
+      <RptSec n="02" title="Critical components" count={critical.length || null} attr={{ "data-report-critical": "" }}
+              extra={critical.length ? <span className={`mr-count-strong ${/not yet/.test(critSummary) ? "mr-amber" : "mr-green"}`} data-report-critical-summary>{critSummary}</span> : null}>
+        {critical.length === 0 ? <p className="mr-empty">No critical components are listed for this machine.</p> : (
           <div className="mr-table">
-            <div className="mr-tr mr-th" style={{ gridTemplateColumns: "1.4fr 1fr 2fr" }}><div>Stage</div><div>Inspections</div><div>Result</div></div>
-            {byDept.map((r) => (
-              <div key={r.d} className="mr-tr" style={{ gridTemplateColumns: "1.4fr 1fr 2fr" }}>
-                <div className="mr-td font-semibold" data-l="Stage">{r.d}</div>
-                <div className="mr-td" data-l="Inspections">{r.n}</div>
-                <div className="mr-td" data-l="Result"><span className={r.passed === r.total ? "mr-green" : ""}>{r.passed === r.total ? `✓ All ${r.total} check points passed` : `${r.passed} of ${r.total} check points verified`}</span></div>
+            <div className="mr-tr mr-th" style={{ gridTemplateColumns: "2.4fr 0.6fr 3fr 1.3fr" }}><div>Component</div><div className="text-right">Qty</div><div>Serial numbers</div><div>Verified</div></div>
+            {critical.map((c, i) => (
+              <div key={`${c.code}-${i}`} className="mr-tr" data-report-critical-row={c.code} style={{ gridTemplateColumns: "2.4fr 0.6fr 3fr 1.3fr" }}>
+                <div className="mr-td" data-l="Component"><div><div className="font-semibold">{c.name || c.code}</div><div className="mr-label mr-mono">{c.code}</div></div></div>
+                <div className="mr-td mr-mono md:text-right" data-l="Qty">{c.qty}</div>
+                <div className="mr-td" data-l="Serial numbers">{c.serials.length ? <div><span className="mr-mono">{c.serials.join(", ")}</span>{c.status === "serial_partial" ? <div className="mr-amber mr-small">{c.serials.length} of {c.qty} serials recorded</div> : null}</div> : c.status === "verified" ? "Checked · no serial number" : c.status === "not_issued" ? <span className="mr-amber">To be fitted</span> : <span className="mr-muted">—</span>}</div>
+                <div className="mr-td" data-l="Verified">{c.status === "serial" || c.status === "verified" ? <span className="mr-green">✓ {rptFmtD(c.when) || "Yes"}</span> : <span className="mr-muted">Pending</span>}</div>
               </div>
             ))}
           </div>
@@ -15723,7 +15963,7 @@ function CustomerMachineReport({ machineId, machineLog = [], bomDefs = {}, hando
               : <p className="mr-empty">The machine is run under load at Trial; its certificate is added here when the trial is complete.</p>}
       </RptSec>
       <RptSec n="05" title="Final sign-off" cls="rpt-signoff-sec" attr={{ "data-report-customer-signoff": "" }}>
-        <p className="mr-small" style={{ marginBottom: 14 }}>We certify that the machine described above, serial no. <b className="mr-mono">{machine.serialNo || "—"}</b>, was built to its approved bill of materials, inspected at every stage and {cert ? "run on trial before release" : "will be run on trial before release"}.</p>
+        <p className="mr-small" style={{ marginBottom: 14 }}>We certify that the machine described above, serial no. <b className="mr-mono">{machine.serialNo || "—"}</b>, was built to its approved bill of materials, inspected at every stage{critical.length ? ", with its critical components recorded," : ""} and {cert ? "run on trial before release" : "will be run on trial before release"}.</p>
         {/* 2026-11-04 — the Trial signatures already captured print here with
             name, department and date; only the lines still to sign stay blank. */}
         <RptSignatureRegister rows={certSigs} />
@@ -15884,6 +16124,7 @@ function ReportCenterPage({
     { id: "owner",      label: "Owner summary",   hint: "performance at a glance" },
     { id: "department", label: "Department-wise", hint: "per department" },
     { id: "stuck",      label: "Where it sticks", hint: "delays, holds, pending" },
+    { id: "comments",   label: "Comments and work jobs", hint: "department-wise, with completion" },
     { id: "machine",    label: "Machine journey", hint: "BOM to Ready, one machine" },
     { id: "monthly",    label: "Monthly",         hint: "month by month" },
     { id: "customer",   label: "Customer",        hint: "progress PDF to send" },
@@ -16002,6 +16243,20 @@ function ReportCenterPage({
       };
     });
 
+  // 2026-11-04 (reports v2) — 💬 comments raised per department in the period
+  // (Report Center date filter), with who raised / completed them and the remark.
+  const commentRows = filteredPending.filter(rptIsComment)
+    .slice().sort((a, b) => { const o = (d) => { const i = RPT_STAGE_DEPTS.indexOf(d); return i < 0 ? 50 : i; };
+      return o(a.raisedInDepartment) - o(b.raisedInDepartment) || String(a.raisedAt || "").localeCompare(String(b.raisedAt || "")); })
+    .map((p) => {
+      const m = (machineLog || []).find((mm) => String(mm.id) === String(p.machineId));
+      return {
+        Department: p.raisedInDepartment || "Unassigned", Machine: m?.bomKey || "", Serial: m?.serialNo || "",
+        Comment: p.description, RaisedBy: rptUserName(allUsers, p.raisedBy), RaisedAt: p.raisedAt || "",
+        AssignedTo: p.assignedDepartment || "", CompletedBy: rptUserName(allUsers, p.resolvedBy), CompletedAt: p.resolvedAt || "",
+        CompletionRemark: p.resolutionNotes || "", Status: p.status === "resolved" ? "Completed" : "Open",
+      };
+    });
   const pendingRows = filteredPending.map((p) => {
     const m = (machineLog || []).find((mm) => mm.id === p.machineId);
     const who = (id) => { if (!id) return ""; const u = (allUsers || []).find((x) => x.id === id); return u ? (u.fullName || u.username || id) : id; };
@@ -16176,6 +16431,7 @@ function ReportCenterPage({
     delay:          { rows: delayRows,    file: "shantaz-delay-report" },
     hold:           { rows: holdRows,     file: "shantaz-hold-report"  },
     pending:        { rows: pendingRows,  file: "shantaz-pending-report" },
+    comments:       { rows: commentRows,  file: "shantaz-comments-by-department" },
     rating:         { rows: ratingRows,   file: "shantaz-rating-report" },
     machineHistory: { rows: machineHistoryRows, file: "shantaz-machine-history" },
     factory:        { rows: factoryRows,  file: "shantaz-factory-internal" },
@@ -16222,7 +16478,7 @@ function ReportCenterPage({
             title, date range and print date once. Not on the Machine journey
             tab: that report carries its own letterhead (it printed twice, with
             an empty first page). */}
-        {tab !== "machine" && <RptPageStyle page="rc-report" head={`${rptCompany(settings).name || "Shantaz Technofoods"} · ${(tabs.find((t) => t.id === tab) || {}).label || ""} ${String(T("Report")).toLowerCase()}`} foot={`${(tabs.find((t) => t.id === tab) || {}).label || ""} ${String(T("Report")).toLowerCase()}`} />}
+        {tab !== "machine" && <RptPageStyle page="rc-report" head={`${rptCompany(settings).name || RPT_LEGAL_NAME} · ${(tabs.find((t) => t.id === tab) || {}).label || ""} ${String(T("Report")).toLowerCase()}`} foot={`${(tabs.find((t) => t.id === tab) || {}).label || ""} ${String(T("Report")).toLowerCase()}`} />}
         {tab !== "machine" && (
           <div className="hidden print:block rpt-doc rpt-rc-head" data-report-center-head>
             <RptLetterhead company={rptCompany(settings)} showLogo={rc.showLogo !== false} line={rc.companyLine || ""} />
@@ -16339,7 +16595,7 @@ function ReportCenterPage({
               <ReportKPI label={T("Total machines")} value={summary.total} color="#2E50D6" />
               <ReportKPI label={T("Active")} value={summary.active} color="#D97706" />
               <ReportKPI label={T("Completed")} value={summary.completed} color="#22c55e" />
-              <ReportKPI label={T("Avg rating")} value={summary.avgRating ?? "—"} color="#eab308" suffix={summary.avgRating ? "★" : ""} />
+              <ReportKPI label={T("Avg rating")} value={summary.avgRating ?? "—"} color="#eab308" suffix={summary.avgRating ? " / 5" : ""} />
               <ReportKPI label={T("Delayed handovers")} value={summary.delayedHandovers} color="#ef4444" />
               <ReportKPI label={T("Held handovers")} value={summary.heldHandovers} color="#ef4444" />
               <ReportKPI label={T("Open pending items")} value={summary.openPending} color="#D97706" />
@@ -16363,6 +16619,20 @@ function ReportCenterPage({
             <ReportTable title={T("Department ratings")} rows={ratingRows} t={T} users={allUsers} />
           </div>
         )}
+
+        {tab === "comments" && (() => {
+          const depts = [...new Set(commentRows.map((r) => r.Department))];
+          return (
+            <div className="space-y-5" data-report-center-comments>
+              <div className="text-[12px] text-slate-600">{commentRows.length} comment{commentRows.length === 1 ? "" : "s"} and work jobs · {commentRows.filter((r) => r.Status === "Completed").length} completed · grouped by the department that raised them<span className="no-print"> · use From / To for the period</span>.</div>
+              {depts.length === 0 && <ReportTable title={T("Comments")} rows={[]} t={T} users={allUsers} />}
+              {depts.map((d) => {
+                const rows = commentRows.filter((r) => r.Department === d).map(({ Department, ...rest }) => rest);
+                return <div key={d} data-report-center-comments-dept={d}><ReportTable title={`Comments raised in ${d}`} rows={rows} t={T} users={allUsers} /></div>;
+              })}
+            </div>
+          );
+        })()}
 
         {tab === "machine" && isAdminUser && (() => {
           // Picker candidates: honour the shared Machine / dept / date filters
@@ -16517,7 +16787,7 @@ function DepartmentScoreboard({ rows = [], openIssues = [], waitingNow = [] }) {
                     {issues || "—"}
                   </td>
                   <td className="px-3 py-2 text-[11px] text-right font-bold text-yellow-600" style={{ letterSpacing: "0.06em" }}>
-                    {r.avgRating === null ? "—" : `${formatRatingBadge(r.avgRating)} ${r.avgRating}`}
+                    {r.avgRating === null ? "—" : `${Number(r.avgRating).toFixed(1)} / 5`}
                   </td>
                 </tr>
               );
@@ -17085,7 +17355,7 @@ const TC_SHEET_CSS = [
   ".tc-signame{margin-top:1mm;min-height:4mm;font-size:10.5px}",
   ".tc-foot{position:absolute;left:13mm;right:13mm;bottom:6mm;display:flex;justify-content:space-between;gap:4mm;border-top:1px solid #d1d5db;padding-top:1.5mm;font-size:8.5px;color:#6b7280}",
   // 2026-11-04 — letterhead on the stand-alone certificate; the slimmer embedded form.
-  ".tc-lh{text-align:center;padding-bottom:2.5mm;margin-bottom:3mm;border-bottom:.6px solid #9ca3af}",
+  ".tc-lh{text-align:center;padding-bottom:2.5mm;margin-bottom:3mm;border-bottom:2.2pt double #8a8a8a}",
   ".tc-lh-logo{display:block;margin:0 auto 1.2mm;height:12mm;width:auto;max-width:56mm;object-fit:contain}",
   // With the letterhead on top the sheet still fits one A4 page.
   ".tc-has-lh th,.tc-has-lh td{padding:.42mm 1.8mm}",
@@ -17093,7 +17363,7 @@ const TC_SHEET_CSS = [
   ".tc-has-lh .tc-title{font-size:16px;margin-bottom:2mm}",
   ".tc-has-lh .tc-rule{margin-bottom:3mm}",
   ".tc-has-lh .tc-sigs{margin-top:4mm}",
-  ".tc-lh-name{font-size:14px;font-weight:700;letter-spacing:.02em}",
+  ".tc-lh-name{font-size:14px;font-weight:700;letter-spacing:.09em;text-transform:uppercase}",
   ".tc-lh-line{font-size:9px;color:#4b5563;margin-top:.6mm}",
   ".tc-head.tc-head-1{grid-template-columns:1fr 1fr}",
   ".tc-embedded .tc-sec:first-of-type{margin-top:2mm}",
@@ -17249,7 +17519,7 @@ function TrialCertificateSheet({ machine, cert, remarks = "", embedded = false, 
       {!embedded && company && (
         <div className="tc-lh">
           {company.logo && <img src={company.logo} alt="" className="tc-lh-logo" />}
-          <div className="tc-lh-name">{company.name || "Shantaz Technofoods"}</div>
+          <div className="tc-lh-name">{company.name || RPT_LEGAL_NAME}</div>
           {[company.address, [company.gst ? `GSTIN ${company.gst}` : "", company.phone ? `Phone ${company.phone}` : "", company.email || ""].filter(Boolean).join("  ·  ")].filter(Boolean).map((l, i) => <div key={i} className="tc-lh-line">{l}</div>)}
         </div>
       )}
@@ -17355,7 +17625,7 @@ function TrialCertificateSheet({ machine, cert, remarks = "", embedded = false, 
         <div className="tc-sigs">
           <TcSheetSig title="Machine Set and Trial By" name={c.trialByName} sig={c.trialBySignature} date={rptFmtD(c.updatedAt || c.trialDate)} />
           <TcSheetSig title="Check By Service Engineer" name={c.checkByName} sig={c.checkBySignature} date={rptFmtD(c.updatedAt || c.trialDate)} />
-          <TcSheetSig title="SHANTA G TECHNOFOODS LLP" showName={false} />
+          <TcSheetSig title={`For ${(company && String(company.name || "").trim()) || RPT_LEGAL_NAME}`} showName={false} />
         </div>
       )}
 
@@ -17976,11 +18246,12 @@ function JobHistory({ item, users = [], compact = false, reportDates = false }) 
             <div className="min-w-0">
               <span className="font-bold" style={{ color: tone[e.kind] }}>{e.label}</span>
               {meta && <span className="text-slate-500"> · {meta}</span>}
-              <div className="text-slate-700">
+              {/* 2026-11-04 (reports v2) — in a printed report an empty reason is left out (comments have none). */}
+              {!(reportDates && e.kind === "reported" && !e.text) && <div className="text-slate-700">
                 {e.text
                   ? <><span className="text-slate-500">{textLabel[e.kind]}: </span>{e.text}</>
                   : <span className="text-slate-400 italic">no {textLabel[e.kind].toLowerCase()} given</span>}
-              </div>
+              </div>}
               {rcBits.length > 0 && <div data-receipt-detail className="text-slate-600">{rcBits.join(" · ")}</div>}
             </div>
           </li>
@@ -22417,7 +22688,8 @@ function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, o
             <div className="flex-1 overflow-y-auto p-2 sm:p-6" onClick={(e) => e.target === e.currentTarget && closeReports()}>
               <div className="mt-report-sheet mx-auto w-full max-w-4xl rounded-xl p-4 sm:p-8" style={{ background: "#fff", boxShadow: "0 24px 60px rgba(17,24,39,0.25)" }}>
                 {reportDoc.kind === "customer" && <CustomerMachineReport machineId={reportDoc.machineId} machineLog={machineLog} bomDefs={bomDefs} handovers={handovers}
-                                                     checklistResponses={checklistResponses} attachments={attachments} settings={settings} generatedBy={by} />}
+                                                     checklistResponses={checklistResponses} attachments={attachments} settings={settings} generatedBy={by}
+                                                     pendingHandoverItems={pendingHandoverItems} outwardLog={outwardLog} auditLog={auditLog} items={items} allUsers={allUsers} />}
                 {reportDoc.kind === "company" && <AtoZMachineReport machineId={reportDoc.machineId} machineLog={machineLog} bomDefs={bomDefs} handovers={handovers}
                                                      pendingHandoverItems={pendingHandoverItems} deptRatings={deptRatings} checklistResponses={checklistResponses}
                                                      outwardLog={outwardLog} items={items} attachments={attachments} settings={settings}
@@ -24459,7 +24731,7 @@ function hrExportPDF(title, rows, cols, company = {}) {
     return esc(v);
   };
   const co = company || {};
-  const name = co.name || "Shantaz Technofoods";
+  const name = co.name || RPT_LEGAL_NAME;
   const contact = [co.gst ? `GSTIN ${co.gst}` : "", co.phone ? `Phone ${co.phone}` : "", co.email || "", co.website || ""].filter(Boolean).join("  ·  ");
   const hdr  = cols.map((c) => `<th>${esc(c.label)}</th>`).join("");
   const body = rows.map((r) => `<tr>${cols.map((c) => `<td>${cell(r[c.key])}</td>`).join("")}</tr>`).join("");
@@ -24470,9 +24742,9 @@ function hrExportPDF(title, rows, cols, company = {}) {
     <style>
     *{box-sizing:border-box}
     body{font-family:Inter,'Segoe UI',Arial,sans-serif;font-size:10.5px;color:#111;margin:24px;font-variant-numeric:tabular-nums}
-    .lh{text-align:center;padding-bottom:10px;border-bottom:.75px solid #9a9a9a}
+    .lh{text-align:center;padding-bottom:10px;border-bottom:2.5px double #8a8a8a}
     .lh img{display:block;margin:0 auto 6px;height:56px;width:auto;max-width:220px;object-fit:contain}
-    .lh .n{font-size:17px;font-weight:700;letter-spacing:.01em}
+    .lh .n{font-size:17px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
     .lh .l{font-size:9.5px;color:#555;margin-top:2px}
     .tb{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin:14px 0 10px}
     h2{font-size:15px;font-weight:700;margin:0}
