@@ -10,6 +10,7 @@ import { getCurrSymbol } from "../../shared/format.js";
 import { SETTINGS_DEFAULTS } from "../../shared/settingsDefaults.js";
 import { Btn } from "../../shared/ui/primitives.jsx";
 import { Topbar } from "../../shared/ui/Topbar.jsx";
+import { ProductionLinePanel } from "./ProductionLinePanel.jsx";
 
 // ─── REEL-INSPIRED ANIMATIONS: count-up + sparkline ──────────────────────────
 // Animate an integer from 0 → target with an ease-out curve. Non-numeric values
@@ -51,7 +52,10 @@ export function CountUpValue({ value, className, style }) {
 
 // ─── DASHBOARD PAGE ───────────────────────────────────────────────────────────
 
-export function DashboardPage({ items = {}, pos = [], vendorList = [], machineLog = [], pendingLog = [], followUps = [], handovers = [], pendingHandoverItems = [], onNavigate, settings = SETTINGS_DEFAULTS, canView = null }) {
+export function DashboardPage({ items = {}, pos = [], vendorList = [], machineLog = [], pendingLog = [], followUps = [], handovers = [], pendingHandoverItems = [], onNavigate, settings = SETTINGS_DEFAULTS, canView = null,
+  // 2026-11-05 — opens Machine Tracker on one of its filters ("active",
+  // "onRack", "completed", "hold"); falls back to plain navigation.
+  onOpenMachines = null }) {
   // 2026-11-04 — a login that may not open a page (e.g. a Production Head and
   // Order Pipeline) used to get buttons that silently did nothing.
   const canOpen = (id) => typeof canView !== "function" || canView(id);
@@ -173,6 +177,13 @@ export function DashboardPage({ items = {}, pos = [], vendorList = [], machineLo
       </Topbar>
 
       <div className="p-6 space-y-6">
+
+        {/* ── 2026-11-05 Production line today — only for logins that may open
+             Machine Tracker (same gate as its nav item: canView("machines")). ── */}
+        {typeof canView === "function" && canView("machines") && (
+          <ProductionLinePanel machines={machineLog} handovers={handovers} settings={settings}
+            onOpenMachines={(filter) => (onOpenMachines ? onOpenMachines(filter) : onNavigate?.("machines"))} />
+        )}
 
         {/* ── KPI tiles: ONE anatomy for all nine (icon · status, number, label, sub).
              The number is always ink; meaning is a dot + one word, never a coloured number. ── */}
