@@ -30,6 +30,52 @@ import { DISPLAY_STAGES, DISPLAY_STAGE_COLORS, MACHINE_STAGES, STAGE_COLORS, dis
 import { SignaturePad } from "../../shared/ui/SignaturePad.jsx";
 import { Topbar } from "../../shared/ui/Topbar.jsx";
 import { VoiceNoteLine, VoiceNoteRecorder, VoicePlayButton } from "../../shared/voice/VoiceNote.jsx";
+import Count from "../../shared/ui/Count.jsx";
+import { toast as sonnerToast } from "../../shared/ui/toast.js";
+import { useMtMotion, leftToDoText } from "./mtMotion.js";
+import "./mtMotion.css";
+
+// Staff view building blocks (phone first). Defined once at module level so a
+// re-render (the 60 s timer tick, a toast, a dialog opening) updates the cards
+// in place instead of re-creating them — the cards no longer re-play their
+// entrance and the counts can roll. Same markup as before; `mid` (machine id)
+// lets the motion layer follow a card from one section to the next.
+function StaffSection({ title, count, hint, children }) {
+  return (
+    <div className="wu-section" data-staff-section={title}>
+      <div className="wu-section-head">
+        <h2 className="wu-section-title">{title}</h2>
+        <span className={`wu-count${count ? " is-on" : ""}`} aria-label={`${count} machines`}><Count value={count} aria-hidden="true" /></span>
+        {hint && <span className="wu-section-hint">{hint}</span>}
+      </div>
+      {children}
+    </div>
+  );
+}
+// Empty state: a small line drawing + one line saying what happens next.
+function StaffEmpty({ text }) {
+  return (
+    <div className="wu-empty">
+      <svg viewBox="0 0 64 48" width="56" height="42" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round">
+        <path d="M8 18l24-10 24 10-24 10z" /><path d="M8 18v16l24 10 24-10V18" /><path d="M32 28v16" />
+      </svg>
+      <span>{text}</span>
+    </div>
+  );
+}
+function StaffCard({ children, tone, mid }) {
+  return <div className="mt-card no-lift wu-card" data-tone={tone || undefined} data-mt-mid={mid != null ? mid : undefined}>{children}</div>;
+}
+// The grey Confirm button says what is still missing, in words (display only).
+function LeftToDo({ text, ...rest }) {
+  if (!text) return null;
+  return (
+    <div className="mt-left" role="status" {...rest}>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+      <span>{text}</span>
+    </div>
+  );
+}
 
 export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = null, onUpdateTrialCertificate = null, canView = () => true, onUpdateStage, onNavigate = () => {}, canDo = () => true, bomDefs = {}, onStartProduction, onRemoveRackMachine, onUpdateBOM,
   // 2026-10-30 — the BOM Outward section (an embedded OutwardPage), or null
@@ -163,6 +209,10 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
   };
 
   const [toast,    setToast]    = useState(null);
+  // Phase 1 motion (visual only): cards glide between sections, the route
+  // pill slides, closing sheets animate out. See ./mtMotion.js.
+  const mtRootRef = useRef(null);
+  useMtMotion(mtRootRef);
   const [issuePopup, setIssuePopup] = useState(null); // pendingHandoverItem for the detail popup
   const [startProd, setStartProd] = useState(null); // rack object { key, label, ready, capacity }
   const [startSel,  setStartSel]  = useState(() => new Set()); // selected rack-machine ids
@@ -400,10 +450,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
       }
       setTrialCertModal(null);
       celebrate("Sent");   // world UI: success moment (visual only)
-      showToast(
-        `${machine.bomKey} → Ready`,
-        "Trial Certificate saved. Awaiting Ready acceptance."
-      );
+      sonnerToast.success(`${machine.bomKey} sent to Ready`, { description: `${machine.serialNo ? `S/N ${machine.serialNo} · ` : ""}Trial Certificate saved. Awaiting Ready acceptance.` });
     } finally {
       setTransferBusy(false);
     }
@@ -470,8 +517,9 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
       setFinishModal(null);
       celebrate("Sent");   // world UI: success moment (visual only)
       const backToRack = !!machine.rackSlot && fromDepartment === "Assembly" && isRackReleaseHop(fromDepartment, toDepartment);
-      showToast(backToRack ? `${machine.bomKey}${machine.serialNo ? ` — ${machine.serialNo}` : ""} · Assembled · Ready` : `${machine.bomKey} → ${toDepartment}`,
-        backToRack ? `Back on ${slotLabel(machine.rackSlot)} — an admin sends it to ${toDepartment} from the Rack View` : (overrunMinutes > 0 ? `Awaiting accept · Overrun ${formatDuration(overrunMinutes)}` : "Awaiting accept"));
+      sonnerToast.success(backToRack ? `${machine.bomKey}${machine.serialNo ? ` — ${machine.serialNo}` : ""} · Assembled · Ready` : `${machine.bomKey} sent to ${toDepartment}`,
+        { description: backToRack ? `Back on ${slotLabel(machine.rackSlot)} — an admin sends it to ${toDepartment} from the Rack View`
+          : `${machine.serialNo ? `S/N ${machine.serialNo} · ` : ""}${overrunMinutes > 0 ? `Awaiting accept · Overrun ${formatDuration(overrunMinutes)}` : "Awaiting accept"}` });
     } finally {
       setTransferBusy(false);
     }
@@ -573,9 +621,9 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
       return;
     }
     setAcceptModal(null);
-    celebrate(handover.toDepartment === "Ready" ? "Ready" : "Accepted");   // world UI: success moment (visual only)
-    showToast(`Accepted into ${handover.toDepartment}`,
-      `${handover.bomKey}${handover.serialNo ? ` · S/N ${handover.serialNo}` : ""}${pendingItemsToRaise.length ? ` · ${pendingItemsToRaise.length} pending item${pendingItemsToRaise.length === 1 ? "" : "s"} raised` : ""}`);
+    celebrate(handover.toDepartment === "Ready" ? "Ready" : "Accepted", { big: handover.toDepartment === "Ready" });   // world UI: success moment (visual only; confetti only for Ready)
+    sonnerToast.success(`${handover.bomKey} accepted`,
+      { description: `Accepted into ${handover.toDepartment}${handover.serialNo ? ` · S/N ${handover.serialNo}` : ""}${pendingItemsToRaise.length ? ` · ${pendingItemsToRaise.length} pending item${pendingItemsToRaise.length === 1 ? "" : "s"} raised` : ""}` });
   };
 
   // ── Phase 1 — My Work ──────────────────────────────────────────────────
@@ -1283,7 +1331,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
   return (
     /* mt-premium (2026-10-31): cream/ivory surfaces and gold hairlines scoped
        to this page only — the rest of the ERP keeps its standard white. */
-    <div className="flex-1 overflow-y-auto mt-premium">
+    <div className="flex-1 overflow-y-auto mt-premium" ref={mtRootRef}>
 
       {/* Arrival alert banner (staff only) — tap to go to that machine's card. */}
       {staffMode && arrival && (
@@ -1466,28 +1514,10 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
           const sentOn     = startedAll.filter((m) => { if (m.status === "completed") return false; const h = machineHandover(m); return h && myDepartments.includes(h.fromDepartment) && !myDepartments.includes(h.toDepartment); });
           const myJobs     = (pendingHandoverItems || []).filter((p) => pendingItemIsOpen(p) && myDepartments.includes(p.assignedDepartment));
           const awaitingRelease = startedAll.filter((m) => { const h = machineHandover(m); return !!(h && isAwaitingRelease(h)); });
-          const Section = ({ title, count, hint, children }) => (
-            <div className="wu-section" data-staff-section={title}>
-              <div className="wu-section-head">
-                <h2 className="wu-section-title">{title}</h2>
-                <span className={`wu-count${count ? " is-on" : ""}`} aria-label={`${count} machines`}>{count}</span>
-                {hint && <span className="wu-section-hint">{hint}</span>}
-              </div>
-              {children}
-            </div>
-          );
-          // Empty state: a small line drawing + one line saying what happens next.
-          const Empty = ({ text }) => (
-            <div className="wu-empty">
-              <svg viewBox="0 0 64 48" width="56" height="42" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round">
-                <path d="M8 18l24-10 24 10-24 10z" /><path d="M8 18v16l24 10 24-10V18" /><path d="M32 28v16" />
-              </svg>
-              <span>{text}</span>
-            </div>
-          );
-          const Card  = ({ children, tone }) => (
-            <div className="mt-card no-lift wu-card" data-tone={tone || undefined}>{children}</div>
-          );
+          // Section / Empty / Card: module-level (StaffSection, StaffEmpty, StaffCard above).
+          const Section = StaffSection;
+          const Empty = StaffEmpty;
+          const Card  = StaffCard;
           // Where the machine is on the line (display only — read from its stage).
           const LINE = ["Assembly", "Mechanical", "Electrical", "Trial", "Ready"];
           const stageLine = (stage) => {
@@ -1596,7 +1626,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                         <button type="button" data-staff-route-step={r.key} onClick={() => goStep(r.sec)}
                                 className={`wu-step${r.key === nowStep ? " is-now" : ""}${r.n ? " has" : ""}`}
                                 aria-current={r.key === nowStep ? "step" : undefined}>
-                          <span className="wu-step-n tabular-nums">{r.n}</span>
+                          <span className="wu-step-n tabular-nums"><Count value={r.n} /></span>
                           <span className="wu-step-l">{r.label}</span>
                         </button>
                       </React.Fragment>
@@ -1619,7 +1649,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                     {awaitingRelease.map((m) => <SafeBoundary key={m.id} name="staff-awaiting-card" label="this machine card" render={() => {
                       const h = machineHandover(m);
                       return (
-                        <Card key={m.id}>
+                        <Card key={m.id} mid={m.id}>
                           {withPhoto(m, h, <div>
                             <div className="wu-title">{titleOf(m, h)}</div>
                             <div className="wu-meta">
@@ -1652,7 +1682,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                     {rackForMe.map((h) => {
                       const m = machineOf(h);
                       return (
-                        <Card key={h.id} tone="rack">
+                        <Card key={h.id} tone="rack" mid={(m && m.id) || h.machineId}>
                           {withPhoto(m, h, <div>
                             <div className="wu-title">{titleOf(m, h)}</div>
                             <div className="wu-meta">
@@ -1694,7 +1724,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                       const late = isHoldOverdue(h.sentAt, h.acceptTimeoutMinutes, nowTick);
                       const waited = h.sentAt ? formatDuration(Math.max(0, Math.floor((nowTick - Date.parse(h.sentAt)) / 60000))) : "";
                       return (
-                        <Card key={h.id} tone={late ? "bad" : "wait"}>
+                        <Card key={h.id} tone={late ? "bad" : "wait"} mid={(m && m.id) || h.machineId}>
                           {withPhoto(m, h, <div>
                             <div className="wu-title">{titleOf(m, h)}</div>
                             <div className="wu-meta">
@@ -1732,7 +1762,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                       const jobs   = openJobsOf(m);
                       const during = !!onSubmitDuringWorkChecklist && !!pickTemplate(checklistTemplates, m.bomKey, dept, "during_work");
                       return (
-                        <Card key={m.id}>
+                        <Card key={m.id} mid={m.id}>
                           {withPhoto(m, null, <div>
                             <div className="wu-title">{titleOf(m)}</div>
                             <div className="wu-meta">{m.bomLabel || ""}{m.bomLabel ? " · " : ""}in {dept}</div>
@@ -1796,7 +1826,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                       // 2026-11-03 — Sender Undo: the button shows itself only for the
                       // sender, within 5 min, while not yet accepted (senderUndoState).
                       return (
-                      <div key={m.id} data-sent-on={m.id} className="wu-sent">
+                      <div key={m.id} data-sent-on={m.id} data-mt-mid={m.id} className="wu-sent">
                         <div className="flex-1 min-w-0">
                           <span className="font-black">{titleOf(m, h)}</span> <span style={{ color: "var(--text-dim)" }}>→ {h.toDepartment} · awaiting accept</span>
                         </div>
@@ -2988,7 +3018,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
             );
 
             return (
-              <div key={machine.id} className={`mt-card overflow-hidden${isComplete ? " mt-card-ready" : ""}`}>
+              <div key={machine.id} data-mt-mid={machine.id} className={`mt-card overflow-hidden${isComplete ? " mt-card-ready" : ""}`}>
 
                 {/* ── Card header ── */}
                 <div className="px-5 py-4">
@@ -4863,6 +4893,10 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                   {pendingItemsProblem(finishModal.owedItems) && <div data-pending-item-problem className="mt-1.5 text-[11px] font-semibold" style={{ color: "#b45309" }}>{pendingItemsProblem(finishModal.owedItems)}</div>}
                 </div>
               </div>
+              <LeftToDo data-finish-left style={{ background: "#fff", borderTop: "1px solid #f1f5f9" }} text={transferBusy ? "" : leftToDoText({
+                needLateReason: isOverrun && !narration.trim(),
+                checksLeft: finishModal.template && Array.isArray(finishModal.answers) && finishModal.answers.length ? validateChecklistAnswers(finishModal.answers).missing.length : 0,
+              })} />
               <div className="px-5 py-3 border-t border-slate-100 flex items-center justify-between flex-shrink-0 bg-white">
                 <button onClick={() => !transferBusy && setFinishModal(null)} disabled={transferBusy}
                         className="mt-cancel text-[12px] font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
@@ -5123,6 +5157,11 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                   </div>
                 )}
               </div>
+              <LeftToDo data-accept-left style={{ background: "#f8f9fb", borderTop: "1px solid #e2e8f0" }} text={busy || !online ? "" : leftToDoText({
+                needPeople: acceptDeptEmps.length > 0 && selectedTeam.filter(Boolean).length === 0,
+                checksLeft: hasChecklist ? validateChecklistAnswers(acceptModal.checklistAnswers || []).missing.length : 0,
+                signLeft: !sigSvg,
+              })} />
               <div className="px-5 py-3 border-t border-slate-200 flex items-center justify-between flex-shrink-0"
                    style={{ background: "#f8f9fb" }}>
                 <button onClick={() => !busy && setAcceptModal(null)} disabled={busy}

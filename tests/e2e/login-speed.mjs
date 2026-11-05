@@ -109,8 +109,17 @@ const seeded = async (p) => { await p.goto(BASE, { waitUntil: "domcontentloaded"
   ok("3D device: the poster is on screen until the 3D intro starts", (await p.locator("[data-logo3d=started]").count()) === 1 || await p.locator(".lg-poster:not(.is-off) svg").isVisible());
   const started = await p.locator("[data-logo3d=started]").waitFor({ timeout: 90000 }).then(() => true).catch(() => false);
   ok("3D intro starts (canvas in, data-logo3d=started)", started && (await p.locator(".lg-3d canvas").count()) === 1);
-  await p.waitForTimeout(800);
-  ok("the poster has faded out under the 3D logo", (await p.locator(".lg-poster.is-off").count()) === 1 && !(await p.locator(".lg-poster").isVisible()));
+  // Wait for the fade itself to finish (is-off + its 600 ms opacity/visibility transition), not a
+  // fixed sleep: with software WebGL (SwiftShader) on a 2-core CI runner the renderer is busy
+  // drawing the 3D logo and the transition can take well over 800 ms to complete. 20 s upper bound.
+  const faded = await p.waitForFunction(() => {
+    const el = document.querySelector(".lg-poster");
+    if (!el || !el.classList.contains("is-off")) return false;
+    const cs = getComputedStyle(el);
+    return cs.visibility === "hidden" && Number(cs.opacity) === 0;
+  }, null, { timeout: 20000, polling: 100 }).then(() => true).catch(() => false);
+  const posterState = await p.evaluate(() => { const el = document.querySelector(".lg-poster"); if (!el) return "no poster"; const cs = getComputedStyle(el); return `${el.className} | opacity ${cs.opacity} | visibility ${cs.visibility}`; });
+  ok("the poster has faded out under the 3D logo", faded && (await p.locator(".lg-poster.is-off").count()) === 1 && !(await p.locator(".lg-poster").isVisible()), posterState);
   await ctx.close();
 }
 
