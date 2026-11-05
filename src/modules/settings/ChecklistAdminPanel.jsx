@@ -47,10 +47,14 @@ export function ChecklistAdminPanel({ templates = [], canConfig = false, onCreat
     } finally { setBusy(false); }
   };
 
-  const remove = async (id) => {
-    if (!window.confirm("Delete this checklist template? Existing responses stay in reports.")) return;
-    const res = await onDelete?.(id);
-    if (res && res.success === false) alert(res.error || "Delete failed.");
+  // Owner rule: never permanently delete. "Switch off" sets active=false via
+  // onUpdate (handleUpdateChecklistTemplate, audited) and keeps the items; the
+  // row moves to the "Switched off" fold and can be switched on from Edit.
+  // onDelete is no longer called from here.
+  const switchOff = async (t) => {
+    if (!window.confirm(`Switch off checklist "${t.name}"?\n\nAre you sure? It is kept, not deleted — existing responses stay in reports and you can switch it on again from Edit.`)) return;
+    const res = await onUpdate?.(t.id, { active: false, name: t.name });
+    if (res && res.success === false) alert(res.error || "Switch off failed.");
   };
 
   const renderRow = (t) => (
@@ -64,7 +68,7 @@ export function ChecklistAdminPanel({ templates = [], canConfig = false, onCreat
               {canConfig && (
                 <>
                   <button onClick={() => start(t)} className="text-[10px] font-bold text-blue-300 hover:text-blue-200 px-2 py-0.5 rounded border border-blue-500/30 bg-blue-500/10">Edit</button>
-                  <button onClick={() => remove(t.id)} className="text-[10px] font-bold text-red-300 hover:text-red-200 px-2 py-0.5 rounded border border-red-500/30 bg-red-500/10">Delete</button>
+                  {t.active !== false && <button onClick={() => switchOff(t)} data-cl-switch-off className="text-[10px] font-bold text-red-300 hover:text-red-200 px-2 py-0.5 rounded border border-red-500/30 bg-red-500/10">Switch off</button>}
                 </>
               )}
             </div>

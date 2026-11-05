@@ -33,7 +33,7 @@ export const BCL_STAGES = [
 // Named confirmation (owner rule: "Are you sure?" with the name). Cancel has
 // focus by default; Escape or a click outside cancels; focus goes back to the
 // button that opened it.
-function ConfirmBox({ ask, onClose }) {
+export function ConfirmBox({ ask, onClose }) {
   const cancelRef = useRef(null);
   useEffect(() => {
     const back = document.activeElement;
