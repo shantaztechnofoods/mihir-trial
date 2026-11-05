@@ -323,3 +323,51 @@ export function canConfigureDept(canDoFn) {
   if (typeof canDoFn !== "function") return false;
   return !!canDoFn("machines", "configDept");
 }
+
+// 2026-11-05 — two-step saves (Finish & Transfer, Accept). The second write is
+// retried a few times before the caller compensates. `save` returns the store
+// shape { success, error }; a thrown error counts as a failed attempt.
+// `sleep` is injectable so tests run instantly.
+export const SAVE_RETRY_DELAYS_MS = Object.freeze([400, 1200]);
+export async function saveWithRetry(save, { attempts = 3, delaysMs = SAVE_RETRY_DELAYS_MS, sleep = (ms) => new Promise((r) => setTimeout(r, ms)) } = {}) {
+  const n = Math.max(1, Math.floor(Number(attempts) || 1));
+  let last = { success: false, error: "not attempted" };
+  for (let i = 0; i < n; i++) {
+    try {
+      last = (await save(i)) || { success: false, error: "no result" };
+    } catch (e) {
+      last = { success: false, error: (e && e.message) || String(e) };
+    }
+    if (last.success) return { ...last, attempts: i + 1 };
+    // A stale answer (someone else changed the machine) will not get better
+    // by retrying — stop and let the caller handle it.
+    if (last.stale) break;
+    if (i < n - 1) await sleep(delaysMs[Math.min(i, delaysMs.length - 1)] || 0);
+  }
+  return { ...last, success: false, attempts: n };
+}
+
+// A pending hand-over already open for this machine, by machine id — not only
+// via the machine's pending_handover_id link (which is the half that can fail).
+export function pendingHandoverForMachine(handovers, machineId) {
+  return (handovers || []).find((h) => h && h.status === "pending" && String(h.machineId) === String(machineId)) || null;
+}
+
+// Machines left half-accepted: the hand-over row is accepted (that write is
+// final — the database refuses to modify it again) but the machine still points
+// at it, so it never moved. Only hand-overs accepted at least `minAgeMs` ago
+// count, so a realtime update that has not arrived yet is not mistaken for one.
+export function findStuckAccepts(machines, handovers, nowMs = Date.now(), minAgeMs = 60000) {
+  const byId = new Map((handovers || []).filter(Boolean).map((h) => [String(h.id), h]));
+  const out = [];
+  for (const m of machines || []) {
+    if (!m || m.pendingHandoverId == null) continue;
+    const h = byId.get(String(m.pendingHandoverId));
+    if (!h || h.status !== "accepted") continue;
+    if (String(h.machineId) !== String(m.id)) continue;
+    const at = Date.parse(h.acceptedAt || "");
+    if (!Number.isFinite(at) || nowMs - at < minAgeMs) continue;
+    out.push({ machine: m, handover: h });
+  }
+  return out;
+}

@@ -32,7 +32,7 @@ import { fetchFollowUps, createFollowUp as followupCreate, updateFollowUp as fol
 import { fetchMachines, createMachine as machineCreate, updateMachine as machineUpdate, updateMachineBomKey, deleteMachine as machineDelete, fetchMachineLockState, appendMachineHistory as machineAppendHistory, STALE_MACHINE_MSG } from "../stores/machinesStore.js";
 import { fetchHandovers, createHandover as handoverCreate, acceptHandover as handoverAccept, releaseHandover, adminCancelHandover, fetchHandoverById } from "../stores/handoverStore.js";
 import { getMySignature, saveMySignature, reauthenticateByPassword } from "../stores/signaturesStore.js";
-import { readDeptWorkflowSettings, setWorkCalendar, isHoldOverdue, RACK_RELEASE_HOPS, canAcceptHandover, canFinishTransfer, canStartAssembly, senderUndoState } from "../utils/handoverLogic.js";
+import { readDeptWorkflowSettings, setWorkCalendar, isHoldOverdue, RACK_RELEASE_HOPS, canAcceptHandover, canFinishTransfer, canStartAssembly, senderUndoState, saveWithRetry, pendingHandoverForMachine, findStuckAccepts } from "../utils/handoverLogic.js";
 // Phase B
 import { fetchTemplates, createTemplate, updateTemplate, deleteTemplate, fetchResponses, createResponse } from "../stores/checklistsStore.js";
 import { fetchPendingItems, createPendingItem, resolvePendingItem, receivePendingItem, receivePendingPart, pendingItemIsPart, pendingItemIsOpen } from "../stores/pendingItemsStore.js";
@@ -451,6 +451,26 @@ export default function App() {
   // machine.pendingHandoverId, which a fast second click reads as still-null
   // before the first write lands — creating two handovers for one machine.
   const transferringRef = useRef(new Set());
+  // 2026-11-05 — stuck-accept repair. A machine whose hand-over is accepted
+  // but which still points at it (the machine half of Accept failed) is moved
+  // on by repairStuckAcceptRef (assigned next to handleAcceptHandover). The
+  // ref keeps this hook above the early returns without touching handlers
+  // that are declared below them.
+  const repairStuckAcceptRef = useRef(null);
+  const stuckRepairDoneRef = useRef(new Set());
+  const [stuckAcceptTick, setStuckAcceptTick] = useState(0);
+  useEffect(() => {
+    if (!SUPA) return undefined;
+    const now = Date.now();
+    const ready = findStuckAccepts(machineLog, handovers, now);
+    if (ready.length && typeof repairStuckAcceptRef.current === "function") ready.forEach((s) => repairStuckAcceptRef.current(s));
+    // One accepted moments ago may just be a realtime update still on its way;
+    // look again once it is old enough to count.
+    const young = findStuckAccepts(machineLog, handovers, now, 0).length > ready.length;
+    if (!young) return undefined;
+    const t = setTimeout(() => setStuckAcceptTick((n) => n + 1), 65000);
+    return () => clearTimeout(t);
+  }, [machineLog, handovers, stuckAcceptTick]);
   // 2026-11-04 (fix/harden-2) — double-submit guard for every mutation prop
   // handed to the pages (see `guarded` below), and "latest response wins" for
   // overlapping refetches of one table (realtime + catch-up + a handler).
@@ -2731,6 +2751,12 @@ export default function App() {
     const machine = machineLog.find((m) => m.id === machineId);
     if (!machine) return { success: false, error: "Machine not found" };
     if (machine.pendingHandoverId) return { success: false, error: "Handover already in progress for this machine." };
+    // 2026-11-05 — also look for a pending hand-over by machine id: if the
+    // machine link was the half that failed, the link field is empty but the
+    // hand-over row exists, and a retry must not open a second one.
+    if (pendingHandoverForMachine(handovers, machineId)) {
+      return { success: false, error: "A hand-over for this machine is already waiting. Use Undo (or ask an admin to pull it back) before sending it again." };
+    }
     if (machine.holdActive) return { success: false, error: "This machine is ON HOLD — release the hold before transferring it." };
     if (machine.status === "completed" || machine.stage === "Ready") {
       return { success: false, error: "This machine is READY — READY is the final stage." };
@@ -2831,17 +2857,10 @@ export default function App() {
     const res = await handoverCreate(payload);
     if (!res.success) return res;
 
-    if (actingMainEmployeeId) {
-      const au = (allUsers || []).find((u) => u.id === actingMainEmployeeId);
-      logAudit({
-        type: "acting_main_assigned", module: "Machine",
-        action: `Acting Main Employee ${au?.fullName || au?.username || actingMainEmployeeId} for ${fromDepartment} → ${toDepartment}: ${machine.bomKey}${machine.serialNo ? ` [${machine.serialNo}]` : ""}`,
-        ref: machine.bomKey, serialNo: machine.serialNo || "",
-        details: { handoverId: res.handover.id, actingMainEmployeeId, assignedBy: currentUser?.id || null, department: fromDepartment },
-      });
-    }
-
     // Attach pending_handover_id to the machine, append a history annotation.
+    // 2026-11-05 — the link is awaited and retried; if it still fails the
+    // hand-over just created is cancelled again (same store call as pull-back)
+    // so the machine is exactly as before and the user can simply retry.
     const dateStr = fmtDate(new Date());
     const historyNote = `Finished ${fromDepartment} → ${toDepartment} (awaiting accept)`;
     setMachineLog((prev) => prev.map((m) =>
@@ -2856,16 +2875,48 @@ export default function App() {
       if (trialCertificate) machUpd.trialCertificate = trialCertificate;
       // 063: append-only (no stage check — the hand-over row is already committed).
       const sentEntry = { stage: machine.stage, date: dateStr, note: historyNote };
-      machineAppendHistory(machineId, { entries: [sentEntry], fullHistory: [...(machine.history || []), sentEntry], updates: machUpd }).then((r) => {
-        if (!r.success) {
-          saveFailed("Finish & Transfer", r.error);
-          // The handover row itself is already committed and checked above. If
-          // this half is lost the machine does not point at it, so the receiving
-          // department never sees the machine and the sender can raise a second
-          // handover for the same unit. Worth shouting about.
-          flashSaveError("Finish & Transfer",
-            `${machine.bomKey}${machine.serialNo ? ` · ${machine.serialNo}` : ""}: the handover was recorded but the machine was not linked to it — ${r.error || "unknown error"}`);
+      const link = await saveWithRetry(async (attempt) => {
+        // A retry first checks whether the previous attempt did save (only
+        // its answer was lost), so the history line is not written twice.
+        if (attempt > 0) {
+          const fresh = await fetchMachineLockState(machineId);
+          if (fresh && String(fresh.pendingHandoverId) === String(res.handover.id)) return { success: true };
         }
+        return machineAppendHistory(machineId, { entries: [sentEntry], fullHistory: [...(machine.history || []), sentEntry], updates: machUpd });
+      });
+      if (!link.success) {
+        saveFailed("Finish & Transfer", link.error);
+        const label = `${machine.bomKey}${machine.serialNo ? ` · ${machine.serialNo}` : ""}`;
+        const undo = await adminCancelHandover(res.handover.id, "Auto-cancelled: the machine could not be linked to this hand-over (save failed)");
+        // Put the screen back the way it was (the optimistic link above).
+        setMachineLog((prev) => prev.map((m) =>
+          m.id === machineId && m.pendingHandoverId === res.handover.id
+            ? { ...m, pendingHandoverId: machine.pendingHandoverId || null, history: machine.history || [],
+                ...(trialCertificate ? { trialCertificate: machine.trialCertificate } : {}) }
+            : m
+        ));
+        if (undo.success) {
+          setHandovers((prev) => [undo.handover, ...prev.filter((h) => h.id !== res.handover.id)]);
+          transferringRef.current.delete(machineId);
+          return { success: false, error: `Could not save — please try again. (${label}: ${link.error || "machine not updated"})` };
+        }
+        // The cancel failed too: the hand-over row stays pending, so show it
+        // (the duplicate check above then blocks a second one) and say so.
+        setHandovers((prev) => [res.handover, ...prev.filter((h) => h.id !== res.handover.id)]);
+        rtMach();
+        flashSaveError("Finish & Transfer",
+          `${label}: the hand-over was recorded but the machine was not linked to it, and it could not be cancelled automatically — ${link.error || "unknown error"}. Use Undo or ask an admin to pull it back, then send again.`);
+        return { success: false, error: "Could not save — please try again after the hand-over is pulled back (Undo / admin)." };
+      }
+    }
+
+    if (actingMainEmployeeId) {
+      const au = (allUsers || []).find((u) => u.id === actingMainEmployeeId);
+      logAudit({
+        type: "acting_main_assigned", module: "Machine",
+        action: `Acting Main Employee ${au?.fullName || au?.username || actingMainEmployeeId} for ${fromDepartment} → ${toDepartment}: ${machine.bomKey}${machine.serialNo ? ` [${machine.serialNo}]` : ""}`,
+        ref: machine.bomKey, serialNo: machine.serialNo || "",
+        details: { handoverId: res.handover.id, actingMainEmployeeId, assignedBy: currentUser?.id || null, department: fromDepartment },
       });
     }
 
@@ -2970,7 +3021,13 @@ export default function App() {
         });
       } else {
         saveFailed("Pending item", pr.error);
-        flashSaveError("Pending job not saved", `${machine.bomKey}${machine.serialNo ? ` · ${machine.serialNo}` : ""}: "${text}" — ${pr.error || "unknown error"}. Raise it again from the machine card.`);
+        // 2026-11-05 — saving a pending job needs Machines → Accept (database
+        // rule, migration 058). A sender with only Finish & Transfer used to get
+        // a raw database error; tell them plainly who can fix it.
+        const noAccept = !authCanDo("machines", "accept");
+        flashSaveError("Pending job not saved", noAccept
+          ? `${machine.bomKey}${machine.serialNo ? ` · ${machine.serialNo}` : ""}: "${text}" was NOT saved — your role cannot save pending jobs (it needs the Machines → Accept permission). The machine was transferred. Ask your admin to add that permission, or to raise this job from the machine card.`
+          : `${machine.bomKey}${machine.serialNo ? ` · ${machine.serialNo}` : ""}: "${text}" — ${pr.error || "unknown error"}. Raise it again from the machine card.`);
       }
     }
 
@@ -2981,11 +3038,100 @@ export default function App() {
   // main session), attach the operator's signature, flip status to accepted,
   // promote the machine to the new department. Password re-auth is required
   // by design — a saved signature alone is not proof of authorization.
+  // 2026-11-05 — the machine half of Accept: move the machine into the
+  // receiving department and clear its pending_handover_id. Awaited and
+  // retried; a retry first re-reads the machine so an attempt whose answer was
+  // lost (but which did save) is not applied twice. On failure the optimistic
+  // move is dropped and the database truth is reloaded.
+  const acceptHistoryEntry = (handover, byName, noteSuffix, dateStr, nowIso) => ({ stage: handover.toDepartment, date: dateStr,
+    by: byName, department: handover.toDepartment, at: nowIso, handoverId: handover.id, signed: true,
+    note: `Accepted into ${handover.toDepartment} by ${byName}${noteSuffix}` });
+  const promoteAcceptedMachine = async (handover, machine, { historyEntry, dateStr, nowIso }) => {
+    const handoverId = handover.id;
+    const newStage = handover.toDepartment;
+    const isComplete = newStage === "Ready";
+    setMachineLog((prev) => prev.map((m) =>
+      String(m.id) === String(handover.machineId)
+        ? {
+            ...m,
+            stage:               newStage,
+            status:              isComplete ? "completed" : "active",
+            completedDate:       isComplete ? dateStr : m.completedDate,
+            history:             [...(m.history || []), historyEntry],
+            currentDepartment:   newStage,
+            departmentEnteredAt: nowIso,
+            pendingHandoverId:   null,
+          }
+        : m
+    ));
+    if (!isSupabaseEnabled()) return { success: true };
+    // 063: append-only (no stage check — the acceptance is already committed).
+    const r = await saveWithRetry(async (attempt) => {
+      if (attempt > 0) {
+        const fresh = await fetchMachineLockState(handover.machineId);
+        if (fresh && String(fresh.pendingHandoverId) !== String(handoverId)) return { success: true };
+      }
+      return machineAppendHistory(handover.machineId, {
+        entries: [historyEntry],
+        fullHistory: [...(machine.history || []), historyEntry],
+        updates: {
+          stage: newStage,
+          status: isComplete ? "completed" : "active",
+          completedDate: isComplete ? dateStr : machine.completedDate,
+          currentDepartment:   newStage,
+          departmentEnteredAt: nowIso,
+          pendingHandoverId:   null,
+        },
+      });
+    });
+    if (!r.success) rtMach();   // drop the optimistic promote; show the DB truth
+    return r;
+  };
+
+  // 2026-11-05 — finish a half-saved Accept found by findStuckAccepts (see the
+  // effect next to transferringRef). Only for a user who may accept into that
+  // department, only after a fresh read confirms the database is really in
+  // that state, and at most once per hand-over until a failure re-arms it.
+  repairStuckAcceptRef.current = ({ machine, handover }) => {
+    if (!currentUser?.id || !canAcceptHandover(authCanDo, handover.toDepartment)) return;
+    const done = stuckRepairDoneRef.current;
+    if (done.has(handover.id)) return;
+    done.add(handover.id);
+    (async () => {
+      const [lock, fresh] = await Promise.all([fetchMachineLockState(machine.id), fetchHandoverById(handover.id)]);
+      if (!lock || !fresh || fresh.status !== "accepted" || String(lock.pendingHandoverId) !== String(handover.id)) {
+        rtMach(); rtHandovers();   // only the screen was stale
+        return;
+      }
+      const dateStr = fmtDate(new Date());
+      const nowIso  = new Date().toISOString();
+      const historyEntry = acceptHistoryEntry(fresh, fresh.acceptedByName || "", " (finished after an earlier save failed)", dateStr, nowIso);
+      const r = await promoteAcceptedMachine(fresh, machine, { historyEntry, dateStr, nowIso });
+      if (!r.success) {
+        saveFailed("Accept (repair)", r.error);
+        setTimeout(() => done.delete(handover.id), 120000);
+        return;
+      }
+      logAudit({
+        type: fresh.toDepartment === "Ready" ? "machine_completed" : "handover_accepted",
+        module: "Machine",
+        action: `Handover accepted (machine moved after an earlier failed save): ${fresh.bomKey}${fresh.serialNo ? ` [${fresh.serialNo}]` : ""}  ${fresh.fromDepartment} → ${fresh.toDepartment}`,
+        ref: fresh.bomKey, serialNo: fresh.serialNo || "",
+        details: { handoverId: fresh.id, machineId: fresh.machineId, from: fresh.fromDepartment, to: fresh.toDepartment, repaired: true },
+      });
+    })();
+  };
+
   const handleAcceptHandover = async ({ handoverId, password, pendingItemsToRaise = [], checklistTemplate = null, checklistAnswers = null, stage = null, department = null, acceptTeamMembers = [], signatureSvg = null, holdReason = "" }) => {
     if (!currentUser?.id) return { success: false, error: "Not authenticated" };
     const handover = handovers.find((h) => h.id === handoverId);
     if (!handover) return { success: false, error: "Handover not found" };
-    if (handover.status !== "pending") return { success: false, error: "This handover is no longer pending." };
+    // 2026-11-05 — "try again" after a half-saved accept: the hand-over is
+    // already accepted (the database never lets that row change again) but the
+    // machine still points at it. Skip the accept write and finish the rest.
+    const resumeAccept = handover.status === "accepted"
+      && String((machineLog.find((m) => String(m.id) === String(handover.machineId)) || {}).pendingHandoverId) === String(handoverId);
+    if (handover.status !== "pending" && !resumeAccept) return { success: false, error: "This handover is no longer pending." };
     if ((machineLog.find((m) => String(m.id) === String(handover.machineId)) || {}).holdActive) return { success: false, error: "This machine is ON HOLD — release the hold before accepting it." };
     // Migration 036 — a machine parked on the rack is not anyone's to accept
     // until a production head releases it. The Accept button is no longer
@@ -3052,71 +3198,45 @@ export default function App() {
     // Who received the machine: the selected employees, else the logged-in user.
     const acceptedByName = (acceptedByTeamSnapshot ? acceptedByTeamSnapshot.map((t) => t.name).join(", ") : "")
       || currentUser.fullName || currentUser.username || "";
-    const accRes = await handoverAccept(handoverId, {
-      acceptedBy: currentUser.id,
-      acceptedBySignatureId: storedSigId,
-      acceptedByTeamSnapshot,
-      acceptedSignatureSvg: signatureSvg,
-      acceptedByName,
-      acceptedInDepartment: handover.toDepartment,
-    });
+    const accRes = resumeAccept
+      ? { success: true, handover }
+      : await handoverAccept(handoverId, {
+          acceptedBy: currentUser.id,
+          acceptedBySignatureId: storedSigId,
+          acceptedByTeamSnapshot,
+          acceptedSignatureSvg: signatureSvg,
+          acceptedByName,
+          acceptedInDepartment: handover.toDepartment,
+        });
     if (!accRes.success) return accRes;
 
-    // Step 4: promote the machine. Same body as handleUpdateMachineStage —
-    // kept inline so we can also clear pending_handover_id atomically.
-    const dateStr = fmtDate(new Date());
-    const nowIso  = new Date().toISOString();
+    // Step 4: promote the machine (awaited + retried — see promoteAcceptedMachine).
     const newStage = handover.toDepartment;
     const isComplete = newStage === "Ready";
     const lateNow = isHoldOverdue(handover.sentAt, handover.acceptTimeoutMinutes, Date.now());
+    // Refresh handovers list locally (the accepted row is the database truth
+    // whether or not the machine half below succeeds).
+    setHandovers((prev) => prev.map((h) => h.id === handoverId ? accRes.handover : h));
+    // While this device is finishing it, the automatic repair leaves it alone.
+    stuckRepairDoneRef.current.add(handoverId);
+    const dateStr = fmtDate(new Date());
+    const nowIso  = new Date().toISOString();
     const historyEntry = { stage: newStage, date: dateStr,
       // 2026-11-02 — name, department, time and a link to the signed hand-over.
       by: acceptedByName, department: newStage, at: nowIso, handoverId, signed: true,
       note: `Accepted into ${newStage} by ${acceptedByName}${lateNow ? ` (ON HOLD — accepted late${holdReason ? `: ${holdReason}` : ""})` : ""}` };
-
-    setMachineLog((prev) => prev.map((m) =>
-      String(m.id) === String(handover.machineId)
-        ? {
-            ...m,
-            stage:               newStage,
-            status:              isComplete ? "completed" : "active",
-            completedDate:       isComplete ? dateStr : m.completedDate,
-            history:             [...(m.history || []), historyEntry],
-            currentDepartment:   newStage,
-            departmentEnteredAt: nowIso,
-            pendingHandoverId:   null,
-          }
-        : m
-    ));
-    if (isSupabaseEnabled()) {
-      // 063: append-only (no stage check — the acceptance is already committed).
-      machineAppendHistory(handover.machineId, {
-        entries: [historyEntry],
-        fullHistory: [...(machine.history || []), historyEntry],
-        updates: {
-          stage: newStage,
-          status: isComplete ? "completed" : "active",
-          completedDate: isComplete ? dateStr : machine.completedDate,
-          currentDepartment:   newStage,
-          departmentEnteredAt: nowIso,
-          pendingHandoverId:   null,
-        },
-      }).then((r) => {
-        if (!r.success) {
-          saveFailed("Accept", r.error);
-          // handover_events is already flipped to accepted and that write WAS
-          // checked. Losing this one deadlocks the machine: it sits in the old
-          // department with pending_handover_id still set, so Finish & Transfer
-          // refuses with "Handover already in progress" and nothing can move it.
-          flashSaveError(`Accept into ${newStage}`,
-            `${machine.bomKey}${machine.serialNo ? ` · ${machine.serialNo}` : ""}: the acceptance was recorded but the machine was not moved — ${r.error || "unknown error"}`);
-          rtMach();   // drop the optimistic promote; show the DB truth
-        }
-      });
+    const promote = await promoteAcceptedMachine(handover, machine, { historyEntry, dateStr, nowIso });
+    if (!promote.success) {
+      saveFailed("Accept", promote.error);
+      // The hand-over row is accepted and the database refuses to change an
+      // accepted row back, so it cannot be undone from here. The machine still
+      // points at it: pressing Accept again resumes (resumeAccept above), and
+      // the stuck-accept repair finishes it automatically if the form is closed.
+      flashSaveError(`Accept into ${newStage}`,
+        `${machine.bomKey}${machine.serialNo ? ` · ${machine.serialNo}` : ""}: the acceptance was recorded but the machine was not moved — ${promote.error || "unknown error"}. Press Accept again to finish.`);
+      setTimeout(() => stuckRepairDoneRef.current.delete(handoverId), 120000);
+      return { success: false, error: "Could not save — please try again (press Accept again)." };
     }
-
-    // Refresh handovers list locally.
-    setHandovers((prev) => prev.map((h) => h.id === handoverId ? accRes.handover : h));
 
     const timeToAcceptMin = Math.max(0, Math.floor((Date.parse(accRes.handover.acceptedAt) - Date.parse(accRes.handover.sentAt)) / 60000));
     const wasOverdue = timeToAcceptMin > (accRes.handover.acceptTimeoutMinutes || 0);
