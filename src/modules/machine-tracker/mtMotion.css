@@ -52,8 +52,14 @@
   @keyframes mt-reveal { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 
   /* ── Confirm becomes possible: ONE ring, then calm (was an endless glow) ─ */
-  .accept-ready, .modal-backdrop button[data-finish-confirm]:not(:disabled) { animation: mt-ready 700ms var(--ease-enter) 1 !important; }
-  @keyframes mt-ready { from { box-shadow: 0 0 0 0 rgba(21, 128, 61, .45); } to { box-shadow: 0 0 0 10px rgba(21, 128, 61, 0); } }
+  /* the ring is a pseudo-element that only scales + fades (no box-shadow paint per frame) */
+  .accept-ready { animation: none !important; }
+  .modal-backdrop button[data-accept-confirm], .modal-backdrop button[data-finish-confirm] { position: relative; }
+  .modal-backdrop button.accept-ready::after, .modal-backdrop button[data-finish-confirm]:not(:disabled)::after {
+    content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+    box-shadow: 0 0 0 3px rgba(21, 128, 61, .45); opacity: 0; animation: mt-ready 700ms var(--ease-enter) 1;
+  }
+  @keyframes mt-ready { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(1.08); } }
   .modal-backdrop button[data-accept-confirm], .modal-backdrop button[data-finish-confirm] { transition: background-color 200ms var(--ease-enter), color 200ms var(--ease-enter), transform 100ms var(--ease-enter); }
 
   /* "1 check left · then sign" under a grey Confirm (display only) */
@@ -73,8 +79,10 @@
   .ck-reason .vn-mic:not(.vn-mic-busy) { animation: mt-mic-in 180ms var(--ease-pop) 60ms backwards; }
   @keyframes mt-mic-in { from { opacity: 0; transform: translateY(-50%) scale(.6); } to { opacity: 1; transform: translateY(-50%); } }
   /* listening = red ring around the box (a live state, so it may breathe) */
-  .modal-backdrop .vn-bar { box-shadow: 0 0 0 3px rgba(220, 38, 38, .16); animation: mt-listen 1.4s ease-in-out infinite; }
-  @keyframes mt-listen { 0%, 100% { box-shadow: 0 0 0 2px rgba(220, 38, 38, .14); } 50% { box-shadow: 0 0 0 5px rgba(220, 38, 38, .22); } }
+  .modal-backdrop .vn-bar { box-shadow: 0 0 0 3px rgba(220, 38, 38, .16); }
+  .modal-backdrop .vn-bar::after { content: ""; position: absolute; inset: -1px; border-radius: inherit; pointer-events: none;
+    box-shadow: 0 0 0 5px rgba(220, 38, 38, .18); opacity: 0; animation: mt-listen 1.4s ease-in-out infinite; }
+  @keyframes mt-listen { 0%, 100% { opacity: 0; } 50% { opacity: 1; } }
   /* writing = a quiet shimmer across the box while the words are made */
   .modal-backdrop .vn-field:has(> .vn-mic-busy) > input, .modal-backdrop .vn-field:has(> .vn-mic-busy) > textarea {
     background-image: linear-gradient(100deg, transparent 30%, rgba(38, 64, 176, .07) 50%, transparent 70%) !important;
@@ -113,10 +121,10 @@ html.wu-lite .wu-confetti { display: none !important; }
   .mt-arrive::after { animation: mt-ring-calm 900ms ease 1; }
   @keyframes mt-ring-calm { 0%, 100% { opacity: 0; } 30%, 70% { opacity: .8; } }
   .wu-hold-badge, .wu-held, .wu-note-bad, .mt-left, .modal-backdrop .vn-writing { animation: wu-fade 120ms ease backwards; }
-  .accept-ready, .modal-backdrop button[data-finish-confirm]:not(:disabled) { animation: none !important; }
+  .modal-backdrop button.accept-ready::after, .modal-backdrop button[data-finish-confirm]:not(:disabled)::after { animation: none; }
   .ck-reason { animation: wu-fade 120ms ease both; }
   .ck-no[aria-pressed="true"], .ck-reason .vn-mic:not(.vn-mic-busy) { animation: none; }
-  .modal-backdrop .vn-bar { animation: none; }
+  .modal-backdrop .vn-bar::after { animation: none; opacity: .6; }
   .modal-backdrop .vn-field:has(> .vn-mic-busy) > input, .modal-backdrop .vn-field:has(> .vn-mic-busy) > textarea { animation: none; }
   .modal-backdrop .vn-field > input, .modal-backdrop .vn-field > textarea { animation: mt-text-in 120ms ease; }
 }
