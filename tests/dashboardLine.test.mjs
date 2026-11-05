@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   LINE_STAGES, lineStageOf, timeLevel, stageTone, humanTarget, lineLegend,
-  buildProductionLine, stageStatusLines, DEFAULT_LINE_TARGET_MINUTES,
+  buildProductionLine, stageStatusLines, lineSummary, DEFAULT_LINE_TARGET_MINUTES,
 } from "../src/modules/dashboard/productionLine.js";
 
 const at = (d, h, m = 0) => new Date(2026, 10, d, h, m).getTime(); // Nov 2026, local time
@@ -165,4 +165,20 @@ test("department heads: real department list, set and clear one head", () => {
   assert.deepEqual(Object.keys(h), ["Assembly"]);
   assert.equal(readDepartmentHeads({ departmentHeads: "junk" }).Assembly, undefined);
   assert.equal(readDepartmentHeads({ departmentHeads: { Assembly: "Old string" } }).Assembly.name, "Old string");
+});
+
+test("dashboard line: folded header summary — late · on hold · near, else all on time", () => {
+  const st = (near = 0) => [{ key: "Assembly", near }, { key: "Trial", near: 0 }];
+  const a = (kind) => ({ kind });
+  assert.equal(lineSummary({ attention: [a("hold"), a("late"), a("late")], stages: st(), inProduction: 5 }), "2 late · 1 on hold");
+  assert.equal(lineSummary({ attention: [a("late")], stages: st(1), inProduction: 3 }), "1 late · 1 near limit");
+  assert.equal(lineSummary({ attention: [], stages: st(), inProduction: 2 }), "All on time");
+  assert.equal(lineSummary({ attention: [], stages: st(), inProduction: 0 }), "No machines in production");
+  assert.equal(lineSummary(null), "No machines in production");
+  // Built from real data: one late (Mechanical, 2 days) + one on hold.
+  const r = buildProductionLine({ settings: ONE_DAY, now: NOW, machines: [
+    { id: 1, stage: "Mechanical", currentDepartment: "Mechanical", status: "active", departmentEnteredAt: iso(at(2, 12)) },
+    { id: 2, stage: "Trial", currentDepartment: "Trial", status: "active", departmentEnteredAt: iso(at(6, 11)), holdActive: true, holdReason: "x" },
+  ] });
+  assert.equal(lineSummary(r), "1 late · 1 on hold");
 });

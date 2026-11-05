@@ -214,3 +214,20 @@ export function stageStatusLines(stage) {
   if (out.length === 0) out.push({ tone: "idle", icon: null, text: "Empty" });
   return out;
 }
+
+// One-line summary for the folded panel header (2026-11-05): "2 late · 1 on hold".
+// Counts machines, not stages: late + on hold from the Needs-attention list,
+// near limit from the stages. Nothing to flag → "All on time" (or "No machines
+// in production" when the line is empty).
+export function lineSummary(line) {
+  const attn = (line && line.attention) || [];
+  const late = attn.filter((a) => a.kind === "late").length;
+  const hold = attn.filter((a) => a.kind === "hold").length;
+  const near = ((line && line.stages) || []).reduce((n, s) => n + (Number(s.near) || 0), 0);
+  const parts = [];
+  if (late > 0) parts.push(`${late} late`);
+  if (hold > 0) parts.push(`${hold} on hold`);
+  if (near > 0) parts.push(`${near} near limit`);
+  if (parts.length) return parts.join(" · ");
+  return (line && line.inProduction > 0) ? "All on time" : "No machines in production";
+}
