@@ -18,6 +18,14 @@
 //     discarded; only the returned text is kept (in the remark box).
 //   - Request shape is unchanged since 2026-11-03, so old and new app builds
 //     both work with either deployed version.
+//   - 2026-11-05 (speed): body { warm: true } (sent by the app when 🎤 is
+//     tapped) only wakes this function up and answers { warm: true } after
+//     the login check — no audio, no Gemini call. Preflight answers are
+//     cached by the browser (Access-Control-Max-Age). Login check and body
+//     read run in parallel; the "active user" check runs in parallel with
+//     Gemini and still gates the answer. Gemini "thinking" is switched off
+//     for this plain transcription (it only added seconds); a model that
+//     rejects that setting is asked again without it.
 //   - Language as spoken: Gujarati → Gujarati script, Hindi → Devanagari,
 //     English → English. No translation.
 
@@ -112,6 +120,7 @@ const corsHeaders = {
   "Access-Control-Allow-Origin":  "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Max-Age":       "86400",
 };
 
 const json = (status: number, body: Record<string, unknown>) =>
@@ -131,11 +140,14 @@ serve(async (req: Request) => {
   if (req.method !== "POST")   return json(405, { error: "Method not allowed" });
 
   try {
-    // 1) Authenticate the caller (same pattern as ai-assistant).
+    // 1) Authenticate the caller (same pattern as ai-assistant). The body is
+    //    read at the same time (speed); nothing is done with it before the
+    //    caller is verified.
     const authHeader = req.headers.get("Authorization") || "";
     if (!authHeader) return json(401, { error: "Missing Authorization header" });
 
     const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { global: { headers: { Authorization: authHeader } } });
+    const bodyP = req.json().then((b) => ({ ok: true, b }), () => ({ ok: false, b: null }));
     let userId = "";
     try {
       const { data, error } = await userClient.auth.getUser();
@@ -146,40 +158,55 @@ serve(async (req: Request) => {
       return json(401, { error: "Could not verify session" });
     }
 
+    const parsed = await bodyP;
+    if (!parsed.ok || !parsed.b || typeof parsed.b !== "object") return json(400, { error: "Invalid JSON body" });
+    const body = parsed.b as { audioBase64?: string; mimeType?: string; warm?: boolean };
+    // Warm-up ping from the app (🎤 tapped): the function is now loaded.
+    if (body.warm === true && !body.audioBase64) return json(200, { warm: true });
+
+    // 2) Active ERP user? Started now, awaited before any text is returned.
     const service = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    try {
-      const { data, error } = await service.from("users").select("status").eq("id", userId).single();
-      if (error || !data) { console.error("[voice-transcribe] users lookup failed:", error?.message); return json(403, { error: "Profile not found" }); }
-      if (data.status !== "active") return json(403, { error: "Account disabled" });
-    } catch (e) {
-      console.error("[voice-transcribe] users lookup threw:", (e as Error).message);
-      return json(500, { error: "Could not load user profile" });
-    }
+    const activeP: Promise<Response | null> = (async () => {
+      try {
+        const { data, error } = await service.from("users").select("status").eq("id", userId).single();
+        if (error || !data) { console.error("[voice-transcribe] users lookup failed:", error?.message); return json(403, { error: "Profile not found" }); }
+        if (data.status !== "active") return json(403, { error: "Account disabled" });
+        return null;
+      } catch (e) {
+        console.error("[voice-transcribe] users lookup threw:", (e as Error).message);
+        return json(500, { error: "Could not load user profile" });
+      }
+    })();
 
-    if (!GEMINI_API_KEY) return json(500, { error: "Transcription not configured (GEMINI_API_KEY missing)." });
+    if (!GEMINI_API_KEY) return (await activeP) || json(500, { error: "Transcription not configured (GEMINI_API_KEY missing)." });
 
-    // 2) Validate input.
-    let body: { audioBase64?: string; mimeType?: string };
-    try { body = await req.json(); } catch { return json(400, { error: "Invalid JSON body" }); }
+    // 3) Validate input.
     const audio = String(body.audioBase64 || "").replace(/^data:[^,]*,/, "").replace(/\s+/g, "");
     const mime  = geminiMime(body.mimeType || "");
-    if (!audio) return json(400, { error: "audioBase64 is required" });
-    if (audio.length > MAX_B64_CHARS) return json(413, { error: "Audio too long (max ~2 MB / 60 s)" });
-    if (!/^[A-Za-z0-9+/]+={0,2}$/.test(audio)) return json(400, { error: "audioBase64 is not valid base64" });
-    if (!ALLOWED_MIME.has(mime)) return json(415, { error: `Unsupported audio type: ${mime || "(none)"}` });
+    const bad =
+      !audio ? json(400, { error: "audioBase64 is required" }) :
+      audio.length > MAX_B64_CHARS ? json(413, { error: "Audio too long (max ~2 MB / 60 s)" }) :
+      !/^[A-Za-z0-9+/]+={0,2}$/.test(audio) ? json(400, { error: "audioBase64 is not valid base64" }) :
+      !ALLOWED_MIME.has(mime) ? json(415, { error: `Unsupported audio type: ${mime || "(none)"}` }) : null;
+    if (bad) return (await activeP) || bad;
 
-    // 3) Ask Gemini for a verbatim transcript.
-    const geminiReq = {
-      contents: [{ role: "user", parts: [{ text: INSTRUCTION }, { inline_data: { mime_type: mime, data: audio } }] }],
-      generationConfig: { temperature: 0.1 },
+    // 4) Ask Gemini for a verbatim transcript (thinking off = much faster).
+    const PREFER = ["gemini-flash-latest", "gemini-3.8-flash", "gemini-2.5-flash", "gemini-flash-lite-latest"];
+    const contents = [{ role: "user", parts: [{ text: INSTRUCTION }, { inline_data: { mime_type: mime, data: audio } }] }];
+    const askGemini = async (): Promise<Response> => {
+      const r = await geminiFetch({ contents, generationConfig: { temperature: 0.1, thinkingConfig: { thinkingBudget: 0 } } }, PREFER, "flash");
+      if (r.status !== 400) return r;
+      console.warn("[voice-transcribe] model refused thinkingConfig, asking again without it");
+      return await geminiFetch({ contents, generationConfig: { temperature: 0.1 } }, PREFER, "flash");
     };
-    let resp: Response;
-    try {
-      resp = await geminiFetch(geminiReq, ["gemini-flash-latest", "gemini-3.8-flash", "gemini-2.5-flash", "gemini-flash-lite-latest"], "flash");
-    } catch (e) {
-      console.error("[voice-transcribe] Gemini fetch threw:", (e as Error).message);
+    const geminiP: Promise<Response | Error> = askGemini().catch((e) => e as Error);
+    const [denied, respOrErr] = await Promise.all([activeP, geminiP]);
+    if (denied) return denied;
+    if (respOrErr instanceof Error) {
+      console.error("[voice-transcribe] Gemini fetch threw:", respOrErr.message);
       return json(502, { error: "Transcription service unreachable" });
     }
+    const resp = respOrErr;
     if (!resp.ok) {
       const errText = await resp.text().catch(() => "");
       console.error(`[voice-transcribe] Gemini returned ${resp.status}:`, errText.slice(0, 2000));
