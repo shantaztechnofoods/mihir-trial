@@ -131,6 +131,42 @@ test("dashboard line: empty / missing data never throws", () => {
   assert.equal(buildProductionLine({ machines: [null, { id: 1, stage: "Nowhere", status: "active" }] }).inProduction, 1);
 });
 
+// Department heads (2026-11-05) — display label from settings.departmentHeads.
+import { readDepartmentHeads, headNameFor, setDepartmentHead, HEAD_DEPARTMENTS } from "../src/utils/departmentHeads.js";
+
+test("dashboard line: department heads show on their stage, hidden when not set", () => {
+  const settings = { ...ONE_DAY, departmentHeads: {
+    Assembly: { userId: "u_sonu", name: "Sonu bhai" },
+    Trial: { userId: null, name: "  Ramesh   ji " },          // typed name (no login), tidied
+    Electrical: { userId: "u_x", name: "   " },             // blank → not set
+    Packing: { userId: null, name: "Nobody" },              // unknown department → ignored
+  } };
+  const r = buildProductionLine({ machines: [], handovers: [], settings, now: NOW });
+  assert.equal(stage(r, "Assembly").head, "Sonu bhai");
+  assert.equal(stage(r, "Trial").head, "Ramesh ji");
+  assert.equal(stage(r, "Electrical").head, "");
+  assert.equal(stage(r, "Mechanical").head, "");
+  assert.equal(stage(r, "Rack").head, "");
+  assert.equal(stage(r, "Ready").head, "");
+  // No settings / no heads → every stage hidden.
+  const none = buildProductionLine({ machines: [], handovers: [], settings: null, now: NOW });
+  assert.ok(none.stages.every((s) => s.head === ""));
+  assert.deepEqual(Object.keys(readDepartmentHeads(settings)), ["Assembly", "Trial"]);
+  assert.equal(headNameFor(settings, "Assembly"), "Sonu bhai");
+});
+
+test("department heads: real department list, set and clear one head", () => {
+  assert.deepEqual([...HEAD_DEPARTMENTS], ["Assembly", "Mechanical", "Electrical", "Trial"]);
+  let h = setDepartmentHead({}, "Mechanical", { userId: 7, name: "Raju" });
+  assert.deepEqual(h, { Mechanical: { userId: "7", name: "Raju" } });
+  h = setDepartmentHead(h, "Assembly", { userId: null, name: "Sonu bhai" });
+  assert.deepEqual(h.Assembly, { userId: null, name: "Sonu bhai" });
+  h = setDepartmentHead(h, "Mechanical", null);
+  assert.deepEqual(Object.keys(h), ["Assembly"]);
+  assert.equal(readDepartmentHeads({ departmentHeads: "junk" }).Assembly, undefined);
+  assert.equal(readDepartmentHeads({ departmentHeads: { Assembly: "Old string" } }).Assembly.name, "Old string");
+});
+
 test("dashboard line: folded header summary — late · on hold · near, else all on time", () => {
   const st = (near = 0) => [{ key: "Assembly", near }, { key: "Trial", near: 0 }];
   const a = (kind) => ({ kind });

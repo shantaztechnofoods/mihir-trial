@@ -3,7 +3,7 @@
 > Not frozen. Changes must still not alter the frozen production flow.
 
 ## What it does
-Company and app settings, report language, PO template (from modules/purchase), the Modules on/off switch (Settings → Modules; ceiling set per deployment by VITE_ENABLED_MODULES, see src/utils/modules.js), checklist templates admin, department employees, the (disabled) admin cleanup panel, signature registration and the build badge.
+Company and app settings, report language, PO template (from modules/purchase), the Modules on/off switch (Settings → Modules; ceiling set per deployment by VITE_ENABLED_MODULES, see src/utils/modules.js), checklist templates admin, department employees, department heads (display label on the Dashboard production line — stored in `settings.departmentHeads`, grants no rights), the (disabled) admin cleanup panel, signature registration and the build badge.
 
 ## Screens
 - Settings (nav `settings`)
@@ -13,6 +13,7 @@ Company and app settings, report language, PO template (from modules/purchase), 
 |---|---|
 | `AdminCleanupPanel.jsx` | 26 |
 | `ChecklistAdminPanel.jsx` | 191 |
+| `DepartmentHeadsPanel.jsx` | 120 |
 | `EmployeeMembersPanel.jsx` | 280 |
 | `ModulesPanel.jsx` | 70 |
 | `SettingsPage.jsx` | 789 |

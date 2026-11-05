@@ -13,6 +13,10 @@ state; rules in `productionLine.js` (pure). Tapping a stage opens Machine Tracke
 (Rack → On rack, departments → Active, Ready → Completed) — Machine Tracker has no per-department filter
 and is frozen, so none was added.
 
+Each department stage shows its head under the name ("Assembly · Sonu bhai") when one is set in
+Settings → Department Workflow → Department heads (`settings.departmentHeads`, via
+`src/utils/departmentHeads.js`). Display only — hidden when not set; grants no rights.
+
 ## Screens
 - Dashboard (nav `dashboard`)
 

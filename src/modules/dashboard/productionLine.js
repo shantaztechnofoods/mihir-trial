@@ -17,6 +17,7 @@
 //     department workflow, else 1 day.
 import { readDeptWorkflowSettings, computeOverrun, isHoldOverdue, heldMinutes, formatDuration, localDateKey } from "../../utils/handoverLogic.js";
 import { readyAtOf } from "../../utils/readyPopup.js";
+import { readDepartmentHeads } from "../../utils/departmentHeads.js";
 
 export const DEFAULT_LINE_TARGET_MINUTES = 24 * 60; // owner: every department = 1 day
 export const NEAR_LIMIT_SHARE = 0.75;                // amber once 75% of the target is used
@@ -87,7 +88,8 @@ const awaitingRelease = (h) => !!(h && h.status === "pending" && h.releaseRequir
 /**
  * buildProductionLine({ machines, handovers, settings, now }) → {
  *   stages: [{ key, label, filter, count, incoming, ok, near, late, hold, tone,
- *              worstLateMinutes, nearLeftMinutes, holdReason, readyTotal? }],
+ *              worstLateMinutes, nearLeftMinutes, holdReason, head, readyTotal? }],
+ *   head = department head's name from Settings (display only), "" when not set.
  *   attention: [{ machine, id, serial, name, department, kind: "late"|"hold",
  *                 minutesInDept, targetMinutes, overMinutes, reason, filter }],
  *   readyToday, readyTotal, inProduction, targets, legend }
@@ -170,7 +172,8 @@ export function buildProductionLine({ machines = [], handovers = [], settings = 
 
   stages.Ready.count = readyToday;
   stages.Ready.readyTotal = readyTotal;
-  const list = LINE_STAGES.map((s) => ({ ...stages[s.key], tone: stageTone(stages[s.key]) }));
+  const heads = readDepartmentHeads(settings);
+  const list = LINE_STAGES.map((s) => ({ ...stages[s.key], tone: stageTone(stages[s.key]), head: heads[s.key] ? heads[s.key].name : "" }));
   // Holds first (a person must act), then the longest overtime.
   attention.sort((a, b) => (a.kind === b.kind ? (b.overMinutes || 0) - (a.overMinutes || 0) : a.kind === "hold" ? -1 : 1));
   const targets = {};
