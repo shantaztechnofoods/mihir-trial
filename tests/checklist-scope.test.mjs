@@ -132,3 +132,61 @@ test("pickTemplate: department-wide stage template is used when the BOM has none
   assert.equal(pickTemplate(t, "M-15", "Mechanical", "before_dispatch")?.id, 9, "a BOM's own template still wins");
   assert.equal(pickTemplate(t, "M-10", "Mechanical", "during_work"), null);
 });
+
+// ─── BOM screen → Checklists (2026-11-05) ──────────────────────────────────
+// Runtime is unchanged: a BOM's own row REPLACES the common row (no merge).
+// These lock that rule and prove the BOM screen edits exactly that row.
+import {
+  bomChecklistSlot, addChecklistPoint, editChecklistPoint, removeChecklistPoint, moveChecklistPoint,
+} from "../src/utils/checklistLogic.js";
+
+const FIX = [
+  { id: 9,  department: "Mechanical", bomKey: null,   stage: "before_dispatch", active: true,  items: [{ id: "c1", label: "Common A" }], updatedAt: "2026-10-01T00:00:00Z" },
+  { id: 10, department: "Mechanical", bomKey: null,   stage: "before_receive",  active: true,  items: [{ id: "c2", label: "Common B" }], updatedAt: "2026-10-01T00:00:00Z" },
+  { id: 20, department: "Mechanical", bomKey: "M-10", stage: "before_dispatch", active: true,  items: [{ id: "b1", label: "M-10 own 1" }, { id: "b2", label: "M-10 own 2" }], updatedAt: "2026-11-01T00:00:00Z" },
+  { id: 21, department: "Mechanical", bomKey: "M-10", stage: "before_receive",  active: false, items: [{ id: "b3", label: "old off" }], updatedAt: "2026-10-05T00:00:00Z" },
+  { id: 5,  department: "Electrical", bomKey: null,   stage: null,              active: false, items: [{ id: "e1", label: "switched off" }] },
+];
+
+test("runtime unchanged: Finish & Transfer shows ONLY the BOM's own list when it has one (no merge)", () => {
+  const t = pickTemplate(FIX, "M-10", "Mechanical", "before_dispatch");
+  assert.equal(t.id, 20);
+  assert.deepEqual(t.items.map((i) => i.label), ["M-10 own 1", "M-10 own 2"]);
+});
+test("runtime unchanged: Accept shows the common list when the BOM's own row is switched off", () => {
+  assert.equal(pickTemplate(FIX, "M-10", "Mechanical", "before_receive").id, 10);
+});
+test("runtime unchanged: a BOM with no own row gets the common list; switched-off common rows are never shown", () => {
+  assert.equal(pickTemplate(FIX, "M-15", "Mechanical", "before_dispatch").id, 9);
+  assert.equal(pickTemplate(FIX, "M-15", "Electrical", "before_dispatch"), null);
+});
+
+test("bomChecklistSlot: own row / fallback / inactiveOwn", () => {
+  const a = bomChecklistSlot(FIX, "M-10", "Mechanical", "before_dispatch");
+  assert.equal(a.own.id, 20); assert.equal(a.fallback, null); assert.equal(a.inactiveOwn, null);
+  const b = bomChecklistSlot(FIX, "M-10", "Mechanical", "before_receive");
+  assert.equal(b.own, null); assert.equal(b.fallback.id, 10); assert.equal(b.inactiveOwn.id, 21);
+  const c = bomChecklistSlot(FIX, "M-15", "Electrical", "before_receive");
+  assert.deepEqual(c, { own: null, fallback: null, inactiveOwn: null });
+});
+
+test("bomChecklistSlot always agrees with pickTemplate (the list the BOM screen shows = what workers see)", () => {
+  for (const bom of ["M-10", "M-15", null]) for (const d of ["Mechanical", "Electrical", "Assembly"]) for (const st of ["before_receive", "before_dispatch"]) {
+    const s = bomChecklistSlot(FIX, bom, d, st);
+    assert.equal((s.own || s.fallback)?.id ?? null, pickTemplate(FIX, bom, d, st)?.id ?? null, `${bom}/${d}/${st}`);
+  }
+});
+
+test("point helpers: add / edit / remove / move keep ids and Must do", () => {
+  const base = [{ id: "a", label: "One", required: true }, { id: "b", label: "Two", required: false }];
+  const added = addChecklistPoint(base, "  Three  ");
+  assert.equal(added.length, 3); assert.equal(added[2].label, "Three"); assert.equal(added[2].required, false); assert.ok(added[2].id);
+  assert.equal(addChecklistPoint(base, "   "), base, "blank text adds nothing");
+  const edited = editChecklistPoint(base, 0, "One fixed");
+  assert.deepEqual(edited[0], { id: "a", label: "One fixed", required: true });
+  assert.deepEqual(editChecklistPoint(base, 0, "  "), base, "blank edit keeps the old text");
+  assert.deepEqual(removeChecklistPoint(base, 0).map((i) => i.id), ["b"]);
+  assert.deepEqual(moveChecklistPoint(base, 1, -1).map((i) => i.id), ["b", "a"]);
+  assert.deepEqual(moveChecklistPoint(base, 0, -1).map((i) => i.id), ["a", "b"], "out of range is a no-op");
+  assert.equal(base[0].label, "One", "input never mutated");
+});

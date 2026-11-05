@@ -6,6 +6,7 @@ import ItemSearchSelect from "../../shared/components/ItemSearchSelect.jsx";
 import { receivedPoRates, bomCostLines, bomCostSummary, validateBomLines, formatINR } from "../../utils/bomCost.js";
 import { rackCapacityFor, slotLabel } from "../../utils/rackSlots.js";
 import { BomChecklistSlots } from "./BomChecklistSlots.jsx";
+import { BomChecklistsPanel } from "./BomChecklistsPanel.jsx";
 import { BomCostPanel } from "./BomCostPanel.jsx";
 import { CHECKLIST_DEPTS, bomHasAllDurations, durationsFormFrom, durationsStoreFrom, validateDurationsForm } from "./bomDurations.js";
 import { BomPhotoField, DeptDurationFields, RackStatusNote } from "./BomFields.jsx";
@@ -16,7 +17,7 @@ import { fmtDate, roundQty } from "../../shared/format.js";
 import { OrgStep } from "../../shared/ui/OrgLayout.jsx";
 import { Btn } from "../../shared/ui/primitives.jsx";
 
-export function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock, onClose, onIssue, onCreateMachineFirst = null, onAbortMachine = null, onUpdateBOM, onRenameBOM, allBomKeys = [], onAfterRename, serialNo = "", rackReady = 0, settings = {}, checklistTemplates = [], onCreateChecklistTemplate, onUpdateChecklistTemplate, onDeleteChecklistTemplate, canConfigChecklist = false,
+export function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpdateStock, onClose, onIssue, onCreateMachineFirst = null, onAbortMachine = null, onUpdateBOM, onRenameBOM, allBomKeys = [], onAfterRename, serialNo = "", rackReady = 0, settings = {}, checklistTemplates = [], onCreateChecklistTemplate, onUpdateChecklistTemplate, onDeleteChecklistTemplate, onSaveBomChecklist = null, canConfigChecklist = false,
   // Feature 2 — Req 2: history of outward issues for serial-number deduplication.
   outwardLog = [],
   // 2026-10-22 — navigate to another page (e.g. Inventory from the Critical
@@ -1063,6 +1064,13 @@ export function BOMDrawer({ bomKey, bom, units, onUnitsChange, items, handleUpda
             <OrgStep n={4} id="checklists" title="Checklists" hint="What each department must check for this machine model. ✓ = checklist ready."
                      status={<span className="org-step-pill" data-done={deptsWithList.length === CHECKLIST_DEPTS.length ? "1" : "0"}>{deptsWithList.length} of {CHECKLIST_DEPTS.length} ✓</span>}>
               <div className="space-y-3">
+                {/* 2026-11-05 — the lists workers actually see for this BOM,
+                    editable point by point (BomChecklistsPanel). The glance +
+                    full editor below stay for "Must do" and Reuse. */}
+                <BomChecklistsPanel bomKey={bomKey} templates={checklistTemplates}
+                                    canEdit={canConfigChecklist} onSave={onSaveBomChecklist}
+                                    allBomKeys={allBomKeys} />
+                <div className="bcl-advanced-label">Full list editor (Must do, copy from a template)</div>
                 <div className="org-dept-glance" data-org-checklist-glance>
                   {CHECKLIST_DEPTS.map((d) => {
                     const n = tpl.filter((t) => t.department === d).length;
