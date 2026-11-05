@@ -1047,7 +1047,7 @@ export function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, 
                       <XAxis dataKey="month" tick={{fill:"#475569",fontSize:9}} axisLine={false} tickLine={false} />
                       <YAxis tick={{fill:"#475569",fontSize:9}} axisLine={false} tickLine={false} />
                       <Tooltip contentStyle={{background:"var(--surface-elevated)",border:"1px solid var(--border-rim)",borderRadius:8,fontSize:11}} />
-                      <Area type="monotone" dataKey="amount" stroke="#2E50D6" strokeWidth={2} fill="url(#hrPG)" name="Amount ₹" />
+                      <Area isAnimationActive={false} type="monotone" dataKey="amount" stroke="#2E50D6" strokeWidth={2} fill="url(#hrPG)" name="Amount ₹" />
                     </AreaChart>
                   </ResponsiveContainer>
                   )}</ChartSlot>
@@ -1065,7 +1065,7 @@ export function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, 
                       <XAxis dataKey="name" tick={{fill:"#475569",fontSize:8}} axisLine={false} tickLine={false} />
                       <YAxis tick={{fill:"#475569",fontSize:9}} axisLine={false} tickLine={false} />
                       <Tooltip contentStyle={{background:"var(--surface-elevated)",border:"1px solid var(--border-rim)",borderRadius:8,fontSize:11}} />
-                      <Bar dataKey="value" fill="#2640B0" radius={[4,4,0,0]} name="Amount ₹" />
+                      <Bar isAnimationActive={false} dataKey="value" fill="#2640B0" radius={[4,4,0,0]} name="Amount ₹" />
                     </BarChart>
                   </ResponsiveContainer>
                   )}</ChartSlot>
@@ -1140,7 +1140,7 @@ export function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, 
                       <XAxis dataKey="month" tick={{fill:"#475569",fontSize:9}} axisLine={false} tickLine={false} />
                       <YAxis tick={{fill:"#475569",fontSize:9}} axisLine={false} tickLine={false} />
                       <Tooltip contentStyle={{background:"var(--surface-elevated)",border:"1px solid var(--border-rim)",borderRadius:8,fontSize:11}} />
-                      <Bar dataKey="qty" fill="#10b981" radius={[4,4,0,0]} name="Qty" />
+                      <Bar isAnimationActive={false} dataKey="qty" fill="#10b981" radius={[4,4,0,0]} name="Qty" />
                     </BarChart>
                   </ResponsiveContainer>
                   )}</ChartSlot>

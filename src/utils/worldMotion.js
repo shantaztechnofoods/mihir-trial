@@ -105,6 +105,13 @@ export function installSheetGestures() {
 // installHeaderCompact()  the sticky page header gets a soft shadow once the page scrolls
 //                    (shadow only — no size change, so it can never oscillate).
 const REVEAL = ".section-card, .kpi-tile, .hero-tile, .wu-card, .wu-tile, .rack-crate, .wu-sent";
+// frame-budget (2026-11-05): no layout reads. The first version called
+// getBoundingClientRect on every new card from a document-wide MutationObserver
+// (a forced synchronous layout right after every React commit that added a
+// card) and sorted the batch by rect. Now the IntersectionObserver's own first
+// report decides: on screen → left alone; off screen → hidden instantly (it is
+// off screen, nobody sees that) and revealed when it scrolls in. Order comes
+// from the observer's entry rects (computed by the browser, free).
 export function installScrollReveal() {
   if (typeof window === "undefined" || window.__wuReveal || !("IntersectionObserver" in window) || reduced()) return;
   window.__wuReveal = true;
@@ -112,28 +119,33 @@ export function installScrollReveal() {
   let flushT = 0;
   const flush = () => {
     flushT = 0;
-    batch.sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top)
-      .forEach((el, i) => { el.style.transitionDelay = `${Math.min(i, 8) * 40}ms`; el.classList.add("wu-in"); });
+    batch.sort((a, b) => a.top - b.top)
+      .forEach(({ el }, i) => { el.style.transitionDelay = `${Math.min(i, 8) * 40}ms`; el.classList.add("wu-in"); });
     batch = [];
   };
   const io = new IntersectionObserver((entries) => {
     entries.forEach((e) => {
+      const el = e.target;
+      if (!el.__wuArmed) {                       // first report for this element
+        el.__wuArmed = true;
+        if (e.isIntersecting) { io.unobserve(el); return; }   // already visible: never hide it
+        el.classList.add("wu-reveal");
+        return;
+      }
       if (!e.isIntersecting) return;
-      io.unobserve(e.target); batch.push(e.target);
+      io.unobserve(el); batch.push({ el, top: e.boundingClientRect.top });
       if (!flushT) flushT = requestAnimationFrame(flush);
     });
-  }, { rootMargin: "0px 0px -6% 0px", threshold: 0.01 });
+  }, { threshold: 0 });
   const consider = (el) => {
     if (el.__wuSeen || el.closest(".modal-backdrop, [data-my-dashboard], .rp-backdrop, .tc-form, .app-sidebar, .mr-paper, .rpt-sheet")) return;
     el.__wuSeen = true;
-    const r = el.getBoundingClientRect();
-    if (r.top < window.innerHeight && r.bottom > 0) return;   // already visible: never hide it
-    el.classList.add("wu-reveal"); io.observe(el);
+    io.observe(el);
   };
   const scan = (root) => {
     if (!root || root.nodeType !== 1) return;
     if (root.matches && root.matches(REVEAL)) consider(root);
-    root.querySelectorAll && root.querySelectorAll(REVEAL).forEach(consider);
+    if (root.firstElementChild && root.querySelectorAll) root.querySelectorAll(REVEAL).forEach(consider);
   };
   const mo = new MutationObserver((muts) => muts.forEach((m) => m.addedNodes.forEach(scan)));
   const start = () => { scan(document.body); mo.observe(document.body, { childList: true, subtree: true }); };

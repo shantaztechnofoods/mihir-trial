@@ -30,6 +30,7 @@ cd "$(dirname "$0")/.."
 REPO="${REPO:-shantaztechnofoods/mihir-trial}"  # renamed from purchase_inventory_os 2026-11-04 (old name 403s via gh api proxy)
 SESSION_URL="${CLAUDE_SESSION_URL:-https://claude.ai/code/session_011Kbdu9cV9BoczPpaspZYws}"
 LOGS="$(mktemp -d /tmp/ship.XXXX)"
+E2E_SOLO="frame-budget"   # suites that measure frame times: run alone (see tests/e2e/frame-budget.mjs)
 CACHE="${SHIP_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/shantaz-ship}"; mkdir -p "$CACHE/dist"
 NPROC=$(nproc 2>/dev/null || echo 2)
 # Each run gets its own free port, so several sessions / agents can ship at the same time.
@@ -201,13 +202,16 @@ cmd_check(){
     while read -r s; do [ -n "$s" ] && suites+=("tests/e2e/$s.mjs"); done < <(python3 scripts/e2e-pick.py --changed "$base")
   fi
   say "running ${#suites[@]} browser suites, $par at a time, longest first ..."
-  local running=0
+  local running=0; local -a solo=()
   while read -r s; do
     [ -n "$s" ] || continue
+    # timing-sensitive suites (frame-budget) run alone after the others, never next to another browser
+    [[ " $E2E_SOLO " == *" $(basename "$s" .mjs) "* ]] && { solo+=("$s"); continue; }
     while [ "$(jobs -rp | wc -l)" -ge "$par" ]; do wait -n 2>/dev/null || true; done
     e2e_job "e2e-$(basename "$s" .mjs)" "$s"
   done < <([ ${#suites[@]} -gt 0 ] && e2e_order "${suites[@]}")
   wait
+  for s in "${solo[@]}"; do e2e_job "e2e-$(basename "$s" .mjs)" "$s"; wait; done
   pkill -f -- "--port $PORT --strictPort" 2>/dev/null || true
   heavy_unlock
   echo "phase-e2e $(since "$te")" >>"$LOGS/times"; echo "total $(el | tr -d s)" >>"$LOGS/times"

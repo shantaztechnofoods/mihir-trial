@@ -10,12 +10,17 @@
   :root { --dur-out: 180ms; --dur-move: 240ms; --ring-ok: rgba(21, 128, 61, .55); }
 
   /* ── Press: 0.98 in 100 ms (calm, never a bounce) ─────────────────────── */
-  .mt-premium button:not(:disabled) { transition-property: transform, background-color, box-shadow, border-color, color, opacity; }
+  .mt-premium button:not(:disabled) { transition-property: transform, background-color, color, opacity; }
   .mt-premium button:not(:disabled):active { transform: scale(.98); transition-duration: 100ms; }
   .mt-premium .wu-step:not(:disabled):active { transform: scale(.98); }
 
-  /* ── Card entrance: 260 ms, first 4 cards stagger, the rest come at once ─ */
+  /* ── Card entrance: 260 ms, first 4 cards stagger, the rest come at once ─
+     mt-smooth: plays ONCE when the page opens (.mt-enter on the root for
+     ~0.8 s), never again on a re-render / a card that moved section, and
+     only for the first 6 cards of a section (the rest are below the fold). */
   [data-staff-section] .mt-card { animation-duration: 260ms !important; }
+  .mt-premium:not(.mt-enter) [data-staff-section] .mt-card,
+  [data-staff-section] .grid > :nth-child(n+7) .mt-card, [data-staff-section] .grid > .mt-card:nth-child(n+7) { animation-name: none !important; }
   [data-staff-section] .grid > :nth-child(2) .mt-card, [data-staff-section] .grid > .mt-card:nth-child(2) { animation-delay: 40ms; }
   [data-staff-section] .grid > :nth-child(3) .mt-card, [data-staff-section] .grid > .mt-card:nth-child(3) { animation-delay: 80ms; }
   [data-staff-section] .grid > :nth-child(4) .mt-card, [data-staff-section] .grid > .mt-card:nth-child(4) { animation-delay: 120ms; }
@@ -24,26 +29,28 @@
   .mt-arrive { position: relative; }
   .mt-arrive::after {
     content: ""; position: absolute; inset: -3px; border-radius: calc(var(--r-card, 18px) + 3px); pointer-events: none;
-    box-shadow: 0 0 0 3px var(--ring-ok), 0 0 0 7px rgba(21, 128, 61, .10); opacity: 0;
+    box-shadow: 0 0 0 3px var(--ring-ok), 0 0 0 7px rgba(21, 128, 61, .10); opacity: 0; will-change: opacity;
     animation: mt-ring 1100ms var(--ease-enter) 140ms;
   }
   @keyframes mt-ring { 0% { opacity: 0; } 18% { opacity: 1; } 60% { opacity: 1; } 100% { opacity: 0; } }
   .wu-sent.mt-arrive::after { border-radius: 14px; }
 
   /* ── Route pill glides (Rack → Accept → Work → Send) ──────────────────── */
+  /* mt-smooth: placed by index (steps are equal flex columns, gap 2px, padding
+     3px) — transform only, no width animation, no layout read in JS */
   .wu-route[data-glide]::before {
-    content: ""; position: absolute; z-index: 0; top: 3px; bottom: 3px; left: 0;
-    width: var(--pill-w, 0); transform: translateX(var(--pill-x, 0));
+    content: ""; position: absolute; z-index: 0; top: 3px; bottom: 3px; left: 3px;
+    width: calc((100% - 6px - (var(--pill-n, 4) - 1) * 2px) / var(--pill-n, 4));
+    transform: translateX(calc(var(--pill-i, 0) * (100% + 2px)));
     border-radius: 11px; background: var(--paper);
     box-shadow: 0 1px 3px rgba(11, 18, 32, .10), 0 0 0 .5px rgba(11, 18, 32, .06);
   }
-  .wu-route[data-glide="on"]::before { transition: transform var(--dur-move) var(--ease-move), width var(--dur-move) var(--ease-move); }
+  .wu-route[data-glide="on"]::before { transition: transform var(--dur-move) var(--ease-move); }
   .wu-route[data-glide] .wu-step { position: relative; z-index: 1; }
   .wu-route[data-glide] .wu-step.is-now { background: transparent; box-shadow: none; }
   .wu-step .wu-step-n, .wu-step .wu-step-l { transition: color var(--dur-ui) var(--ease-enter); }
   /* rolling numbers keep the exact box of the plain number (no height jump) */
   .wu-step-n { display: inline-flex; align-items: center; justify-content: center; height: 20px; }
-  .wu-step-n number-flow-react, .wu-count number-flow-react { font: inherit; color: inherit; line-height: 1; --number-flow-mask-height: .12em; }
   .wu-count { transition: background-color var(--dur-ui) var(--ease-enter), color var(--dur-ui) var(--ease-enter); }
 
   /* ── Status changes happen in place ──────────────────────────────────── */
@@ -68,10 +75,9 @@
   .mt-left svg { flex-shrink: 0; color: var(--wait, #b45309); }
   .mt-left + div { border-top: 0 !important; }
 
-  /* ── Checklist ✗: the reason row opens in place (200 ms, no jump) ─────── */
-  .ck-reason { display: grid; grid-template-rows: 1fr; animation: mt-ck-open 200ms var(--ease-enter) both; }
-  .ck-reason > * { min-height: 0; overflow: hidden; padding: 6px; margin: -6px; }
-  @keyframes mt-ck-open { from { grid-template-rows: 0fr; opacity: 0; padding-bottom: 0; } to { grid-template-rows: 1fr; opacity: 1; } }
+  /* ── Checklist ✗: the reason row fades + settles in (opacity/transform only;
+     mt-smooth: was a grid-template-rows height animation = layout every frame) */
+  .ck-reason { animation: mt-reveal 180ms var(--ease-enter) backwards; }
   .ck-no { transition: background-color 150ms, color 150ms, border-color 150ms, transform 100ms var(--ease-enter); }
   .ck-no[aria-pressed="true"] { animation: mt-ck-x 200ms var(--ease-pop); }
   @keyframes mt-ck-x { from { transform: scale(.88); } to { transform: none; } }
@@ -88,9 +94,8 @@
     background-image: linear-gradient(100deg, transparent 30%, rgba(38, 64, 176, .07) 50%, transparent 70%) !important;
     background-size: 220% 100% !important; animation: wu-shimmer 1.2s linear infinite;
   }
-  /* the written words fade in when writing ends */
-  .modal-backdrop .vn-field > input, .modal-backdrop .vn-field > textarea { animation: mt-text-in 200ms var(--ease-enter); }
-  @keyframes mt-text-in { from { opacity: .35; } to { opacity: 1; } }
+  /* (mt-smooth: the "words fade in" rule was removed — it only ever played when
+     a dialog opened, on every field at once, on top of the sheet slide) */
   .modal-backdrop .vn-writing { animation: mt-reveal 200ms var(--ease-enter) backwards; }
 
   /* ── Ghost host (exiting cards / sheets) ─────────────────────────────── */
@@ -126,5 +131,4 @@ html.wu-lite .wu-confetti { display: none !important; }
   .ck-no[aria-pressed="true"], .ck-reason .vn-mic:not(.vn-mic-busy) { animation: none; }
   .modal-backdrop .vn-bar::after { animation: none; opacity: .6; }
   .modal-backdrop .vn-field:has(> .vn-mic-busy) > input, .modal-backdrop .vn-field:has(> .vn-mic-busy) > textarea { animation: none; }
-  .modal-backdrop .vn-field > input, .modal-backdrop .vn-field > textarea { animation: mt-text-in 120ms ease; }
 }

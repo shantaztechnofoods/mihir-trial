@@ -18,7 +18,7 @@ import sys
 ROOT = os.environ.get("E2E_PICK_ROOT") or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 E2E = os.path.join(ROOT, "tests", "e2e")
 SMOKE = ["go-live-workflows", "mobile-sweep"]          # whole-app walk-through, phone + desktop
-MT = ["go-live-workflows", "pending-part-or-comment", "sender-undo", "staff-hold", "mt-polish", "back-closes-popup"]
+MT = ["go-live-workflows", "pending-part-or-comment", "sender-undo", "staff-hold", "mt-polish", "back-closes-popup", "frame-budget"]
 
 # (regex on the App.jsx component name OR on a file path, suites). First match wins.
 COMPONENT_MAP = [
@@ -34,6 +34,9 @@ COMPONENT_MAP = [
     (r"^(LoginPage|Login\w*|readBootShell|adoptBootAnimations|probeHero|heroMode)$", ["login-speed"]),
 ]
 PATH_MAP = [
+    # motion / CSS / dialog shells → the ERP-wide frame budget (2026-11-05)
+    (r"^src/modules/machine-tracker/mtMotion", MT + ["ready-popup", "delay-reasons", "compact-checklist", "mobile-sweep"]),
+    (r"^src/(world-ui\.css|index\.css|utils/worldMotion|shared/(ui/Count|motion/))", ["frame-budget"] + SMOKE),
     (r"^(src/main\.jsx|src/app/(LoginPage|loginBoot|loadApp)|src/shared/components/(LoginBrand3D|shantazLogo)|src/auth/AuthContext|scripts/vite-login-boot|index\.html|vite\.config)", ["login-speed"] + SMOKE),
     (r"^tests/e2e/lib/", SMOKE),
     (r"^src/realtime/|liveSync", ["live-sync"]),
