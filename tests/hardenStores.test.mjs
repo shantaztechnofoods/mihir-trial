@@ -106,3 +106,20 @@ test("a failed load with a corrupt local cache falls back to [] instead of crash
   const p = await quiet(() => pendingIt.fetchPendingItems());
   assert.ok(Array.isArray(p));
 });
+
+// 2026-11-05 — a stored status goes stale when min_stock is edited; fromRow must
+// always recompute from stock vs min (stock 0 / min 10 stored 'safe' → 'critical').
+test("items: status is recomputed from stock vs min, never trusted from the row", async () => {
+  const rows = [
+    { id: 1, code: "Z0", category: "Cat", name: "zero", stock: 0,  min_stock: 10, status: "safe" },
+    { id: 2, code: "W5", category: "Cat", name: "low",  stock: 5,  min_stock: 10, status: "safe" },
+    { id: 3, code: "S9", category: "Cat", name: "ok",   stock: 50, min_stock: 10, status: "critical" },
+  ];
+  const b = {};
+  for (const m of ["select", "eq", "order", "range"]) b[m] = () => b;
+  b.then = (ok, err) => Promise.resolve({ data: rows, error: null }).then(ok, err);
+  CLIENT = { from: () => b };
+  const g = await quiet(() => items.fetchItems());
+  const by = Object.fromEntries(g.Cat.map((i) => [i.code, i.status]));
+  assert.deepEqual(by, { Z0: "critical", W5: "warning", S9: "safe" });
+});
