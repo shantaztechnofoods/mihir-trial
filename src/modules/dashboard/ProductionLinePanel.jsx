@@ -4,7 +4,7 @@
 // carries an icon + words, so colour never has to be remembered.
 import React, { useEffect, useMemo, useState } from "react";
 import { Check, Timer, AlertTriangle, PauseCircle, Inbox, ChevronRight } from "lucide-react";
-import { buildProductionLine, stageStatusLines } from "./productionLine.js";
+import { buildProductionLine, stageStatusLines, lineSummary } from "./productionLine.js";
 import { formatDuration } from "../../utils/handoverLogic.js";
 
 const ICONS = { ok: Check, near: Timer, late: AlertTriangle, hold: PauseCircle, incoming: Inbox };
@@ -35,19 +35,34 @@ export function ProductionLinePanel({ machines = [], handovers = [], settings = 
   const open = (filter) => onOpenMachines?.(filter);
   const top = line.attention.slice(0, 5);
   const lg = line.legend;
+  // Fold / unfold, same as Machine Tracker's "Issue a BOM" section: open by
+  // default on a wide screen, folded on a phone; an explicit choice is
+  // remembered per browser.
+  const [isOpen, setIsOpen] = useState(() => {
+    try { const v = localStorage.getItem("erp_dash_line_open"); if (v !== null) return v === "1"; } catch {}
+    return typeof window === "undefined" || window.innerWidth >= 768;
+  });
+  const toggle = () => setIsOpen((v) => { try { localStorage.setItem("erp_dash_line_open", v ? "0" : "1"); } catch {} return !v; });
 
   return (
     <section className="section-card dash-line" data-production-line aria-labelledby="dash-line-title">
-      <div className="dash-line-head">
-        <div>
-          <h2 id="dash-line-title" className="dash-line-title">Production line today</h2>
-          <div className="dash-line-meta">{lg.same ? `Target: ${lg.target} in each department` : "Target per department (Settings)"} · tap a stage</div>
-        </div>
-        <div className="dash-line-ready" data-ready-today={line.readyToday}>
-          <Check size={14} strokeWidth={2.25} aria-hidden="true" />
-          Ready today: <b>{line.readyToday}</b>
-        </div>
-      </div>
+      <h2 className="dash-line-h">
+        <button type="button" className="dash-line-head dash-line-toggle" onClick={toggle} aria-expanded={isOpen}
+                aria-controls="dash-line-body" data-line-toggle>
+          <span className="dash-line-head-l">
+            <span id="dash-line-title" className="dash-line-title">Production line today</span>
+            {!isOpen && <span className="dash-line-summary" data-line-summary>{lineSummary(line)}</span>}
+          </span>
+          <span className="dash-line-ready" data-ready-today={line.readyToday}>
+            <Check size={14} strokeWidth={2.25} aria-hidden="true" />
+            Ready today: <b>{line.readyToday}</b>
+          </span>
+          <span className="dash-line-fold" aria-hidden="true">{isOpen ? "Hide" : "Show"} <span className="dash-line-arrow" data-open={isOpen ? "" : undefined}>▼</span></span>
+        </button>
+      </h2>
+
+      {isOpen && <div id="dash-line-body" className="dash-line-body" data-line-body>
+      <div className="dash-line-meta">{lg.same ? `Target: ${lg.target} in each department` : "Target per department (Settings)"} · tap a stage</div>
 
       <div className="dash-line-strip">
         {line.stages.map((st) => {
@@ -112,6 +127,7 @@ export function ProductionLinePanel({ machines = [], handovers = [], settings = 
           <button type="button" className="dash-line-more" onClick={() => open("active")}>+{line.attention.length - 5} more in Machine Tracker</button>
         )}
       </div>
+      </div>}
     </section>
   );
 }

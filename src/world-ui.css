@@ -729,6 +729,23 @@
   .dash-line-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
   .dash-line-title { margin: 0; font: 600 16px/1.25 var(--font-ui); color: var(--ink); letter-spacing: -0.01em; }
   .dash-line-meta { margin-top: 4px; font-size: 12px; line-height: 1.4; color: var(--ink-3); }
+  /* Fold / unfold (2026-11-05) — the whole header line is one 44px button,
+     "Hide ▲ / Show ▼" like Machine Tracker's "Issue a BOM". Arrow turns and
+     the body fades in, 200 ms; none under reduced motion. */
+  .dash-line-h { margin: 0; font: inherit; }
+  .dash-line-toggle { align-items: center; min-height: 44px; margin: -4px -8px 0; padding: 4px 8px; width: calc(100% + 16px);
+    border: 0; background: none; text-align: left; color: inherit; border-radius: var(--r-ctl); cursor: pointer; }
+  .dash-line-toggle[aria-expanded="false"] { margin-bottom: -4px; }
+  @media (hover: hover) and (pointer: fine) { .dash-line-toggle:hover { background: var(--sunk); } }
+  .dash-line-toggle:focus-visible { outline: 2px solid var(--action); outline-offset: 2px; }
+  .dash-line-head-l { flex: 1 1 auto; display: flex; flex-direction: column; min-width: 0; }
+  .dash-line-summary { margin-top: 4px; font-size: 12px; line-height: 1.4; font-weight: 500; color: var(--ink-3); }
+  .dash-line-fold { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; font-size: 11px; font-weight: 600; color: var(--ink-3); }
+  .dash-line-arrow { display: inline-block; transition: transform var(--dur-ui) var(--ease-enter); }
+  .dash-line-arrow[data-open] { transform: rotate(180deg); }
+  .dash-line-body { animation: dash-line-unfold var(--dur-ui) var(--ease-enter) both; }
+  .dash-line-body > .dash-line-meta { margin: 0 0 8px; }
+  @keyframes dash-line-unfold { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
   .dash-line-ready { display: inline-flex; align-items: center; gap: 4px; min-height: 24px; color: var(--ok); font-size: 14px; font-weight: 500; white-space: nowrap; }
   .dash-line-ready b { font-weight: 600; font-variant-numeric: tabular-nums; }
 
@@ -806,6 +823,8 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .dash-line-num { animation: none; }
+  .dash-line-body { animation: none; }
+  .dash-line-arrow { transition: none; }
 }
 
 /* ═══ UI P0 PLATFORM UTILITIES (2026-11-05) — native, 0 KB JS ══════════════
