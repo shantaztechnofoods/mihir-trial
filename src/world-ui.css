@@ -812,3 +812,46 @@
 @media (prefers-reduced-motion: reduce) {
   .dash-line-num { animation: none; }
 }
+
+/* ═══ UI P0 PLATFORM UTILITIES (2026-11-05) — native, 0 KB JS ══════════════
+   Motion tokens (vectorlab motion): 100 · 150 · 200 · 300 ms; enter = ease-out,
+   exit = ease-in; only transform / opacity animate. Every feature is behind
+   @supports or is ignored by older browsers, which keep today's instant look.
+   View Transitions run through src/shared/motion/viewTransition.js.          */
+:root {
+  --motion-100: 100ms; --motion-150: 150ms; --motion-200: 200ms; --motion-300: 300ms;
+  --ease-out: cubic-bezier(.16, 1, .3, 1); --ease-in: cubic-bezier(.7, 0, .84, 0);
+}
+@media screen {
+  /* View Transitions: a calm 200 ms cross-fade; .wu-vt-main names the page area */
+  ::view-transition-old(root) { animation-duration: var(--motion-150); animation-timing-function: var(--ease-in); }
+  ::view-transition-new(root) { animation-duration: var(--motion-200); animation-timing-function: var(--ease-out); }
+  .wu-vt-main { view-transition-name: wu-main; }
+  ::view-transition-group(wu-main) { animation-duration: var(--motion-200); animation-timing-function: var(--ease-out); }
+
+  /* Container queries: a card lays itself out by its own width, not the screen's */
+  .wu-cq { container-type: inline-size; container-name: wu-card; }
+  @container wu-card (max-width: 420px) {
+    .wu-cq-stack { flex-direction: column !important; align-items: stretch !important; }
+    .wu-cq-hide { display: none !important; }
+  }
+
+  /* Long lists: skip layout / paint of rows that are off screen */
+  .wu-cv { content-visibility: auto; contain-intrinsic-size: auto 64px; }
+
+  /* Scroll-driven: a sticky header that settles (shadow in) as the page scrolls */
+  @supports (animation-timeline: scroll()) {
+    .wu-scroll-settle { animation: wu-settle linear both; animation-timeline: scroll(nearest block); animation-range: 0 96px; }
+    @keyframes wu-settle { from { box-shadow: 0 0 0 transparent; } to { box-shadow: var(--e1); } }
+  }
+
+  /* Anchor positioning: a tooltip / menu tied to its button; others keep the current CSS */
+  @supports (anchor-name: --a) {
+    .wu-anchor { anchor-name: --wu-anchor; }
+    .wu-anchored { position: fixed; position-anchor: --wu-anchor; position-area: block-end span-inline-end; margin-top: 6px; position-try-fallbacks: flip-block, flip-inline; }
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+  .wu-scroll-settle { animation: none !important; }
+}

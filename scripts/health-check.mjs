@@ -437,6 +437,16 @@ if (ONLY.includes("bundle")) {
       report("bundle", `first download (entry + preloads + css) ≤ ${kb(FIRST_GZ)} gzip`, firstGz > FIRST_GZ ? [`${kb(firstGz)} > ${kb(FIRST_GZ)}`] : [], { detail: `${kb(firstGz)} gzip in ${first.length} files` });
       const heavy = [entry, ...preloads].filter((u) => /charts|xlsx/i.test(u));
       report("bundle", "recharts / xlsx stay out of the first download", heavy.map((u) => `${u} is preloaded`));
+      // UI P0 (2026-11-05): the after-login UI libraries never enter the login download.
+      const UI_LIBS = [["sonner", /data-sonner-toaster/], ["@number-flow/react", /number-flow-react|<number-flow/], ["@tanstack/react-table", /getToggleSortingHandler/], ["@tanstack/react-virtual", /measureElement/]];
+      const uiProblems = [];
+      for (const u of [entry, ...preloads]) {
+        if (/AppToaster|DataTable|motionFeatures|MotionProvider/i.test(u)) { uiProblems.push(`${u} is in the first download`); continue; }
+        const p2 = join(DIST, u.replace(/^\//, "")); if (!existsSync(p2)) continue;
+        const txt = readFileSync(p2, "utf8");
+        for (const [name, re] of UI_LIBS) if (re.test(txt)) uiProblems.push(`${name} found in ${u}`);
+      }
+      report("bundle", "motion / sonner / number-flow / tanstack stay out of the first download", uiProblems);
     }
   }
 }
