@@ -3423,6 +3423,33 @@ export default function App() {
     });
     return res;
   };
+  // 2026-11-05 — BOM screen → Checklists. Writes ONE BOM's own list for one
+  // (department, stage): updates its row (templateId) or creates it. Never
+  // deletes — an emptied list is switched off (active=false) so the common
+  // list applies again. Same store calls as the Settings handlers above.
+  const handleSaveBomChecklist = async ({ bomKey, department, stage, templateId = null, items = [], active = true, name = "", change = "" }) => {
+    if (!bomKey || !department || !stage) return { success: false, error: "Missing BOM, department or stage." };
+    const clean = (items || []).map((it) => ({ id: it.id, label: String(it.label || "").trim(), required: !!it.required })).filter((it) => it.label);
+    const stageLabel = stage === "before_receive" ? "Before receive" : stage === "before_dispatch" ? "Before transfer" : stage;
+    let res;
+    if (templateId) {
+      res = await updateTemplate(templateId, { items: clean, active: !!active });
+      if (!res.success) return res;
+      const now = new Date().toISOString();
+      setChecklistTemplates((prev) => prev.map((t) => t.id === templateId ? { ...t, items: clean, active: !!active, version: (t.version || 1) + 1, updatedAt: now } : t));
+    } else {
+      res = await createTemplate({ department, stage, bomKey, name: name || `${department} · ${stageLabel}`, items: clean, active: true });
+      if (!res.success) return res;
+      setChecklistTemplates((prev) => [res.template, ...prev]);
+    }
+    logAudit({
+      type: "bom_checklist_changed", module: "BOM",
+      action: `BOM checklist ${change || "updated"}: ${bomKey} · ${department} · ${stageLabel}`,
+      ref: bomKey,
+      details: { templateId: templateId || res.template?.id || null, department, stage, items: clean.length, active: templateId ? !!active : true, change },
+    });
+    return res;
+  };
 
   // Migration 029 — save a user's department assignments (admin action).
   // Updates both Supabase and the in-memory allUsers list so Settings UI
@@ -4171,6 +4198,7 @@ export default function App() {
     onCreateChecklistTemplate: handleCreateChecklistTemplate,
     onUpdateChecklistTemplate: handleUpdateChecklistTemplate,
     onDeleteChecklistTemplate: handleDeleteChecklistTemplate,
+    onSaveBomChecklist: handleSaveBomChecklist,
     onNavigate: setActivePage,
     onStockIssueFailed: (bomKey, failures) =>
       flashSaveError(`Issue ${bomKey}`,

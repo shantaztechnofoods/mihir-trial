@@ -88,7 +88,9 @@ export async function fetchTemplates() {
 
 export async function createTemplate(t) {
   if (!isSupabaseEnabled()) {
-    const row = { id: Date.now(), ...tFrom({ ...tTo(t), created_at: new Date().toISOString() }) };
+    // id AFTER the spread: tFrom() returns `id: undefined` for an unsaved row,
+    // which used to wipe the local id, so a later edit could never find it.
+    const row = { ...tFrom({ ...tTo(t), created_at: new Date().toISOString() }), id: Date.now() };
     setLocalT([row, ...getLocalT()]);
     return { success: true, template: row };
   }

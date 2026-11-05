@@ -11,6 +11,11 @@ export function ChecklistAdminPanel({ templates = [], canConfig = false, onCreat
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [preview, setPreview] = useState(false);  // Preview-mode toggle for the editor
+  // 2026-11-05 — switched-off (active=false) templates are kept (never deleted)
+  // but folded into a closed "Switched off (N)" section below the main list.
+  const [showOff, setShowOff] = useState(false);
+  const activeTemplates = templates.filter((t) => t && t.active !== false);
+  const offTemplates    = templates.filter((t) => t && t.active === false);
 
   const start = (tpl) => setEditing(tpl ? { ...tpl, items: Array.isArray(tpl.items) ? tpl.items : [] } : { department: "Assembly", name: "", items: [], active: true });
   const addItem = () => setEditing((e) => e && ({ ...e, items: [...e.items, { id: `i${Date.now()}`, label: "", required: false }] }));
@@ -48,6 +53,23 @@ export function ChecklistAdminPanel({ templates = [], canConfig = false, onCreat
     if (res && res.success === false) alert(res.error || "Delete failed.");
   };
 
+  const renderRow = (t) => (
+            <div key={t.id} className="rounded-lg px-3 py-2 flex items-center gap-3 flex-wrap"
+                 style={{ background: t.active === false ? "rgba(17,24,39,0.03)" : "rgba(46, 80, 214,0.05)", border: `1px solid ${t.active === false ? "rgba(17,24,39,0.06)" : "rgba(46, 80, 214,0.25)"}` }}>
+              <span className="text-[11px] font-black text-blue-300 w-28">{t.department}</span>
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full border border-slate-200 bg-white text-slate-600" title={t.bomKey ? `Only for BOM ${t.bomKey}` : "Common – all BOMs"}>{t.bomKey || "Common"}</span>
+              <span className="text-[12px] font-bold text-slate-900 flex-1">{t.name}</span>
+              <span className="text-[10px] text-slate-500">{(t.items || []).length} item{(t.items || []).length === 1 ? "" : "s"} · v{t.version || 1}</span>
+              {t.active === false && <span className="text-[9px] font-bold text-slate-500 px-1.5 py-0.5 rounded-full bg-white/5 border border-white/10">inactive</span>}
+              {canConfig && (
+                <>
+                  <button onClick={() => start(t)} className="text-[10px] font-bold text-blue-300 hover:text-blue-200 px-2 py-0.5 rounded border border-blue-500/30 bg-blue-500/10">Edit</button>
+                  <button onClick={() => remove(t.id)} className="text-[10px] font-bold text-red-300 hover:text-red-200 px-2 py-0.5 rounded border border-red-500/30 bg-red-500/10">Delete</button>
+                </>
+              )}
+            </div>
+  );
+
   return (
     <Section icon="📋" title="Department Checklists">
       {!canConfig && (
@@ -58,7 +80,7 @@ export function ChecklistAdminPanel({ templates = [], canConfig = false, onCreat
       )}
 
       <div className="flex items-center justify-between mb-3">
-        <div className="text-[11px] text-slate-500">{templates.length} template{templates.length === 1 ? "" : "s"} configured.</div>
+        <div className="text-[11px] text-slate-500">{activeTemplates.length} template{activeTemplates.length === 1 ? "" : "s"} configured.{offTemplates.length > 0 ? ` ${offTemplates.length} switched off.` : ""}</div>
         {canConfig && !editing && (
           <button onClick={() => start(null)}
                   className="text-[11px] font-black text-white px-3 py-1.5 rounded-lg"
@@ -70,24 +92,20 @@ export function ChecklistAdminPanel({ templates = [], canConfig = false, onCreat
 
       {!editing && (
         <div className="space-y-2">
-          {templates.length === 0 && (
+          {activeTemplates.length === 0 && (
             <div className="text-[11px] text-slate-500 italic">No templates yet. Add one so operators see a checklist on Finish & Transfer.</div>
           )}
-          {templates.map((t) => (
-            <div key={t.id} className="rounded-lg px-3 py-2 flex items-center gap-3 flex-wrap"
-                 style={{ background: t.active === false ? "rgba(17,24,39,0.03)" : "rgba(46, 80, 214,0.05)", border: `1px solid ${t.active === false ? "rgba(17,24,39,0.06)" : "rgba(46, 80, 214,0.25)"}` }}>
-              <span className="text-[11px] font-black text-blue-300 w-28">{t.department}</span>
-              <span className="text-[12px] font-bold text-slate-900 flex-1">{t.name}</span>
-              <span className="text-[10px] text-slate-500">{(t.items || []).length} item{(t.items || []).length === 1 ? "" : "s"} · v{t.version || 1}</span>
-              {t.active === false && <span className="text-[9px] font-bold text-slate-500 px-1.5 py-0.5 rounded-full bg-white/5 border border-white/10">inactive</span>}
-              {canConfig && (
-                <>
-                  <button onClick={() => start(t)} className="text-[10px] font-bold text-blue-300 hover:text-blue-200 px-2 py-0.5 rounded border border-blue-500/30 bg-blue-500/10">Edit</button>
-                  <button onClick={() => remove(t.id)} className="text-[10px] font-bold text-red-300 hover:text-red-200 px-2 py-0.5 rounded border border-red-500/30 bg-red-500/10">Delete</button>
-                </>
-              )}
+          {activeTemplates.map((t) => renderRow(t))}
+          {offTemplates.length > 0 && (
+            <div className="pt-2" data-cl-switched-off>
+              <button type="button" onClick={() => setShowOff((v) => !v)} aria-expanded={showOff}
+                      className="w-full flex items-center justify-between gap-2 min-h-[44px] px-3 rounded-lg text-[12px] font-bold text-slate-600 border border-slate-200 bg-slate-50 hover:bg-slate-100">
+                <span>Switched off ({offTemplates.length})</span>
+                <span className="text-[11px] font-semibold text-slate-500">{showOff ? "▲ Hide" : "▼ Show"}</span>
+              </button>
+              {showOff && <div className="space-y-2 mt-2">{offTemplates.map((t) => renderRow(t))}</div>}
             </div>
-          ))}
+          )}
         </div>
       )}
 
