@@ -43,6 +43,67 @@ const GEMINI_API_KEY            = Deno.env.get("GEMINI_API_KEY");
 const GEMINI_MODEL              = "gemini-2.5-pro";
 const GEMINI_URL                = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
+// 2026-11-05: Google retires older model names for new API keys (a new key
+// got 404 "gemini-2.5-flash is no longer available to new users"). Pick the
+// model at run time: GEMINI_MODEL secret if set, else the preferred list; on a
+// 404 ask Google which models this key may use and take the best match.
+let resolvedModel: string | null = null;
+// 404 = model gone for this key; 429/500/503 = busy -> try the next model.
+const RETRY_NEXT = new Set([404, 429, 500, 503]);
+const ATTEMPT_MS = 25000;
+async function geminiFetch(body: unknown, prefer: string[], kind: "flash" | "pro"): Promise<Response> {
+  const envModel = (Deno.env.get("GEMINI_MODEL") || "").trim();
+  const tried = new Set<string>();
+  const order = [resolvedModel, envModel, ...prefer].filter(Boolean) as string[];
+  let last: Response | null = null;
+  // Speed: a model that has not answered in ATTEMPT_MS is treated as busy and
+  // the next model is tried, so one slow model never makes the user wait.
+  const call = async (m: string): Promise<Response> => {
+    const ac = new AbortController();
+    const t = setTimeout(() => ac.abort(), ATTEMPT_MS);
+    try {
+      return await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY! },
+        body: JSON.stringify(body),
+        signal: ac.signal,
+      });
+    } catch (e) {
+      console.warn(`[gemini] ${m} timed out / failed:`, (e as Error).message);
+      return new Response(JSON.stringify({ error: "timeout" }), { status: 503 });
+    } finally { clearTimeout(t); }
+  };
+  for (const m of order) {
+    if (tried.has(m)) continue; tried.add(m);
+    const r = await call(m);
+    if (!RETRY_NEXT.has(r.status)) { if (r.ok) resolvedModel = m; return r; }
+    last = r;
+  }
+  try {
+    const lr = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", { headers: { "x-goog-api-key": GEMINI_API_KEY! } });
+    const lj = await lr.json();
+    const names: string[] = (lj?.models || [])
+      .filter((x: any) => (x.supportedGenerationMethods || []).includes("generateContent"))
+      .map((x: any) => String(x.name || "").replace(/^models\//, ""))
+      .filter((n: string) => n.startsWith("gemini-") && !/(tts|image|embedding|live|audio|vision-only)/.test(n) && !/preview|exp/.test(n));
+    const score = (n: string) => {
+      const v = parseFloat((n.match(/gemini-(\d+(?:\.\d+)?)/) || [])[1] || "0");
+      const tierOk = kind === "pro" ? (n.includes("pro") ? 2 : n.includes("flash") && !n.includes("lite") ? 1 : 0)
+                                    : (n.includes("flash") && !n.includes("lite") ? 2 : n.includes("flash") ? 1 : 0);
+      return tierOk * 1000 + v;
+    };
+    names.sort((a, b) => score(b) - score(a));
+    for (const m of names) {
+      if (tried.has(m)) continue; tried.add(m);
+      const r = await call(m);
+      if (!RETRY_NEXT.has(r.status)) { if (r.ok) { resolvedModel = m; console.log(`[gemini] using model ${m}`); } return r; }
+      console.warn(`[gemini] ${m} returned ${r.status}, trying next`);
+      last = r;
+    }
+  } catch (e) { console.error("[gemini] model list failed:", (e as Error).message); }
+  return last as Response;
+}
+
 const corsHeaders = {
   "Access-Control-Allow-Origin":  "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -423,11 +484,7 @@ serve(async (req: Request) => {
         generationConfig: { temperature: 0.2 },
       };
 
-      const resp = await fetch(GEMINI_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY },
-        body: JSON.stringify(geminiReq),
-      });
+      const resp = await geminiFetch(geminiReq, ["gemini-2.5-pro", "gemini-3.8-flash", "gemini-pro-latest", "gemini-flash-latest"], "pro");
       if (!resp.ok) {
         const errText = await resp.text().catch(() => "");
         console.error(`[ai-assistant] Gemini API returned ${resp.status}:`, errText.slice(0, 2000));
