@@ -17,6 +17,7 @@ import { SETTINGS_DEFAULTS } from "../../shared/settingsDefaults.js";
 import { OrgGroup } from "../../shared/ui/OrgLayout.jsx";
 import { SignaturePad } from "../../shared/ui/SignaturePad.jsx";
 import { Topbar } from "../../shared/ui/Topbar.jsx";
+import { ThemeSwitch } from "../../shared/ui/ThemeSwitch.jsx";
 
 export function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, onSave, isSuperAdmin = false, canDo = () => true, onRegisterSignature, currentUser = null,
   // Phase B — checklist admin props (optional)
@@ -187,7 +188,7 @@ export function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, on
         )}
         <button onClick={() => handleSave()}
                 className="inline-flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-xl transition-all duration-200"
-                style={{ background: saved ? "rgba(22,163,74,0.12)" : "#2640B0", color: saved ? "#15803d" : "#fff", border: saved ? "1px solid rgba(22,163,74,0.35)" : "1px solid rgba(38, 64, 176,0.45)", boxShadow: saved ? "none" : "0 0 12px rgba(46, 80, 214,0.3)" }}>
+                style={{ background: saved ? "var(--p-okBg)" : "var(--p-pri)", color: saved ? "var(--p-okTx)" : "var(--p-onPri)", border: saved ? "1px solid var(--p-okLine)" : "1px solid var(--p-pri)", boxShadow: saved ? "none" : "var(--p-priShadow)" }}>
           <LeadLabel text={saved ? "✅ Saved!" : "💾 Save Changes"} />
         </button>
       </Topbar>
@@ -205,6 +206,18 @@ export function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, on
         </div>
       )}
 
+      {/* Appearance — Light / Dark / Auto, this person in this browser only (2026-11-05) */}
+      <div className="px-6 pt-4 max-w-5xl">
+        <div data-settings-appearance className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl px-4 py-3"
+             style={{ background: "var(--p-s1)", border: "1px solid var(--p-line)" }}>
+          <div className="min-w-0 flex-1">
+            <div className="text-[13px] font-semibold" style={{ color: "var(--p-tx1)" }}>Appearance</div>
+            <div className="text-[12px] mt-0.5" style={{ color: "var(--p-tx3)" }}>Light or dark screen. Auto follows this device. Saved in this browser only.</div>
+          </div>
+          <ThemeSwitch withLabels />
+        </div>
+      </div>
+
       {/* Tab bar */}
       <div className="px-6 pt-4 max-w-5xl">
         <div className="settings-tabs flex gap-1 border-b border-slate-200 overflow-x-auto">
@@ -214,9 +227,9 @@ export function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, on
               <button key={t.id} onClick={() => setTab(t.id)}
                       className="text-[12px] font-bold px-3.5 py-2.5 -mb-px transition-all whitespace-nowrap"
                       style={{
-                        color:       sel ? "#2E50D6" : "#6b7280",
-                        background:  sel ? "rgba(46, 80, 214,0.07)" : "transparent",
-                        borderBottom: `2px solid ${sel ? "#2E50D6" : "transparent"}`,
+                        color:       sel ? "var(--p-priTx)" : "var(--p-tx3)",
+                        background:  sel ? "var(--p-priWash)" : "transparent",
+                        borderBottom: `2px solid ${sel ? "var(--p-pri)" : "transparent"}`,
                       }}>
                 <LeadLabel text={t.label} />
               </button>
