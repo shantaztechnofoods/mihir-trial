@@ -14,7 +14,7 @@ import { shantazLogo } from "./shantazLogoGeometry.js";
 //   showTagline   – drop the tagline for tiny sizes
 const STEEL = "#C3CCDB";
 
-export default function ShantazLogoSVG({ tone = "light", shine = false, showTagline = true, className = "", style, title = "SHANTAZ — Innovation for Life" }) {
+function ShantazLogoSVG({ tone = "light", shine = false, showTagline = true, className = "", style, title = "SHANTAZ — Innovation for Life" }) {
   const L = shantazLogo();
   const uid = useId().replace(/:/g, "");
   const dark = tone === "dark";
@@ -72,3 +72,8 @@ export default function ShantazLogoSVG({ tone = "light", shine = false, showTagl
     </svg>
   );
 }
+
+// 2026-11-05 (fast tap): memo — a pure drawing of its props; the sidebar
+// passes fixed props, so an app re-render (every tap) no longer redraws the
+// ~40 logo paths.
+export default React.memo(ShantazLogoSVG);

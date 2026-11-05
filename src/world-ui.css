@@ -228,7 +228,9 @@
   /* Three or more actions (Machine Tracker): they take their own row below the title */
   .page-header:has(.page-header-actions > :nth-child(3)) { flex-wrap: wrap !important; }
   .page-header:has(.page-header-actions > :nth-child(3)) .page-header-actions { flex: 1 0 100% !important; width: 100% !important; }
-  .page-header:has(.page-header-actions > :nth-child(3)) .page-header-actions > button:not([aria-label^="Departments called"]) { flex: 1 1 0; justify-content: center; }
+  /* fast tap: same buttons as `.page-header:has(.page-header-actions > :nth-child(3)) .page-header-actions > button`
+     (a header has one actions row) — said with positions, because that :has() made every DOM insert restyle the page */
+  .page-header .page-header-actions > button:is(:nth-child(n+3), :nth-last-child(n+3), :nth-child(2):nth-last-child(n+2)):not([aria-label^="Departments called"]) { flex: 1 1 0; justify-content: center; }
   .app-shell .p-6 { padding: 16px !important; }
   .hero-tile, .kpi-tile { min-height: 0 !important; }
 
@@ -567,7 +569,8 @@
   .modal-backdrop button[data-finish-confirm]:not(:disabled) { background: var(--ok) !important; color: #fff !important; box-shadow: var(--press-hi), 0 1px 2px rgba(11, 18, 32, .2) !important; border: 0 !important; }
   .modal-backdrop button[data-finish-confirm] { min-height: 48px; border-radius: var(--r-ctl) !important; font-size: 15px !important; font-weight: 600 !important; white-space: nowrap; padding: 0 16px !important; max-width: 100%; }
   .modal-backdrop span:has(> button[data-finish-confirm]) { flex: 1 1 auto; min-width: 0; display: flex; justify-content: flex-end; }
-  .modal-backdrop span:has(> button[data-finish-confirm]) > button { flex: 0 1 auto; }
+  /* fast tap: was `span:has(> button[data-finish-confirm]) > button` (that span holds only this button); :is(button) keeps the old specificity */
+  .modal-backdrop span > button[data-finish-confirm]:is(button) { flex: 0 1 auto; }
   [data-accept-confirm] { white-space: nowrap; font-weight: 600 !important; }
   .modal-backdrop [data-voice-record] { min-width: 40px !important; min-height: 40px !important; }
   [data-accept-signature] button { min-height: 40px !important; padding-left: 14px; padding-right: 14px; border-radius: 10px !important; font-weight: 600 !important; box-shadow: none !important; }
