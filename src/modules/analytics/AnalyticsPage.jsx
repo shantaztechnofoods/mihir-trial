@@ -118,7 +118,7 @@ export function AnalyticsPage({ items, pos, vendorList, settings = SETTINGS_DEFA
                 <XAxis dataKey="month" tick={{ fill: "#475569", fontSize: 11 }} />
                 <YAxis tick={{ fill: "#475569", fontSize: 11 }} />
                 <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="value" name="PO Value (₹K)" fill="#2E50D620" stroke="#2E50D6" strokeWidth={1.5} radius={[3, 3, 0, 0]} />
+                <Bar isAnimationActive={false} dataKey="value" name="PO Value (₹K)" fill="#2E50D620" stroke="#2E50D6" strokeWidth={1.5} radius={[3, 3, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
             )}</ChartSlot>
@@ -139,7 +139,7 @@ export function AnalyticsPage({ items, pos, vendorList, settings = SETTINGS_DEFA
                 <XAxis dataKey="month" tick={{ fill: "#475569", fontSize: 11 }} />
                 <YAxis tick={{ fill: "#475569", fontSize: 11 }} domain={[3.5, 7]} />
                 <Tooltip content={<CustomTooltip />} />
-                <Area type="monotone" dataKey="rate" name="Turnover" stroke="#a78bfa" fill="url(#tGrad)" strokeWidth={2} dot={{ fill: "#a78bfa", r: 4 }} />
+                <Area isAnimationActive={false} type="monotone" dataKey="rate" name="Turnover" stroke="#a78bfa" fill="url(#tGrad)" strokeWidth={2} dot={{ fill: "#a78bfa", r: 4 }} />
               </AreaChart>
             </ResponsiveContainer>
             )}</ChartSlot>
@@ -154,7 +154,7 @@ export function AnalyticsPage({ items, pos, vendorList, settings = SETTINGS_DEFA
                 <ChartSlot height={180}>{({ ResponsiveContainer, PieChart, Pie, Cell, Tooltip }) => (
                 <ResponsiveContainer width="100%" height={180}>
                   <PieChart>
-                    <Pie data={spendByCat} cx="50%" cy="50%" innerRadius={45} outerRadius={70} dataKey="value" stroke="none">
+                    <Pie isAnimationActive={false} data={spendByCat} cx="50%" cy="50%" innerRadius={45} outerRadius={70} dataKey="value" stroke="none">
                       {spendByCat.map((entry, i) => <Cell key={i} fill={entry.color + "80"} stroke={entry.color} strokeWidth={1.5} />)}
                     </Pie>
                     <Tooltip content={<CustomTooltip />} />
@@ -188,7 +188,7 @@ export function AnalyticsPage({ items, pos, vendorList, settings = SETTINGS_DEFA
                   <XAxis type="number" tick={{ fill: "#475569", fontSize: 10 }} />
                   <YAxis type="category" dataKey="name" tick={{ fill: "#475569", fontSize: 10 }} width={55} />
                   <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="count" name="PO Count" fill="#22c55e20" stroke="#22c55e" strokeWidth={1.5} radius={[0, 3, 3, 0]} />
+                  <Bar isAnimationActive={false} dataKey="count" name="PO Count" fill="#22c55e20" stroke="#22c55e" strokeWidth={1.5} radius={[0, 3, 3, 0]} />
                 </BarChart>
               </ResponsiveContainer>
               )}</ChartSlot>
@@ -205,7 +205,7 @@ export function AnalyticsPage({ items, pos, vendorList, settings = SETTINGS_DEFA
             <ChartSlot height={180}>{({ ResponsiveContainer, PieChart, Pie, Cell, Tooltip }) => (
             <ResponsiveContainer width="100%" height={180}>
               <PieChart>
-                <Pie data={stockDist} cx="50%" cy="50%" innerRadius={45} outerRadius={70} dataKey="value" stroke="none">
+                <Pie isAnimationActive={false} data={stockDist} cx="50%" cy="50%" innerRadius={45} outerRadius={70} dataKey="value" stroke="none">
                   {stockDist.map((entry, i) => <Cell key={i} fill={entry.color + "60"} stroke={entry.color} strokeWidth={2} />)}
                 </Pie>
                 <Tooltip content={<CustomTooltip />} />

@@ -2,12 +2,14 @@
 // At 4x CPU throttle (CDP Emulation.setCPUThrottlingRate) every module page is
 // opened from the sidebar, then its main dialog/sheet is opened and closed,
 // while the page records requestAnimationFrame deltas. For each transition:
-//   * the CLICK frame (the one frame that holds the click's own React commit,
-//     before any animation can start) is logged as input latency, not gated;
+//   * frames in which the app committed new DOM content inside #root (React
+//     render work for the tap) are input latency: logged as "click frame"
+//     (the slowest of them), not gated;
 //   * every other frame of the next 900 ms is an ANIMATION frame and must be
 //     <= 50 ms, and their p95 must be <= 25 ms.
-// A transition that misses is measured once more (shared CI boxes are noisy);
-// it fails only if it misses twice. The worst offenders are printed at the end.
+// A transition that misses is measured again, up to 3 times (shared CI boxes are
+// noisy; the suite also runs alone, after the other suites of its shard); it
+// fails only if every try misses. The worst offenders are printed at the end.
 import fs from "fs";
 import { BASE, makeOk, track, settle } from "./lib/helpers.mjs";
 import pw from "/usr/local/lib/node_modules_global/playwright/index.js";
@@ -31,10 +33,17 @@ const more = () => {
   localStorage.setItem("erp_machines", JSON.stringify(ms)); localStorage.setItem("erp_handovers", JSON.stringify(hs));
 };
 const seed = new Function(`(${baseSeed.toString()})(); (${more.toString()})();`);
+// Each frame is tagged "render" when the app changed its DOM content in it
+// (React committed new nodes or text inside #root) — that is the app doing work
+// for the tap (input latency, logged); every other frame is a pure ANIMATION
+// frame (only style/compositor work), which is what this suite gates.
 const recorder = () => {
-  const st = { on: false, last: 0, d: [] }; window.__fb = st;
-  const loop = (t) => { if (st.on) { if (st.last) st.d.push(t - st.last); st.last = t; } requestAnimationFrame(loop); };
+  const st = { on: false, last: 0, d: [], m: [], dirty: false }; window.__fb = st;
+  const loop = (t) => { if (st.on) { if (st.last) { st.d.push(t - st.last); st.m.push(st.dirty); } st.last = t; } st.dirty = false; requestAnimationFrame(loop); };
   requestAnimationFrame(loop);
+  const watch = () => { const root = document.getElementById("root"); if (!root) return setTimeout(watch, 50);
+    new MutationObserver(() => { st.dirty = true; }).observe(root, { childList: true, characterData: true, subtree: true }); };
+  watch();
 };
 
 const { ok, done } = makeOk();
@@ -58,14 +67,15 @@ async function session(viewport, user, pass) {
 
 // One measured transition; returns { click, max, p95 } over the animation frames.
 async function measure(p, act) {
-  await p.evaluate(() => { const s = window.__fb; s.d = []; s.last = 0; s.on = true; });
+  await p.evaluate(() => { const s = window.__fb; s.d = []; s.m = []; s.last = 0; s.on = true; });
   await act();
   await p.waitForTimeout(WINDOW);
-  const d = await p.evaluate(() => { const s = window.__fb; s.on = false; return s.d; });
-  const head = d.slice(0, 10); const top = Math.max(0, ...head); const k = top > 33.4 ? head.indexOf(top) : -1;
-  const anim = d.filter((_, i) => i !== k).sort((a, b2) => a - b2);
+  const { d, m } = await p.evaluate(() => { const s = window.__fb; s.on = false; return { d: s.d, m: s.m }; });
   const r = (x) => Math.round(x * 10) / 10;
-  return { click: k >= 0 ? r(d[k]) : 0, max: r(anim[anim.length - 1] || 0), p95: r(anim[Math.floor(anim.length * 0.95)] || 0), frames: d.length };
+  // a commit is drawn in the frame AFTER the one it happened in (style + layout + paint run after rAF)
+  const isWork = (i) => m[i] || (i > 0 && m[i - 1]);
+  const work = d.filter((_, i) => isWork(i)); const anim = d.filter((_, i) => !isWork(i)).sort((a, b2) => a - b2);
+  return { click: r(Math.max(0, ...work)), workFrames: work.length, max: r(anim[anim.length - 1] || 0), p95: r(anim[Math.floor(anim.length * 0.95)] || 0), frames: d.length };
 }
 // Best of TRIES: a shared CI box (another browser suite on the other core) can
 // stall any single frame; a real regression misses on every try.
