@@ -69,6 +69,7 @@ import { fmtDate, recomputeStatus, roundQty } from "../shared/format.js";
 import { SETTINGS_DEFAULTS } from "../shared/settingsDefaults.js";
 import { SkeletonLoader } from "../shared/ui/primitives.jsx";
 import { Topbar } from "../shared/ui/Topbar.jsx";
+import { LazyAppToaster } from "../shared/ui/lazyUi.js";
 
 // 2026-11-04 (fix/perf-1) — admin-only pages load on first open (smaller first bundle).
 export const UserManagementPage = React.lazy(() => importWithReload(() => import("../modules/users-roles/UserManagementPage.jsx")));
@@ -4595,6 +4596,8 @@ export default function App() {
         </button>
       </nav>
       )}
+      {/* UI P0: the one shared toast area (sonner), loaded after login — see src/shared/ui/toast.js */}
+      <React.Suspense fallback={null}><LazyAppToaster /></React.Suspense>
     </div>
     </MobileNavContext.Provider>
   );
