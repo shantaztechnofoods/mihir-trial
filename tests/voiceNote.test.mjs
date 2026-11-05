@@ -7,6 +7,7 @@ import {
   clearVoiceText, appendTranscript, readVoiceLang,
   VOICE_TRANSCRIBE_FN, VOICE_TRANSCRIBE_MAX_BYTES, bytesToBase64, blobToBase64, readTranscribeResult,
   transcribeVoiceBlob, fillTranscript, tidySpoken, appendSpoken, isAppleMobile, VOICE_WRITE_PROMPT,
+  isAndroid, canDictateWhileRecording, mergeSpeechResults, encodeWav16, VOICE_WAV_RATE, voiceFailText,
 } from "../src/utils/voiceNote.js";
 
 test("max length is 60 seconds", () => assert.equal(VOICE_MAX_SECONDS, 60));
@@ -178,4 +179,36 @@ test("isAppleMobile: iPhone / iPad (incl. desktop-mode iPad) only", () => {
 
 test("failure prompt is short", () => {
   assert.equal(VOICE_WRITE_PROMPT, "Could not hear — please type");
+});
+
+// ── 2026-11-05: spoken words never reached the box ──
+const AND = { userAgent: "Mozilla/5.0 (Linux; Android 14; SM-A146B) AppleWebKit/537.36 Chrome/130 Mobile Safari/537.36" };
+const WIN = { userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/130 Safari/537.36", maxTouchPoints: 0 };
+const IPH = { userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)" };
+test("dictation runs next to the recorder only on desktop (phones lose the mic)", () => {
+  assert.equal(isAndroid(AND), true); assert.equal(isAndroid(WIN), false); assert.equal(isAndroid(null), false);
+  assert.equal(canDictateWhileRecording(WIN), true);
+  assert.equal(canDictateWhileRecording(AND), false);
+  assert.equal(canDictateWhileRecording(IPH), false);
+});
+const R = (t, f) => Object.assign([{ transcript: t }], { isFinal: f });
+test("mergeSpeechResults: desktop segments join; Android cumulative repeats fold; interim kept", () => {
+  assert.deepEqual(mergeSpeechResults([R("belt is", true), R("loose", true), R("and mo", false)]), { finals: "belt is loose", interim: "and mo" });
+  assert.deepEqual(mergeSpeechResults([R("belt", true), R("belt is loose", true)]), { finals: "belt is loose", interim: "" });
+  assert.deepEqual(mergeSpeechResults([R("बेल्ट ढीला है", true)]), { finals: "बेल्ट ढीला है", interim: "" });
+  assert.deepEqual(mergeSpeechResults(null), { finals: "", interim: "" });
+});
+test("encodeWav16: valid 16 kHz mono PCM WAV header + samples", () => {
+  const w = encodeWav16(new Float32Array([0, 1, -1, 0.5]), VOICE_WAV_RATE);
+  assert.equal(w.length, 44 + 8);
+  assert.equal(String.fromCharCode(...w.slice(0, 4)), "RIFF");
+  assert.equal(String.fromCharCode(...w.slice(8, 12)), "WAVE");
+  const v = new DataView(w.buffer);
+  assert.equal(v.getUint16(22, true), 1); assert.equal(v.getUint32(24, true), 16000); assert.equal(v.getUint32(40, true), 8);
+  assert.equal(v.getInt16(46, true), 32767); assert.equal(v.getInt16(48, true), -32768);
+});
+test("voiceFailText: friendly mic-blocked text; retry hint only when phone dictation can retry", () => {
+  assert.equal(voiceFailText("not allowed"), "Mic is off — allow it in the browser");
+  assert.equal(voiceFailText("Transcription service error (502)"), VOICE_WRITE_PROMPT);
+  assert.equal(voiceFailText("x", true), `${VOICE_WRITE_PROMPT} — or tap 🎤 again`);
 });

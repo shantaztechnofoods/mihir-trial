@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { isSupabaseEnabled } from "../../config/env.js";
 import { getSupabase } from "../../supabase/client.js";
 import { signedUrlFor } from "../../stores/attachmentsStore.js";
-import { VOICE_MAX_SECONDS, pickVoiceMime, baseMime, formatClock, micErrorMessage, transcribeVoiceBlob, VOICE_WRITING_TEXT, VOICE_WRITE_PROMPT, tidySpoken, appendSpoken, isAppleMobile, readVoiceLang } from "../../utils/voiceNote.js";
+import { VOICE_MAX_SECONDS, pickVoiceMime, baseMime, formatClock, micErrorMessage, transcribeVoiceBlob, VOICE_WRITING_TEXT, VOICE_WRITE_PROMPT, tidySpoken, appendSpoken, isAppleMobile, readVoiceLang, isAndroid, canDictateWhileRecording, mergeSpeechResults, encodeWav16, VOICE_WAV_RATE, VOICE_TRANSCRIBE_MAX_BYTES, voiceFailText } from "../../utils/voiceNote.js";
 
 // ── Voice (2026-11-03, changed 2026-11-04) ───────────────────────────────
 // Since 2026-11-04 the 🎤 only writes TEXT (no audio is saved). Voice notes
@@ -73,6 +73,40 @@ export function transcribeVoice(blob) {
   return transcribeVoiceBlob(blob, invoke);
 }
 
+// 2026-11-05 — the recorded clip (WebM on Chrome, MP4 on iPhone) is decoded
+// in the browser and re-encoded as 16 kHz mono WAV before it is sent, so the
+// speech model always gets a format it accepts. Any failure → original clip.
+export async function voiceClipToWav(blob) {
+  try {
+    if (typeof window === "undefined" || !blob || !blob.size) return blob;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    if (!AC || !OAC) return blob;
+    const buf = await blob.arrayBuffer();
+    const ctx = new AC();
+    let decoded;
+    try {
+      decoded = await new Promise((res, rej) => {
+        const p = ctx.decodeAudioData(buf, res, rej);
+        if (p && typeof p.then === "function") p.then(res, rej);
+      });
+    } finally { try { ctx.close(); } catch {} }
+    if (!decoded || !decoded.duration) return blob;
+    const len = Math.max(1, Math.ceil(decoded.duration * VOICE_WAV_RATE));
+    const off = new OAC(1, len, VOICE_WAV_RATE);
+    const src = off.createBufferSource();
+    src.buffer = decoded; src.connect(off.destination); src.start(0);
+    const out = await off.startRendering();
+    const wav = encodeWav16(out.getChannelData(0), VOICE_WAV_RATE);
+    if (wav.length > VOICE_TRANSCRIBE_MAX_BYTES) return blob;
+    return new Blob([wav], { type: "audio/wav" });
+  } catch { return blob; }
+}
+
+// Android: once the voice server has failed on this phone, the next 🎤 tap
+// uses the phone's own dictation only (no recorder, so it gets the mic).
+let serverVoiceDown = false;
+
 // Small 🎤 icon INSIDE the text box (pass the box as `children`).
 // 2026-11-04 (owner): the mic only WRITES TEXT into the box — no audio is
 // saved, no player, no "voice note saved". Tap 🎤 → "Listening… 0:05" + Stop
@@ -88,7 +122,7 @@ export function VoiceNoteRecorder({ place, setText = null, disabled = false, chi
   const [secs, setSecs]   = useState(0);
   const [err, setErr]     = useState("");
   const [preview, setPreview] = useState("");
-  const r = useRef({ rec: null, sr: null, stream: null, timer: null, t0: 0, chunks: [], finals: "", interim: "", discard: false, tx: 0, stopping: false });
+  const r = useRef({ rec: null, sr: null, stream: null, timer: null, t0: 0, chunks: [], finals: "", interim: "", discard: false, tx: 0, stopping: false, srErr: "", dictOnly: false });
   const fieldRef = useRef(null);
   const textRef = useRef(setText); textRef.current = setText;
 
@@ -107,10 +141,13 @@ export function VoiceNoteRecorder({ place, setText = null, disabled = false, chi
     try { s.stream && s.stream.getTracks().forEach((t) => t.stop()); } catch {}
     s.stream = null;
   };
-  useEffect(() => () => {
+  useEffect(() => {
+    r.current.discard = false; // StrictMode re-mount: un-stick the unmount flag
+    return () => {
     const s = r.current; s.discard = true; s.tx++;
     try { if (s.rec && s.rec.state !== "inactive") s.rec.stop(); } catch {}
     releaseMic();
+    };
   }, []);
 
   const liveText = () => { const s = r.current; return tidySpoken(`${s.finals} ${s.interim}`); };
@@ -121,14 +158,21 @@ export function VoiceNoteRecorder({ place, setText = null, disabled = false, chi
     const tx = ++s.tx;
     setPhase("writing"); setErr("");
     // Give browser dictation a moment to deliver its last words.
-    await new Promise((res) => setTimeout(res, 250));
-    let out = { ok: false, text: "" };
-    if (blob && blob.size) out = await transcribeVoice(blob);
+    await new Promise((res) => setTimeout(res, blob ? 250 : 700));
+    let out = { ok: false, text: "", error: "" };
+    if (blob && blob.size) {
+      out = await transcribeVoice(await voiceClipToWav(blob));
+      if (!out.ok && out.error && out.error !== "No words heard") {
+        try { console.warn("[voice] server could not write the words:", out.error); } catch {}
+        if (isAndroid(navigator) && (window.SpeechRecognition || window.webkitSpeechRecognition)) serverVoiceDown = true;
+      }
+    }
     if (s.discard || tx !== s.tx) return;
     const text = out.ok ? String(out.text).trim() : liveText();
+    const srErr = s.srErr; s.srErr = "";
     s.finals = ""; s.interim = ""; s.chunks = [];
     setPreview(""); setPhase("idle");
-    if (!text) { setErr(VOICE_WRITE_PROMPT); flagBox(); return; }
+    if (!text) { setErr(srErr === "not-allowed" ? voiceFailText("not allowed") : (blob ? voiceFailText(out.error, serverVoiceDown) : VOICE_WRITE_PROMPT)); flagBox(); return; }
     if (textRef.current) textRef.current((prev) => appendSpoken(prev, text));
   };
 
@@ -159,16 +203,19 @@ export function VoiceNoteRecorder({ place, setText = null, disabled = false, chi
       sr.lang = readVoiceLang(window.localStorage);
       sr.continuous = true; sr.interimResults = true;
       sr.onresult = (e) => {
-        const s = r.current; let interim = "";
-        for (let i = e.resultIndex; i < e.results.length; i++) {
-          const t = (e.results[i][0] && e.results[i][0].transcript) || "";
-          if (e.results[i].isFinal) s.finals = `${s.finals} ${t}`.trim(); else interim += t;
-        }
-        s.interim = interim;
+        const s = r.current;
+        const m = mergeSpeechResults(e.results);
+        s.finals = m.finals; s.interim = m.interim;
         setPreview(liveText());
       };
-      sr.onerror = () => {};
-      sr.onend = () => { if (r.current.sr === sr) r.current.sr = null; };
+      sr.onerror = (e) => { r.current.srErr = (e && e.error) || ""; };
+      sr.onend = () => {
+        const s = r.current;
+        if (s.sr === sr) s.sr = null;
+        // Dictation-only (no recorder): the phone stops listening by itself
+        // after a pause — write the words straight away.
+        if (!s.rec && !s.discard && !s.stopping && s.dictOnly) stop();
+      };
       sr.start();
       return sr;
     } catch { return null; }
@@ -178,10 +225,10 @@ export function VoiceNoteRecorder({ place, setText = null, disabled = false, chi
     if (disabled || phase !== "idle") return;
     setErr(""); setPreview("");
     const s = r.current;
-    s.finals = ""; s.interim = ""; s.chunks = []; s.stopping = false; s.rec = null; s.sr = null;
+    s.finals = ""; s.interim = ""; s.chunks = []; s.stopping = false; s.rec = null; s.sr = null; s.srErr = ""; s.dictOnly = false;
     const md = typeof navigator !== "undefined" ? navigator.mediaDevices : null;
-    const canRecord = !!(md && md.getUserMedia && typeof window.MediaRecorder !== "undefined");
     const hasSR = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+    const canRecord = !!(md && md.getUserMedia && typeof window.MediaRecorder !== "undefined") && !(serverVoiceDown && hasSR && isAndroid(navigator));
     if (!canRecord && !hasSR) { setErr(micErrorMessage({ name: "unsupported" })); flagBox(); return; }
     setPhase("starting");
     if (canRecord) {
@@ -201,8 +248,10 @@ export function VoiceNoteRecorder({ place, setText = null, disabled = false, chi
         rec.start(1000);
       }
     }
-    // Live preview: not on iPhone/iPad while recording (it fights for the mic).
-    if (hasSR && (!s.rec || !isAppleMobile(navigator))) s.sr = startDictation();
+    // Live preview: desktop only while recording — on iPhone/iPad AND Android
+    // phone dictation takes the mic from the recorder (the clip goes silent).
+    if (hasSR && (!s.rec || canDictateWhileRecording(navigator))) s.sr = startDictation();
+    s.dictOnly = !s.rec && !!s.sr;
     if (!s.rec && !s.sr) { releaseMic(); setPhase("idle"); setErr(micErrorMessage({ name: "unsupported" })); return; }
     s.t0 = Date.now(); setSecs(0); setPhase("recording");
     s.timer = setInterval(() => {

@@ -178,3 +178,63 @@ export function isAppleMobile(nav) {
   const ua = String((nav && nav.userAgent) || "");
   return /iPhone|iPad|iPod/i.test(ua) || (/Macintosh/.test(ua) && Number(nav && nav.maxTouchPoints) > 1);
 }
+
+// ── 2026-11-05 (owner): spoken words never reached the box on phones ─────
+// Android Chrome: browser dictation (SpeechRecognition) takes the mic away
+// from the recorder, so the recorded clip was silent and the server heard
+// nothing. Like iPhone, Android must not run dictation next to the recorder.
+export function isAndroid(nav) {
+  return /Android/i.test(String((nav && nav.userAgent) || ""));
+}
+// Run live dictation next to the recorder only on desktop browsers.
+export function canDictateWhileRecording(nav) {
+  return !isAppleMobile(nav) && !isAndroid(nav);
+}
+
+// Speech results → { finals, interim }. Rebuilt from ALL results each time
+// (not appended), and Android's habit of repeating the earlier words inside
+// each new final result ("belt", "belt is loose") is folded into one phrase.
+export function mergeSpeechResults(results) {
+  let finals = ""; let interim = "";
+  const list = results ? Array.from({ length: results.length }, (_, i) => results[i]) : [];
+  for (const res of list) {
+    const t = String((res && res[0] && res[0].transcript) || "").trim();
+    if (!t) continue;
+    if (res.isFinal) {
+      const a = finals.toLowerCase(); const b = t.toLowerCase();
+      if (!finals) finals = t;
+      else if (b.startsWith(a)) finals = t;      // cumulative repeat (Android)
+      else if (a.endsWith(b)) { /* exact repeat */ }
+      else finals = `${finals} ${t}`;
+    } else interim = interim ? `${interim} ${t}` : t;
+  }
+  return { finals, interim };
+}
+
+// Mono 16-bit PCM WAV. The recorder's WebM/MP4 clip is turned into WAV
+// before it goes to the voice-transcribe server: WAV is accepted by every
+// speech model (WebM is not on Gemini's list of audio types).
+export const VOICE_WAV_RATE = 16000;
+export function encodeWav16(samples, sampleRate = VOICE_WAV_RATE) {
+  const n = samples ? samples.length : 0;
+  const out = new Uint8Array(44 + n * 2);
+  const v = new DataView(out.buffer);
+  const str = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  str(0, "RIFF"); v.setUint32(4, 36 + n * 2, true); str(8, "WAVE");
+  str(12, "fmt "); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, sampleRate, true); v.setUint32(28, sampleRate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+  str(36, "data"); v.setUint32(40, n * 2, true);
+  for (let i = 0; i < n; i++) {
+    const s = Math.max(-1, Math.min(1, Number(samples[i]) || 0));
+    v.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+  }
+  return out;
+}
+
+// Short reason shown under the box when the words could not be written.
+export function voiceFailText(error, canRetryByPhone) {
+  const e = String(error || "");
+  const base = VOICE_WRITE_PROMPT;
+  if (/not allowed|denied|mic is off/i.test(e)) return "Mic is off — allow it in the browser";
+  return canRetryByPhone ? `${base} — or tap 🎤 again` : base;
+}
