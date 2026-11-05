@@ -50,16 +50,29 @@ const GEMINI_URL                = `https://generativelanguage.googleapis.com/v1b
 let resolvedModel: string | null = null;
 // 404 = model gone for this key; 429/500/503 = busy -> try the next model.
 const RETRY_NEXT = new Set([404, 429, 500, 503]);
+const ATTEMPT_MS = 25000;
 async function geminiFetch(body: unknown, prefer: string[], kind: "flash" | "pro"): Promise<Response> {
   const envModel = (Deno.env.get("GEMINI_MODEL") || "").trim();
   const tried = new Set<string>();
   const order = [resolvedModel, envModel, ...prefer].filter(Boolean) as string[];
   let last: Response | null = null;
-  const call = (m: string) => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY! },
-    body: JSON.stringify(body),
-  });
+  // Speed: a model that has not answered in ATTEMPT_MS is treated as busy and
+  // the next model is tried, so one slow model never makes the user wait.
+  const call = async (m: string): Promise<Response> => {
+    const ac = new AbortController();
+    const t = setTimeout(() => ac.abort(), ATTEMPT_MS);
+    try {
+      return await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY! },
+        body: JSON.stringify(body),
+        signal: ac.signal,
+      });
+    } catch (e) {
+      console.warn(`[gemini] ${m} timed out / failed:`, (e as Error).message);
+      return new Response(JSON.stringify({ error: "timeout" }), { status: 503 });
+    } finally { clearTimeout(t); }
+  };
   for (const m of order) {
     if (tried.has(m)) continue; tried.add(m);
     const r = await call(m);
