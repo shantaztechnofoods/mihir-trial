@@ -118,7 +118,7 @@
   .wu-seal {
     width: 104px; height: 104px; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
     background: var(--ok); color: #fff; box-shadow: 0 24px 60px -16px rgba(18, 128, 74, .6), 0 0 0 10px rgba(18, 128, 74, .12);
-    animation: wu-seal 1.15s var(--ease-pop) backwards;
+    animation: wu-seal 900ms var(--ease-pop) backwards;
   }
   .wu-seal svg { width: 44px; height: 44px; }
   .wu-seal svg path { stroke-dasharray: 40; stroke-dashoffset: 40; animation: wu-draw 380ms 160ms var(--ease-enter) forwards; }
