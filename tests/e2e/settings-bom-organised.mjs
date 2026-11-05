@@ -12,8 +12,8 @@ await loginAdmin(p); await gotoMachineTracker(p);
 // ── Machine Tracker → ⚙️ Settings ──────────────────────────────────────────
 await p.locator("button[data-mt-settings]", { hasText: /^Settings$/ }).first().click(); await p.waitForTimeout(800);
 const groups = await p.locator("[data-org-group] .org-group-title").allInnerTexts();
-ok("settings groups in order", JSON.stringify(groups) === JSON.stringify(["Deadlines & HOLD rules", "Employees per department", "Working calendar", "Advanced"]), JSON.stringify(groups));
-ok("every group has a one-line helper", await p.locator("[data-org-group] .org-group-hint").count() === 4);
+ok("settings groups in order", JSON.stringify(groups) === JSON.stringify(["Deadlines & HOLD rules", "Employees per department", "Department heads", "Working calendar", "Advanced"]), JSON.stringify(groups));
+ok("every group has a one-line helper", await p.locator("[data-org-group] .org-group-hint").count() === 5);
 ok("deadline inputs reachable (4 depts x 3 + timeout 2)", await p.locator('[data-org-group="deadlines"] input[type=number]:visible').count() === 14);
 ok("weekly-off Tue button and + Add holiday visible", await p.getByRole("button", { name: "Tue" }).isVisible() && await p.getByRole("button", { name: "+ Add holiday" }).isVisible());
 ok("Department Employees rows present", await p.locator('[data-org-group="employees"]').getByText("Department Employees").count() === 1);
