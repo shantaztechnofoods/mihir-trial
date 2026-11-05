@@ -4178,7 +4178,8 @@ export default function App() {
   };
 
   const pages = {
-    dashboard: <DashboardPage items={items} pos={pos} vendorList={vendorList} machineLog={machineLog} pendingLog={pendingLog} followUps={followUps} handovers={handovers} pendingHandoverItems={pendingHandoverItems} onNavigate={goToPage} settings={settings} canView={canOpenPage} />,
+    dashboard: <DashboardPage items={items} pos={pos} vendorList={vendorList} machineLog={machineLog} pendingLog={pendingLog} followUps={followUps} handovers={handovers} pendingHandoverItems={pendingHandoverItems} onNavigate={goToPage} settings={settings} canView={canOpenPage}
+                 onOpenMachines={(filter) => { goToPage("machines"); setMtFilterReq({ filter, n: Date.now() }); }} />,
     inventory: <InventoryPage items={items} setItems={setItems} handleUpdateStock={handleUpdateStock}
                               pos={pos} inwardLog={inwardLog} outwardLog={outwardLog}
                               pendingLog={pendingLog} bomDefs={bomDefs} machineLog={machineLog}
