@@ -5,13 +5,23 @@
 ## What it does
 Home page: stock / PO / machine KPIs, recent stock movements, charts and quick links into the other modules.
 
+**Production line today** (2026-11-05, top of the page, only for logins that may open Machine Tracker —
+`canView("machines")`): six stages Rack → Assembly → Mechanical → Electrical → Trial → Ready with counts,
+On time / Near limit / Late / On hold in icon + words (never colour alone), a legend line, "Ready today: N",
+and a "Needs attention" list (max 5: late or ON HOLD). Read-only, from `machineLog` + `handovers` already in
+state; rules in `productionLine.js` (pure). Tapping a stage opens Machine Tracker on its existing filter
+(Rack → On rack, departments → Active, Ready → Completed) — Machine Tracker has no per-department filter
+and is frozen, so none was added.
+
 ## Screens
 - Dashboard (nav `dashboard`)
 
 ## Files
 | file | lines |
 |---|---|
-| `DashboardPage.jsx` | 556 |
+| `DashboardPage.jsx` | 566 |
+| `ProductionLinePanel.jsx` | 117 |
+| `productionLine.js` | 213 |
 | `index.js` | 4 |
 
 `index.js` is the public surface — the app shell and other modules import only from it:
@@ -25,6 +35,7 @@ The screens here are presentational: state and every write (handler) still live 
 |---|---|---|
 | `<DashboardPage>` | `onNavigate` | `goToPage` |
 | `<DashboardPage>` | `canView` | `canOpenPage` |
+| `<DashboardPage>` | `onOpenMachines` | inline: `goToPage("machines")` + `setMtFilterReq({ filter, n })` |
 
 Depends on other modules (imported through their `index.js`): _none_
 Shared code used: `src/shared/components/LeadIcon.jsx`, `src/shared/format.js`, `src/shared/settingsDefaults.js`, `src/shared/ui/Topbar.jsx`, `src/shared/ui/primitives.jsx`
@@ -52,8 +63,8 @@ _none_
 Every audit type is also listed in `AUDIT_EVENT_TYPES` in `tests/regression.test.mjs` when it must never disappear.
 
 ## Tests
-Unit / static tests that read this module: `tests/purchaseAudit2.test.mjs`; plus `tests/regression.test.mjs` (inventory + size floor for this folder).
-Browser suites (`tests/e2e/`): `mobile-sweep`
+Unit / static tests that read this module: `tests/purchaseAudit2.test.mjs`, `tests/dashboardLine.test.mjs`; plus `tests/regression.test.mjs` (inventory + size floor for this folder).
+Browser suites (`tests/e2e/`): `mobile-sweep`, `dashboard-line`
 
 ## How to verify it
 Log in and check every tile shows a number and its link opens the right page.

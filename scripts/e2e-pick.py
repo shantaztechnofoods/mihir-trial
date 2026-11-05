@@ -26,7 +26,7 @@ COMPONENT_MAP = [
     (r"^(PendingPage|Pending\w*)$", ["bom-unselected", "part-received-completes", "store-audit"]),
     (r"^(HistoryPage|HR\w*|ReportCenterPage|Report\w*|fmtTs|inDateRange)$", ["reports-v2", "reports-pdf", "perf-budget"]),
     (r"^(VendorsPage|Vendor\w*|OrderPipelinePage|POSearchCenter|PurchasePage|PO\w*|ApprovalsPage|AnalyticsPage)$", ["perf-budget", "store-audit"]),
-    (r"^(DashboardPage|MyDashboard\w*)$", ["my-dashboard", "go-live-workflows"]),
+    (r"^(DashboardPage|MyDashboard\w*)$", ["dashboard-line", "my-dashboard", "go-live-workflows"]),
     (r"^(SettingsPage|Settings\w*|Checklist\w*)$", ["settings-bom-organised", "compact-checklist", "dept-staff-create"]),
     (r"^(Machine\w*|MT\w*|Mt\w*|Rack\w*|Trial\w*|Handover\w*|Accept\w*|Finish\w*|Hold\w*|Ready\w*|Delay\w*)$", MT + ["ready-popup", "delay-reasons", "trial-signature-report"]),
     (r"^(Voice\w*|Mic\w*)$", ["voice-note", "voice-transcribe"]),
@@ -50,7 +50,7 @@ PATH_MAP = [
     (r"^src/modules/reports/", ["reports-v2", "reports-pdf", "perf-budget"]),
     (r"^src/modules/(purchase|analytics)/", ["perf-budget", "store-audit"]),
     (r"^src/modules/settings/", ["settings-bom-organised", "compact-checklist", "dept-staff-create"]),
-    (r"^src/modules/dashboard/", ["my-dashboard", "go-live-workflows"]),
+    (r"^src/modules/dashboard/", ["dashboard-line", "my-dashboard", "go-live-workflows"]),
     (r"^src/shared/components/(LazyCharts|useProgressiveCount|MoreRowsNote|DebouncedSearchInput)", ["perf-budget"]),
     (r"^(src/|index\.html|vite\.config|package(-lock)?\.json|public/)", SMOKE),   # shared shell, styles, deps
 ]
