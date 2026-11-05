@@ -94,7 +94,8 @@
   @media (hover: hover) and (pointer: fine) { button.kpi-tile:hover, .hero-tile:hover { box-shadow: var(--e2) !important; transform: none !important; } }
 
   /* Dialogs */
-  .modal-backdrop { animation: wu-fade var(--dur-ui) var(--ease-enter) backwards; background: rgba(7, 9, 14, .42) !important; backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+  /* frame-budget (2026-11-05): no backdrop blur on the dim layer — it was re-blurred every frame while a dialog faded / a sheet slid */
+  .modal-backdrop { animation: wu-fade var(--dur-ui) var(--ease-enter) backwards; background: rgba(7, 9, 14, .42) !important; }
   .modal-backdrop > div { animation: wu-pop 280ms var(--ease-enter) backwards; border-radius: 20px !important; box-shadow: 0 32px 80px -24px rgba(7, 9, 14, .45), 0 0 0 1px rgba(11, 18, 32, .06) !important; }
   @keyframes wu-pop { from { opacity: 0; transform: translateY(8px) scale(.985); } to { opacity: 1; transform: none; } }
   /* Fields inside dialogs: one style — paper, hairline, no inner shadow */
@@ -129,8 +130,8 @@
   @keyframes wu-burst { 0% { opacity: 1; transform: translate(-50%, -50%) rotate(0); } 100% { opacity: 0; transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) rotate(var(--rot)); } }
 
   /* Scroll reveal: only cards that start below the fold (JS adds .wu-reveal) */
-  .wu-reveal { opacity: 0; transform: translateY(8px); transition: opacity 360ms var(--ease-enter), transform 360ms var(--ease-enter); }
-  .wu-reveal.wu-in { opacity: 1; transform: none; }
+  .wu-reveal { opacity: 0; transform: translateY(8px); }
+  .wu-reveal.wu-in { opacity: 1; transform: none; transition: opacity 360ms var(--ease-enter), transform 360ms var(--ease-enter); }
 
   /* Rack crate settles; Ready seal turns once */
   .rack-crate { animation: wu-crate 380ms var(--ease-pop) backwards; }
@@ -869,3 +870,29 @@
   ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
   .wu-scroll-settle { animation: none !important; }
 }
+
+/* ── Dialog dim layers: never blurred (frame-budget 2026-11-05). Every popup
+   dim layer used an inline backdrop-filter blur(6–12px) over the whole screen;
+   it is re-blurred for every frame the dialog animates or anything under it
+   moves (~50 ms frames at 1440x900 with a 4x slower CPU). The dark wash stays. */
+.modal-backdrop, .rack-panel-backdrop, .rp-backdrop, [style*="backdrop-filter"] { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+
+/* ── Phones: no backdrop blur anywhere (frame-budget 2026-11-05). A blurred sticky header,
+   tab bar or dim layer is re-blurred every frame while the page scrolls or a
+   sheet slides — the main source of dropped frames on real phones. ──── */
+@media screen and (max-width: 767px) {
+  .modal-backdrop, .mobile-tabbar, .page-header, .wu-md-head, .arrival-banner { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+  .mobile-tabbar { background: rgba(255, 255, 255, .97) !important; }
+  .page-header { background: rgba(245, 246, 248, .97) !important; }
+  .wu-md-head { background: rgba(255, 255, 255, .98) !important; }
+}
+
+/* ── <Count/> roll (frame-budget 2026-11-05): the new number slides + fades in,
+   transform/opacity only (was @number-flow, which measured layout in every commit) */
+@media screen {
+  .wu-roll { display: inline-block; animation: wu-roll-up 260ms var(--ease-enter, cubic-bezier(.2, .8, .2, 1)) backwards; }
+  .wu-roll-down { animation-name: wu-roll-down; }
+  @keyframes wu-roll-up { from { opacity: 0; transform: translateY(.45em); } to { opacity: 1; transform: none; } }
+  @keyframes wu-roll-down { from { opacity: 0; transform: translateY(-.45em); } to { opacity: 1; transform: none; } }
+}
+@media (prefers-reduced-motion: reduce) { .wu-roll { animation: none; } }

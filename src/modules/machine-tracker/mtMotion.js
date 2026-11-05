@@ -40,6 +40,7 @@ const EASE_IN = "cubic-bezier(.4, 0, 1, 1)";
 const EASE_DRAWER = "cubic-bezier(.32, .72, 0, 1)";
 const MAX_CHANGES = 8;
 const MAX_CARDS = 40;
+const DIALOG_GHOST = true;
 
 const reducedMotion = () => {
   try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { return false; }
@@ -128,40 +129,84 @@ export function dialogGhost(node) {
 }
 
 // ── Snapshot of every machine card: key = section|machine id ──────────────
+// Smooth-motion pass (2026-11-05, "mt-smooth"): the first version read 30 card
+// rects + the route pill's offsetLeft INSIDE every React commit (useLayoutEffect),
+// i.e. a forced synchronous layout on every keystroke, tick and click, and it
+// read getBoundingClientRect, which includes running transforms — so a move
+// that started while another animation ran glided from the wrong place.
+// Now:
+//   * commit time: no layout read at all — only a cheap key signature
+//     (querySelectorAll + attributes). Unchanged keys → nothing else runs.
+//   * changed keys: ONE read of every card's layout box in the next frame's
+//     rAF (the layout that frame needs anyway), then only writes (WAAPI
+//     transform/opacity), so there is never a read-after-write in a frame.
+//   * positions come from the offset chain (layout boxes, transforms ignored).
+//   * the "before" picture is refreshed while idle (debounced), never per frame.
 function sectionOf(el) {
   const s = el.closest("[data-staff-section]");
   return s ? s.getAttribute("data-staff-section") : (el.getAttribute("data-mt-sec") || "board");
 }
+function cardEls(root) {
+  const out = [];
+  root.querySelectorAll("[data-mt-mid]").forEach((el) => { if (!el.closest(".modal-backdrop")) out.push(el); });
+  return out;
+}
+// Cheap: no layout. Changes only when a card enters / leaves a section.
+function cardKeys(root) {
+  const els = cardEls(root);
+  if (els.length > MAX_CARDS) return "many";
+  let sig = "";
+  for (const el of els) sig += `${sectionOf(el)}|${el.getAttribute("data-mt-mid")};`;
+  return sig;
+}
+// Layout box of el inside root's scroll content (transforms ignored).
+function boxIn(el, root, rootOff) {
+  let x = 0, y = 0, n = el;
+  while (n && n !== root && n !== document.body) {
+    x += n.offsetLeft; y += n.offsetTop;
+    const op = n.offsetParent;
+    if (!op || op === root) break;
+    if (op.contains(root)) { x -= rootOff.x; y -= rootOff.y; break; }
+    n = op;
+  }
+  return { x, y, w: el.offsetWidth, h: el.offsetHeight };
+}
+function offsetOf(root, op) {
+  // root's own offset from the shared offsetParent (only when root is not one)
+  let x = 0, y = 0, n = root;
+  while (n && n !== op) { x += n.offsetLeft; y += n.offsetTop; n = n.offsetParent; if (!n) break; }
+  return { x, y };
+}
 function snapshot(root) {
   const map = new Map();
   if (!root) return map;
-  const rr = root.getBoundingClientRect();
-  const st = root.scrollTop;
-  const els = root.querySelectorAll("[data-mt-mid]");
+  const els = cardEls(root);
   if (els.length > MAX_CARDS) { map.tooMany = true; return map; }
-  els.forEach((el) => {
-    if (el.closest(".modal-backdrop")) return;
-    const r = el.getBoundingClientRect();
-    if (!r.width && !r.height) return;
+  const rr = root.getBoundingClientRect();
+  map.view = { top: rr.top, left: rr.left, st: root.scrollTop, h: root.clientHeight };
+  const rootOff = offsetOf(root, root.offsetParent && root.offsetParent.contains(root) ? root.offsetParent : null);
+  for (const el of els) {
+    const b = boxIn(el, root, rootOff);
+    if (!b.w && !b.h) continue;
     const mid = el.getAttribute("data-mt-mid");
-    // y is in the scroll container's content coordinates, so scrolling between
-    // two renders never looks like a move.
-    map.set(`${sectionOf(el)}|${mid}`, { el, mid, x: r.left - rr.left, y: r.top - rr.top + st, w: r.width, h: r.height });
-  });
+    map.set(`${sectionOf(el)}|${mid}`, { el, mid, ...b });
+  }
   return map;
 }
 
 // ── Route pill: Rack → Accept → Work → Send ───────────────────────────────
+// Steps are equal flex columns, so the pill is placed by INDEX in pure CSS
+// (--pill-i / --pill-n); no offsetLeft read, no width animation.
 function placeRoutePill(root) {
   const nav = root && root.querySelector("[data-staff-route]");
   if (!nav) return;
-  const now = nav.querySelector(".wu-step.is-now");
-  if (!now) { nav.removeAttribute("data-glide"); return; }
-  const x = now.offsetLeft, w = now.offsetWidth;
-  if (!w) return;
-  const px = `${x}px`, pw = `${w}px`;
-  if (nav.style.getPropertyValue("--pill-x") !== px) nav.style.setProperty("--pill-x", px);
-  if (nav.style.getPropertyValue("--pill-w") !== pw) nav.style.setProperty("--pill-w", pw);
+  const steps = nav.querySelectorAll(".wu-step");
+  let i = -1;
+  steps.forEach((el, k) => { if (el.classList.contains("is-now")) i = k; });
+  if (i < 0) { nav.removeAttribute("data-glide"); return; }
+  const si = String(i), sn = String(steps.length);
+  if (nav.style.getPropertyValue("--pill-i") !== si) nav.style.setProperty("--pill-i", si);
+  if (nav.style.getPropertyValue("--pill-n") !== sn) nav.style.setProperty("--pill-n", sn);
   // The first placement must not slide in from the left edge: switch the
   // transition on only after the pill has been drawn once.
   if (!nav.hasAttribute("data-glide")) {
@@ -170,75 +215,94 @@ function placeRoutePill(root) {
   }
 }
 
-export function useMtMotion(rootRef) {
-  const prev = useRef(null);
+function playMoves(root, s) {
+  const next = snapshot(root);                     // the ONE read of this frame
+  const before = s.snap;
+  s.snap = next;
+  if (!before || before.tooMany || next.tooMany) return;
+  const gone = [], came = [];
+  before.forEach((v, k) => { if (!next.has(k)) gone.push(v); });
+  next.forEach((v, k) => { if (!before.has(k)) came.push(v); });
+  if (!gone.length && !came.length) return;
+  if (gone.length + came.length > MAX_CHANGES) return;      // a load / filter change, not an action
+  const reduce = reducedMotion();
+  const vw = next.view;
+  // 1. The card that left: a detached copy fades up and out where it was.
+  for (const v of gone) {
+    if (v.el.isConnected) continue;
+    const y = v.y - vw.st + vw.top;
+    if (y > window.innerHeight || y + v.h < 0) continue;     // off screen: nothing to see
+    cardGhost(v.el, { x: v.x + vw.left, y, w: v.w, h: v.h });
+  }
+  // 2. The same machine in its new section: soft ring (opacity only).
+  const goneMids = new Set(gone.map((v) => v.mid));
+  for (const v of came) {
+    if (!goneMids.has(v.mid)) continue;
+    v.el.classList.add("mt-arrive");
+    setTimeout(() => { try { v.el.classList.remove("mt-arrive"); } catch { /* gone */ } }, DUR.ring + 200);
+  }
+  // 3. Cards on screen glide into the gap (FLIP, transform only, no reads).
+  if (reduce) return;
+  const top = vw.st - 80, bottom = vw.st + vw.h + 80;
+  next.forEach((v, k) => {
+    const b = before.get(k);
+    if (!b || !canAnimate(v.el)) return;
+    const dx = b.x - v.x, dy = b.y - v.y;
+    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
+    if (v.y > bottom || v.y + v.h < top) return;              // off screen
+    v.el.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "translate(0, 0)" }],
+      { duration: DUR.move, easing: EASE_MOVE });
+  });
+}
 
-  // After EVERY commit (no deps on purpose — cheap: at most 40 rects).
+export function useMtMotion(rootRef) {
+  const st = useRef({ snap: null, keys: null, raf: 0 });
+
+  // Card entrance plays once, when the page opens (CSS keys off .mt-enter).
+  useLayoutEffect(() => {
+    const root = rootRef.current;
+    if (!root) return undefined;
+    root.classList.add("mt-enter");
+    const t = setTimeout(() => root.classList.remove("mt-enter"), 800);
+    return () => { clearTimeout(t); root.classList.remove("mt-enter"); };
+  }, [rootRef]);
+
+  // After every commit: NO layout read here (it used to force a synchronous
+  // layout of the whole page inside the commit).
   useLayoutEffect(() => {
     const root = rootRef.current;
     if (!root) return;
     placeRoutePill(root);
-    const next = snapshot(root);
-    const before = prev.current;
-    prev.current = next;
-    if (!before || before.tooMany || next.tooMany) return;
-
-    const gone = [], came = [];
-    before.forEach((v, k) => { if (!next.has(k)) gone.push([k, v]); });
-    next.forEach((v, k) => { if (!before.has(k)) came.push([k, v]); });
-    if (!gone.length && !came.length) return;                 // nothing moved between sections
-    if (gone.length + came.length > MAX_CHANGES) return;      // a load / filter change, not an action
-
-    const reduce = reducedMotion();
-    const rr = root.getBoundingClientRect();
-    const st = root.scrollTop;
-
-    // 1. The card that left: a detached copy fades up and out where it was.
-    for (const [, v] of gone) {
-      cardGhost(v.el, { x: v.x + rr.left, y: v.y - st + rr.top, w: v.w, h: v.h });
-    }
-    // 2. The same machine in its new section: soft ring (opacity only).
-    const goneMids = new Set(gone.map(([, v]) => v.mid));
-    for (const [, v] of came) {
-      if (!goneMids.has(v.mid)) continue;
-      v.el.classList.remove("mt-arrive");
-      void v.el.offsetWidth;                                   // restart the ring if it was still on
-      v.el.classList.add("mt-arrive");
-      setTimeout(() => { try { v.el.classList.remove("mt-arrive"); } catch { /* gone */ } }, DUR.ring + 60);
-    }
-    // 3. Everyone else glides into the gap (FLIP, transform only).
-    if (reduce) return;
-    next.forEach((v, k) => {
-      const b = before.get(k);
-      if (!b || !canAnimate(v.el)) return;
-      const dx = b.x - v.x, dy = b.y - v.y;
-      if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
-      v.el.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "none" }],
-        { duration: DUR.move, easing: EASE_MOVE });
-    });
+    const s = st.current;
+    const keys = cardKeys(root);
+    if (keys === s.keys) return;
+    s.keys = keys;
+    if (s.raf) return;                              // already scheduled for this frame
+    s.raf = requestAnimationFrame(() => { s.raf = 0; if (rootRef.current) playMoves(rootRef.current, s); });
   });
 
-  // Keep the "before" picture fresh between renders (photos loading, window
-  // resize), so the next move starts from where the cards really are.
+  // Keep the "before" picture fresh while idle (photos loading, resize,
+  // panels opening) — debounced, read in a quiet moment, never per frame.
   useEffect(() => {
     const root = rootRef.current;
     if (!root || typeof window === "undefined") return undefined;
-    let raf = 0;
+    const s = st.current;
+    let t = 0;
     const refresh = () => {
-      if (raf) return;
-      raf = requestAnimationFrame(() => {
-        raf = 0;
-        if (prev.current) prev.current = snapshot(root);
-        placeRoutePill(root);
-      });
+      clearTimeout(t);
+      t = setTimeout(() => {
+        t = 0;
+        if (s.raf || !rootRef.current) return;      // a move is about to read anyway
+        if (s.snap) s.snap = snapshot(rootRef.current);
+      }, 260);
     };
     root.addEventListener("load", refresh, true);
     window.addEventListener("resize", refresh);
-    // Dialogs and sheets: animate the one that just closed.
     let mo = null;
     if (typeof MutationObserver !== "undefined") {
       mo = new MutationObserver((muts) => {
         for (const m of muts) {
+          if (!DIALOG_GHOST) break;
           m.removedNodes.forEach((n) => {
             if (n.nodeType === 1 && n.classList && n.classList.contains("modal-backdrop")) dialogGhost(n);
           });
@@ -251,7 +315,8 @@ export function useMtMotion(rootRef) {
       root.removeEventListener("load", refresh, true);
       window.removeEventListener("resize", refresh);
       if (mo) mo.disconnect();
-      if (raf) cancelAnimationFrame(raf);
+      clearTimeout(t);
+      if (s.raf) { cancelAnimationFrame(s.raf); s.raf = 0; }
     };
   }, [rootRef]);
 }

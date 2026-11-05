@@ -1,27 +1,34 @@
-// UI P0 (2026-11-05) — <Count value={n}/>: a number that rolls to its new value
-// (@number-flow/react, ~6 KB gzip, loaded on demand). Until it has loaded — and
-// for non-numeric values — the same number shows as plain text, so the first
-// paint never waits and the layout never jumps (tabular-nums).
-// NumberFlow follows prefers-reduced-motion (respectMotionPreference) itself.
+// UI P0 (2026-11-05) — <Count value={n}/>: a number that rolls to its new value.
+//
+// Frame-budget pass (2026-11-05, owner: "no frame drops"): this used
+// @number-flow/react. Every NumberFlow measures itself with offsetWidth /
+// getBoundingClientRect before AND after each React commit, so a commit that
+// changed several counts (Accept, Finish & Transfer) forced one synchronous
+// layout per number in the middle of the commit (~45 ms at 4x CPU throttle).
+// Now the roll is pure CSS: when the value changes, the new text is a fresh
+// span that slides + fades in (transform/opacity only, 260 ms, see
+// world-ui.css .wu-roll). No layout read, no library download. The first
+// render never animates; non-numeric values are plain text; tabular-nums keeps
+// the width steady. Reduced motion: no roll (world-ui.css).
 //
 //   import Count from "../../shared/ui/Count.jsx";
 //   <Count value={stock} />   <Count value={pct} format={{ style: "percent" }} />
-import { Suspense, lazy } from "react";
-import { importWithReload } from "../../utils/lazyImport.js";
+import { useRef } from "react";
 import { formatCount, isCountable } from "./countFormat.js";
-
-const NumberFlow = lazy(() => importWithReload(() => import("@number-flow/react")));
 
 export default function Count({ value, locales = "en-IN", format, className = "", ...rest }) {
   const cls = `tabular-nums ${className}`.trim();
-  const text = <span className={cls} {...rest}>{formatCount(value, locales, format)}</span>;
-  if (!isCountable(value)) return text;
+  const text = formatCount(value, locales, format);
+  const seen = useRef({ first: value, dir: "up", last: value });
+  const s = seen.current;
+  if (value !== s.last) {
+    if (isCountable(value) && isCountable(s.last)) s.dir = Number(value) < Number(s.last) ? "down" : "up";
+    s.last = value;
+  }
+  if (!isCountable(value) || value === s.first) return <span className={cls} {...rest}>{text}</span>;
   return (
-    <Suspense fallback={text}>
-      <NumberFlow value={value} locales={locales} format={format} className={cls} willChange={false}
-        transformTiming={{ duration: 300, easing: "cubic-bezier(0.16, 1, 0.3, 1)" }}
-        spinTiming={{ duration: 300, easing: "cubic-bezier(0.16, 1, 0.3, 1)" }}
-        opacityTiming={{ duration: 150, easing: "ease-out" }} {...rest} />
-    </Suspense>
+    <span className={cls} {...rest}>
+      <span key={text} className={`wu-roll wu-roll-${s.dir}`}>{text}</span>
+    </span>
   );
 }
