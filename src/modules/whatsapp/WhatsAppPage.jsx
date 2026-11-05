@@ -20,8 +20,12 @@ export function WaLogo({ size = 22 }) {
   );
 }
 
-export function WhatsAppPage({ settings = {}, onSave }) {
+export function WhatsAppPage({ settings = {}, onSave, canDo = () => false }) {
   const onMobileMenu = React.useContext(MobileNavContext);
+  // Settings (incl. the API key), number book and Meta templates are admin
+  // config. No "whatsapp" action exists in the role matrix, so reuse the
+  // existing admin-config action (users.edit; super_admin always passes).
+  const canEdit = canDo("users", "edit");
   const [localSettings, setLocalSettings] = useState({
     waApiKey: settings.waApiKey || "",
     waPhoneId: settings.waPhoneId || "",
@@ -176,6 +180,7 @@ export function WhatsAppPage({ settings = {}, onSave }) {
   const upd = (key, val) => { setLocalSettings((p) => ({ ...p, [key]: val })); setDirty(true); };
 
   const handleSave = () => {
+    if (!canEdit) return;
     if (onSave) onSave({ ...settings, ...localSettings });
     setDirty(false);
     setRevealKey({});
@@ -504,6 +509,7 @@ export function WhatsAppPage({ settings = {}, onSave }) {
   };
 
   const createAlertTemplate = async () => {
+    if (!canEdit) return;
     if (!localSettings.waApiKey || !localSettings.waWabaId) {
       setTplErr("Add the API key and WABA ID in Settings first"); return;
     }
@@ -544,6 +550,7 @@ export function WhatsAppPage({ settings = {}, onSave }) {
   // Saves just this change on top of what is already saved. Anything still
   // being typed on the Settings tab stays unsaved, as the operator left it.
   const persist = (patch) => {
+    if (!canEdit) return;
     setLocalSettings((p) => ({ ...p, ...patch }));
     if (onSave) onSave({ ...settings, ...patch });
   };
@@ -574,6 +581,7 @@ export function WhatsAppPage({ settings = {}, onSave }) {
   };
 
   const deleteTemplate = async (t) => {
+    if (!canEdit) return;
     setTplBusy(`delete:${t.name}`); setTplErr(""); setTplMsg(""); setTplConfirm("");
     const { callWhatsAppFn } = await import("../../stores/adminApi.js");
     const res = await callWhatsAppFn("whatsapp-templates", {
@@ -607,7 +615,7 @@ export function WhatsAppPage({ settings = {}, onSave }) {
   })();
 
   const saveTplForm = async () => {
-    if (!tplForm || tplFormProblem) return;
+    if (!canEdit || !tplForm || tplFormProblem) return;
     const slots = tplSlots(tplForm.body);
     const bodyComp = { type: "BODY", text: tplForm.body };
     if (slots.length) bodyComp.example = { body_text: [slots.map((n) => String(tplForm.examples[n - 1]).trim())] };
@@ -800,7 +808,7 @@ export function WhatsAppPage({ settings = {}, onSave }) {
               {connected ? "+91 70161 00287" : "Setup incomplete"}
             </div>
           </div>
-          {dirty && (
+          {dirty && canEdit && (
             <button onClick={handleSave}
                     className="px-4 py-2 rounded-lg text-[12px] font-semibold text-white flex-shrink-0"
                     style={{ background: "var(--wa-accent)" }}>
@@ -1177,12 +1185,14 @@ export function WhatsAppPage({ settings = {}, onSave }) {
               })()}
 
               <div className="flex flex-wrap items-center gap-2 mb-4">
+                {canEdit && (
                 <button onClick={() => openTplForm(null)}
                         className="px-4 py-2 rounded-lg text-[12.5px] font-semibold text-white inline-flex items-center gap-1.5"
                         style={{ background: "var(--wa-accent)" }}>
                   <Plus size={15} /> New template
                 </button>
-                {!templates.some((t) => t.name === ERP_ALERT_TEMPLATE.name) && (
+                )}
+                {canEdit && !templates.some((t) => t.name === ERP_ALERT_TEMPLATE.name) && (
                   <button onClick={() => { setShowNewTpl(true); setTplForm(null); setTplErr(""); setTplMsg(""); }}
                           className="px-3.5 py-2 rounded-lg text-[12.5px] font-semibold"
                           style={{ border: "1px solid var(--wa-line)", color: "var(--wa-ink)", background: "var(--wa-surface)" }}>
@@ -1314,7 +1324,7 @@ export function WhatsAppPage({ settings = {}, onSave }) {
                         </div>
                       )}
                       <div className="flex flex-wrap items-center gap-2">
-                        <button onClick={saveTplForm} disabled={!!tplFormProblem || tplCreating}
+                        <button onClick={saveTplForm} disabled={!canEdit || !!tplFormProblem || tplCreating}
                                 className="px-4 py-2 rounded-lg text-[12.5px] font-semibold text-white disabled:opacity-40"
                                 style={{ background: "var(--wa-accent)" }}>
                           {tplCreating ? "Sending…" : tplForm.mode === "edit" ? "Submit changes to Meta" : "Submit to Meta for approval"}
@@ -1378,14 +1388,14 @@ export function WhatsAppPage({ settings = {}, onSave }) {
                       {t.text && <div className="wa-tpl-preview">{tplFill(t.text, t.example)}</div>}
 
                       <div className="flex flex-wrap items-center gap-2 mt-3">
-                        {approved && !isAlert && tplFitsAlerts(t) && (
+                        {canEdit && approved && !isAlert && tplFitsAlerts(t) && (
                           <button onClick={() => chooseAlertTemplate(t)}
                                   className="px-3.5 py-2 rounded-lg text-[12px] font-semibold text-white"
                                   style={{ background: "var(--wa-live)" }}>
                             Use for alerts
                           </button>
                         )}
-                        {isAlert && (
+                        {canEdit && isAlert && (
                           <button onClick={stopTemplateForAlerts}
                                   className="px-3.5 py-2 rounded-lg text-[12px] font-semibold"
                                   style={{ border: "1px solid var(--wa-line)", color: "var(--wa-ink)" }}>
@@ -1399,7 +1409,7 @@ export function WhatsAppPage({ settings = {}, onSave }) {
                             <Send size={13} /> {busy("test") ? "Sending…" : "Send me a test"}
                           </button>
                         )}
-                        {st !== "PENDING" && (
+                        {canEdit && st !== "PENDING" && (
                           <button onClick={() => openTplForm(t)} disabled={!!tplBusy}
                                   className="px-3.5 py-2 rounded-lg text-[12px] font-semibold disabled:opacity-40"
                                   style={{ border: "1px solid var(--wa-line)", color: "var(--wa-ink)" }}>
@@ -1407,7 +1417,7 @@ export function WhatsAppPage({ settings = {}, onSave }) {
                           </button>
                         )}
                         <span className="flex-1" />
-                        {tplConfirm === t.name ? (
+                        {!canEdit ? null : tplConfirm === t.name ? (
                           <span className="flex items-center gap-2 text-[12px]" style={{ color: "#b91c1c" }}>
                             Delete? This name cannot be reused for 30 days.
                             <button onClick={() => deleteTemplate(t)}
@@ -1730,7 +1740,7 @@ export function WhatsAppPage({ settings = {}, onSave }) {
                           <input value={p.dept || ""} placeholder="Department"
                                  onChange={(e) => setDirRow(i, { dept: e.target.value })}
                                  className="wa-field-input" style={{ flex: "1 1 28%" }} />
-                          <button onClick={() => removeDirRow(i)} className="wa-icon-btn" title="Remove">
+                          <button onClick={() => removeDirRow(i)} disabled={!canEdit} className="wa-icon-btn" title="Remove">
                             <Trash2 size={15} />
                           </button>
                         </div>
@@ -1844,7 +1854,7 @@ export function WhatsAppPage({ settings = {}, onSave }) {
               {/* Saving used to just make the button vanish, which left you
                   guessing — twice today it looked saved when it was not. */}
               <div className="flex items-center gap-3">
-                <button onClick={handleSave} disabled={!dirty}
+                <button onClick={handleSave} disabled={!dirty || !canEdit}
                         className="px-5 py-2.5 rounded-lg text-[13px] font-semibold text-white disabled:opacity-40"
                         style={{ background: "var(--wa-accent)" }}>
                   Save changes
