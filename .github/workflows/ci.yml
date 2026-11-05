@@ -107,7 +107,10 @@ jobs:
   # tests/e2e/timings.txt). Runs on every push (feature branches + main);
   # the pull_request copy of this workflow skips it so it never runs twice.
   # e2e-build builds the bundle ONCE; every shard downloads it instead of
-  # rebuilding. ci and health run in parallel with all of this (no needs).
+  # rebuilding. Shards start at once and do their own setup (node_modules,
+  # Playwright) while the build runs, then wait for the build job before
+  # downloading it (fails fast if the build failed). ci and health run in
+  # parallel with all of this (no needs).
   # The "e2e" job below is the single check scripts/ship.sh waits for.
   e2e-build:
     name: e2e build
@@ -151,9 +154,11 @@ jobs:
   e2e-shard:
     name: e2e shard ${{ matrix.shard }}/8
     if: github.event_name == 'push'
-    needs: e2e-build
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read              # wait for the "e2e build" job + download its artifact
     strategy:
       fail-fast: false
       matrix:
@@ -196,7 +201,8 @@ jobs:
         # The suites import /usr/local/lib/node_modules_global/playwright/index.js
         # (the dev box's global install); recreate that path here. One frozen
         # suite also saves a screenshot under /home/claude/work. On a cache hit
-        # only the OS libraries are installed (browsers + package are cached).
+        # the package + browsers come from the cache; the OS libraries/fonts are
+        # always installed (--with-deps) so rendering matches every run.
         run: |
           if [ "${{ steps.pw.outputs.cache-hit }}" != "true" ]; then
             npm install --no-save --no-audit --no-fund --prefix "$RUNNER_TEMP/pw" "playwright@$PW_VERSION" >/dev/null
@@ -205,6 +211,21 @@ jobs:
           sudo ln -sfn "$RUNNER_TEMP/pw/node_modules/playwright" /usr/local/lib/node_modules_global/playwright
           sudo chown -R "$USER" /home/claude
           "$RUNNER_TEMP/pw/node_modules/.bin/playwright" install --with-deps chromium
+
+      - name: Wait for the e2e build job
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for _ in $(seq 1 200); do
+            st=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs?per_page=50" \
+                 --jq '.jobs[] | select(.name == "e2e build") | "\(.status) \(.conclusion)"' 2>/dev/null || true)
+            case "$st" in
+              "completed success") echo "e2e build done"; exit 0 ;;
+              completed*) echo "::error::e2e build finished as: $st"; exit 1 ;;
+            esac
+            sleep 3
+          done
+          echo "::error::timed out waiting for the e2e build job"; exit 1
 
       - name: Download the e2e build
         uses: actions/download-artifact@v4
