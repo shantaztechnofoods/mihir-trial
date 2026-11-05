@@ -8,10 +8,12 @@ import { VendorImportModal } from "./VendorImportModal.jsx";
 import { VendorModal } from "./VendorModal.jsx";
 import { Btn, MetricCard, StatusBadge } from "../../shared/ui/primitives.jsx";
 import { Topbar } from "../../shared/ui/Topbar.jsx";
+import ArchivedSection from "../../shared/components/ArchivedSection.jsx";
+import { archiveConfirmTitle } from "../../utils/archive.js";
 
 // ─── VENDORS PAGE ─────────────────────────────────────────────────────────────
 
-export function VendorsPage({ vendorList, pos, items, onAddVendor, onEditVendor, onDeleteVendor, onBulkAddVendors, canDo = () => true }) {
+export function VendorsPage({ vendorList, pos, items, onAddVendor, onEditVendor, onDeleteVendor, onRestoreVendor = null, onBulkAddVendors, canDo = () => true }) {
   const [search,        setSearch]        = useState("");
   // Auto-focus on mount — same Tally-style pattern as InventoryPage.
   const searchRef = useRef(null);
@@ -127,7 +129,7 @@ export function VendorsPage({ vendorList, pos, items, onAddVendor, onEditVendor,
                onClick={(e) => e.target === e.currentTarget && setConfirmDelete(null)}>
             <div className="w-96 rounded-2xl p-6" style={{ background: "var(--surface-elevated)", border: `1px solid ${use.anyRefs ? "rgba(234,179,8,0.4)" : "rgba(239,68,68,0.35)"}` }}>
               <div className="text-sm font-black text-slate-900 mb-2">
-                {use.anyRefs ? "Archive Vendor?" : "Delete Vendor?"}
+                {archiveConfirmTitle("vendor", confirmDelete.name)}
               </div>
               {use.anyRefs ? (
                 <div className="space-y-2.5 mb-5">
@@ -160,21 +162,21 @@ export function VendorsPage({ vendorList, pos, items, onAddVendor, onEditVendor,
                 </div>
               ) : (
                 <div className="text-[11px] text-slate-400 mb-5">
-                  Remove <span className="text-slate-900 font-bold">{confirmDelete.name}</span> from the vendor list? No purchase history will be lost — this vendor has no live references.
+                  <span className="text-slate-900 font-bold">{confirmDelete.name}</span> will be hidden from the vendor list and selectors. Nothing is deleted — restore it any time from Archived below the vendor cards.
                 </div>
               )}
               <div className="flex gap-3 justify-end">
-                <Btn variant="ghost" size="sm" onClick={() => setConfirmDelete(null)}>Cancel</Btn>
-                <Btn variant={use.anyRefs ? "orange" : "red"} size="sm" onClick={async () => {
+                <Btn variant="ghost" size="sm" autoFocus onClick={() => setConfirmDelete(null)}>Cancel</Btn>
+                <Btn variant="orange" size="sm" onClick={async () => {
                   const res = await onDeleteVendor(confirmDelete.id);
                   if (res?.success) {
-                    showToast(res.mode === "archived" ? `${confirmDelete.name} archived` : `${confirmDelete.name} removed`);
+                    showToast(`${confirmDelete.name} archived`);
                   } else {
                     showToast(`Failed: ${res?.error || "unknown error"}`);
                   }
                   setConfirmDelete(null);
                   if (profileVendor?.id === confirmDelete.id) setProfileVendor(null);
-                }}>{use.anyRefs ? "Archive" : "Delete"}</Btn>
+                }}>Archive vendor</Btn>
               </div>
             </div>
           </div>
@@ -268,7 +270,7 @@ export function VendorsPage({ vendorList, pos, items, onAddVendor, onEditVendor,
                     <Btn variant="wa"    size="xs" onClick={() => { const r = openVendorWhatsApp(v); if (!r.ok) showToast(waErrorToast(r.error)); }}><LeadIcon e="📱" />WA</Btn>
                     <Btn variant="mail"  size="xs"><Glyph e="✉️" size={14} /></Btn>
                     {canDo("vendors","edit")   && <Btn variant="ghost" size="xs" onClick={() => { setEditingVendor(v); setShowModal(true); }}><Glyph e="✏️" size={14} /></Btn>}
-                    {canDo("vendors","delete") && <Btn variant="red"   size="xs" onClick={() => setConfirmDelete(v)}><Glyph e="🗑" size={14} /></Btn>}
+                    {canDo("vendors","delete") && <Btn variant="orange" size="xs" title={`Archive ${v.name}`} onClick={() => setConfirmDelete(v)}><Glyph e="🗄" size={14} /></Btn>}
                   </div>
                 </div>
               </div>
@@ -276,6 +278,15 @@ export function VendorsPage({ vendorList, pos, items, onAddVendor, onEditVendor,
             {filtered.length === 0 && (
               <div className="col-span-3 py-16 text-center text-slate-600 text-sm">No vendors match your search.</div>
             )}
+            {/* 2026-11-05 — archived vendors (never deleted): collapsed, Restore
+                guarded by the same permission as Archive. */}
+            <div className="col-span-full">
+              <ArchivedSection kind="vendor" testId="vendors" rows={vendorList.filter((v) => v.archived)}
+                               getKey={(v) => v.id} getName={(v) => v.name}
+                               getMeta={(v) => `${v.category || "—"} · ${vendorPOCounts[v.name] || 0} POs`}
+                               canRestore={!!onRestoreVendor && canDo("vendors","delete")}
+                               onRestore={async (v) => { const r = await onRestoreVendor(v); if (r?.success) showToast(`${v.name} restored`); return r; }} />
+            </div>
           </div>
 
           {/* Vendor History panel */}

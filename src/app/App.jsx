@@ -15,15 +15,16 @@ import PageErrorBoundary from "../shared/components/PageErrorBoundary.jsx";
 import SafeBoundary from "../shared/components/SafeBoundary.jsx";
 import { makeInFlight, makeLatest } from "../utils/inFlight.js";
 import { readLocalJson } from "../utils/fetchAll.js";
+import { archiveBomDef, restoreBomDef, isBomArchived } from "../utils/archive.js";
 import { MobileNavContext } from "../shared/components/PageHeader.jsx";
 import { appendAuditWithUser, getAuditLog, subscribeAudit } from "../auth/auditStore.js";
 import { isSupabaseEnabled, ALLOW_DEMO, ENABLED_MODULES_ENV, ERP_INSTANCE } from "../config/env.js";
 import { MODULES, effectiveEnabledModules, isModuleOn, normaliseModuleSelection } from "../utils/modules.js";
 import { getSupabase } from "../supabase/client.js";
 import { loadSettings, saveSettings } from "../stores/settingsStore.js";
-import { listVendors, createVendor, updateVendor, deleteVendor, archiveVendor } from "../stores/vendorsStore.js";
-import { fetchItems, createItem as itemCreate, updateItem as itemUpdate, deleteItem as itemDelete, updateStockAndHistory } from "../stores/itemsStore.js";
-import { fetchBOMs, createBOM as bomCreate, updateBOM as bomUpdate, renameBOM as bomRename, deleteBOM as bomDelete } from "../stores/bomsStore.js";
+import { listVendors, createVendor, updateVendor, archiveVendor, restoreVendor } from "../stores/vendorsStore.js";
+import { fetchItems, createItem as itemCreate, updateItem as itemUpdate, deleteItem as itemDelete, fetchArchivedItems, restoreItem as itemRestore, updateStockAndHistory } from "../stores/itemsStore.js";
+import { fetchBOMs, createBOM as bomCreate, updateBOM as bomUpdate, renameBOM as bomRename, deleteBOM as bomDelete, restoreBOM as bomRestore } from "../stores/bomsStore.js";
 import { fetchPOs, createPO as poCreate, updatePO as poUpdate, deletePO as poDelete, fetchPOStatus } from "../stores/posStore.js";
 import { fetchInward, createInward, bulkCreateInward, deleteInwardByPO } from "../stores/inwardStore.js";
 import { fetchOutward, createOutward, updateOutwardRef, deleteOutwardByIssueId } from "../stores/outwardStore.js";
@@ -34,7 +35,7 @@ import { fetchHandovers, createHandover as handoverCreate, acceptHandover as han
 import { getMySignature, saveMySignature, reauthenticateByPassword } from "../stores/signaturesStore.js";
 import { readDeptWorkflowSettings, setWorkCalendar, isHoldOverdue, RACK_RELEASE_HOPS, canAcceptHandover, canFinishTransfer, canStartAssembly, senderUndoState, saveWithRetry, pendingHandoverForMachine, findStuckAccepts } from "../utils/handoverLogic.js";
 // Phase B
-import { fetchTemplates, createTemplate, updateTemplate, deleteTemplate, fetchResponses, createResponse } from "../stores/checklistsStore.js";
+import { fetchTemplates, createTemplate, updateTemplate, fetchResponses, createResponse } from "../stores/checklistsStore.js";
 import { fetchPendingItems, createPendingItem, resolvePendingItem, receivePendingItem, receivePendingPart, pendingItemIsPart, pendingItemIsOpen } from "../stores/pendingItemsStore.js";
 import { fetchAllAttachments, uploadAttachment, deleteAttachment } from "../stores/attachmentsStore.js";
 import { fetchRatings, createRating, overrideRating } from "../stores/ratingsStore.js";
@@ -210,6 +211,15 @@ export default function App() {
     }
     return out;
   });
+
+  // 2026-11-05 — archived (never deleted) items for Item Master → Archived (N).
+  const [archivedItems, setArchivedItems] = useState([]);
+  useEffect(() => {
+    if (!currentUser?.id) return undefined;
+    let cancelled = false;
+    fetchArchivedItems().then((rows) => { if (!cancelled && Array.isArray(rows)) setArchivedItems(rows); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [currentUser?.id]);
 
   const [pos,        setPos]        = useState(() => { if (SUPA) return []; { const v = readLocalJson("erp_pos", NO_LOCAL_LIST);        if (v !== NO_LOCAL_LIST) return v; } return SEED_DEMO ? initialPOs : []; });
   const [vendorList, setVendorList] = useState(() => { if (SUPA) return []; { const v = readLocalJson("erp_vendors", NO_LOCAL_LIST);    if (v !== NO_LOCAL_LIST) return v; } return SEED_DEMO ? vendors : []; });
@@ -1507,20 +1517,38 @@ export default function App() {
     }
     return { success: true, item: res.item, mediaStripped: !!res.mediaStripped };
   };
+  // Owner rule (2026-11-05): an item is never deleted — "Archive" hides it
+  // from every list (is_active=false, migration 008) and keeps the row, its
+  // rates and its history. It comes back from Item Master → Archived (N).
   const handleDeleteItemRow = async (category, code) => {
-    console.info("[App] handleDeleteItemRow", { code, category });
+    console.info("[App] handleDeleteItemRow (archive)", { code, category });
     const before = (items[category] || []).find((i) => i.code === code);
     const res = await itemDelete(category, code);
-    if (!res.success) { console.warn("[App] item delete failed:", res.error); return { success: false, error: res.error }; }
+    if (!res.success) { console.warn("[App] item archive failed:", res.error); return { success: false, error: res.error }; }
     setItems((prev) => ({ ...prev, [category]: (prev[category] || []).filter((i) => i.code !== code) }));
-    // Audit trail: deletions must be recoverable from the log — capture the
-    // name, unit, and current stock level at delete time so Audit Trail reads
-    // show WHAT disappeared, not just "code X deleted".
+    if (before) setArchivedItems((prev) => [{ category, item: { ...before, archived: true, archivedAt: new Date().toISOString() } }, ...prev.filter((x) => x.item?.code !== code)]);
+    // Audit trail: capture name, unit and stock at archive time.
     logAudit({
-      type: "item_deleted", module: "Inventory",
-      action: `Item Deleted: ${before?.name || code} (${code}) from ${category}`,
+      type: "item_archived", module: "Inventory",
+      action: `Item Archived: ${before?.name || code} (${code}) from ${category}`,
       ref: code, itemCode: code, itemName: before?.name || code,
-      details: { category, stockAtDelete: before?.stock ?? 0, unit: before?.unit || "", vendor: before?.vendor || "" },
+      details: { category, stockAtArchive: before?.stock ?? 0, unit: before?.unit || "", vendor: before?.vendor || "" },
+    });
+    return { success: true };
+  };
+  const handleRestoreItemRow = async ({ category, item }) => {
+    const code = item?.code;
+    if (!code) return { success: false, error: "item not found" };
+    const res = await itemRestore(category, code);
+    if (!res.success) { console.warn("[App] item restore failed:", res.error); return { success: false, error: res.error }; }
+    const back = { ...(res.item || item), archived: undefined, archivedAt: undefined };
+    const cat = back.category || category;
+    setItems((prev) => ({ ...prev, [cat]: [...(prev[cat] || []).filter((i) => i.code !== code), { ...back, status: recomputeStatus(back.stock, back.min) }] }));
+    setArchivedItems((prev) => prev.filter((x) => x.item?.code !== code));
+    logAudit({
+      type: "item_restored", module: "Inventory",
+      action: `Item Restored: ${back.name || code} (${code}) to ${cat}`,
+      ref: code, itemCode: code, itemName: back.name || code, details: { category: cat },
     });
     return { success: true };
   };
@@ -1687,36 +1715,33 @@ export default function App() {
     logAudit({ type: "vendor_edit", module: "Vendor", action: `Vendor Updated: ${res.vendor.name}`, ref: res.vendor.name, vendor: res.vendor.name });
   };
   // Phase 4: vendor delete = hard delete when unused, archive when referenced.
-  // History-safe: hard delete leaves POs intact (po.vendor is the NAME string, not a
-  // FK), but archive is preferred whenever live data references the vendor so the
-  // operator can still see the vendor name on existing rows.
+  // Owner rule (2026-11-05): a vendor is never deleted — it is always
+  // ARCHIVED (hidden from lists and selectors, kept for PO / item history)
+  // and comes back from Vendors → Archived (N).
   const handleDeleteVendor = async (id) => {
     const v = vendorList.find((x) => x.id === id);
     if (!v) return { success: false, error: "vendor not found" };
-
     const hasPOs           = pos.some((p) => p.vendor === v.name);
     const hasLinkedItems   = Object.values(items).some((arr) => (arr || []).some((it) =>
       (it.vendorLinks || []).some((l) => l.vendorId === v.id) || it.vendor === v.name
     ));
-    const shouldArchive    = hasPOs || hasLinkedItems;
-
-    if (shouldArchive) {
-      const res = await archiveVendor(v);
-      if (!res.success) { console.warn("[App] handleDeleteVendor archive failed:", res.error); return { success: false, error: res.error }; }
-      setVendorList((prev) => prev.map((x) => x.id === id ? (res.vendor || { ...v, archived: true }) : x));
-      logAudit({
-        type: "vendor_archive", module: "Vendor",
-        action: `Vendor Archived: ${v.name} (referenced by ${hasPOs ? "POs" : ""}${hasPOs && hasLinkedItems ? " + " : ""}${hasLinkedItems ? "items" : ""})`,
-        ref: v.name, vendor: v.name,
-      });
-      return { success: true, mode: "archived" };
-    }
-
-    const res = await deleteVendor(id);
-    if (!res.success) { console.warn("[App] handleDeleteVendor failed:", res.error); return { success: false, error: res.error }; }
-    setVendorList((prev) => prev.filter((x) => x.id !== id));
-    logAudit({ type: "vendor_delete", module: "Vendor", action: `Vendor Deleted: ${v.name}`, ref: v.name, vendor: v.name });
-    return { success: true, mode: "deleted" };
+    const res = await archiveVendor(v);
+    if (!res.success) { console.warn("[App] handleDeleteVendor archive failed:", res.error); return { success: false, error: res.error }; }
+    setVendorList((prev) => prev.map((x) => x.id === id ? (res.vendor || { ...v, archived: true }) : x));
+    logAudit({
+      type: "vendor_archived", module: "Vendor",
+      action: `Vendor Archived: ${v.name}${hasPOs || hasLinkedItems ? ` (referenced by ${hasPOs ? "POs" : ""}${hasPOs && hasLinkedItems ? " + " : ""}${hasLinkedItems ? "items" : ""})` : ""}`,
+      ref: v.name, vendor: v.name,
+    });
+    return { success: true, mode: "archived" };
+  };
+  const handleRestoreVendor = async (v) => {
+    if (!v) return { success: false, error: "vendor not found" };
+    const res = await restoreVendor(v);
+    if (!res.success) { console.warn("[App] handleRestoreVendor failed:", res.error); return { success: false, error: res.error }; }
+    setVendorList((prev) => prev.map((x) => x.id === v.id ? (res.vendor || { ...v, archived: false }) : x));
+    logAudit({ type: "vendor_restored", module: "Vendor", action: `Vendor Restored: ${v.name}`, ref: v.name, vendor: v.name });
+    return { success: true };
   };
   // Per-row vendor import. Replaces the previous all-or-nothing bulk insert so a single
   // failing row no longer kills the whole batch. Rows tagged _status:"update" merge
@@ -1809,7 +1834,7 @@ export default function App() {
   const handleCreateBOM = (key, def) => {
     const k = (key || "").trim();
     if (!k) return { success: false, error: "BOM Key is required" };
-    if (bomDefs[k]) return { success: false, error: "A BOM with this key already exists" };
+    if (bomDefs[k]) return { success: false, error: isBomArchived(bomDefs[k]) ? `BOM ${k} is archived — restore it from Archived (below the BOM list)` : "A BOM with this key already exists" };
     if (!(def.label || "").trim()) return { success: false, error: "Machine Model Name is required" };
     if (!(def.items || []).length) return { success: false, error: "At least one component is required" };
     const palette = ["#2E50D6","#2640B0","#6d28d9","#be185d","#b45309","#15803d","#0e7490","#0f766e","#B45309","#7e22ce"];
@@ -1920,26 +1945,42 @@ export default function App() {
         console.error("[App] handleDeleteBOM: rack remove threw for machine", m.id, e);
       }
     }
-    // Step 2: drop the BOM definition. Completed machine_log rows survive —
-    // they carry denormalized bomKey/bomLabel so history reads stay intact.
+    // Step 2: ARCHIVE the BOM (owner rule 2026-11-05 — never delete). It
+    // gets retired_at, so it leaves issuing and the BOM list but the row, its
+    // checklists (checklist_templates.bom_key) and its history stay; it comes
+    // back from Outward → BOM list → Archived (N) → Restore.
     const oldDef = bomDefs[key];
-    setBomDefs((prev) => { const next = { ...prev }; delete next[key]; return next; });
-    if (isSupabaseEnabled()) {
-      const r = await bomDelete(key);
-      if (!r.success) {
-        console.warn("[App] handleDeleteBOM: Supabase delete failed", r.error);
-        // Roll back local state so the operator can retry without ghost
-        setBomDefs((prev) => ({ ...prev, [key]: oldDef }));
-        return { success: false, error: r.error };
-      }
+    const at = new Date().toISOString();
+    setBomDefs((prev) => (prev[key] ? { ...prev, [key]: archiveBomDef(prev[key], at) } : prev));
+    const r = await bomDelete(key);   // bomsStore.deleteBOM archives (retired_at)
+    if (!r.success) {
+      console.warn("[App] handleDeleteBOM: archive failed", r.error);
+      // Roll back local state so the operator can retry without ghost
+      setBomDefs((prev) => ({ ...prev, [key]: oldDef }));
+      return { success: false, error: r.error };
     }
     logAudit({
-      type: "bom_deleted", module: "BOM",
-      action: `BOM Deleted: ${key} — ${info.rack.length} rack machine(s) cleared, ${restored} component(s) returned to stock`,
+      type: "bom_archived", module: "BOM",
+      action: `BOM Archived: ${key} — ${info.rack.length} rack machine(s) cleared, ${restored} component(s) returned to stock`,
       ref: key,
-      details: { rackCount: info.rack.length, completedCount: info.completed.length, restored },
+      details: { rackCount: info.rack.length, completedCount: info.completed.length, restored, archivedAt: at },
     });
-    return { success: true, rackCount: info.rack.length, completedCount: info.completed.length, restored };
+    return { success: true, rackCount: info.rack.length, completedCount: info.completed.length, restored, archived: true };
+  };
+  const handleRestoreBOM = async (key) => {
+    const def = bomDefs[key];
+    if (!def) return { success: false, error: "BOM not found" };
+    if (!isBomArchived(def)) return { success: true, noop: true };
+    setBomDefs((prev) => (prev[key] ? { ...prev, [key]: restoreBomDef(prev[key]) } : prev));
+    const r = await bomRestore(key);
+    if (!r.success) {
+      console.warn("[App] handleRestoreBOM: restore failed", r.error);
+      setBomDefs((prev) => ({ ...prev, [key]: def }));
+      return { success: false, error: r.error };
+    }
+    logAudit({ type: "bom_restored", module: "BOM", action: `BOM Restored: ${key}${def.label ? ` (${def.label})` : ""}`, ref: key,
+               details: { archivedAt: def.retiredAt || null, replacedBy: def.replacedBy || null } });
+    return { success: true };
   };
 
   const handleRenameBOM = (oldKey, newKey, newLabel) => {
@@ -1948,7 +1989,7 @@ export default function App() {
     if (!bomDefs[oldKey]) return { success: false, error: "BOM not found" };
     if (!nk) return { success: false, error: "BOM Key is required" };
     if (!nl) return { success: false, error: "Machine Model Name is required" };
-    if (nk !== oldKey && bomDefs[nk]) return { success: false, error: "A BOM with this key already exists" };
+    if (nk !== oldKey && bomDefs[nk]) return { success: false, error: isBomArchived(bomDefs[nk]) ? `BOM ${nk} is archived — restore it from Archived (below the BOM list)` : "A BOM with this key already exists" };
     const old = bomDefs[oldKey];
     const keyChanged   = nk !== oldKey;
     const labelChanged = nl !== old.label;
@@ -3402,28 +3443,25 @@ export default function App() {
     return res;
   };
   const handleUpdateChecklistTemplate = async (id, patch) => {
+    const before = checklistTemplates.find((x) => x.id === id);
     const res = await updateTemplate(id, patch);
     if (!res.success) return res;
     setChecklistTemplates((prev) => prev.map((t) => t.id === id ? { ...t, ...patch, version: (t.version || 1) + 1 } : t));
+    // Owner rule (2026-11-05): templates are never deleted. Switching one off
+    // is its archive, switching it back on its restore — audited as such.
+    const wasOff = before ? before.active === false : false;
+    const archived = patch && patch.active === false && !wasOff;
+    const restored = patch && patch.active === true && wasOff;
     logAudit({
-      type: "checklist_template_updated", module: "Settings",
-      action: `Checklist template updated: ${patch.name || id}`,
-      ref: String(id), details: { patchKeys: Object.keys(patch || {}) },
+      type: archived ? "checklist_template_archived" : restored ? "checklist_template_restored" : "checklist_template_updated", module: "Settings",
+      action: `Checklist template ${archived ? "switched off (archived)" : restored ? "switched on (restored)" : "updated"}: ${patch.name || before?.name || id}`,
+      ref: String(id), details: { patchKeys: Object.keys(patch || {}), department: before?.department || "", bomKey: before?.bomKey || null },
     });
     return res;
   };
-  const handleDeleteChecklistTemplate = async (id) => {
-    const t = checklistTemplates.find((x) => x.id === id);
-    const res = await deleteTemplate(id);
-    if (!res.success) return res;
-    setChecklistTemplates((prev) => prev.filter((x) => x.id !== id));
-    logAudit({
-      type: "checklist_template_deleted", module: "Settings",
-      action: `Checklist template deleted: ${t?.name || id}`,
-      ref: String(id), details: { department: t?.department || "" },
-    });
-    return res;
-  };
+  // Kept as a handler name (regression inventory); never deletes — it switches
+  // the template off (active=false) through the same path as above.
+  const handleDeleteChecklistTemplate = async (id) => handleUpdateChecklistTemplate(id, { active: false });
   // 2026-11-05 — BOM screen → Checklists. Writes ONE BOM's own list for one
   // (department, stage): updates its row (templateId) or creates it. Never
   // deletes — an emptied list is switched off (active=false) so the common
@@ -4176,6 +4214,9 @@ export default function App() {
     deleteItemRow:     G.guard((cat, code) => `item-del:${cat}:${code}`, handleDeleteItemRow),
     deleteVendor:      G.guard((id) => `vendor-del:${id}`, handleDeleteVendor),
     deleteBOM:         G.guard((key) => `bom-del:${key}`, handleDeleteBOM),
+    restoreBOM:        G.guard((key) => `bom-restore:${key}`, handleRestoreBOM),
+    restoreItemRow:    G.guard((row) => `item-restore:${row?.item?.code}`, handleRestoreItemRow),
+    restoreVendor:     G.guard((v) => `vendor-restore:${v?.id}`, handleRestoreVendor),
   };
   const outwardPageProps = {
     items, handleUpdateStock,
@@ -4193,6 +4234,7 @@ export default function App() {
     onRemoveRackMachine: guarded.removeRackMachine,
     onDuplicateBOM: handleDuplicateBOM,
     onDeleteBOM: guarded.deleteBOM,
+    onRestoreBOM: guarded.restoreBOM,
     computeBOMDeletionInfo,
     settings,
     checklistTemplates,
@@ -4215,6 +4257,7 @@ export default function App() {
                               onLogAudit={logAudit} canDo={canDo} vendorList={vendorList} settings={settings}
                               onCreateItem={handleCreateItemRow} onUpdateItem={handleUpdateItemRow} onDeleteItem={guarded.deleteItemRow}
                               onDeleteBOM={guarded.deleteBOM}
+                              archivedItems={archivedItems} onRestoreItem={guarded.restoreItemRow}
                               onBulkAddItems={handleBulkAddItems} />,
     inward:    <InwardPage    items={items} handleUpdateStock={handleUpdateStock} vendorList={vendorList} onInwardComplete={handleInwardComplete} onAddInward={(entry) => { setInwardLog(prev => [entry, ...prev]); if (isSupabaseEnabled()) createInward(entry).then((r) => { if (!r.success) console.warn("[App] Inward create Supabase failed:", r.error); }); logAudit({ type: "inward_manual", module: "Inward", action: `Manual Inward: ${entry.item} × ${entry.qty}`, ref: entry.code, itemCode: entry.code, itemName: entry.item, vendor: entry.vendor, qty: entry.qty, details: { unit: entry.unit, notes: entry.notes } }); }} appInwardLog={inwardLog} canDo={canDo} />,
     outward:   <OutwardPage {...outwardPageProps} />,
@@ -4277,7 +4320,7 @@ export default function App() {
                               allUsers={allUsers} />,
     vendors:   <VendorsPage   vendorList={vendorList} pos={pos} items={items}
                               onAddVendor={handleAddVendor} onEditVendor={handleEditVendor}
-                              onDeleteVendor={guarded.deleteVendor} onBulkAddVendors={handleBulkAddVendors} canDo={canDo} />,
+                              onDeleteVendor={guarded.deleteVendor} onRestoreVendor={guarded.restoreVendor} onBulkAddVendors={handleBulkAddVendors} canDo={canDo} />,
     analytics: <AnalyticsPage items={items} pos={pos} vendorList={vendorList} settings={settings} />,
     ai:        <AIPage items={items} pos={pos} vendorList={vendorList} bomDefs={bomDefs} machineLog={machineLog} pendingLog={pendingLog} settings={settings} />,
     whatsapp:  <WhatsAppPage settings={settings} onSave={handleSaveSettings} canDo={canDo} />,

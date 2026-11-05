@@ -89,7 +89,7 @@ Edge Functions / serverless:
 The database (RLS policies) is the real enforcer; the UI gates only hide buttons.
 
 ## Audit event types (written by this module or its handlers)
-`followup_done`, `inventory_edit`, `pending_fulfilled`, `po_approved`, `po_created`, `po_edited`, `po_ordered`, `po_receive_reversed`, `po_received`, `po_rejected`, `stock_adjust`, `vendor_add`, `vendor_archive`, `vendor_delete`, `vendor_edit`
+`followup_done`, `inventory_edit`, `pending_fulfilled`, `po_approved`, `po_created`, `po_edited`, `po_ordered`, `po_receive_reversed`, `po_received`, `po_rejected`, `stock_adjust`, `vendor_add`, `vendor_archive`, `vendor_archived`, `vendor_delete`, `vendor_restored`, `vendor_edit`
 Every audit type is also listed in `AUDIT_EVENT_TYPES` in `tests/regression.test.mjs` when it must never disappear.
 
 ## Tests
