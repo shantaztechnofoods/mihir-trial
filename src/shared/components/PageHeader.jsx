@@ -7,6 +7,7 @@
 // second line on narrow screens instead of running off the edge.
 import React from "react";
 import { Menu } from "lucide-react";
+import { ThemeSwitch } from "../ui/ThemeSwitch.jsx";
 
 export const MobileNavContext = React.createContext(null);
 
@@ -26,6 +27,7 @@ export function PageHeader({ title, subtitle, children }) {
         <h1 className="text-[17px] font-extrabold tracking-[-0.02em] leading-tight" style={{ color: "var(--text-strong)" }}>{title}</h1>
         {subtitle && <div className="text-[11.5px] mt-1 leading-snug" style={{ color: "var(--text-dim)" }}>{subtitle}</div>}
       </div>
+      <ThemeSwitch className="flex-shrink-0" />
       {children && <div className="page-header-actions flex items-center gap-2 flex-wrap">{children}</div>}
     </div>
   );

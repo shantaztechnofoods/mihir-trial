@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { Menu } from "lucide-react";
 import { MobileNavContext } from "../components/PageHeader.jsx";
+import { ThemeSwitch } from "./ThemeSwitch.jsx";
 
 // ─── TOPBAR ──────────────────────────────────────────────────────────────────
 
@@ -43,6 +44,8 @@ export function Topbar({ title, subtitle, children }) {
         <h1 className="text-[17px] font-extrabold tracking-[-0.02em] leading-tight" style={{ color: "var(--text-strong)" }}>{title}</h1>
         {subtitle && <p className="text-[11.5px] mt-1 leading-snug font-normal" style={{ color: "var(--text-dim)" }}>{subtitle}</p>}
       </div>
+      {/* Light / Dark / Auto — each person's choice, remembered in this browser */}
+      <ThemeSwitch className="flex-shrink-0" />
       <div className="text-[11px] tabular-nums hidden sm:flex items-center gap-1.5 flex-shrink-0 px-3 py-1.5 rounded-lg"
            style={{ fontFamily: "'Inter',system-ui,sans-serif", color: "var(--text-dim)", background: "var(--surface-raised)", border: "1px solid var(--border-subtle)" }}>
         <TopbarClock />
