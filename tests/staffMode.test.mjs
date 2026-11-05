@@ -16,12 +16,13 @@ test("staffMode is derived from isAdminUser, and admins keep the full tracker", 
   assert.match(mp, /const isAdminUser = currentUser\?\.role === "super_admin" \|\| currentUser\?\.role === "Admin";/);
   assert.match(mp, /const staffMode\s*=\s*!isAdminUser;/);
   // the staff dashboard renders only in staffMode; the admin blocks only outside it
-  assert.match(mp, /\{staffMode && \(\(\) => \{/);
+  // 2026-11-05 (fast tap): the board is the same block, now rendered through DeferredBoard
+  assert.match(mp, /\{staffMode && <DeferredBoard stamp=\{boardStamp\} render=\{\(\) => \{/);
   assert.match(mp, /data-staff-dashboard/);
   assert.match(mp, /\{!staffMode && \(\(\) => \{\s*const cards = \[/, "summary-box nav is admin only");
   assert.match(mp, /\{!staffMode && mtTab === "pending" && \(\(\) => \{/, "factory Pending Jobs tab is admin only");
   // 2026-11-04 (fix/harden-2): each card renders inside its own SafeBoundary.
-  assert.match(mp, /\{!staffMode && \(\s*<div className="space-y-4">\s*\{listForTab\(\)\.map\(\(machine\) => <SafeBoundary key=\{machine\.id\} name="machine-card" label="[^"]*" render=\{\(\) => \{/, "All Machines cards are admin only");
+  assert.match(mp, /\{!staffMode && <DeferredBoard stamp=\{boardStamp\} urgent=\{\[stageMap, expanded, stageEditFor\]\} render=\{\(\) => \(\s*<div className="space-y-4">\s*\{listForTab\(\)\.map\(\(machine\) => <SafeBoundary key=\{machine\.id\} name="machine-card" label="[^"]*" render=\{\(\) => \{/, "All Machines cards are admin only");
   assert.match(mp, /\{!staffMode && \(\(\) => \{\s*const view = mtTab === "transfer"/, "screen header is admin only");
 });
 
@@ -40,7 +41,7 @@ test("staff dashboard: department header, the four sections, and no-department m
 });
 
 test("staff actions reuse the existing modals and are permission-gated; buttons are touch sized", () => {
-  const sd = mp.slice(mp.indexOf("{staffMode && (() => {"), mp.indexOf("data-staff-dashboard") + 20000);
+  const sd = mp.slice(mp.indexOf("{staffMode && <DeferredBoard stamp={boardStamp} render={() => {"), mp.indexOf("data-staff-dashboard") + 20000);
   assert.match(sd, /const canAccept\s*=\s*canAcceptHandover\(canDo\) && !!onAcceptHandover;/);
   assert.match(sd, /const canFinish\s*=\s*canFinishTransfer\(canDo\) && !!onFinishTransfer;/);
   assert.match(sd, /const canReport\s*=\s*!!onRaisePendingItem && canDo\("machines", "accept"\);/);
@@ -93,7 +94,7 @@ test("rack release stays gated by canDo('machines','release') || isAdminUser", (
 });
 
 test("staff My Dashboard (2026-11-03): button in the staff layout, read-only panel scoped to my departments", () => {
-  const sd = mp.slice(mp.indexOf("{staffMode && (() => {"), mp.indexOf("data-staff-dashboard") + 20000);
+  const sd = mp.slice(mp.indexOf("{staffMode && <DeferredBoard stamp={boardStamp} render={() => {"), mp.indexOf("data-staff-dashboard") + 20000);
   assert.match(sd, /\{!isProdHead && hasDepartments && \(\s*<button type="button" data-my-dashboard-open onClick=\{\(\) => setMyDashOpen\(true\)\}/);
   assert.match(mp, /\{staffMode && !isProdHead && hasDepartments && myDashOpen && \(\s*<StaffMyDashboard departments=\{myDepartments\}/);
   const dash = readSrc("src/modules/machine-tracker/StaffMyDashboard.jsx");

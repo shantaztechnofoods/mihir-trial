@@ -1839,7 +1839,11 @@ tbody tr:hover {
   }
   /* Row two: the action cluster, full width, wrapping, left-aligned so the
      primary button lands where a thumb already is rather than off-screen. */
-  div:has(> .nav-menu-btn) > div:last-child {
+  /* 2026-11-05 (fast tap) — written as "the last div after .nav-menu-btn"
+     (same elements as `div:has(> .nav-menu-btn) > div:last-child`): a :has()
+     followed by more selector parts made Chrome restyle ~300 elements on
+     EVERY DOM insert anywhere on the page (every sheet open / card move). */
+  div > .nav-menu-btn ~ div:last-child {
     flex: 1 0 100%;
     flex-wrap: wrap;
     justify-content: flex-start;
@@ -1847,14 +1851,14 @@ tbody tr:hover {
   }
   /* A search field in that cluster takes the row it is on; the buttons beside
      it keep their intrinsic width instead of being crushed by it. */
-  div:has(> .nav-menu-btn) > div:last-child .search-field,
-  div:has(> .nav-menu-btn) > div:last-child input[type="text"],
-  div:has(> .nav-menu-btn) > div:last-child input:not([type]) {
+  div > .nav-menu-btn ~ div:last-child .search-field,
+  div > .nav-menu-btn ~ div:last-child input[type="text"],
+  div > .nav-menu-btn ~ div:last-child input:not([type]) {
     flex: 1 1 100%;
     min-width: 0;
     width: 100%;
   }
-  div:has(> .nav-menu-btn) > div:last-child > button { flex: 0 1 auto; }
+  div > .nav-menu-btn ~ div:last-child > button { flex: 0 1 auto; }
 
   /* The page header stacks its own content at this width; 24px of side padding
      on a 390px screen left almost nothing for the title. */

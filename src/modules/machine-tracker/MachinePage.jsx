@@ -1,6 +1,6 @@
 // src/modules/machine-tracker/MachinePage.jsx — moved verbatim from the former single-file src/App.jsx
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, useDeferredValue } from "react";
 import { Wrench, User, Boxes, AlertOctagon, Trash2, Bell } from "lucide-react";
 import { celebrate } from "../../utils/worldMotion.js";
 import { LeadIcon, LeadLabel, Glyph } from "../../shared/components/LeadIcon.jsx";
@@ -40,6 +40,44 @@ import "./mtMotion.css";
 // in place instead of re-creating them — the cards no longer re-play their
 // entrance and the counts can roll. Same markup as before; `mid` (machine id)
 // lets the motion layer follow a card from one section to the next.
+// 2026-11-05 (fast tap) — renders `render()` like the inline block it
+// replaces, but only when `stamp` changes. MachinePage passes a
+// useDeferredValue() of a per-render stamp, so in the tap's urgent render the
+// stamp is still the previous one: React keeps the board as it is and paints
+// the sheet / toast at once; the deferred (interruptible) render that follows
+// carries the new stamp and draws the board from that render's own, current
+// values. Nothing is skipped for good — the board is always at most one
+// background render behind. `urgent` (optional) lists state that must show
+// in the same frame — a controlled <select> inside the cards, an expand
+// toggle — and re-renders the block at once when one of them changes. The
+// department board holds buttons only, so it needs none.
+// 2026-11-05 (fast tap) — focus only. The Confirm button the worker just
+// pressed still held focus when React removed the closing sheet; Chrome then
+// recalculated style + layout for the whole page in the middle of that commit
+// (≈30 ms at 4x CPU) and again for the frame. Letting go of focus at the tap,
+// before anything on the page has changed, costs almost nothing. Focus lands
+// on <body> — where it landed anyway once the sheet was removed. Called only
+// after the sheet's own checks pass (a refused tap keeps its focus).
+function releaseSheetFocus() {
+  try {
+    const a = typeof document !== "undefined" ? document.activeElement : null;
+    if (a && a !== document.body && typeof a.blur === "function" && a.closest && a.closest(".modal-backdrop")) a.blur();
+  } catch { /* focus housekeeping must never break an action */ }
+}
+
+// 2026-11-05 (fast tap) — run a purely visual extra (success seal, toast)
+// right after the next paint, so the tap's own frame only closes the sheet.
+// The toast library measures its height on mount (a forced layout); after the
+// paint the page is clean and that read is cheap.
+function afterPaint(fn) {
+  const run = () => { try { fn(); } catch { /* decoration must never break an action */ } };
+  try { requestAnimationFrame(() => setTimeout(run, 0)); } catch { setTimeout(run, 0); }
+}
+
+const sameList = (a, b) => a === b || (Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((x, i) => Object.is(x, b[i])));
+const DeferredBoard = React.memo(function DeferredBoard({ render }) { return render(); },
+  (a, b) => a.stamp === b.stamp && sameList(a.urgent, b.urgent));
+
 function StaffSection({ title, count, hint, children }) {
   return (
     <div className="wu-section" data-staff-section={title}>
@@ -213,6 +251,9 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
   // pill slides, closing sheets animate out. See ./mtMotion.js.
   const mtRootRef = useRef(null);
   useMtMotion(mtRootRef);
+  // Fast tap (see DeferredBoard): a fresh stamp every render; the deferred copy
+  // lags one render behind during a tap, which lets the board wait its turn.
+  const boardStamp = useDeferredValue({});
   const [issuePopup, setIssuePopup] = useState(null); // pendingHandoverItem for the detail popup
   const [startProd, setStartProd] = useState(null); // rack object { key, label, ready, capacity }
   const [startSel,  setStartSel]  = useState(() => new Set()); // selected rack-machine ids
@@ -449,8 +490,10 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
         return;
       }
       setTrialCertModal(null);
-      celebrate("Sent");   // world UI: success moment (visual only)
-      sonnerToast.success(`${machine.bomKey} sent to Ready`, { description: `${machine.serialNo ? `S/N ${machine.serialNo} · ` : ""}Trial Certificate saved. Awaiting Ready acceptance.` });
+      afterPaint(() => {   // fast tap: seal + toast right after the sheet-close frame
+        celebrate("Sent");   // world UI: success moment (visual only)
+        sonnerToast.success(`${machine.bomKey} sent to Ready`, { description: `${machine.serialNo ? `S/N ${machine.serialNo} · ` : ""}Trial Certificate saved. Awaiting Ready acceptance.` });
+      });
     } finally {
       setTransferBusy(false);
     }
@@ -487,6 +530,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
     // collected at Transfer; the signed-in user is recorded as the transferer.
     if (!currentUser?.id) { showToast("Not signed in", "Sign in again to transfer.", "warning"); return; }
     const transferrerName = currentUser.fullName || currentUser.username || null;
+    releaseSheetFocus();   // fast tap (focus only): see releaseSheetFocus
     setTransferBusy(true);
     try {
       const res = await onFinishTransfer({
@@ -515,11 +559,13 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
         return;
       }
       setFinishModal(null);
-      celebrate("Sent");   // world UI: success moment (visual only)
       const backToRack = !!machine.rackSlot && fromDepartment === "Assembly" && isRackReleaseHop(fromDepartment, toDepartment);
-      sonnerToast.success(backToRack ? `${machine.bomKey}${machine.serialNo ? ` — ${machine.serialNo}` : ""} · Assembled · Ready` : `${machine.bomKey} sent to ${toDepartment}`,
-        { description: backToRack ? `Back on ${slotLabel(machine.rackSlot)} — an admin sends it to ${toDepartment} from the Rack View`
-          : `${machine.serialNo ? `S/N ${machine.serialNo} · ` : ""}${overrunMinutes > 0 ? `Awaiting accept · Overrun ${formatDuration(overrunMinutes)}` : "Awaiting accept"}` });
+      afterPaint(() => {   // fast tap: seal + toast right after the sheet-close frame
+        celebrate("Sent");   // world UI: success moment (visual only)
+        sonnerToast.success(backToRack ? `${machine.bomKey}${machine.serialNo ? ` — ${machine.serialNo}` : ""} · Assembled · Ready` : `${machine.bomKey} sent to ${toDepartment}`,
+          { description: backToRack ? `Back on ${slotLabel(machine.rackSlot)} — an admin sends it to ${toDepartment} from the Rack View`
+            : `${machine.serialNo ? `S/N ${machine.serialNo} · ` : ""}${overrunMinutes > 0 ? `Awaiting accept · Overrun ${formatDuration(overrunMinutes)}` : "Awaiting accept"}` });
+      });
     } finally {
       setTransferBusy(false);
     }
@@ -601,6 +647,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
       }
     }
     { const pp = pendingItemsProblem(acceptModal.pendingItemsToRaise); if (pp) { setAcceptModal((prev) => prev ? { ...prev, error: pp, errorField: pp } : prev); flagField("[data-accept-pending]"); return; } }
+    releaseSheetFocus();   // fast tap (focus only): see releaseSheetFocus
     setAcceptModal((prev) => prev ? { ...prev, busy: true, error: "" } : prev);
     const pendingItemsToRaise = cleanPendingJobs(acceptModal.pendingItemsToRaise);
     const res = await onAcceptHandover({ handoverId: handover.id, password, pendingItemsToRaise, holdReason: holdReason.trim(),
@@ -621,9 +668,11 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
       return;
     }
     setAcceptModal(null);
-    celebrate(handover.toDepartment === "Ready" ? "Ready" : "Accepted", { big: handover.toDepartment === "Ready" });   // world UI: success moment (visual only; confetti only for Ready)
-    sonnerToast.success(`${handover.bomKey} accepted`,
-      { description: `Accepted into ${handover.toDepartment}${handover.serialNo ? ` · S/N ${handover.serialNo}` : ""}${pendingItemsToRaise.length ? ` · ${pendingItemsToRaise.length} pending item${pendingItemsToRaise.length === 1 ? "" : "s"} raised` : ""}` });
+    afterPaint(() => {   // fast tap: seal + toast right after the sheet-close frame
+      celebrate(handover.toDepartment === "Ready" ? "Ready" : "Accepted", { big: handover.toDepartment === "Ready" });   // world UI: success moment (visual only; confetti only for Ready)
+      sonnerToast.success(`${handover.bomKey} accepted`,
+        { description: `Accepted into ${handover.toDepartment}${handover.serialNo ? ` · S/N ${handover.serialNo}` : ""}${pendingItemsToRaise.length ? ` · ${pendingItemsToRaise.length} pending item${pendingItemsToRaise.length === 1 ? "" : "s"} raised` : ""}` });
+    });
   };
 
   // ── Phase 1 — My Work ──────────────────────────────────────────────────
@@ -1333,6 +1382,14 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
        to this page only — the rest of the ERP keeps its standard white. */
     <div className="flex-1 overflow-y-auto mt-premium" ref={mtRootRef}>
 
+      {/* 2026-11-05 (fast tap) — every pop-up of this page mounts inside a
+          permanent display:contents host (no box, no layout change). Mounting
+          it straight into the page root made it the root's new first/last
+          child, and the `:first-child` / `:last-child … button` rules in the
+          CSS then restyled the WHOLE card list (~700 elements, 25–45 ms at 4x
+          CPU) on every sheet open / close and every toast. Report viewers stay
+          direct children (the print CSS keys on that). */}
+      <div className="mt-sheet-host" style={{ display: "contents" }}>
       {/* Arrival alert banner (staff only) — tap to go to that machine's card. */}
       {staffMode && arrival && (
         <div className="arrival-banner" role="alert" data-arrival-banner
@@ -1363,6 +1420,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
         </div>
         );
       })()}
+      </div>
 
       <Topbar title="Machine Tracker" subtitle="Mechanical → Electrical → Trial → Ready">
         {/* 2026-10-31 — the Report Center opens from here (no sidebar entry). */}
@@ -1496,7 +1554,12 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
             setRaiseModal / setJobsDrawer / setJobAction) — the handlers,
             signatures and checklists are untouched. No machine history,
             ratings or reports: those stay admin-only. */}
-        {staffMode && (() => {
+        {/* 2026-11-05 (fast tap) — the department board renders one beat
+            after the tap (DeferredBoard): a sheet opens / closes / a toast
+            shows in the tap's own frame, then the cards catch up in a
+            background render that never blocks the next frame. Same JSX,
+            same handlers, same data. */}
+        {staffMode && <DeferredBoard stamp={boardStamp} render={() => {
           // World UI (2026-11-04): one button anatomy, tone by meaning (classes in world-ui.css).
           const btn = "min-h-[48px] w-full sm:w-auto text-[15px] wu-btn";
           const canAccept  = canAcceptHandover(canDo) && !!onAcceptHandover;
@@ -1883,7 +1946,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
               )}
             </div>
           );
-        })()}
+        }} />}
 
         {/* ── Pending Jobs (2026-10-30) ──
             Every unfinished job and missing part, grouped by machine and serial
@@ -2984,7 +3047,12 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
         )}
 
         {/* ── Machine cards ── */}
-        {!staffMode && (
+        {/* fast tap: the admin card list renders one beat after a tap, like the
+            department board (see DeferredBoard). Card-local controls — the
+            stage <select>, expand / stage-edit toggles — are passed as
+            `urgent`, so changing them re-renders the list at once and the
+            select never shows a stale value. */}
+        {!staffMode && <DeferredBoard stamp={boardStamp} urgent={[stageMap, expanded, stageEditFor]} render={() => (
         <div className="space-y-4">
           {listForTab().map((machine) => <SafeBoundary key={machine.id} name="machine-card" label="this machine card" render={() => {
             const curIdx   = stageIdx(machine.stage);
@@ -3755,10 +3823,11 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
             );
           }} />)}
         </div>
-        )}
+        )} />}
 
       </div>
 
+      <div className="mt-sheet-host" style={{ display: "contents" }}>
       {attachAsk && (() => {
         const close = () => !attachAsk.busy && setAttachAsk(null);
         const doUpload = async (customer) => {
@@ -3811,6 +3880,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                           machineLog={machineLog} onClose={() => setMyDashOpen(false)} />
       )}
 
+      </div>
       {/* ── Admin Pull Back (2026-10-30) ── */}
       {/* ── Full machine report (2026-11-01) ──
           Full screen on every device: a fixed bar with Back, the title, Print
@@ -3845,6 +3915,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
         </div>
       )}
 
+      <div className="mt-sheet-host" style={{ display: "contents" }}>
       {/* ── Reports chooser (2026-11-03) — the four PDF reports ── */}
       {reportsMenu && (() => {
         const sorted = (machineLog || []).slice().sort((a, b) => String(a.bomKey || "").localeCompare(String(b.bomKey || "")) || String(a.serialNo || "").localeCompare(String(b.serialNo || "")));
@@ -3900,6 +3971,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
           </div>
         );
       })()}
+      </div>
 
       {/* ── Report viewer for the four reports (2026-11-03) — same full-screen
           sheet and print rules as the machine report above. ── */}
@@ -3959,6 +4031,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
         );
       })()}
 
+      <div className="mt-sheet-host" style={{ display: "contents" }}>
       {deleteModal && (() => {
         const m = deleteModal.machine;
         const submit = async () => {
@@ -5296,6 +5369,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
           </div>
         );
       })()}
+      </div>
     </div>
   );
 }

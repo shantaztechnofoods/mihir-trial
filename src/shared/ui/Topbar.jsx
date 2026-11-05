@@ -16,14 +16,19 @@ import { ThemeSwitch } from "./ThemeSwitch.jsx";
 
 // 2026-11-05 (speed): the ticking clock is its own tiny component, so the
 // once-a-second tick re-renders only this text — not the whole page header.
-function TopbarClock() {
+// 2026-11-05 (fast tap): memo — it has no props, so a page re-render (every
+// tap) no longer re-renders it; and one cached formatter instead of
+// toLocaleTimeString(), which built a new Intl formatter on every call. Same
+// locale and options, so the same text.
+const CLOCK_FMT = (() => { try { return new Intl.DateTimeFormat("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }); } catch { return null; } })();
+const TopbarClock = React.memo(function TopbarClock() {
   const [time, setTime] = useState(() => new Date());
   useEffect(() => {
     const t = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
-  return time.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-}
+  return CLOCK_FMT ? CLOCK_FMT.format(time) : time.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+});
 
 export function Topbar({ title, subtitle, children }) {
   const onMenu = React.useContext(MobileNavContext);
