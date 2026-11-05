@@ -8,14 +8,19 @@
     "build": "vite build",
     "preview": "vite preview",
     "health": "node scripts/health-check.mjs",
-    "test": "node --test tests/auth.test.mjs tests/gst.test.mjs tests/itemImport.test.mjs tests/handover.test.mjs tests/rating.test.mjs tests/checklist.test.mjs tests/checklist-scope.test.mjs tests/teamMemory.test.mjs tests/bomPaste.test.mjs tests/whatsappWebhook.test.mjs tests/storeImports.test.mjs tests/localDate.test.mjs tests/popupHost.test.mjs tests/pendingJobs.test.mjs tests/workCalendar.test.mjs tests/bomCost.test.mjs tests/rackSlots.test.mjs tests/login.test.mjs tests/logoIntroClock.test.mjs tests/loginSpeed.test.mjs tests/parseDate.test.mjs tests/goLiveApp.test.mjs tests/staffMode.test.mjs tests/senderUndo.test.mjs tests/delayReasons.test.mjs tests/online.test.mjs tests/readyPopup.test.mjs tests/voiceNote.test.mjs tests/partReceivedCompletes.test.mjs tests/harden.test.mjs tests/harden2.test.mjs tests/liveSync.test.mjs tests/purchaseAudit.test.mjs tests/purchaseAudit2.test.mjs tests/storeAudit2.test.mjs tests/purchaseAudit3.test.mjs tests/goLiveMigrations.test.mjs tests/moduleSwitch.test.mjs tests/deployServer.test.mjs tests/dashboardLine.test.mjs tests/checklistNoDelete.test.mjs tests/regression.test.mjs && node --test --experimental-test-module-mocks tests/hardenStores.test.mjs tests/stores-zero-row.test.mjs tests/goLiveStores.test.mjs tests/pendingReceipts.test.mjs tests/holdUnselected.test.mjs tests/transferMainEmployee.test.mjs tests/pendingChecks.test.mjs tests/criticalOptions.test.mjs tests/pendingSplit.test.mjs tests/departmentRls.test.mjs tests/deptStaffCreate.test.mjs tests/rackBoms.test.mjs tests/acceptSignature.test.mjs tests/bomPhoto.test.mjs tests/historyAppend.test.mjs tests/reportContent.test.mjs"
+    "test": "node --test tests/auth.test.mjs tests/gst.test.mjs tests/itemImport.test.mjs tests/handover.test.mjs tests/rating.test.mjs tests/checklist.test.mjs tests/checklist-scope.test.mjs tests/teamMemory.test.mjs tests/bomPaste.test.mjs tests/whatsappWebhook.test.mjs tests/storeImports.test.mjs tests/localDate.test.mjs tests/popupHost.test.mjs tests/pendingJobs.test.mjs tests/workCalendar.test.mjs tests/bomCost.test.mjs tests/rackSlots.test.mjs tests/login.test.mjs tests/logoIntroClock.test.mjs tests/loginSpeed.test.mjs tests/parseDate.test.mjs tests/goLiveApp.test.mjs tests/staffMode.test.mjs tests/senderUndo.test.mjs tests/delayReasons.test.mjs tests/online.test.mjs tests/readyPopup.test.mjs tests/voiceNote.test.mjs tests/partReceivedCompletes.test.mjs tests/harden.test.mjs tests/harden2.test.mjs tests/liveSync.test.mjs tests/purchaseAudit.test.mjs tests/purchaseAudit2.test.mjs tests/storeAudit2.test.mjs tests/purchaseAudit3.test.mjs tests/goLiveMigrations.test.mjs tests/moduleSwitch.test.mjs tests/deployServer.test.mjs tests/dashboardLine.test.mjs tests/uiStack.test.mjs tests/checklistNoDelete.test.mjs tests/regression.test.mjs && node --test --experimental-test-module-mocks tests/hardenStores.test.mjs tests/stores-zero-row.test.mjs tests/goLiveStores.test.mjs tests/pendingReceipts.test.mjs tests/holdUnselected.test.mjs tests/transferMainEmployee.test.mjs tests/pendingChecks.test.mjs tests/criticalOptions.test.mjs tests/pendingSplit.test.mjs tests/departmentRls.test.mjs tests/deptStaffCreate.test.mjs tests/rackBoms.test.mjs tests/acceptSignature.test.mjs tests/bomPhoto.test.mjs tests/historyAppend.test.mjs tests/reportContent.test.mjs"
   },
   "dependencies": {
+    "@number-flow/react": "0.6.2",
     "@supabase/supabase-js": "^2.106.1",
+    "@tanstack/react-table": "9.3.1",
+    "@tanstack/react-virtual": "3.14.26",
     "lucide-react": "^1.63.0",
+    "motion": "14.9.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "recharts": "^2.12.7",
+    "sonner": "2.0.8",
     "three": "0.169.0",
     "xlsx": "^0.18.5"
   },
