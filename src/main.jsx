@@ -2,7 +2,7 @@ import React, { Suspense, lazy, useEffect, useState } from 'react'
 import ReactDOM from 'react-dom/client'
 import './index.css'
 import './world-ui.css'
-import { installSheetGestures, installScrollReveal, installHeaderCompact } from './utils/worldMotion.js'
+import { installSheetGestures, installScrollReveal, installHeaderCompact, installLiteMode } from './utils/worldMotion.js'
 import { AuthProvider, useAuth } from './auth/AuthContext.jsx'
 import LoginPage from './app/LoginPage.jsx'
 import { loadApp } from './app/loadApp.js'
@@ -35,7 +35,7 @@ try {
 // failure mode). The per-page PageErrorBoundary inside App is still the
 // preferred catch site — this is the last-resort safety net.
 // World UI: drag a phone sheet down by its header to close it (presses its own Close).
-installSheetGestures(); installScrollReveal(); installHeaderCompact();
+installSheetGestures(); installScrollReveal(); installHeaderCompact(); installLiteMode();
 
 // ── Login does not wait for the app (2026-11-04, perf/login-fast) ─────────────
 // The signed-in app (src/app/App.jsx + every module) is its own chunk. While
