@@ -120,6 +120,31 @@ ok("copied points get fresh ids", c15 && c15.items[0].id !== all.find((x) => x.i
 ok("source BOM row untouched by copy", all.find((x) => x.id === 102).items.length === 3);
 ok("no row was deleted", all.length >= 6);
 
+// Older full-list editor (BomChecklistSlots) → "Remove Checklist": named
+// "Are you sure?", then the row is switched off (active=false, items kept) —
+// never deleted (owner rule, 2026-11-05).
+{
+  const before = await ls(p, "erp_checklist_templates");
+  await p.locator('[data-org-checklist-glance] button[data-dept="Mechanical"]').click(); await settle(p, 400);
+  await p.locator('[data-cl-dept="Mechanical"] button').first().click(); await settle(p, 400); // Before Transfer = row 102
+  await p.locator("[data-cl-editor] [data-cl-remove]").click(); await p.waitForTimeout(200);
+  const box = p.locator("[data-bcl-confirm]");
+  const txt = await box.innerText();
+  ok("old editor: Remove Checklist asks 'Are you sure?' with the name", txt.includes("Are you sure?") && txt.includes("Mechanical · Before transfer"), txt);
+  await box.getByRole("button", { name: "Cancel" }).click(); await p.waitForTimeout(150);
+  ok("old editor: Cancel changes nothing", (await ls(p, "erp_checklist_templates")).find((x) => x.id === 102).active === true);
+  await p.locator("[data-cl-editor] [data-cl-remove]").click(); await p.waitForTimeout(200);
+  await p.locator("[data-bcl-confirm]").getByRole("button", { name: "Remove Checklist" }).click(); await settle(p, 600);
+  const after = await ls(p, "erp_checklist_templates");
+  const r102 = after.find((x) => x.id === 102);
+  ok("old editor: Remove Checklist switches the row off, items kept (no delete)", r102 && r102.active === false && r102.items.length === 3 && after.length === before.length, JSON.stringify(r102));
+  ok("old editor: editor closed after switch off", await p.locator("[data-cl-editor]").count() === 0);
+  const auditRows = (await ls(p, "erp_audit")) || [];
+  const audit = JSON.stringify(auditRows);
+  ok("old editor: switch off is audited (checklist_template_updated)", audit.includes("checklist_template_updated"));
+  ok("old editor: no checklist_template_deleted audit event", !audit.includes("checklist_template_deleted"));
+}
+
 // Sizes
 const ib = await recv.locator(".bcl-add input").boundingBox();
 const ab = await recv.getByRole("button", { name: "Add point" }).boundingBox();
@@ -160,5 +185,19 @@ ok("Settings: switched-off rows hidden until opened", await p.getByText("Old ele
 await fold.locator("button").first().click(); await p.waitForTimeout(200);
 ok("Settings: opening shows them (still there, not deleted)", await p.getByText("Old electrical", { exact: true }).count() === 1);
 if (SHOT) await p.screenshot({ path: `${SHOT}/settings-switched-off-1200.png`, fullPage: false });
+
+// Settings → "Switch off" (was a permanent Delete): named confirm, row kept.
+{
+  const before = await ls(p, "erp_checklist_templates");
+  let msg = "";
+  p.once("dialog", async (d) => { msg = d.message(); await d.accept(); });
+  const row = p.locator("div").filter({ has: p.getByText("Assembly common", { exact: true }) }).filter({ has: p.locator("[data-cl-switch-off]") }).last();
+  ok("Settings: no 'Delete' button for checklist templates", await p.locator("button", { hasText: /^Delete$/ }).count() === 0);
+  await row.locator("[data-cl-switch-off]").click(); await settle(p, 500);
+  const after = await ls(p, "erp_checklist_templates");
+  const r10 = after.find((x) => x.id === 10);
+  ok("Settings: Switch off asks 'Are you sure?' with the name", msg.includes("Are you sure?") && msg.includes("Assembly common"), msg);
+  ok("Settings: Switch off keeps the row (active=false, items kept, no delete)", r10 && r10.active === false && r10.items.length === 2 && after.length === before.length, JSON.stringify(r10));
+}
 ok("no page errors", errs.length === 0, errs.join(" | "));
 await done(b);
