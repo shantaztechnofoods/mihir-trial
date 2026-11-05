@@ -287,3 +287,80 @@ test("canStartAssembly (2026-11-04): admin, or an Assembly floor login only", as
   // the grant is NOT updateStage: dept roles keep updateStage off
   assert.equal(DEFAULT_ROLES.dept_staff.actions.machines.updateStage, false);
 });
+
+// ─── 2026-11-05 — safe two-step saves (Finish & Transfer, Accept) ─────────
+import { saveWithRetry, pendingHandoverForMachine, findStuckAccepts } from "../src/utils/handoverLogic.js";
+
+const noSleep = async () => {};
+
+test("saveWithRetry returns on the first success without retrying", async () => {
+  let calls = 0;
+  const r = await saveWithRetry(async () => { calls++; return { success: true }; }, { sleep: noSleep });
+  assert.equal(r.success, true); assert.equal(r.attempts, 1); assert.equal(calls, 1);
+});
+
+test("saveWithRetry retries failures and throws, then succeeds", async () => {
+  const seen = []; const waits = [];
+  const r = await saveWithRetry(async (i) => {
+    seen.push(i);
+    if (i === 0) throw new Error("network down");
+    if (i === 1) return { success: false, error: "timeout" };
+    return { success: true };
+  }, { sleep: async (ms) => { waits.push(ms); } });
+  assert.equal(r.success, true); assert.equal(r.attempts, 3);
+  assert.deepEqual(seen, [0, 1, 2]); assert.deepEqual(waits, [400, 1200]);
+});
+
+test("saveWithRetry gives up after the attempts and reports the last error", async () => {
+  let calls = 0;
+  const r = await saveWithRetry(async () => { calls++; return { success: false, error: `fail ${calls}` }; }, { sleep: noSleep });
+  assert.equal(r.success, false); assert.equal(calls, 3); assert.equal(r.error, "fail 3");
+});
+
+test("saveWithRetry stops at a stale answer (retrying cannot help)", async () => {
+  let calls = 0;
+  const r = await saveWithRetry(async () => { calls++; return { success: false, stale: true, error: "stale" }; }, { sleep: noSleep });
+  assert.equal(r.success, false); assert.equal(calls, 1);
+});
+
+test("saveWithRetry treats a missing result as a failure", async () => {
+  const r = await saveWithRetry(async () => undefined, { attempts: 2, sleep: noSleep });
+  assert.equal(r.success, false); assert.equal(r.attempts, 2);
+});
+
+test("pendingHandoverForMachine finds a pending hand-over by machine id only", () => {
+  const hs = [
+    { id: 1, machineId: 7, status: "cancelled" },
+    { id: 2, machineId: 7, status: "accepted" },
+    { id: 3, machineId: "7", status: "pending" },
+    { id: 4, machineId: 8, status: "pending" },
+  ];
+  assert.equal(pendingHandoverForMachine(hs, 7).id, 3);
+  assert.equal(pendingHandoverForMachine(hs, 9), null);
+  assert.equal(pendingHandoverForMachine(hs.slice(0, 2), 7), null);
+  assert.equal(pendingHandoverForMachine(null, 7), null);
+});
+
+test("findStuckAccepts: accepted hand-over still linked from its machine, old enough", () => {
+  const now = Date.parse("2026-11-05T10:00:00Z");
+  const machines = [
+    { id: 1, pendingHandoverId: 11 },          // stuck
+    { id: 2, pendingHandoverId: 12 },          // pending — normal
+    { id: 3, pendingHandoverId: null },        // moved — normal
+    { id: 4, pendingHandoverId: 14 },          // accepted 10s ago — maybe realtime lag
+    { id: 5, pendingHandoverId: 15 },          // link points at another machine's row
+  ];
+  const handovers = [
+    { id: 11, machineId: 1, status: "accepted", acceptedAt: "2026-11-05T09:50:00Z" },
+    { id: 12, machineId: 2, status: "pending" },
+    { id: 13, machineId: 3, status: "accepted", acceptedAt: "2026-11-05T09:00:00Z" },
+    { id: 14, machineId: 4, status: "accepted", acceptedAt: "2026-11-05T09:59:50Z" },
+    { id: 15, machineId: 99, status: "accepted", acceptedAt: "2026-11-05T09:00:00Z" },
+  ];
+  const out = findStuckAccepts(machines, handovers, now);
+  assert.deepEqual(out.map((s) => s.machine.id), [1]);
+  assert.equal(out[0].handover.id, 11);
+  // With no minimum age the recent one counts too.
+  assert.deepEqual(findStuckAccepts(machines, handovers, now, 0).map((s) => s.machine.id), [1, 4]);
+  assert.deepEqual(findStuckAccepts(null, null, now), []);
+});

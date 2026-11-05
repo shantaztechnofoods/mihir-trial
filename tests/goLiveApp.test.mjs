@@ -90,7 +90,8 @@ test("D: Accept finds the machine (refetching once) BEFORE the handover is flipp
   const lookup = body.indexOf("let machine = machineLog.find((m) => String(m.id) === String(handover.machineId));");
   const refetch = body.indexOf("const fresh = await fetchMachines();");
   const refuse = body.indexOf("was not found — refresh the page and try again. The handover has not been accepted.");
-  const accept = body.indexOf("const accRes = await handoverAccept(handoverId, {");
+  // 2026-11-05 — the accept write sits behind the resume check (": await handoverAccept(").
+  const accept = body.indexOf("await handoverAccept(handoverId, {");
   assert.ok(lookup > 0 && refetch > lookup && refuse > refetch && refuse < accept, "lookup → refetch → refuse all precede the accept write");
   assert.ok(!body.includes("if (isSupabaseEnabled() && machine) {"), "promote is no longer skipped silently when the machine is missing");
 });
