@@ -231,6 +231,58 @@ export function encodeWav16(samples, sampleRate = VOICE_WAV_RATE) {
   return out;
 }
 
+// ── 2026-11-05 (owner: "the mic takes too long to write text") ───────────
+// Android Chrome: the phone's own dictation works well ALONE (it only fails
+// when the recorder runs next to it), and it writes the words the moment the
+// worker stops talking — so Android uses dictation alone first. If dictation
+// fails on that phone, the next tap records and asks the server instead.
+export function canDictateAlone(nav) {
+  return isAndroid(nav);
+}
+
+// Desktop: the live dictation words go into the box the moment Stop is
+// tapped; the server's cleaner version replaces them if it arrives within
+// this time. Later (or failed) → the live words simply stay.
+export const VOICE_SERVER_WAIT_MS = 6000;
+
+// Swap the live words we put at the END of the box for the server's text.
+// If the worker already changed that part of the box, leave the box alone.
+export function swapLiveText(prev, live, server) {
+  const cur = String(prev || "");
+  const l = String(live || "").trim();
+  const s = String(server || "").trim();
+  if (!l || !s) return cur;
+  const trimmed = cur.replace(/\s+$/, "");
+  if (!trimmed.endsWith(l)) return cur;
+  return appendSpoken(trimmed.slice(0, trimmed.length - l.length), s);
+}
+
+// Cut the quiet part before the first and after the last spoken sound, so a
+// smaller clip is sent (faster upload + faster model). Keeps `padMs` of
+// air on each side. A clip with no sound above the threshold is returned
+// unchanged (the server then says "nothing heard", as before).
+export function trimSilence(samples, sampleRate = VOICE_WAV_RATE, { threshold = 0.012, padMs = 250, frameMs = 20 } = {}) {
+  const n = samples ? samples.length : 0;
+  if (!n) return samples;
+  const frame = Math.max(1, Math.round((sampleRate * frameMs) / 1000));
+  const loud = (from) => {
+    const to = Math.min(n, from + frame);
+    let sum = 0;
+    for (let i = from; i < to; i++) { const v = Number(samples[i]) || 0; sum += v * v; }
+    return Math.sqrt(sum / Math.max(1, to - from)) >= threshold;
+  };
+  let first = -1;
+  for (let i = 0; i < n; i += frame) if (loud(i)) { first = i; break; }
+  if (first < 0) return samples;
+  let last = first;
+  for (let i = Math.floor((n - 1) / frame) * frame; i >= first; i -= frame) if (loud(i)) { last = Math.min(n, i + frame); break; }
+  const pad = Math.round((sampleRate * padMs) / 1000);
+  const a = Math.max(0, first - pad);
+  const b = Math.min(n, last + pad);
+  if (a === 0 && b === n) return samples;
+  return typeof samples.subarray === "function" ? samples.subarray(a, b) : samples.slice(a, b);
+}
+
 // Short reason shown under the box when the words could not be written.
 export function voiceFailText(error, canRetryByPhone) {
   const e = String(error || "");
