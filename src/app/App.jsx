@@ -4130,7 +4130,7 @@ export default function App() {
                               onDeleteVendor={guarded.deleteVendor} onBulkAddVendors={handleBulkAddVendors} canDo={canDo} />,
     analytics: <AnalyticsPage items={items} pos={pos} vendorList={vendorList} settings={settings} />,
     ai:        <AIPage items={items} pos={pos} vendorList={vendorList} bomDefs={bomDefs} machineLog={machineLog} pendingLog={pendingLog} settings={settings} />,
-    whatsapp:  <WhatsAppPage settings={settings} onSave={handleSaveSettings} />,
+    whatsapp:  <WhatsAppPage settings={settings} onSave={handleSaveSettings} canDo={canDo} />,
     history:   <HistoryPage auditLog={auditLog} pos={pos} inwardLog={inwardLog} outwardLog={outwardLog} pendingLog={pendingLog} machineLog={machineLog} items={items} vendorList={vendorList} bomDefs={bomDefs} settings={settings} />,
     reports:   <ReportCenterPage
                               allUsers={allUsers}
