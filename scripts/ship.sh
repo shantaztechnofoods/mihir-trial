@@ -2,7 +2,7 @@
 # SHANTAZ ERP — fast, safe ship script.   Usage: scripts/ship.sh <command> [args]
 #   check                 preflight + guards + npm test + build + the browser suites RELATED TO YOUR CHANGE
 #                         (scripts/e2e-pick.py maps changed files -> suites). The FULL e2e suite runs in GitHub
-#                         Actions on every push (job "e2e", 4 shards) and is part of the merge gate.
+#                         Actions on every push (job "e2e", 8 shards) and is part of the merge gate.
 #                         E2E_ONLY=<name-part> → only matching suites; SHIP_E2E=all → every suite locally (rarely needed).
 #   bump <tag>            set APP_BUILD (src/shared/buildInfo.js) and APP_BUILD_TAG (src/main.jsx) to the same tag
 #   pr "<title>" <body-file>   commit everything, push, open the PR (body file = markdown; attribution is appended)

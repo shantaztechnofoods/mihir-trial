@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Pick browser suites (tests/e2e/*.mjs).
 
-  e2e-pick.py --shard K N          suites for CI shard K of N (balanced by tests/e2e/timings.txt)
+  e2e-pick.py --shard K N          suites for CI shard K of N (CI uses N=8; longest-first into the lightest
+                                   bin, by the CI-measured seconds in tests/e2e/timings.txt)
   e2e-pick.py --changed <base>     suites related to files changed since <base> (incl. uncommitted);
                                    reasons go to stderr. The FULL suite always runs in CI.
 
@@ -169,6 +170,8 @@ def changed(base):
 
 if __name__ == "__main__":
     if len(sys.argv) == 4 and sys.argv[1] == "--shard":
+        if not 1 <= int(sys.argv[2]) <= int(sys.argv[3]):
+            sys.exit(f"shard {sys.argv[2]} is outside 1..{sys.argv[3]}")
         print("\n".join(shard(int(sys.argv[2]), int(sys.argv[3]))))
     elif len(sys.argv) == 3 and sys.argv[1] == "--changed":
         picked, why = changed(sys.argv[2])
