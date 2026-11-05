@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { LeadIcon } from "../../shared/components/LeadIcon.jsx";
 import { duplicateTemplateItems } from "../../utils/checklistLogic.js";
 import { CHECKLIST_DEPTS, CHECKLIST_STAGES } from "./bomDurations.js";
+import { ConfirmBox } from "./BomChecklistsPanel.jsx";
 
 export function BomChecklistSlots({
   bomKey = null,                 // null = BOM create (buffered); non-null = BOMDrawer edit (immediate writes)
@@ -12,7 +13,7 @@ export function BomChecklistSlots({
   setPending = () => {},         // used only when bomKey is null
   onSave,                        // async (template) => { success, template? }
   onUpdate,                      // async (id, patch) => { success }
-  onDelete,                      // async (id)        => { success }
+  onDelete,                      // UNUSED since 2026-11-05 (owner rule: never permanently delete) — kept so callers need no change
   readOnly = false,
 }) {
   // Resolve slot content:
@@ -32,6 +33,7 @@ export function BomChecklistSlots({
   const [editErr, setEditErr] = useState("");
   const [busy,    setBusy]    = useState(false);
   const [reuseOpen, setReuseOpen] = useState(false);
+  const [ask, setAsk] = useState(null); // named "Are you sure?" before Remove Checklist
   // Enter in a step box moves to the next box (adding one at the end).
   const [focusIdx, setFocusIdx] = useState(null);
   const editorRef = useRef(null);
@@ -136,11 +138,16 @@ export function BomChecklistSlots({
     const s = slotFor(dept, stage);
     if (!s) return;
     if (bomKey) {
-      // Mark inactive so historical responses keep working.
-      await onDelete(s.id);
+      // Owner rule: never permanently delete. Switch the row off (active=false),
+      // keep its items, so past answers keep working and it can be switched
+      // back on from Settings → Department Checklists. Audited by
+      // handleUpdateChecklistTemplate ("checklist_template_updated").
+      const r = await onUpdate(s.id, { active: false, name: s.name });
+      if (r && r.success === false) { setEditErr(r.error || "Could not switch the checklist off."); return false; }
     } else {
       setPending((prev) => prev.filter((p) => !(p.department === dept && p.stage === stage)));
     }
+    return true;
   };
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -294,8 +301,21 @@ export function BomChecklistSlots({
                  style={{ background: "#f8f9fb" }}>
               <div className="flex gap-2">
                 {(editing._id || editing._localId) && (
-                  <button onClick={async () => { await removeSlot(editing.dept, editing.stage); closeEditor(); }}
+                  <button onClick={() => {
+                            const { dept, stage, name } = editing;
+                            setAsk({
+                              title: "Remove this checklist?",
+                              quote: name || `${dept} · ${CHECKLIST_STAGES.find((x) => x.key === stage).short}`,
+                              note: bomKey ? "It is switched off, not deleted — past answers stay in reports and it can be switched on again in Settings → Department Checklists." : "This checklist has not been saved yet.",
+                              confirmLabel: "Remove Checklist", danger: true,
+                              run: async () => {
+                                setBusy(true);
+                                try { if (await removeSlot(dept, stage)) closeEditor(); } finally { setBusy(false); }
+                              },
+                            });
+                          }}
                           disabled={busy}
+                          data-cl-remove
                           className="text-[11px] font-bold px-3 py-1.5 rounded-lg text-red-300 border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 transition-all">
                     Remove Checklist
                   </button>
@@ -316,6 +336,7 @@ export function BomChecklistSlots({
           </div>
         </div>
       )}
+      {ask && <ConfirmBox ask={ask} onClose={() => setAsk(null)} />}
     </div>
   );
 }
