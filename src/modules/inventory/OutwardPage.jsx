@@ -18,7 +18,7 @@ export function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, on
   // component — same BOM data, serial check, popups and issue logic. The
   // Outward page itself renders with embedded=false and is unchanged.
   embedded = false,
-  checklistTemplates = [], onCreateChecklistTemplate, onUpdateChecklistTemplate, onDeleteChecklistTemplate,
+  checklistTemplates = [], onCreateChecklistTemplate, onUpdateChecklistTemplate, onDeleteChecklistTemplate, onSaveBomChecklist = null,
   // 2026-10-22 — navigate out of Outward (used by BOM Edit → Critical Items
   // "→ Open Inventory" button). Optional; falls back to no-op.
   onNavigate = () => {},
@@ -583,6 +583,7 @@ export function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, on
           onCreateChecklistTemplate={onCreateChecklistTemplate}
           onUpdateChecklistTemplate={onUpdateChecklistTemplate}
           onDeleteChecklistTemplate={onDeleteChecklistTemplate}
+          onSaveBomChecklist={onSaveBomChecklist}
           canConfigChecklist={canConfigChecklist}
           outwardLog={outwardLog}
           onNavigate={onNavigate}

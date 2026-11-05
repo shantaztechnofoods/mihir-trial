@@ -22,13 +22,14 @@ BOM lifecycle and editors: the BOM drawer (create / duplicate / rename / safe de
 | `index.js` | 9 |
 
 `index.js` is the public surface — the app shell and other modules import only from it:
-`BomChecklistSlots`, `BOMDrawer`, `durationsFormFrom`, `durationsStoreFrom`, `validateDurationsForm`, `BomPhotoField`, `BomPhotoThumb`, `DeptDurationFields`, `RackStatusNote`, `BomLineCheckPointsModal`, `BOMPasteLines`
+`BomChecklistSlots`, `BomChecklistsPanel`, `BOMDrawer`, `durationsFormFrom`, `durationsStoreFrom`, `validateDurationsForm`, `BomPhotoField`, `BomPhotoThumb`, `DeptDurationFields`, `RackStatusNote`, `BomLineCheckPointsModal`, `BOMPasteLines`
 
 ## How it plugs into the app
 The screens here are presentational: state and every write (handler) still live in the app shell
 `src/app/App.jsx` and come in as props. Handlers wired into this module's components:
 
-_No App.jsx handlers are passed in (read-only screens, or the module calls its stores / Edge Function directly)._
+* `handleSaveBomChecklist` (2026-11-05) — BOM screen → Checklists (`BomChecklistsPanel`): saves one BOM's own list for one department × stage (update or create; an emptied list is switched off, never deleted). Prop path: `outwardPageProps.onSaveBomChecklist` → `OutwardPage` → `BOMDrawer`.
+* `handleCreateChecklistTemplate` / `handleUpdateChecklistTemplate` / `handleDeleteChecklistTemplate` — used by the older full-list editor (`BomChecklistSlots`).
 
 Depends on other modules (imported through their `index.js`): `modules/pending-jobs`
 Shared code used: `src/shared/components/ItemSearchSelect.jsx`, `src/shared/components/LeadIcon.jsx`, `src/shared/format.js`, `src/shared/ui/OrgLayout.jsx`, `src/shared/ui/primitives.jsx`
@@ -37,7 +38,7 @@ Used by: `modules/inventory`, `modules/machine-tracker`
 
 ## Data: stores, tables, functions
 Store functions called (by this module directly, or by the handlers above):
-_none_
+`checklistsStore.createTemplate`, `checklistsStore.updateTemplate` (via the handlers)
 
 Database tables touched through those stores: _none_
 Database functions (RPC): _none_
@@ -45,16 +46,16 @@ Migrations this module relies on (by file name in `supabase/migrations/`): `028_
 Edge Functions / serverless: _none_
 
 ## Permissions (`canDo(module, action)` keys checked here or in its handlers)
-_none checked inside the module — page access is gated by `canView(<nav id>)` in the app shell_
+`machines.configDept` — passed in as `canConfigChecklist` (OutwardPage); gates every checklist edit (same key as Settings → Department Checklists). Page access is gated by `canView(<nav id>)` in the app shell.
 The database (RLS policies) is the real enforcer; the UI gates only hide buttons.
 
 ## Audit event types (written by this module or its handlers)
-_none_
+`bom_checklist_changed` (handleSaveBomChecklist)
 Every audit type is also listed in `AUDIT_EVENT_TYPES` in `tests/regression.test.mjs` when it must never disappear.
 
 ## Tests
-Unit / static tests that read this module: `tests/goLiveApp.test.mjs`; plus `tests/regression.test.mjs` (inventory + size floor for this folder).
-Browser suites (`tests/e2e/`): `bom-unselected`, `bom-photo`, `settings-bom-organised`, `fill-rack-pending-item`, `go-live-workflows`
+Unit / static tests that read this module: `tests/goLiveApp.test.mjs`, `tests/checklist-scope.test.mjs` (bomChecklistSlot + point helpers); plus `tests/regression.test.mjs` (inventory + size floor for this folder).
+Browser suites (`tests/e2e/`): `bom-checklists`, `bom-unselected`, `bom-photo`, `settings-bom-organised`, `fill-rack-pending-item`, `go-live-workflows`
 
 ## How to verify it
 Create a BOM, paste lines from Excel, set durations and a photo, duplicate it, rename it, try to delete a BOM that is in use (must refuse) and one that is not.

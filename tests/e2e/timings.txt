@@ -3,6 +3,7 @@ arrival-alert 30.8
 assembly-start-checklist 12.0
 back-closes-popup 8.8
 bell-machine-waiting 8.8
+bom-checklists 14.0
 bom-photo 11.1
 bom-unselected 51.8
 compact-checklist 14.3
