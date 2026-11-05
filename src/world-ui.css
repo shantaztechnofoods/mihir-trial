@@ -889,6 +889,10 @@
    Status colours keep their meaning, word and icon; only their dark-mode tint
    changes. Screen only: printed reports/certificates are never touched.
    Switching mode = 200 ms colour-only cross-fade (html.theme-xf), no layout.
+   2026-11-05 light-restore (owner): LIGHT mode is the pre-Petrol blue/white look
+   again — every remap below is scoped to html[data-theme="dark"] via :where()
+   (zero added specificity, so dark mode cascades exactly as before). Only the
+   --p-* definitions, the switch itself and the cross-fade apply in light.
    ═══════════════════════════════════════════════════════════════════════════ */
 @media screen {
   :root {
@@ -950,7 +954,7 @@
 }
 @media screen {
   /* Older token families → Petrol tokens (declared last, so these win) */
-  :root {
+  :root:where([data-theme="dark"]) {
     color-scheme: light;
     --brand: var(--p-pri); --brand-mid: var(--p-priHov); --brand-deep: var(--p-priPress); --brand-light: var(--p-priTx);
     --brand-pale: var(--p-priWash); --brand-wash: var(--p-priWash); --brand-glow: var(--p-ringHalo); --brand-rgb: var(--p-priRgb);
@@ -984,57 +988,63 @@
     --shadow-lg: var(--p-shadowLg); --shadow-xl: var(--p-shadowLg);
     --ok-press: #136A3D; --sh-1: 0 0 0 1px var(--p-line); --sh-2: var(--p-shadowLg);
   }
+  /* Settings save button + tabs: dark uses Petrol; light falls back to the old inline colours */
+  :root[data-theme="dark"] {
+    --st-saveBg: var(--p-pri); --st-saveTx: var(--p-onPri); --st-saveBorder: 1px solid var(--p-pri); --st-saveShadow: var(--p-priShadow);
+    --st-okBg: var(--p-okBg); --st-okTx: var(--p-okTx); --st-okBorder: 1px solid var(--p-okLine);
+    --st-tabTx: var(--p-priTx); --st-tabMuted: var(--p-tx3); --st-tabWash: var(--p-priWash); --st-tabLine: var(--p-pri);
+  }
 
   /* --ok is green TEXT on paper (AA); filled green buttons keep a deep green under white words */
   :root[data-theme="dark"] :is(.wu-ok, .wu-seal, .wu-progress-track i), :root[data-theme="dark"] .modal-backdrop button[data-finish-confirm]:not(:disabled) { background: #187A47 !important; }
-  html body .sidebar-slate .text-\[9px\].truncate[style] { color: var(--p-sideTx) !important; }
+  html:where([data-theme="dark"]) body .sidebar-slate .text-\[9px\].truncate[style] { color: var(--p-sideTx) !important; }
   html[data-theme="dark"] body .sp-pill-red { background: var(--p-badBg); color: var(--p-badTx); }
   html[data-theme="dark"] body .sp-pill-green { background: var(--p-okBg); color: var(--p-okTx); }
   html[data-theme="dark"] body .sp-pill-amber { background: var(--p-warnBg); color: var(--p-warnTx); }
   html[data-theme="dark"] body .sp-pill-purple { background: var(--p-infoBg); color: var(--p-infoTx); }
-  html body .sp-pill-blue { background: var(--p-priWash); color: var(--p-priTx); }
-  html body .sp-pill-slate { background: var(--p-s3); color: var(--p-tx2); }
+  html:where([data-theme="dark"]) body .sp-pill-blue { background: var(--p-priWash); color: var(--p-priTx); }
+  html:where([data-theme="dark"]) body .sp-pill-slate { background: var(--p-s3); color: var(--p-tx2); }
 
   /* 200 ms colour cross-fade while the mode switches; nothing moves */
   html.theme-xf *, html.theme-xf *::before, html.theme-xf *::after {
     transition: background-color 200ms ease, color 200ms ease, border-color 200ms ease, fill 200ms ease, stroke 200ms ease, box-shadow 200ms ease !important;
   }
 
-  html, body, #root, .app-shell { background-color: var(--p-bg); }
-  body { color: var(--p-tx1); }
-  ::selection { background: var(--p-ringHalo); }
-  *:focus-visible { outline-color: var(--p-ring); }
-  .app-shell :focus-visible, .lg-root :focus-visible { outline-color: var(--p-ring); }
-  :is(input, textarea, select):focus-visible:where(:not(.lg-root *)) { border-color: var(--p-ring) !important; box-shadow: 0 0 0 3px var(--p-ringHalo); }
-  :is(input:not([type="checkbox"]):not([type="radio"]):not([type="color"]), textarea, select):where(:not(.lg-root *)) { border-color: var(--p-line2) !important; }
-  .app-shell input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]), .app-shell textarea, .app-shell select,
-  .modal-backdrop input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]), .modal-backdrop textarea, .modal-backdrop select { background-color: var(--p-s1); color: var(--p-tx1); }
-  input[type="checkbox"], input[type="radio"], input[type="range"], progress { accent-color: var(--p-pri); }
-  ::-webkit-scrollbar-thumb { background: var(--p-line2); }
+  html:where([data-theme="dark"]), :where(html[data-theme="dark"]) body, :where(html[data-theme="dark"]) #root, :where(html[data-theme="dark"]) .app-shell { background-color: var(--p-bg); }
+  :where(html[data-theme="dark"]) body { color: var(--p-tx1); }
+  :where(html[data-theme="dark"]) ::selection { background: var(--p-ringHalo); }
+  :where(html[data-theme="dark"]) *:focus-visible { outline-color: var(--p-ring); }
+  :where(html[data-theme="dark"]) .app-shell :focus-visible, :where(html[data-theme="dark"]) .lg-root :focus-visible { outline-color: var(--p-ring); }
+  :where(html[data-theme="dark"]) :is(input, textarea, select):focus-visible:where(:not(.lg-root *)) { border-color: var(--p-ring) !important; box-shadow: 0 0 0 3px var(--p-ringHalo); }
+  :where(html[data-theme="dark"]) :is(input:not([type="checkbox"]):not([type="radio"]):not([type="color"]), textarea, select):where(:not(.lg-root *)) { border-color: var(--p-line2) !important; }
+  :where(html[data-theme="dark"]) .app-shell input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]), :where(html[data-theme="dark"]) .app-shell textarea, :where(html[data-theme="dark"]) .app-shell select,
+  :where(html[data-theme="dark"]) .modal-backdrop input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]), :where(html[data-theme="dark"]) .modal-backdrop textarea, :where(html[data-theme="dark"]) .modal-backdrop select { background-color: var(--p-s1); color: var(--p-tx1); }
+  :where(html[data-theme="dark"]) input[type="checkbox"], :where(html[data-theme="dark"]) input[type="radio"], :where(html[data-theme="dark"]) input[type="range"], :where(html[data-theme="dark"]) progress { accent-color: var(--p-pri); }
+  :where(html[data-theme="dark"]) ::-webkit-scrollbar-thumb { background: var(--p-line2); }
 
   /* Every field: the old rule forced #fff / #111827 !important */
-  html body :is(input:not([type="checkbox"]):not([type="radio"]):not([type="color"]), textarea, select, .modal-input):where(:not(.lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *)) {
+  html:where([data-theme="dark"]) body :is(input:not([type="checkbox"]):not([type="radio"]):not([type="color"]), textarea, select, .modal-input):where(:not(.lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *)) {
     background-color: var(--p-s1) !important; color: var(--p-tx1) !important; }
 
   /* Pro-polish literals (index.css) → tokens */
-  html body .hero-tile::before { background: var(--p-pri); }
-  html body [data-reports-menu]:hover, html body [data-mt-settings]:hover, html body .mt-cancel:hover { background: var(--p-s2) !important; }
-  html body [data-mt-today-chip][aria-pressed="true"] { border-color: var(--p-pri) !important; }
-  html body .delay-card [role="group"][aria-label="Period"] { background: var(--p-s3); }
-  html body .delay-card [data-delay-period][aria-pressed="true"] { background: var(--p-s1) !important; }
-  html body [data-my-dashboard-open] { color: var(--p-priTx) !important; }
-  html body .mt-cancel { color: var(--p-tx2) !important; background: var(--p-s1) !important; border-color: var(--p-line2) !important; }
-  html body [data-cl-step-row] > label { background: var(--p-s1); color: var(--p-tx3) !important; border-color: var(--p-line2); }
-  html body label[style*="rgb(38, 64, 176)"], html body label[style*="rgb(46, 80, 214)"] { color: var(--p-tx2) !important; }
+  html:where([data-theme="dark"]) body .hero-tile::before { background: var(--p-pri); }
+  html:where([data-theme="dark"]) body [data-reports-menu]:hover, html:where([data-theme="dark"]) body [data-mt-settings]:hover, html:where([data-theme="dark"]) body .mt-cancel:hover { background: var(--p-s2) !important; }
+  html:where([data-theme="dark"]) body [data-mt-today-chip][aria-pressed="true"] { border-color: var(--p-pri) !important; }
+  html:where([data-theme="dark"]) body .delay-card [role="group"][aria-label="Period"] { background: var(--p-s3); }
+  html:where([data-theme="dark"]) body .delay-card [data-delay-period][aria-pressed="true"] { background: var(--p-s1) !important; }
+  html:where([data-theme="dark"]) body [data-my-dashboard-open] { color: var(--p-priTx) !important; }
+  html:where([data-theme="dark"]) body .mt-cancel { color: var(--p-tx2) !important; background: var(--p-s1) !important; border-color: var(--p-line2) !important; }
+  html:where([data-theme="dark"]) body [data-cl-step-row] > label { background: var(--p-s1); color: var(--p-tx3) !important; border-color: var(--p-line2); }
+  html:where([data-theme="dark"]) body label[style*="rgb(38, 64, 176)"], html:where([data-theme="dark"]) body label[style*="rgb(46, 80, 214)"] { color: var(--p-tx2) !important; }
 
   /* Primary button (shared Btn) + Settings save */
-  body .btn-primary-brand, .btn-primary-brand { background: var(--p-pri) !important; color: var(--p-onPri) !important; border-color: var(--p-pri) !important; box-shadow: var(--p-priShadow) !important; }
-  body .btn-primary-brand:hover:not(:disabled) { background: var(--p-priHov) !important; }
-  body .btn-primary-brand:active:not(:disabled) { background: var(--p-priPress) !important; }
-  .wu-sig-save { color: var(--p-onPri) !important; }
+  :where(html[data-theme="dark"]) body .btn-primary-brand, :where(html[data-theme="dark"]) .btn-primary-brand { background: var(--p-pri) !important; color: var(--p-onPri) !important; border-color: var(--p-pri) !important; box-shadow: var(--p-priShadow) !important; }
+  :where(html[data-theme="dark"]) body .btn-primary-brand:hover:not(:disabled) { background: var(--p-priHov) !important; }
+  :where(html[data-theme="dark"]) body .btn-primary-brand:active:not(:disabled) { background: var(--p-priPress) !important; }
+  :where(html[data-theme="dark"]) .wu-sig-save { color: var(--p-onPri) !important; }
 
   /* Login stays exactly as it was (owner): pin its old token values, always light */
-  .lg-root, #login-boot { color-scheme: light;
+  :where(html[data-theme="dark"]) .lg-root, :where(html[data-theme="dark"]) #login-boot { color-scheme: light;
     --action: #2F5BEA; --action-press: #2349CC; --action-wash: #EEF2FE; --action-ring: rgba(47, 91, 234, .22);
     --canvas: #F5F6F8; --paper: #FFFFFF; --sunk: #F0F2F5; --ink: #0B1220; --ink-2: #344054; --ink-3: #667085; --ink-4: #98A2B3;
     --hair: rgba(11, 18, 32, .08); --hair-2: rgba(11, 18, 32, .14); --hair-3: rgba(11, 18, 32, .22); --line: #E6E8EC; --line-strong: #D0D5DD;
@@ -1042,44 +1052,44 @@
     --surface-card: #ffffff; --surface-page: #F4F6FA; --border-subtle: rgba(15, 23, 42, 0.09); --brand: #2E50D6; }
 
   /* Nav rail: deep petrol (both modes), brand red marks "you are here" */
-  .sidebar-slate { background: var(--p-side) !important; border-right-color: var(--p-sideLine) !important; color: var(--p-sideTx); }
-  .sidebar-slate .sb-divider { border-bottom-color: var(--p-sideLine); }
-  .sidebar-slate .sb-divider-top { border-top-color: var(--p-sideLine); }
-  .sidebar-slate .sb-logo { background: var(--p-sideAct); box-shadow: none; }
-  .sidebar-slate .sb-search, .sidebar-slate .sb-iconbtn { background: rgba(255, 255, 255, .05); border-color: var(--p-sideLine); color: var(--p-sideTx); }
-  .sidebar-slate .sb-search:hover, .sidebar-slate .sb-iconbtn:hover { background: rgba(255, 255, 255, .09); border-color: rgba(255, 255, 255, .14); }
-  .sidebar-slate .sb-kbd { background: transparent; border-color: rgba(255, 255, 255, .14); color: var(--p-sideTx2); }
-  .sidebar-slate .sb-user-chevron, .sidebar-slate .sb-collapse { color: var(--p-sideTx2); }
-  html body .app-sidebar .sb-section { color: var(--p-sideTx2) !important; }
-  html body .app-sidebar .sb-item.is-active { background: var(--p-sideAct) !important; color: var(--p-sideActTx) !important; }
-  .sidebar-slate .sb-item { color: var(--p-sideTx); }
-  .sidebar-slate .sb-item:not(.is-active):hover { background: var(--p-sideHov); color: #FFFFFF; }
-  .sidebar-slate .sb-item.is-active { background: var(--p-sideAct); color: var(--p-sideActTx); }
-  .sidebar-slate .sb-indicator { background: var(--p-brand); }
-  .sidebar-slate .sb-icon { color: var(--p-sideTx2); }
-  .sidebar-slate .sb-icon.is-active { background: rgba(255, 255, 255, .08); border-color: rgba(255, 255, 255, .14); color: #FFFFFF; }
-  .sidebar-slate nav::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, .14); }
+  :where(html[data-theme="dark"]) .sidebar-slate { background: var(--p-side) !important; border-right-color: var(--p-sideLine) !important; color: var(--p-sideTx); }
+  :where(html[data-theme="dark"]) .sidebar-slate .sb-divider { border-bottom-color: var(--p-sideLine); }
+  :where(html[data-theme="dark"]) .sidebar-slate .sb-divider-top { border-top-color: var(--p-sideLine); }
+  :where(html[data-theme="dark"]) .sidebar-slate .sb-logo { background: var(--p-sideAct); box-shadow: none; }
+  :where(html[data-theme="dark"]) .sidebar-slate .sb-search, :where(html[data-theme="dark"]) .sidebar-slate .sb-iconbtn { background: rgba(255, 255, 255, .05); border-color: var(--p-sideLine); color: var(--p-sideTx); }
+  :where(html[data-theme="dark"]) .sidebar-slate .sb-search:hover, :where(html[data-theme="dark"]) .sidebar-slate .sb-iconbtn:hover { background: rgba(255, 255, 255, .09); border-color: rgba(255, 255, 255, .14); }
+  :where(html[data-theme="dark"]) .sidebar-slate .sb-kbd { background: transparent; border-color: rgba(255, 255, 255, .14); color: var(--p-sideTx2); }
+  :where(html[data-theme="dark"]) .sidebar-slate .sb-user-chevron, :where(html[data-theme="dark"]) .sidebar-slate .sb-collapse { color: var(--p-sideTx2); }
+  html:where([data-theme="dark"]) body .app-sidebar .sb-section { color: var(--p-sideTx2) !important; }
+  html:where([data-theme="dark"]) body .app-sidebar .sb-item.is-active { background: var(--p-sideAct) !important; color: var(--p-sideActTx) !important; }
+  :where(html[data-theme="dark"]) .sidebar-slate .sb-item { color: var(--p-sideTx); }
+  :where(html[data-theme="dark"]) .sidebar-slate .sb-item:not(.is-active):hover { background: var(--p-sideHov); color: #FFFFFF; }
+  :where(html[data-theme="dark"]) .sidebar-slate .sb-item.is-active { background: var(--p-sideAct); color: var(--p-sideActTx); }
+  :where(html[data-theme="dark"]) .sidebar-slate .sb-indicator { background: var(--p-brand); }
+  :where(html[data-theme="dark"]) .sidebar-slate .sb-icon { color: var(--p-sideTx2); }
+  :where(html[data-theme="dark"]) .sidebar-slate .sb-icon.is-active { background: rgba(255, 255, 255, .08); border-color: rgba(255, 255, 255, .14); color: #FFFFFF; }
+  :where(html[data-theme="dark"]) .sidebar-slate nav::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, .14); }
 
   /* Header, tables, cards, dialogs, chips */
-  .page-header { background: var(--p-s1) !important; border-bottom-color: var(--p-line) !important; }
-  .erp-table thead th, body .erp-table thead th { background: var(--p-s2); color: var(--p-tx2); border-bottom-color: var(--p-line2); }
-  .erp-table tbody tr:hover, body .erp-table tbody tr:hover { background: var(--p-s2); }
-  .app-shell table:not(.mr-table):not(.rpt-table) thead th { background-color: var(--p-s2); color: var(--p-tx2); }
-  .app-shell table:not(.mr-table):not(.rpt-table) td, .app-shell table:not(.mr-table):not(.rpt-table) th { border-color: var(--p-line); }
-  body .section-card, .kpi-tile, .hero-tile, .premium-card, .glass, .glass-strong { background: var(--p-s1); color: var(--p-tx1); }
-  .modal-panel, .modal-backdrop > div { background-color: var(--p-s1); color: var(--p-tx1); }
-  .modal-panel label { color: var(--p-tx2) !important; }
-  .modal-backdrop { background: var(--p-scrim) !important; }
-  .modal-backdrop .modal-x { background: var(--p-s2) !important; color: var(--p-tx2) !important; }
-  .mt-premium .mt-chip[data-on="1"], .mt-premium .mt-chip-active { color: var(--p-priTx); background: var(--p-priWash); border-color: var(--p-priLine); }
-  .skeleton, .wu-sk { background: linear-gradient(90deg, var(--p-s3) 0%, var(--p-s2) 40%, var(--p-s3) 80%) !important; background-size: 240% 100% !important; }
-  .mobile-tabbar { background: color-mix(in srgb, var(--p-s1) 92%, transparent) !important; border-top-color: var(--p-line) !important; }
-  .mobile-tabbar > button { color: var(--p-tx3); }
-  .mobile-tabbar > button[aria-current="page"] { color: var(--p-priTx); }
-  .mobile-tabbar > button[aria-current="page"] svg { color: var(--p-priTx); }
-  .app-shell [role="tab"][aria-selected="true"] { color: var(--p-priTx) !important; }
-  @media (hover: hover) and (pointer: fine) { .app-shell table:not(.mr-table):not(.rpt-table) tbody tr:hover { background: var(--p-s2); } .wu-cardbtn:hover { background: var(--p-s2); } }
-  [data-sonner-toaster] [data-sonner-toast] { background: var(--p-toastBg); color: var(--p-toastTx); border-color: transparent; }
+  :where(html[data-theme="dark"]) .page-header { background: var(--p-s1) !important; border-bottom-color: var(--p-line) !important; }
+  :where(html[data-theme="dark"]) .erp-table thead th, :where(html[data-theme="dark"]) body .erp-table thead th { background: var(--p-s2); color: var(--p-tx2); border-bottom-color: var(--p-line2); }
+  :where(html[data-theme="dark"]) .erp-table tbody tr:hover, :where(html[data-theme="dark"]) body .erp-table tbody tr:hover { background: var(--p-s2); }
+  :where(html[data-theme="dark"]) .app-shell table:not(.mr-table):not(.rpt-table) thead th { background-color: var(--p-s2); color: var(--p-tx2); }
+  :where(html[data-theme="dark"]) .app-shell table:not(.mr-table):not(.rpt-table) td, :where(html[data-theme="dark"]) .app-shell table:not(.mr-table):not(.rpt-table) th { border-color: var(--p-line); }
+  :where(html[data-theme="dark"]) body .section-card, :where(html[data-theme="dark"]) .kpi-tile, :where(html[data-theme="dark"]) .hero-tile, :where(html[data-theme="dark"]) .premium-card, :where(html[data-theme="dark"]) .glass, :where(html[data-theme="dark"]) .glass-strong { background: var(--p-s1); color: var(--p-tx1); }
+  :where(html[data-theme="dark"]) .modal-panel, :where(html[data-theme="dark"]) .modal-backdrop > div { background-color: var(--p-s1); color: var(--p-tx1); }
+  :where(html[data-theme="dark"]) .modal-panel label { color: var(--p-tx2) !important; }
+  :where(html[data-theme="dark"]) .modal-backdrop { background: var(--p-scrim) !important; }
+  :where(html[data-theme="dark"]) .modal-backdrop .modal-x { background: var(--p-s2) !important; color: var(--p-tx2) !important; }
+  :where(html[data-theme="dark"]) .mt-premium .mt-chip[data-on="1"], :where(html[data-theme="dark"]) .mt-premium .mt-chip-active { color: var(--p-priTx); background: var(--p-priWash); border-color: var(--p-priLine); }
+  :where(html[data-theme="dark"]) .skeleton, :where(html[data-theme="dark"]) .wu-sk { background: linear-gradient(90deg, var(--p-s3) 0%, var(--p-s2) 40%, var(--p-s3) 80%) !important; background-size: 240% 100% !important; }
+  :where(html[data-theme="dark"]) .mobile-tabbar { background: color-mix(in srgb, var(--p-s1) 92%, transparent) !important; border-top-color: var(--p-line) !important; }
+  :where(html[data-theme="dark"]) .mobile-tabbar > button { color: var(--p-tx3); }
+  :where(html[data-theme="dark"]) .mobile-tabbar > button[aria-current="page"] { color: var(--p-priTx); }
+  :where(html[data-theme="dark"]) .mobile-tabbar > button[aria-current="page"] svg { color: var(--p-priTx); }
+  :where(html[data-theme="dark"]) .app-shell [role="tab"][aria-selected="true"] { color: var(--p-priTx) !important; }
+  @media (hover: hover) and (pointer: fine) { :where(html[data-theme="dark"]) .app-shell table:not(.mr-table):not(.rpt-table) tbody tr:hover { background: var(--p-s2); } :where(html[data-theme="dark"]) .wu-cardbtn:hover { background: var(--p-s2); } }
+  :where(html[data-theme="dark"]) [data-sonner-toaster] [data-sonner-toast] { background: var(--p-toastBg); color: var(--p-toastTx); border-color: transparent; }
 
   /* Colour-mode switch (header + Settings → Appearance) */
   .theme-switch { display: inline-flex; flex: none; align-items: center; gap: 2px; padding: 3px; border-radius: 999px; background: var(--p-s3); }
@@ -1102,111 +1112,111 @@
 
 @media screen {
   /* Neutrals → petrol-tinted steel (both modes; values come from the tokens) */
-   html body .bg-white:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .hover\:bg-white:hover:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)) { background-color: var(--p-s1); }
-   html body .bg-slate-50:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .bg-gray-50:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .hover\:bg-slate-50:hover:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)) { background-color: var(--p-s2); }
-   html body .bg-slate-100:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .bg-gray-100:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .bg-slate-200:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .bg-gray-200:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .hover\:bg-slate-100:hover:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)) { background-color: var(--p-s3); }
-   html body .bg-slate-300:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .bg-gray-300:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)) { background-color: var(--p-line2); }
-   html body .bg-slate-400:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .bg-gray-400:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)) { background-color: var(--p-fillMid); }
-   html body .bg-slate-500:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .bg-gray-500:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)) { background-color: var(--p-tx3); }
-   html body .bg-slate-600:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .bg-slate-700:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .hover\:bg-slate-700:hover:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)) { background-color: var(--p-fillStrong); }
-   html body .bg-slate-800:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .bg-slate-900:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .bg-gray-900:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .hover\:bg-slate-900:hover:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)) { background-color: var(--p-fillInk); }
-   html body .text-slate-900:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .text-slate-800:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .text-gray-900:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .text-gray-800:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .text-\[\#111827\]:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .text-\[\#0f141c\]:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .hover\:text-slate-900:hover:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)) { color: var(--p-tx1); }
-   html body .text-slate-700:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .text-slate-600:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .text-gray-700:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .text-gray-600:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .hover\:text-slate-700:hover:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .hover\:text-slate-600:hover:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)) { color: var(--p-tx2); }
-   html body .text-slate-500:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .text-slate-400:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .text-slate-300:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .text-gray-500:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .text-gray-400:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .text-gray-300:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .hover\:text-slate-500:hover:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .hover\:text-slate-400:hover:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .hover\:text-slate-300:hover:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)) { color: var(--p-tx3); }
-   html body .text-emerald-300:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .text-emerald-200:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)) { color: var(--p-okTx); }
-   html body .border-slate-100:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .border-slate-200:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .border-gray-100:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .border-gray-200:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .hover\:border-slate-200:hover:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)) { border-color: var(--p-line); }
-   html body .border-slate-300:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .border-gray-300:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .hover\:border-slate-300:hover:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)) { border-color: var(--p-line2); }
-   html body .divide-slate-100 > :not([hidden]) ~ :not([hidden]), html body .divide-slate-200 > :not([hidden]) ~ :not([hidden]) { border-color: var(--p-line); }
+   html:where([data-theme="dark"]) body .bg-white:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .hover\:bg-white:hover:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)) { background-color: var(--p-s1); }
+   html:where([data-theme="dark"]) body .bg-slate-50:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .bg-gray-50:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .hover\:bg-slate-50:hover:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)) { background-color: var(--p-s2); }
+   html:where([data-theme="dark"]) body .bg-slate-100:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .bg-gray-100:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .bg-slate-200:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .bg-gray-200:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .hover\:bg-slate-100:hover:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)) { background-color: var(--p-s3); }
+   html:where([data-theme="dark"]) body .bg-slate-300:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .bg-gray-300:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)) { background-color: var(--p-line2); }
+   html:where([data-theme="dark"]) body .bg-slate-400:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .bg-gray-400:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)) { background-color: var(--p-fillMid); }
+   html:where([data-theme="dark"]) body .bg-slate-500:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .bg-gray-500:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)) { background-color: var(--p-tx3); }
+   html:where([data-theme="dark"]) body .bg-slate-600:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .bg-slate-700:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .hover\:bg-slate-700:hover:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)) { background-color: var(--p-fillStrong); }
+   html:where([data-theme="dark"]) body .bg-slate-800:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .bg-slate-900:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .bg-gray-900:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .hover\:bg-slate-900:hover:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)) { background-color: var(--p-fillInk); }
+   html:where([data-theme="dark"]) body .text-slate-900:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .text-slate-800:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .text-gray-900:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .text-gray-800:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .text-\[\#111827\]:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .text-\[\#0f141c\]:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .hover\:text-slate-900:hover:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)) { color: var(--p-tx1); }
+   html:where([data-theme="dark"]) body .text-slate-700:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .text-slate-600:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .text-gray-700:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .text-gray-600:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .hover\:text-slate-700:hover:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .hover\:text-slate-600:hover:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)) { color: var(--p-tx2); }
+   html:where([data-theme="dark"]) body .text-slate-500:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .text-slate-400:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .text-slate-300:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .text-gray-500:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .text-gray-400:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .text-gray-300:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .hover\:text-slate-500:hover:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .hover\:text-slate-400:hover:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .hover\:text-slate-300:hover:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)) { color: var(--p-tx3); }
+   html:where([data-theme="dark"]) body .text-emerald-300:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .text-emerald-200:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)) { color: var(--p-okTx); }
+   html:where([data-theme="dark"]) body .border-slate-100:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .border-slate-200:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .border-gray-100:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .border-gray-200:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .hover\:border-slate-200:hover:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)) { border-color: var(--p-line); }
+   html:where([data-theme="dark"]) body .border-slate-300:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .border-gray-300:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .hover\:border-slate-300:hover:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)) { border-color: var(--p-line2); }
+   html:where([data-theme="dark"]) body .divide-slate-100 > :not([hidden]) ~ :not([hidden]), html:where([data-theme="dark"]) body .divide-slate-200 > :not([hidden]) ~ :not([hidden]) { border-color: var(--p-line); }
   
    /* Blue primary → petrol */
-   html body .bg-blue-50:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .bg-indigo-50:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .bg-sky-50:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .hover\:bg-blue-50:hover:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .bg-blue-500\/10:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .bg-blue-500\/15:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .bg-blue-500\/20:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .bg-blue-600\/10:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .bg-blue-50\/50:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)) { background-color: var(--p-priWash); }
-   html body .bg-blue-100:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .bg-indigo-100:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .hover\:bg-blue-100:hover:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)) { background-color: var(--p-pri100); }
-   html body .bg-blue-500:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .bg-blue-600:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .bg-\[\#2E50D6\]:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .bg-indigo-600:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)) { background-color: var(--p-pri); color: var(--p-onPri); }
-   html body .bg-blue-700:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .hover\:bg-blue-500:hover:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .hover\:bg-blue-600:hover:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)) { background-color: var(--p-priHov); color: var(--p-onPri); }
-   html body .text-blue-300:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .text-blue-400:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .text-blue-200:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .group:hover .group-hover\:text-blue-300:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .hover\:text-blue-300:hover:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .hover\:text-blue-200:hover:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .text-indigo-300:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .text-indigo-400:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .text-indigo-500:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .text-blue-500:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .text-blue-600:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .text-blue-700:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .text-blue-800:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .text-blue-900:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .text-indigo-600:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .text-indigo-700:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .hover\:text-blue-600:hover:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .hover\:text-blue-700:hover:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .hover\:text-blue-900:hover:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)) { color: var(--p-priTx); }
-   html body .border-blue-100:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .border-blue-200:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .border-blue-300:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .border-indigo-200:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .hover\:border-blue-300:hover:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)) { border-color: var(--p-priLine); }
-   html body .border-blue-400:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .border-blue-500:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .border-blue-600:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
-  html body .border-\[\#2E50D6\]:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)) { border-color: var(--p-pri); }
+   html:where([data-theme="dark"]) body .bg-blue-50:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .bg-indigo-50:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .bg-sky-50:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .hover\:bg-blue-50:hover:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .bg-blue-500\/10:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .bg-blue-500\/15:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .bg-blue-500\/20:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .bg-blue-600\/10:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .bg-blue-50\/50:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)) { background-color: var(--p-priWash); }
+   html:where([data-theme="dark"]) body .bg-blue-100:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .bg-indigo-100:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .hover\:bg-blue-100:hover:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)) { background-color: var(--p-pri100); }
+   html:where([data-theme="dark"]) body .bg-blue-500:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .bg-blue-600:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .bg-\[\#2E50D6\]:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .bg-indigo-600:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)) { background-color: var(--p-pri); color: var(--p-onPri); }
+   html:where([data-theme="dark"]) body .bg-blue-700:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .hover\:bg-blue-500:hover:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .hover\:bg-blue-600:hover:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)) { background-color: var(--p-priHov); color: var(--p-onPri); }
+   html:where([data-theme="dark"]) body .text-blue-300:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .text-blue-400:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .text-blue-200:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .group:hover .group-hover\:text-blue-300:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .hover\:text-blue-300:hover:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .hover\:text-blue-200:hover:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .text-indigo-300:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .text-indigo-400:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .text-indigo-500:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .text-blue-500:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .text-blue-600:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .text-blue-700:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .text-blue-800:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .text-blue-900:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .text-indigo-600:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .text-indigo-700:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .hover\:text-blue-600:hover:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .hover\:text-blue-700:hover:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .hover\:text-blue-900:hover:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)) { color: var(--p-priTx); }
+   html:where([data-theme="dark"]) body .border-blue-100:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .border-blue-200:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .border-blue-300:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .border-indigo-200:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .hover\:border-blue-300:hover:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)) { border-color: var(--p-priLine); }
+   html:where([data-theme="dark"]) body .border-blue-400:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .border-blue-500:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .border-blue-600:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
+  html:where([data-theme="dark"]) body .border-\[\#2E50D6\]:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)) { border-color: var(--p-pri); }
   /* Status colours in dark: the theme's dark chips (word + icon rules unchanged) */
    html[data-theme="dark"] body .bg-red-50:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
   html[data-theme="dark"] body .bg-red-100:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
@@ -1364,17 +1374,17 @@
    surfaces and ink greys follow the surface and text tokens. Not inside paper
    documents, the login scene or the nav rail. */
 @media screen {
-  html body :is([style*="background: rgb(46, 80, 214)"], [style*="background-color: rgb(46, 80, 214)"], [style*="background: rgb(38, 64, 176)"], [style*="background-color: rgb(38, 64, 176)"], [style*="background: rgb(47, 91, 234)"], [style*="background: rgb(37, 99, 235)"], [style*="background-color: rgb(37, 99, 235)"], [style*="background: rgb(29, 78, 216)"], [style*="background: rgb(29, 49, 135)"]):where(:not(.lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *)) {
+  html:where([data-theme="dark"]) body :is([style*="background: rgb(46, 80, 214)"], [style*="background-color: rgb(46, 80, 214)"], [style*="background: rgb(38, 64, 176)"], [style*="background-color: rgb(38, 64, 176)"], [style*="background: rgb(47, 91, 234)"], [style*="background: rgb(37, 99, 235)"], [style*="background-color: rgb(37, 99, 235)"], [style*="background: rgb(29, 78, 216)"], [style*="background: rgb(29, 49, 135)"]):where(:not(.lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *)) {
     background: var(--p-pri) !important; color: var(--p-onPri) !important; }
-  html body :is([style^="color: rgb(46, 80, 214)"], [style*=" color: rgb(46, 80, 214)"], [style^="color: rgb(38, 64, 176)"], [style*=" color: rgb(38, 64, 176)"], [style^="color: rgb(29, 49, 135)"], [style*=" color: rgb(29, 49, 135)"], [style^="color: rgb(37, 99, 235)"], [style*=" color: rgb(37, 99, 235)"], [style^="color: rgb(29, 78, 216)"], [style*=" color: rgb(29, 78, 216)"], [style^="color: rgb(47, 91, 234)"], [style*=" color: rgb(47, 91, 234)"]):where(:not(.lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *)) {
+  html:where([data-theme="dark"]) body :is([style^="color: rgb(46, 80, 214)"], [style*=" color: rgb(46, 80, 214)"], [style^="color: rgb(38, 64, 176)"], [style*=" color: rgb(38, 64, 176)"], [style^="color: rgb(29, 49, 135)"], [style*=" color: rgb(29, 49, 135)"], [style^="color: rgb(37, 99, 235)"], [style*=" color: rgb(37, 99, 235)"], [style^="color: rgb(29, 78, 216)"], [style*=" color: rgb(29, 78, 216)"], [style^="color: rgb(47, 91, 234)"], [style*=" color: rgb(47, 91, 234)"]):where(:not(.lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *)) {
     color: var(--p-priTx) !important; }
-  html body :is([style*="background: rgba(46, 80, 214"], [style*="background-color: rgba(46, 80, 214"], [style*="background: rgba(38, 64, 176"], [style*="background: rgba(37, 99, 235"], [style*="background: rgba(47, 91, 234"]):where(:not(.lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *)) {
+  html:where([data-theme="dark"]) body :is([style*="background: rgba(46, 80, 214"], [style*="background-color: rgba(46, 80, 214"], [style*="background: rgba(38, 64, 176"], [style*="background: rgba(37, 99, 235"], [style*="background: rgba(47, 91, 234"]):where(:not(.lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *)) {
     background: var(--p-priWash) !important; }
-  html body :is([style*="border: 1px solid rgb(46, 80, 214)"], [style*="border: 1px solid rgba(46, 80, 214"], [style*="border: 1px solid rgba(38, 64, 176"], [style*="border: 1.5px solid rgba(46, 80, 214"], [style*="border: 1px solid rgba(37, 99, 235"]):where(:not(.lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *)) {
+  html:where([data-theme="dark"]) body :is([style*="border: 1px solid rgb(46, 80, 214)"], [style*="border: 1px solid rgba(46, 80, 214"], [style*="border: 1px solid rgba(38, 64, 176"], [style*="border: 1.5px solid rgba(46, 80, 214"], [style*="border: 1px solid rgba(37, 99, 235"]):where(:not(.lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *)) {
     border-color: var(--p-priLine) !important; }
-  html body :is([style*="border-bottom: 2px solid rgb(46, 80, 214)"], [style*="border-bottom: 2px solid rgb(38, 64, 176)"]) { border-bottom-color: var(--p-pri) !important; }
-  html body :is([style*="border-left: 3px solid rgb(46, 80, 214)"], [style*="border-left: 2px solid rgb(46, 80, 214)"]) { border-left-color: var(--p-pri) !important; }
-  html body [style*="box-shadow"][style*="rgba(46, 80, 214"] { box-shadow: var(--p-priShadow) !important; }
+  html:where([data-theme="dark"]) body :is([style*="border-bottom: 2px solid rgb(46, 80, 214)"], [style*="border-bottom: 2px solid rgb(38, 64, 176)"]) { border-bottom-color: var(--p-pri) !important; }
+  html:where([data-theme="dark"]) body :is([style*="border-left: 3px solid rgb(46, 80, 214)"], [style*="border-left: 2px solid rgb(46, 80, 214)"]) { border-left-color: var(--p-pri) !important; }
+  html:where([data-theme="dark"]) body [style*="box-shadow"][style*="rgba(46, 80, 214"] { box-shadow: var(--p-priShadow) !important; }
 }
 @media screen {
   html[data-theme="dark"] body :is([style*="background: rgb(255, 255, 255)"], [style*="background-color: rgb(255, 255, 255)"], [style*="background: white"], [style*="background: rgba(255, 255, 255, 0.9"]):where(:not(.lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .sidebar-slate *)) {
@@ -1392,11 +1402,11 @@
 }
 @media screen {
   /* Status words set inline: theme status text (AA on paper and on their own tint, both modes) */
-  html body :is([style^="color: rgb(220, 38, 38)"], [style*=" color: rgb(220, 38, 38)"], [style^="color: rgb(185, 28, 28)"], [style*=" color: rgb(185, 28, 28)"], [style^="color: rgb(239, 68, 68)"], [style*=" color: rgb(239, 68, 68)"], [style^="color: rgb(153, 27, 27)"], [style*=" color: rgb(153, 27, 27)"]):where(:not(.lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .sidebar-slate *)) { color: var(--p-badTx) !important; }
-  html body :is([style^="color: rgb(21, 128, 61)"], [style*=" color: rgb(21, 128, 61)"], [style^="color: rgb(22, 163, 74)"], [style*=" color: rgb(22, 163, 74)"], [style^="color: rgb(5, 150, 105)"], [style*=" color: rgb(5, 150, 105)"], [style^="color: rgb(4, 120, 87)"], [style*=" color: rgb(4, 120, 87)"], [style^="color: rgb(22, 101, 52)"], [style*=" color: rgb(22, 101, 52)"], [style^="color: rgb(6, 95, 70)"], [style*=" color: rgb(6, 95, 70)"], [style^="color: rgb(18, 128, 74)"], [style*=" color: rgb(18, 128, 74)"]):where(:not(.lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .sidebar-slate *)) { color: var(--p-okTx) !important; }
+  html:where([data-theme="dark"]) body :is([style^="color: rgb(220, 38, 38)"], [style*=" color: rgb(220, 38, 38)"], [style^="color: rgb(185, 28, 28)"], [style*=" color: rgb(185, 28, 28)"], [style^="color: rgb(239, 68, 68)"], [style*=" color: rgb(239, 68, 68)"], [style^="color: rgb(153, 27, 27)"], [style*=" color: rgb(153, 27, 27)"]):where(:not(.lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .sidebar-slate *)) { color: var(--p-badTx) !important; }
+  html:where([data-theme="dark"]) body :is([style^="color: rgb(21, 128, 61)"], [style*=" color: rgb(21, 128, 61)"], [style^="color: rgb(22, 163, 74)"], [style*=" color: rgb(22, 163, 74)"], [style^="color: rgb(5, 150, 105)"], [style*=" color: rgb(5, 150, 105)"], [style^="color: rgb(4, 120, 87)"], [style*=" color: rgb(4, 120, 87)"], [style^="color: rgb(22, 101, 52)"], [style*=" color: rgb(22, 101, 52)"], [style^="color: rgb(6, 95, 70)"], [style*=" color: rgb(6, 95, 70)"], [style^="color: rgb(18, 128, 74)"], [style*=" color: rgb(18, 128, 74)"]):where(:not(.lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .sidebar-slate *)) { color: var(--p-okTx) !important; }
   html[data-theme="dark"] body :is([style^="color: rgb(180, 83, 9)"], [style*=" color: rgb(180, 83, 9)"], [style^="color: rgb(217, 119, 6)"], [style*=" color: rgb(217, 119, 6)"], [style^="color: rgb(146, 64, 14)"], [style*=" color: rgb(146, 64, 14)"], [style^="color: rgb(194, 65, 12)"], [style*=" color: rgb(194, 65, 12)"], [style^="color: rgb(234, 88, 12)"], [style*=" color: rgb(234, 88, 12)"]):where(:not(.lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .sidebar-slate *)) { color: var(--p-warnTx) !important; }
   html[data-theme="dark"] body :is([style^="color: rgb(109, 40, 217)"], [style*=" color: rgb(109, 40, 217)"], [style^="color: rgb(124, 58, 237)"], [style*=" color: rgb(124, 58, 237)"], [style^="color: rgb(91, 33, 182)"], [style*=" color: rgb(91, 33, 182)"], [style^="color: rgb(67, 56, 202)"], [style*=" color: rgb(67, 56, 202)"], [style^="color: rgb(91, 71, 214)"], [style*=" color: rgb(91, 71, 214)"]):where(:not(.lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .sidebar-slate *)) { color: var(--p-infoTx) !important; }
-  html body :is([style*="background: rgb(239, 68, 68)"], [style*="background-color: rgb(239, 68, 68)"]):where(:not(.lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *)) { background: var(--p-badSolid) !important; }
+  html:where([data-theme="dark"]) body :is([style*="background: rgb(239, 68, 68)"], [style*="background-color: rgb(239, 68, 68)"]):where(:not(.lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *)) { background: var(--p-badSolid) !important; }
 }
 
 /* ── Dialog dim layers: never blurred (frame-budget 2026-11-05). Every popup

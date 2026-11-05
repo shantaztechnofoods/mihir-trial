@@ -42,3 +42,4 @@ voice-note 48
 voice-transcribe 30
 no-delete 30
 theme-petrol 25
+light-restore 30
