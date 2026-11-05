@@ -37,6 +37,10 @@ export const AUDIT_META = {
   vendor_add:        { label: "Vendor Added",        icon: "➕", color: "#15803d", module: "Vendor"     },
   vendor_edit:       { label: "Vendor Updated",      icon: "✏️", color: "#2E50D6", module: "Vendor"     },
   vendor_delete:     { label: "Vendor Deleted",      icon: "🗑️", color: "#b91c1c", module: "Vendor"     },
+  vendor_archived:   { label: "Vendor Archived",     icon: "🗄", color: "#b45309", module: "Vendor"     },
+  vendor_restored:   { label: "Vendor Restored",     icon: "↩", color: "#15803d", module: "Vendor"     },
+  bom_archived:      { label: "BOM Archived",        icon: "🗄", color: "#b45309", module: "BOM"        },
+  bom_restored:      { label: "BOM Restored",        icon: "↩", color: "#15803d", module: "BOM"        },
   role_changed:      { label: "Role Changed",        icon: "👤", color: "#6d28d9", module: "Settings"   },
 };
 

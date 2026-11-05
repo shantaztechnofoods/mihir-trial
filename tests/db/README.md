@@ -50,3 +50,14 @@ UI e2e (not part of `npm test`, needs the local-mode preview on :5183):
 disabled / no-permission / other-department users, append, compare-and-set stale, audit row) and
 `bash tests/db/063_concurrent_append.sh` (two real sessions at the same moment: Hold + stage change
 both kept; two stage changes from the same stage — one wins, the other is reported stale).
+
+## 070 — no hard delete (archive instead)
+
+`bash tests/db/build_local_db.sh 070` then
+`su postgres -c "psql -q -d erp_test -f tests/db/070_no_hard_delete_tests.sql"`: every guarded table
+(bom_definitions, items, vendors, checklist_templates, item_history, machine_log, handover_events,
+pending_handover_items, checklist_responses) refuses DELETE and TRUNCATE — superuser and app users alike —
+with "Deleting is not allowed — archive instead"; archive / restore UPDATEs still work; BOM rename still
+cascades; checklist_templates.bom_key is ON DELETE RESTRICT; the transaction-local
+`app.allow_hard_delete=on` escape hatch works only inside its own transaction; the Super Admin machine
+delete and Remove From Rack still work and leave a full row snapshot in audit_log.

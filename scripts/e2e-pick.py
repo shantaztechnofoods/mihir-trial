@@ -22,11 +22,11 @@ MT = ["go-live-workflows", "pending-part-or-comment", "sender-undo", "staff-hold
 
 # (regex on the App.jsx component name OR on a file path, suites). First match wins.
 COMPONENT_MAP = [
-    (r"^(InventoryPage|InwardPage|AddItemModal|ItemImportModal|EditItemModal|QuickStock\w*|Item\w*)$", ["store-audit", "perf-budget"]),
-    (r"^(OutwardPage|BOM\w*|Bom\w*|RackFill\w*)$", ["bom-unselected", "fill-rack-pending-item", "store-audit"]),
+    (r"^(InventoryPage|InwardPage|AddItemModal|ItemImportModal|EditItemModal|QuickStock\w*|Item\w*|ClearDemoDataModal)$", ["store-audit", "perf-budget", "no-delete"]),
+    (r"^(OutwardPage|BOM\w*|Bom\w*|RackFill\w*)$", ["bom-unselected", "fill-rack-pending-item", "store-audit", "no-delete"]),
     (r"^(PendingPage|Pending\w*)$", ["bom-unselected", "part-received-completes", "store-audit"]),
     (r"^(HistoryPage|HR\w*|ReportCenterPage|Report\w*|fmtTs|inDateRange)$", ["reports-v2", "reports-pdf", "perf-budget"]),
-    (r"^(VendorsPage|Vendor\w*|OrderPipelinePage|POSearchCenter|PurchasePage|PO\w*|ApprovalsPage|AnalyticsPage)$", ["perf-budget", "store-audit"]),
+    (r"^(VendorsPage|Vendor\w*|OrderPipelinePage|POSearchCenter|PurchasePage|PO\w*|ApprovalsPage|AnalyticsPage)$", ["perf-budget", "store-audit", "no-delete"]),
     (r"^(DashboardPage|MyDashboard\w*)$", ["dashboard-line", "my-dashboard", "go-live-workflows"]),
     (r"^(SettingsPage|Settings\w*|Checklist\w*)$", ["settings-bom-organised", "compact-checklist", "dept-staff-create"]),
     (r"^(Machine\w*|MT\w*|Mt\w*|Rack\w*|Trial\w*|Handover\w*|Accept\w*|Finish\w*|Hold\w*|Ready\w*|Delay\w*)$", MT + ["ready-popup", "delay-reasons", "trial-signature-report"]),

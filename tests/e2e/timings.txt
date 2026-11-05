@@ -40,3 +40,4 @@ trial-signature-report 33
 ui-p0 16
 voice-note 48
 voice-transcribe 30
+no-delete 30

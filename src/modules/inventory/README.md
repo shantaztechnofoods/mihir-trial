@@ -94,7 +94,7 @@ Edge Functions / serverless: _none_
 The database (RLS policies) is the real enforcer; the UI gates only hide buttons.
 
 ## Audit event types (written by this module or its handlers)
-`bom_created`, `bom_deleted`, `bom_duplicated`, `bom_renamed`, `bom_updated`, `checklist_template_created`, `checklist_template_deleted`, `checklist_template_updated`, `inventory_add`, `inventory_delete`, `inventory_edit`, `item_created`, `item_deleted`, `item_updated`, `machine_created`, `machine_issue_aborted`, `machine_rack_removed`, `outward_bom`, `outward_manual`, `pending_cleared`, `pending_fulfilled`, `pending_item_raised`, `rack_crate_filled`, `rack_slot_assigned`, `stock_adjust`
+`bom_created`, `bom_archived`, `bom_restored`, `bom_duplicated`, `bom_renamed`, `bom_updated`, `checklist_template_created`, `checklist_template_archived`, `checklist_template_restored`, `checklist_template_updated`, `inventory_add`, `inventory_delete`, `inventory_edit`, `item_created`, `item_archived`, `item_restored`, `item_updated`, `machine_created`, `machine_issue_aborted`, `machine_rack_removed`, `outward_bom`, `outward_manual`, `pending_cleared`, `pending_fulfilled`, `pending_item_raised`, `rack_crate_filled`, `rack_slot_assigned`, `stock_adjust`
 Every audit type is also listed in `AUDIT_EVENT_TYPES` in `tests/regression.test.mjs` when it must never disappear.
 
 ## Tests
