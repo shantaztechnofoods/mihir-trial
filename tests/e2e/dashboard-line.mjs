@@ -1,6 +1,7 @@
 // Dashboard "Production line today" (2026-11-05). LOCAL TEST DATA ONLY
 // (localStorage mode, no real accounts or passwords).
-// Checks: who sees the panel (admin / production head yes, purchase manager no),
+// Checks: fold/unfold header (aria-expanded, 44px, remembered, keyboard, reduced motion),
+// who sees the panel (admin / production head yes, purchase manager no),
 // words + icons on every coloured state, Needs attention list, a stage opens
 // Machine Tracker on its filter, no page sideways scroll on phones.
 import { launch, login, loginAdmin, settle, makeOk } from "./lib/helpers.mjs";
@@ -75,6 +76,38 @@ const openDashboard = async (p) => { await p.locator("button, a").filter({ hasTe
   await p.mouse.move(0, 0); await p.waitForTimeout(300);
   await p.screenshot({ path: `${shots}/dashboard-line-1440x900.png` });
 
+  // ── Fold / unfold (2026-11-05): like Machine Tracker's "Issue a BOM" ──
+  const tog = p.locator("[data-line-toggle]");
+  const exp = () => tog.getAttribute("aria-expanded");
+  ok("fold: header is a <button> with aria-expanded=true on a laptop", await tog.evaluate((e) => e.tagName) === "BUTTON" && await exp() === "true");
+  ok("fold: header button is a >= 44px target", ((await tog.boundingBox()) || {}).height >= 44);
+  ok("fold: open shows 'Hide ▲' like the BOM section", /Hide\s*▼/.test(await tog.innerText()) && await p.locator(".dash-line-arrow[data-open]").count() === 1);
+  const motion = await p.evaluate(() => ({ body: getComputedStyle(document.querySelector("[data-line-body]")).animationDuration,
+    arrow: getComputedStyle(document.querySelector(".dash-line-arrow")).transitionDuration }));
+  ok("fold: motion <= 200 ms", parseFloat(motion.body) <= 0.2 && parseFloat(motion.arrow) <= 0.2, JSON.stringify(motion));
+  await tog.click(); await settle(p, 600);
+  ok("fold: click folds (aria-expanded=false, body gone)", await exp() === "false" && await p.locator("[data-line-body]").count() === 0 && await p.locator("[data-production-line] [data-stage]").count() === 0);
+  ok("fold: folded header keeps title + Ready today", /Production line today/.test(await tog.innerText()) && /Ready today:\s*1/.test(await tog.innerText()));
+  ok("fold: folded summary '1 late · 1 on hold'", (await p.locator("[data-line-summary]").innerText()).trim() === "1 late · 1 on hold", await p.locator("[data-line-summary]").innerText());
+  ok("fold: folded shows 'Show ▼'", /Show\s*▼/.test(await tog.innerText()) && await p.locator(".dash-line-arrow[data-open]").count() === 0);
+  ok("fold: remembered in this browser", await p.evaluate(() => localStorage.getItem("erp_dash_line_open")) === "0");
+  await p.mouse.move(0, 0); await p.waitForTimeout(250);
+  await p.screenshot({ path: `${shots}/dashboard-line-1440x900-closed.png` });
+  await p.reload({ waitUntil: "networkidle" }); await settle(p, 800);
+  if (await p.locator("[data-line-toggle]").count() === 0) await openDashboard(p);
+  ok("fold: still folded after reload", await p.locator("[data-line-toggle]").getAttribute("aria-expanded") === "false");
+  await p.locator("[data-line-toggle]").focus(); await p.keyboard.press("Enter"); await settle(p, 600);
+  ok("fold: Enter key unfolds", await exp() === "true" && await p.locator("[data-production-line] [data-stage]").count() === 6);
+  await p.keyboard.press("Space"); await settle(p, 400);
+  ok("fold: Space key folds", await exp() === "false");
+  await p.keyboard.press("Space"); await settle(p, 400);
+  ok("fold: open again, remembered as open", await exp() === "true" && await p.evaluate(() => localStorage.getItem("erp_dash_line_open")) === "1");
+  await p.emulateMedia({ reducedMotion: "reduce" });
+  const rm = await p.evaluate(() => ({ body: getComputedStyle(document.querySelector("[data-line-body]")).animationName,
+    arrow: getComputedStyle(document.querySelector(".dash-line-arrow")).transitionDuration }));
+  ok("fold: reduced motion → no animation", rm.body === "none" && parseFloat(rm.arrow) <= 0.001, JSON.stringify(rm));
+  await p.emulateMedia({ reducedMotion: "no-preference" });
+
   // A stage opens Machine Tracker on its existing filter.
   await p.locator('[data-stage="Ready"]').click(); await settle(p, 1500);
   ok("Ready stage opens Machine Tracker (completed machines)", /finished — Ready is the final stage/.test(await p.locator("body").innerText()));
@@ -96,15 +129,26 @@ const openDashboard = async (p) => { await p.locator("button, a").filter({ hasTe
   await p.mouse.move(200, 30); await p.evaluate(() => document.activeElement && document.activeElement.blur()); await p.waitForTimeout(250);
   await p.screenshot({ path: `${shots}/dashboard-line-390x844.png` });
   await p.screenshot({ path: `${shots}/dashboard-line-390x844-full.png`, fullPage: true });
+  await p.locator("[data-line-toggle]").click(); await settle(p, 600);
+  ok("fold at 390: folds, no sideways scroll", await p.locator("[data-line-toggle]").getAttribute("aria-expanded") === "false" && await noOverflow(p));
+  const tb = await p.locator("[data-line-toggle]").boundingBox();
+  ok("fold at 390: header button fits and is >= 44px", tb && tb.height >= 44 && tb.x >= 0 && tb.x + tb.width <= 390.5, JSON.stringify(tb));
+  await p.locator("[data-production-line]").scrollIntoViewIfNeeded();
+  await p.mouse.move(200, 30); await p.evaluate(() => document.activeElement && document.activeElement.blur()); await p.waitForTimeout(250);
+  await p.screenshot({ path: `${shots}/dashboard-line-390x844-closed.png` });
   ok("no page errors (admin)", errs.length === 0, errs.join(" | "));
   await b.close();
 }
 
 // ── Production Head: may open Machine Tracker → sees it ──────────────────────
 {
-  const { b, p, errs } = await launch(`(${seed})();`, { width: 1280, height: 800 });
-  await login(p, "head", "head123"); await openDashboard(p);
+  // Phone, nothing remembered yet → starts folded (same as the BOM section).
+  const { b, p, errs } = await launch(`(${seed})();`, { width: 390, height: 844 });
+  await login(p, "head", "head123"); await settle(p, 1200);   // lands on the Dashboard (sidebar is a drawer on a phone)
   ok("production head sees the panel", await p.locator("[data-production-line]").count() === 1);
+  ok("phone default: folded, summary shown", await p.locator("[data-line-toggle]").getAttribute("aria-expanded") === "false" && await p.locator("[data-line-summary]").count() === 1);
+  await p.locator("[data-line-toggle]").click(); await settle(p, 600);
+  ok("phone: tap unfolds the six stages", await p.locator("[data-production-line] [data-stage]").count() === 6);
   ok("no page errors (head)", errs.length === 0, errs.join(" | "));
   await b.close();
 }
