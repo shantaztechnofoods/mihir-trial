@@ -132,7 +132,7 @@ make it pass.**
 
 1. Push to any branch → GitHub Actions `ci` workflow runs: job `ci`
    (`npm ci → npm test → npm run build` + bundle budget), job `health`,
-   and the full browser e2e (`e2e shard 1/4..4/4` + gate job `e2e`).
+   and the full browser e2e (`e2e build`, `e2e shard 1/8..8/8` + gate job `e2e`).
    `scripts/ship.sh merge` requires `ci` AND `e2e` green on the PR head.
    Red build blocks merge once branch protection is enabled (see
    external action items in README/the deployment report).
