@@ -284,14 +284,19 @@ test("regression: sidebar navItems contains all 16 modules", () => {
 // Removing one silently drops a whole class of event from the audit trail.
 
 const AUDIT_EVENT_TYPES = [
-  "bom_created", "bom_duplicated", "bom_renamed", "bom_deleted",
+  // 2026-11-05 — owner rule "nothing is ever deleted": bom_deleted → bom_archived
+  // (BOM gets retired_at), + bom_restored. Renamed, not removed.
+  "bom_created", "bom_duplicated", "bom_renamed", "bom_archived", "bom_restored",
   "machine_created", "machine_stage", "machine_completed", "production_started",
   "pending_fulfilled",
   "po_created", "po_received", "po_deleted", "po_deleted_received",
   "inward_manual",
   // Added by the full-system-check audit — item master-data mutations and
   // company settings changes now emit audit events too.
-  "item_created", "item_updated", "item_deleted",
+  // 2026-11-05 — item_deleted → item_archived (is_active=false), + item_restored.
+  "item_created", "item_updated", "item_archived", "item_restored",
+  // 2026-11-05 — vendors are always archived, never deleted; + restore.
+  "vendor_archived", "vendor_restored",
   "settings_updated",
   // Go-live — Settings → Modules on/off (super admin).
   "modules_changed",
@@ -299,7 +304,9 @@ const AUDIT_EVENT_TYPES = [
   "handover_sent", "handover_accepted", "handover_overrun_narrated",
   "signature_registered",
   // Phase B — checklists / pending items / attachments / ratings
-  "checklist_template_created", "checklist_template_updated", "checklist_template_deleted",
+  // 2026-11-05 — checklist_template_deleted → checklist_template_archived (switched
+  // off, active=false), + checklist_template_restored (switched back on).
+  "checklist_template_created", "checklist_template_updated", "checklist_template_archived", "checklist_template_restored",
   "machine_hold_set", "machine_hold_released", "machine_deleted", "pending_item_raised", "pending_item_resolved", "pending_item_received", "pending_item_completed_on_receipt", "pending_item_issued", "acting_main_assigned", "handover_pulled_back",
   // Migration 036 — a production head releases a machine off the rack.
   "handover_released",
@@ -565,11 +572,11 @@ for (const s of USER_FACING_STRINGS) {
 
 const STORE_SURFACE = [
   // bomsStore
-  { file: "bomsStore.js",    exports: ["fetchBOMs", "createBOM", "updateBOM", "renameBOM", "deleteBOM"] },
+  { file: "bomsStore.js",    exports: ["fetchBOMs", "createBOM", "updateBOM", "renameBOM", "deleteBOM", "archiveBOM", "restoreBOM"] },
   // machinesStore
   { file: "machinesStore.js",exports: ["fetchMachines", "createMachine", "updateMachine", "updateMachineBomKey", "deleteMachine", "appendMachineHistory", "STALE_MACHINE_MSG"] },
   // itemsStore
-  { file: "itemsStore.js",   exports: ["fetchItems", "createItem", "updateItem", "deleteItem", "updateStockAndHistory", "addItemHistory"] },
+  { file: "itemsStore.js",   exports: ["fetchItems", "createItem", "updateItem", "deleteItem", "updateStockAndHistory", "addItemHistory", "fetchArchivedItems", "restoreItem"] },
   // posStore
   { file: "posStore.js",     exports: ["fetchPOs", "createPO", "updatePO", "deletePO"] },
   // inwardStore
@@ -579,7 +586,7 @@ const STORE_SURFACE = [
   // pendingStore
   { file: "pendingStore.js", exports: ["fetchPending", "bulkCreatePending", "updatePending", "deletePending", "clearAllPending", "updatePendingBomKey"] },
   // vendorsStore
-  { file: "vendorsStore.js", exports: ["listVendors", "createVendor", "updateVendor", "deleteVendor", "archiveVendor", "bulkCreateVendors"] },
+  { file: "vendorsStore.js", exports: ["listVendors", "createVendor", "updateVendor", "deleteVendor", "archiveVendor", "restoreVendor", "bulkCreateVendors"] },
   // followupsStore
   { file: "followupsStore.js", exports: ["fetchFollowUps", "createFollowUp", "updateFollowUp", "deleteFollowUpsByPO"] },
   // settingsStore

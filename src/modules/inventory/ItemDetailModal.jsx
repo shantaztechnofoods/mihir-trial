@@ -671,7 +671,7 @@ export function ItemDetailModal({ item, category, onClose, onDelete, onUpdateSto
         <div className="px-6 py-4 border-t border-slate-200 flex items-center gap-2 flex-wrap flex-shrink-0"
              style={{ background: "#f8f9fb" }}>
           {onEdit   && <Btn variant="ghost" size="sm" onClick={onEdit}><LeadIcon e="✏️" />Edit</Btn>}
-          {onDelete && <Btn variant="danger" size="sm" onClick={() => { setAdjustMode(null); onDelete(); }}><LeadIcon e="🗑️" />Delete</Btn>}
+          {onDelete && <Btn variant="orange" size="sm" onClick={() => { setAdjustMode(null); onDelete(); }}><LeadIcon e="🗄" />Archive</Btn>}
           <div className="flex-1" />
           {/* 2b71bbc — removed stray setConfirmDelete(false); ItemDetailModal doesn't
               own that state, so Add/Remove Stock used to throw a ReferenceError. */}

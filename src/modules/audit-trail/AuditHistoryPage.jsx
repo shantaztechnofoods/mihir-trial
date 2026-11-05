@@ -66,6 +66,15 @@ const TYPE_META = {
   vendor_add:            { label: "Vendor Added",         color: "#15803d" },
   vendor_edit:           { label: "Vendor Updated",       color: "#2E50D6" },
   vendor_delete:         { label: "Vendor Deleted",       color: "#b91c1c" },
+  // 2026-11-05 — archive / restore (nothing is ever deleted).
+  vendor_archived:       { label: "Vendor Archived",      color: "#b45309" },
+  vendor_restored:       { label: "Vendor Restored",      color: "#15803d" },
+  bom_archived:          { label: "BOM Archived",         color: "#b45309" },
+  bom_restored:          { label: "BOM Restored",         color: "#15803d" },
+  item_archived:         { label: "Item Archived",        color: "#b45309" },
+  item_restored:         { label: "Item Restored",        color: "#15803d" },
+  checklist_template_archived: { label: "Checklist Switched Off", color: "#b45309" },
+  checklist_template_restored: { label: "Checklist Restored",     color: "#15803d" },
 };
 
 function fmtTs(iso) {

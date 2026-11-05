@@ -71,7 +71,7 @@ Edge Functions / serverless: _none_
 The database (RLS policies) is the real enforcer; the UI gates only hide buttons.
 
 ## Audit event types (written by this module or its handlers)
-`admin_cleanup`, `checklist_template_created`, `checklist_template_deleted`, `checklist_template_updated`, `modules_changed`, `settings_updated`, `signature_registered`, `user_departments_updated`
+`admin_cleanup`, `checklist_template_created`, `checklist_template_archived`, `checklist_template_restored`, `checklist_template_updated`, `modules_changed`, `settings_updated`, `signature_registered`, `user_departments_updated`
 Every audit type is also listed in `AUDIT_EVENT_TYPES` in `tests/regression.test.mjs` when it must never disappear.
 
 ## Tests

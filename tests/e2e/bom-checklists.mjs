@@ -141,7 +141,9 @@ ok("no row was deleted", all.length >= 6);
   ok("old editor: editor closed after switch off", await p.locator("[data-cl-editor]").count() === 0);
   const auditRows = (await ls(p, "erp_audit")) || [];
   const audit = JSON.stringify(auditRows);
-  ok("old editor: switch off is audited (checklist_template_updated)", audit.includes("checklist_template_updated"));
+  // 2026-11-05 (no-delete PR): a switch-off is now audited as its own type,
+  // checklist_template_archived (switch-on = checklist_template_restored).
+  ok("old editor: switch off is audited (checklist_template_archived)", audit.includes("checklist_template_archived"));
   ok("old editor: no checklist_template_deleted audit event", !audit.includes("checklist_template_deleted"));
 }
 

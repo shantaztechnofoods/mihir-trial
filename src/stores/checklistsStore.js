@@ -146,23 +146,13 @@ export async function updateTemplate(id, patch) {
   return { success: true };
 }
 
+// Owner rule (2026-11-05): a checklist template is never deleted. deleteTemplate
+// is kept as a name (regression inventory) and now SWITCHES THE ROW OFF
+// (active=false) through updateTemplate — the database refuses DELETE on
+// checklist_templates (migration 070). Switch it back on with
+// updateTemplate(id, { active: true }).
 export async function deleteTemplate(id) {
-  if (!isSupabaseEnabled()) {
-    setLocalT(getLocalT().filter((t) => t.id !== id));
-    return { success: true };
-  }
-  const c = getSupabase(); if (!c) return { success: false, error: "no client" };
-  // Same zero-row trap as updateTemplate: a DELETE matching nothing is not an
-  // error to PostgREST, so a template the operator lacks rights to remove
-  // would vanish from the UI and reappear on the next reload.
-  const { data, error } = await c.from("checklist_templates").delete().eq("id", id).select("id");
-  if (error) { console.error("[checklists:delete] failed", error); return { success: false, error: error.message }; }
-  if (!Array.isArray(data) || data.length === 0) {
-    const msg = `checklist template ${id} was not deleted — no such row, or it is not visible to this user`;
-    console.error("[checklists:delete] matched no rows", { id });
-    return { success: false, error: msg, noRows: true };
-  }
-  return { success: true };
+  return updateTemplate(id, { active: false });
 }
 
 export async function fetchResponses() {

@@ -162,21 +162,37 @@ export async function renameBOM(oldKey, newKey, newLabel) {
   return { success: true };
 }
 
-export async function deleteBOM(key) {
-  console.info("[boms:delete] start", { key });
-  if (!isSupabaseEnabled()) { const g = getLocal(); delete g[key]; setLocal(g); return { success: true }; }
+// Owner rule (2026-11-05): a BOM is never deleted. "Archive" sets
+// retired_at (migration 046) — the row, its checklists and its history stay,
+// it disappears from issuing and lists, and restoreBOM brings it back. The
+// database refuses a real DELETE (migration 070). deleteBOM is kept as a name
+// (regression inventory) and now archives.
+async function setBomRetired(key, retiredAt, tag) {
+  console.info(`[boms:${tag}] start`, { key });
+  if (!isSupabaseEnabled()) {
+    const g = getLocal();
+    // Local mode: the App also persists its bomDefs state to this key, so a
+    // def not written here yet is not an error.
+    if (!g[key]) return { success: true, retiredAt };
+    g[key] = retiredAt ? { ...g[key], retiredAt } : { ...g[key], retiredAt: null, replacedBy: null };
+    setLocal(g);
+    return { success: true, retiredAt };
+  }
   const c = getSupabase();
   if (!c) return { success: false, error: "no client" };
-  // Same zero-row trap: a DELETE matching nothing is not an error to
-  // PostgREST, so a safe-delete that hit an RLS wall would report success and
-  // the BOM would reappear on the next reload.
-  const { data, error } = await c.from("bom_definitions").delete().eq("key", key).select("key");
-  if (error) { console.error("[boms:delete] failed", error); return { success: false, error: error.message }; }
+  const patch = retiredAt ? { retired_at: retiredAt } : { retired_at: null, replaced_by: null };
+  // `.select("key")`: an UPDATE matching zero rows (RLS wall) is not an error
+  // to PostgREST — check the row count so a silent no-op is reported.
+  const { data, error } = await c.from("bom_definitions").update(patch).eq("key", key).select("key");
+  if (error) { console.error(`[boms:${tag}] failed`, error); return { success: false, error: error.message }; }
   if (!Array.isArray(data) || data.length === 0) {
-    const msg = `BOM ${key} was not deleted — no such row, or it is not visible to this user`;
-    console.error("[boms:delete] matched no rows", { key });
+    const msg = `BOM ${key} was not ${retiredAt ? "archived" : "restored"} — no such row, or it is not visible to this user`;
+    console.error(`[boms:${tag}] matched no rows`, { key });
     return { success: false, error: msg, noRows: true };
   }
-  console.info("[boms:delete] ok");
-  return { success: true };
+  console.info(`[boms:${tag}] ok`);
+  return { success: true, retiredAt };
 }
+export function archiveBOM(key, at = new Date().toISOString()) { return setBomRetired(key, at, "archive"); }
+export function restoreBOM(key) { return setBomRetired(key, null, "restore"); }
+export async function deleteBOM(key) { return archiveBOM(key); }

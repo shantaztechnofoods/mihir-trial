@@ -11,6 +11,9 @@ import { fmtDate, parseStoreQty, recomputeStatus, roundQty } from "../../shared/
 import { loadXLSX } from "../../shared/loadXlsx.js";
 import { Btn, MetricCard, StatusBadge, statusConfig } from "../../shared/ui/primitives.jsx";
 import { Topbar } from "../../shared/ui/Topbar.jsx";
+import ArchivedSection from "../../shared/components/ArchivedSection.jsx";
+import { ERP_INSTANCE } from "../../config/env.js";
+import { archiveConfirmTitle } from "../../utils/archive.js";
 
 // ─── QUICK STOCK MODAL ───────────────────────────────────────────────────────
 
@@ -141,27 +144,32 @@ export function QuickStockModal({ item, mode, onConfirm, onClose }) {
 
 // ─── INVENTORY PAGE ───────────────────────────────────────────────────────────
 
-// ─── CLEAR DEMO DATA MODAL ──────────────────────────────────────────────────
-// One-shot wipe of the demo items + demo BOMs created while trialling the ERP,
-// so the operator can start the real production run from a clean Item Master.
+// ─── CLEAR DEMO DATA MODAL (MIHIR TRIAL only) ────────────────────────────────
+// 2026-11-05: on ERP LIVE this button wiped all 6 BOMs (both boxes were ticked
+// by default) — the owner's "nothing may ever disappear" incident. Now:
+//   • the button renders ONLY when ERP_INSTANCE === "trial" (VITE_ERP_INSTANCE,
+//     set on the Trial Vercel project; Live leaves it unset) — same code in
+//     both, hidden on Live;
+//   • it ARCHIVES (BOM → retired_at, item → is_active=false); everything comes
+//     back from the "Archived (N)" sections — the database refuses DELETE
+//     anyway (migration 070);
+//   • the BOMs box starts UNticked; already-archived BOMs are skipped.
 //
-// Deliberately loops the SAME per-row handlers a manual delete uses
-// (onDeleteItem / onDeleteBOM) instead of adding a bulk store call: every
-// delete keeps its audit entry, its stock reversal and its Supabase round-trip.
-// Slower for a large list, but it cannot leave the ledger inconsistent.
+// Loops the SAME per-row handlers a manual archive uses (onDeleteItem /
+// onDeleteBOM — names kept, they archive): every row keeps its audit entry,
+// its rack stock return and its Supabase round-trip.
 //
-// Order is load-bearing: BOMs are deleted FIRST, because handleDeleteBOM
-// reverses rack stock back onto the item rows. Wiping items first would strand
-// those restores against rows that no longer exist.
+// Order is load-bearing: BOMs first, because handleDeleteBOM returns rack
+// stock onto the item rows.
 export function ClearDemoDataModal({ items = {}, bomDefs = {}, onDeleteItem, onDeleteBOM, onClose, onDone }) {
   const flatItems = useMemo(
     () => Object.entries(items).flatMap(([cat, arr]) => (arr || []).map((i) => ({ category: cat, code: i.code, name: i.name }))),
     [items],
   );
-  const bomKeys = useMemo(() => Object.keys(bomDefs || {}), [bomDefs]);
+  const bomKeys = useMemo(() => Object.entries(bomDefs || {}).filter(([, d]) => !(d && d.retiredAt)).map(([k]) => k), [bomDefs]);
 
   const [wipeItems, setWipeItems] = useState(true);
-  const [wipeBoms,  setWipeBoms]  = useState(true);
+  const [wipeBoms,  setWipeBoms]  = useState(false);   // 2026-11-05: BOMs never ticked by default
   const [confirm,   setConfirm]   = useState("");
   const [busy,      setBusy]      = useState(false);
   const [progress,  setProgress]  = useState(null);   // { done, total, label }
@@ -174,7 +182,7 @@ export function ClearDemoDataModal({ items = {}, bomDefs = {}, onDeleteItem, onD
   }, [onClose, busy]);
 
   const total = (wipeBoms ? bomKeys.length : 0) + (wipeItems ? flatItems.length : 0);
-  const armed = confirm.trim().toUpperCase() === "DELETE" && total > 0 && !busy;
+  const armed = confirm.trim().toUpperCase() === "ARCHIVE" && total > 0 && !busy;
 
   const run = async () => {
     if (!armed) return;
@@ -231,7 +239,7 @@ export function ClearDemoDataModal({ items = {}, bomDefs = {}, onDeleteItem, onD
         <div className="px-6 py-5 border-b border-slate-200"
              style={{ background: "linear-gradient(90deg,rgba(239,68,68,0.10),rgba(239,68,68,0.04))" }}>
           <div className="text-[15px] font-semibold text-slate-900"><LeadIcon e="🧹" />Clear Demo Data</div>
-          <div className="text-[11px] text-slate-500 mt-0.5">Remove old demo data before starting the trial</div>
+          <div className="text-[11px] text-slate-500 mt-0.5">Archive old demo data (Trial only) — nothing is deleted, everything can be restored</div>
         </div>
 
         <div className="px-6 py-5 space-y-4">
@@ -241,8 +249,8 @@ export function ClearDemoDataModal({ items = {}, bomDefs = {}, onDeleteItem, onD
                 <input type="checkbox" checked={wipeBoms} disabled={busy}
                        onChange={(e) => setWipeBoms(e.target.checked)} className="mt-0.5" />
                 <div>
-                  <div className="text-[13px] font-bold text-slate-900">Delete all BOMs ({bomKeys.length})</div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">Material of machines on the rack returns to stock. BOMs in active production are not deleted.</div>
+                  <div className="text-[13px] font-bold text-slate-900">Archive all BOMs ({bomKeys.length})</div>
+                  <div className="text-[11px] text-slate-500 mt-0.5">Material of machines on the rack returns to stock. BOMs in active production are skipped. Restore from Outward → Archived.</div>
                 </div>
               </label>
 
@@ -250,24 +258,24 @@ export function ClearDemoDataModal({ items = {}, bomDefs = {}, onDeleteItem, onD
                 <input type="checkbox" checked={wipeItems} disabled={busy}
                        onChange={(e) => setWipeItems(e.target.checked)} className="mt-0.5" />
                 <div>
-                  <div className="text-[13px] font-bold text-slate-900">Delete all items ({flatItems.length})</div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">Item Master will be emptied completely.</div>
+                  <div className="text-[13px] font-bold text-slate-900">Archive all items ({flatItems.length})</div>
+                  <div className="text-[11px] text-slate-500 mt-0.5">They leave Item Master; stock, rates and history are kept. Restore from Item Master → Archived.</div>
                 </div>
               </label>
 
               <div className="px-4 py-3 rounded-xl" style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.25)" }}>
-                <div className="text-[11px] font-bold text-red-700"><LeadIcon e="⚠️" />This cannot be undone</div>
-                <div className="text-[11px] text-slate-600 mt-1">Type <b>DELETE</b> below to confirm.</div>
+                <div className="text-[11px] font-bold text-amber-700"><LeadIcon e="⚠️" />Everything ticked leaves the lists</div>
+                <div className="text-[11px] text-slate-600 mt-1">Type <b>ARCHIVE</b> below to confirm.</div>
               </div>
 
               <input value={confirm} onChange={(e) => setConfirm(e.target.value)} disabled={busy}
-                     placeholder="DELETE"
+                     placeholder="ARCHIVE" aria-label="Type ARCHIVE to confirm"
                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[13px] font-bold tracking-widest text-slate-900 outline-none modal-input" />
 
               {busy && progress && (
                 <div>
                   <div className="h-2 rounded-full overflow-hidden" style={{ background: "rgba(17,24,39,0.08)" }}>
-                    <div className="h-full transition-all" style={{ width: `${Math.round((progress.done / Math.max(1, progress.total)) * 100)}%`, background: "#dc2626" }} />
+                    <div className="h-full transition-all" style={{ width: `${Math.round((progress.done / Math.max(1, progress.total)) * 100)}%`, background: "#b45309" }} />
                   </div>
                   <div className="text-[11px] text-slate-500 mt-1.5">
                     {progress.done} / {progress.total} — {progress.label}
@@ -282,7 +290,7 @@ export function ClearDemoDataModal({ items = {}, bomDefs = {}, onDeleteItem, onD
               <div className="px-4 py-3 rounded-xl" style={{ background: "rgba(16,185,129,0.07)", border: "1px solid rgba(16,185,129,0.3)" }}>
                 <div className="text-[13px] font-bold text-emerald-700"><LeadIcon e="✅" />Done</div>
                 <div className="text-[12px] text-slate-700 mt-1">
-                  {result.boms} BOMs and {result.items} items deleted.
+                  {result.boms} BOMs and {result.items} items archived.
                 </div>
               </div>
               {result.failed.length > 0 && (
@@ -298,12 +306,12 @@ export function ClearDemoDataModal({ items = {}, bomDefs = {}, onDeleteItem, onD
         </div>
 
         <div className="px-6 py-4 border-t border-slate-200 flex items-center justify-end gap-2">
-          <Btn variant="ghost" size="sm" onClick={onClose} disabled={busy}>{result ? "Close" : "Cancel"}</Btn>
+          <Btn variant="ghost" size="sm" autoFocus onClick={onClose} disabled={busy}>{result ? "Close" : "Cancel"}</Btn>
           {!result && (
             <button onClick={run} disabled={!armed}
                     className="text-xs font-bold px-4 py-2 rounded-lg text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                    style={{ background: "#dc2626" }}>
-              {busy ? "Deleting…" : `Delete ${total} item/BOM`}
+                    style={{ background: "#b45309" }}>
+              {busy ? "Archiving…" : `Archive ${total} item/BOM`}
             </button>
           )}
         </div>
@@ -312,7 +320,7 @@ export function ClearDemoDataModal({ items = {}, bomDefs = {}, onDeleteItem, onD
   );
 }
 
-export function InventoryPage({ items, setItems, handleUpdateStock, pos = [], inwardLog = [], outwardLog = [], pendingLog = [], bomDefs = {}, machineLog = [], onLogAudit = () => {}, canDo = () => true, vendorList = [], onCreateItem, onUpdateItem, onDeleteItem, onDeleteBOM, onBulkAddItems }) {
+export function InventoryPage({ items, setItems, handleUpdateStock, pos = [], inwardLog = [], outwardLog = [], pendingLog = [], bomDefs = {}, machineLog = [], onLogAudit = () => {}, canDo = () => true, vendorList = [], onCreateItem, onUpdateItem, onDeleteItem, onDeleteBOM, onBulkAddItems, archivedItems = [], onRestoreItem = null }) {
   const [search,        setSearch]        = useState("");
   // Search input ref so we can auto-focus on page mount (Tally-style: land
   // the cursor in search so the operator types straight away). Same pattern
@@ -373,7 +381,10 @@ export function InventoryPage({ items, setItems, handleUpdateStock, pos = [], in
   const machines = useMemo(() => Object.keys(items), [items]);
   // Every code in use (archived rows included — the code stays taken), for the
   // Add / Edit item duplicate-code check.
-  const allCodes = useMemo(() => Object.values(items).flatMap((arr) => (arr || []).map((i) => String(i.code || "").toUpperCase())), [items]);
+  const allCodes = useMemo(() => [
+    ...Object.values(items).flatMap((arr) => (arr || []).map((i) => String(i.code || "").toUpperCase())),
+    ...(archivedItems || []).map((r) => String(r?.item?.code || "").toUpperCase()),   // archived → code stays taken (restore it instead)
+  ], [items, archivedItems]);
   // Flatten + filter archived in a single useMemo so we don't reallocate the
   // array on every keystroke in the search box. With 1000+ items the unmemoised
   // version reflowed all four downstream metric calcs and the sort/filter on
@@ -512,12 +523,12 @@ export function InventoryPage({ items, setItems, handleUpdateStock, pos = [], in
     if (!item) return;
     if (onDeleteItem) {
       const res = await onDeleteItem(category, code);
-      if (!res?.success) { alert("Failed to delete: " + (res?.error || "unknown error")); return; }
+      if (!res?.success) { alert("Failed to archive: " + (res?.error || "unknown error")); return; }
     } else {
       setItems(prev => ({ ...prev, [category]: prev[category].filter(i => i.code !== code) }));
     }
-    // onDeleteItem (handleDeleteItemRow) already logs "item_deleted".
-    if (!onDeleteItem) onLogAudit({ type: "inventory_delete", module: "Inventory", action: `Item Deleted: ${item.name}`, ref: code, itemCode: code, details: { name: item.name, category } });
+    // onDeleteItem (handleDeleteItemRow) archives the item and logs "item_archived".
+    if (!onDeleteItem) onLogAudit({ type: "item_archived", module: "Inventory", action: `Item Archived: ${item.name}`, ref: code, itemCode: code, details: { name: item.name, category } });
     setDeleteModal(null);
   };
 
@@ -571,14 +582,14 @@ export function InventoryPage({ items, setItems, handleUpdateStock, pos = [], in
   return (
     <div className="flex-1 overflow-y-auto">
       {showModal && <AddItemModal machines={machines} onSave={handleAddItem} onClose={() => setShowModal(false)} vendorList={vendorList} existingCodes={allCodes} />}
-      {showClearDemo && (
+      {showClearDemo && ERP_INSTANCE === "trial" && (
         <ClearDemoDataModal
           items={items}
           bomDefs={bomDefs}
           onDeleteItem={onDeleteItem}
           onDeleteBOM={onDeleteBOM}
           onClose={() => setShowClearDemo(false)}
-          onDone={() => setToast({ status: "safe", name: "Demo data cleared", machine: "Cleanup" })}
+          onDone={() => setToast({ status: "safe", name: "Demo data archived", machine: "Cleanup" })}
         />
       )}
 
@@ -637,7 +648,7 @@ export function InventoryPage({ items, setItems, handleUpdateStock, pos = [], in
                          onClose={() => setQuickAdjust(null)} />
       )}
 
-      {/* ── Delete Confirmation Modal ── */}
+      {/* ── Archive Confirmation Modal (2026-11-05: archive, never delete) ── */}
       {deleteModal && (
         <div className="modal-backdrop fixed inset-0 z-[60] flex items-center justify-center p-4"
              style={{ background: "rgba(17,24,39,0.45)", backdropFilter: "blur(12px)" }}
@@ -647,7 +658,7 @@ export function InventoryPage({ items, setItems, handleUpdateStock, pos = [], in
 
             {/* Header */}
             <div className="px-5 py-4 border-b border-slate-200" style={{ background: "rgba(239,68,68,0.06)" }}>
-              <div className="text-sm font-black text-red-600"><LeadIcon e="🗑️" />Delete Item</div>
+              <div className="text-sm font-black text-amber-700">{archiveConfirmTitle("item", deleteModal.item.name)}</div>
               <div className="text-[10px] text-slate-500 mt-0.5">{deleteModal.item.name} · {deleteModal.item.code}</div>
             </div>
 
@@ -669,7 +680,7 @@ export function InventoryPage({ items, setItems, handleUpdateStock, pos = [], in
                 </div>
               )}
               <div className="text-[11px] text-slate-400 leading-relaxed">
-                Are you sure you want to permanently delete <span className="text-slate-900 font-semibold">{deleteModal.item.name}</span>? This action cannot be undone.
+                <span className="text-slate-900 font-semibold">{deleteModal.item.name}</span> will be hidden from Item Master and selectors. Its stock, rates and history are kept — restore it any time from Archived at the bottom of Item Master.
               </div>
             </div>
 
@@ -680,8 +691,8 @@ export function InventoryPage({ items, setItems, handleUpdateStock, pos = [], in
               <div className="flex-1" />
               <button onClick={() => handleConfirmDelete(deleteModal.category, deleteModal.item.code)}
                       className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-lg px-4 py-1.5 text-white border transition-all"
-                      style={{ background: "#b91c1c", borderColor: "rgba(239,68,68,0.5)", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
-                <LeadIcon e="🗑️" />Delete
+                      style={{ background: "#b45309", borderColor: "rgba(217,119,6,0.5)", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
+                <LeadIcon e="🗄" />Archive item
               </button>
             </div>
           </div>
@@ -716,11 +727,12 @@ export function InventoryPage({ items, setItems, handleUpdateStock, pos = [], in
             <LeadIcon e="⬆" />Import Items
           </button>
         )}
-        {canDo("inventory","delete") && (
+        {/* MIHIR TRIAL only (VITE_ERP_INSTANCE=trial) — hidden on ERP LIVE. Archives, never deletes. */}
+        {ERP_INSTANCE === "trial" && canDo("inventory","delete") && (
           <button onClick={() => setShowClearDemo(true)}
-                  title="Delete demo items and BOMs together"
+                  title="Archive demo items and BOMs together (Trial only)"
                   className="text-xs font-bold px-3 py-1.5 rounded-lg border transition-all flex items-center gap-1.5"
-                  style={{ borderColor: "rgba(239,68,68,0.35)", color: "#dc2626" }}>
+                  style={{ borderColor: "rgba(217,119,6,0.35)", color: "#b45309" }}>
             <LeadIcon e="🧹" />Clear Demo Data
           </button>
         )}
@@ -968,6 +980,13 @@ export function InventoryPage({ items, setItems, handleUpdateStock, pos = [], in
             </div>
           </div>
         </div>
+
+        {/* 2026-11-05 — archived items (never deleted): collapsed, Restore guarded
+            by the same permission as Archive. */}
+        <ArchivedSection kind="item" testId="items" rows={archivedItems || []}
+                         getKey={(r) => r.item?.code} getName={(r) => `${r.item?.name || r.item?.code} (${r.item?.code})`}
+                         getMeta={(r) => `${r.category} · stock ${r.item?.stock ?? 0} ${r.item?.unit || ""}`}
+                         canRestore={!!onRestoreItem && canDo("inventory","delete")} onRestore={onRestoreItem} />
       </div>
     </div>
   );

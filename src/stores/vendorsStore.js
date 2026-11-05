@@ -108,22 +108,33 @@ export async function updateVendor(v) {
   return { success: true, vendor: updated };
 }
 
-// Hard delete a vendor row. Used by the App handler when the vendor has no purchase
-// history / POs / linked items — no FK ripple to worry about.
-export async function deleteVendor(id) {
-  console.info("[vendors:delete] start", { id });
+// Owner rule (2026-11-05): a vendor is never deleted. deleteVendor is kept as
+// a name (regression inventory) and now ARCHIVES the vendor (the database
+// refuses DELETE on vendors — migration 070). Pass the vendor object; an id
+// alone is looked up in the local cache.
+export async function deleteVendor(idOrVendor) {
+  const v = idOrVendor && typeof idOrVendor === "object" ? idOrVendor : getLocal().find((x) => x.id === idOrVendor);
+  if (!v) return { success: false, error: "vendor not found" };
+  return archiveVendor(v);
+}
+
+// Restore an archived vendor (clears the archived marker).
+export async function restoreVendor(vendor) {
+  console.info("[vendors:restore] start", { id: vendor?.id, name: vendor?.name });
+  const restored = { ...vendor, archived: false };
   if (!isSupabaseEnabled()) {
-    setLocal(getLocal().filter((v) => v.id !== id));
-    console.info("[vendors:delete] local ok");
-    return { success: true };
+    setLocal(getLocal().map((v) => v.id === restored.id ? restored : v));
+    return { success: true, vendor: restored };
   }
   const c = getSupabase();
   if (!c) return { success: false, error: "Supabase not configured" };
-  const { error } = await c.from("vendors").delete().eq("id", id);
-  if (error) { console.error("[vendors:delete] failed", error); return { success: false, error: error.message }; }
-  setLocal(getLocal().filter((v) => v.id !== id));
-  console.info("[vendors:delete] supabase ok");
-  return { success: true };
+  const row = toRow(restored); const rid = row.id; delete row.id;
+  const { data, error } = await c.from("vendors").update(row).eq("id", rid).select().single();
+  if (error) { console.error("[vendors:restore] failed", error); return { success: false, error: error.message }; }
+  const updated = fromRow(data);
+  setLocal(getLocal().map((v) => v.id === updated.id ? updated : v));
+  console.info("[vendors:restore] supabase ok");
+  return { success: true, vendor: updated };
 }
 
 // Archive a vendor (keeps the row so PO history / item-link references stay intact,

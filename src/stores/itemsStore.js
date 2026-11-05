@@ -7,6 +7,7 @@ import { getSupabase } from "../supabase/client.js";
 import { fetchAllRows, readLocalJson } from "../utils/fetchAll.js";
 import { recordMovement, inferMovementType } from "./stockMovementsStore.js";
 import { localIsoDate } from "./localDate.js";
+import { archivedItemsFromGrouped, withoutArchivedItems, archiveItemRow, restoreItemRow } from "../utils/archive.js";
 
 const LOCAL_KEY = "erp_items";
 
@@ -124,6 +125,10 @@ function getLocal() {
   } } catch {}
   return {};
 }
+// Local mode: archived items live under their own key → [{ category, item }].
+const LOCAL_ARCHIVED_KEY = "erp_items_archived";
+function getLocalArchived() { const v = readLocalJson(LOCAL_ARCHIVED_KEY, []); return Array.isArray(v) ? v : []; }
+function setLocalArchived(list) { try { localStorage.setItem(LOCAL_ARCHIVED_KEY, JSON.stringify(list)); } catch {} }
 function setLocal(grouped) {
   try { localStorage.setItem(LOCAL_KEY, JSON.stringify(grouped)); } catch {}
 }
@@ -135,7 +140,7 @@ export async function fetchItems() {
   const mode = isSupabaseEnabled() ? "SUPABASE" : "LOCAL";
   console.info("[items:load] start", { mode });
   if (!isSupabaseEnabled()) {
-    const g = getLocal();
+    const g = withoutArchivedItems(getLocal());   // archived rows stay stored, hidden here
     const total = Object.values(g).reduce((s, l) => s + (l?.length || 0), 0);
     console.info("[items:load] local ok", { categories: Object.keys(g).length, items: total });
     return g;
@@ -417,23 +422,25 @@ export async function updateItem(originalCode, originalCategory, updatedItem, ne
 
 // Delete an item by code.
 //
-// Phase 2 fix: schema-tolerant. Production reports "Could not find 'deactivated_at'
-// column of 'items'" — migration 008 hasn't been run there, so is_active / deactivated_at
-// / deactivated_by don't exist yet. Strategy:
-//   1) Try full soft-delete (is_active=false, deactivated_at, deactivated_by) — preferred,
-//      preserves item_history rows for audit.
-//   2) On missing-column error, retry with just is_active=false (008 partial).
-//   3) Still missing? Fall back to hard DELETE so the operator isn't stuck. item_history
-//      rows survive because their FK is ON DELETE SET NULL (008) — and pre-008 schemas
-//      use ON DELETE CASCADE, which removes the rows the operator wanted gone anyway.
+// Owner rule (2026-11-05): an item is never deleted. "Archive" is the soft
+// delete of migration 008 (is_active=false, deactivated_at, deactivated_by):
+// the row, its rates and its item_history stay; normal lists load only
+// is_active=true; restoreItem brings it back. The old last-resort hard DELETE
+// fallback is gone — the database refuses DELETE on items (migration 070).
+// deleteItem is kept as a name (regression inventory) and archives.
 export async function deleteItem(category, code) {
-  console.info("[items:delete] start", { code, category });
+  console.info("[items:archive] start", { code, category });
   if (!isSupabaseEnabled()) {
+    // Local mode: the App persists its visible `items` state over erp_items,
+    // so the archived row is MOVED to its own key (never dropped).
     const g = getLocal();
-    if (g[category]) g[category] = g[category].filter((i) => i.code !== code);
+    const row = (g[category] || []).find((i) => i.code === code);
+    if (!row) return { success: false, error: `Item ${code} not found` };
+    g[category] = g[category].filter((i) => i.code !== code);
     setLocal(g);
-    console.info("[items:delete] local ok");
-    return { success: true };
+    setLocalArchived([...getLocalArchived().filter((x) => x.item?.code !== code), { category, item: archiveItemRow(row) }]);
+    console.info("[items:archive] local ok");
+    return { success: true, mode: "archived" };
   }
   const c = getSupabase();
   if (!c) return { success: false, error: "Supabase not configured" };
@@ -441,48 +448,89 @@ export async function deleteItem(category, code) {
   // Fetch item details for audit history BEFORE we touch the row.
   const { data: cur } = await c.from("items").select("id, code, name, category, stock").eq("code", code).maybeSingle();
 
-  // ── Attempt 1: full soft-delete (migration 008 applied) ────────────────────
   let resp = await c.from("items").update({
     is_active:      false,
     deactivated_at: new Date().toISOString(),
     deactivated_by: _currentUserCtx?.id || null,
-  }).eq("code", code);
-
+  }).eq("code", code).select("id");
   let mode = "soft-full";
   if (resp.error && isMissingColumnError(resp.error)) {
-    console.warn("[items:delete] deactivated_at/deactivated_by missing — retrying with is_active only");
-    resp = await c.from("items").update({ is_active: false }).eq("code", code);
+    console.warn("[items:archive] deactivated_at/deactivated_by missing — retrying with is_active only");
+    resp = await c.from("items").update({ is_active: false }).eq("code", code).select("id");
     mode = "soft-min";
   }
-  if (resp.error && isMissingColumnError(resp.error)) {
-    console.warn("[items:delete] is_active missing too (migration 008 not run) — falling back to hard DELETE");
-    resp = await c.from("items").delete().eq("code", code);
-    mode = "hard";
-  }
   if (resp.error) {
-    console.error("[items:delete] supabase failed", { mode, error: resp.error });
-    return { success: false, error: resp.error.message };
+    console.error("[items:archive] supabase failed", { mode, error: resp.error });
+    return { success: false, error: isMissingColumnError(resp.error) ? "Items cannot be archived on this database yet (run migration 008)." : resp.error.message };
+  }
+  if (!Array.isArray(resp.data) || resp.data.length === 0) {
+    return { success: false, error: `Item ${code} was not archived — no such row, or it is not visible to this user`, noRows: true };
   }
 
-  // Write a final history row noting deactivation. Skip on hard-delete (the FK may be
-  // CASCADE on older schemas, which would drop the row we just inserted; on 008+ it's
-  // SET NULL so it stays — but the soft path already wrote it, so a hard fallback row
-  // is informational only).
-  if (cur && mode !== "hard") {
+  if (cur) {
     try {
       await addItemHistory(cur.id, {
         item_code: cur.code, item_name: cur.name, category: cur.category,
         event_type: "Deactivated", quantity_change: 0,
         stock_before: Number(cur.stock) || 0, stock_after: Number(cur.stock) || 0,
-        notes: `Item deactivated (${mode})`,
+        notes: "Item archived",
       });
     } catch (e) {
-      console.warn("[items:delete] history write after delete failed (non-fatal)", e);
+      console.warn("[items:archive] history write failed (non-fatal)", e);
     }
   }
 
-  console.info("[items:delete] supabase ok", { mode });
+  console.info("[items:archive] supabase ok", { mode });
   return { success: true, mode };
+}
+
+// Archived items for the "Archived (N)" section → [{ category, item }].
+export async function fetchArchivedItems() {
+  if (!isSupabaseEnabled()) return [...getLocalArchived(), ...archivedItemsFromGrouped(getLocal())];
+  const c = getSupabase();
+  if (!c) return [];
+  const { data, error } = await fetchAllRows(() => c.from("items").select("*").eq("is_active", false).order("code", { ascending: true }).order("id", { ascending: true }), { tag: "items:archived" });
+  if (error) { console.warn("[items:archived] load failed", error); return []; }
+  return (data || []).map((r) => { const item = fromRow(r); return { category: item.category, item }; });
+}
+
+// Restore an archived item (is_active=true). Returns { success, item }.
+export async function restoreItem(category, code) {
+  console.info("[items:restore] start", { code, category });
+  if (!isSupabaseEnabled()) {
+    const arch = getLocalArchived();
+    const hit = arch.find((x) => x.item?.code === code);
+    const g = getLocal();
+    let restored = null;
+    if (hit) {
+      restored = restoreItemRow(hit.item);
+      const cat = hit.category || category;
+      g[cat] = [...(g[cat] || []).filter((i) => i.code !== code), restored];
+      setLocalArchived(arch.filter((x) => x !== hit));
+    } else if (g[category]) {
+      g[category] = g[category].map((i) => { if (i.code !== code) return i; restored = restoreItemRow(i); return restored; });
+    }
+    if (!restored) return { success: false, error: `Item ${code} not found` };
+    setLocal(g);
+    return { success: true, item: restored };
+  }
+  const c = getSupabase();
+  if (!c) return { success: false, error: "Supabase not configured" };
+  let resp = await c.from("items").update({ is_active: true, deactivated_at: null, deactivated_by: null }).eq("code", code).select("*");
+  if (resp.error && isMissingColumnError(resp.error)) resp = await c.from("items").update({ is_active: true }).eq("code", code).select("*");
+  if (resp.error) { console.error("[items:restore] failed", resp.error); return { success: false, error: resp.error.message }; }
+  if (!Array.isArray(resp.data) || resp.data.length === 0) return { success: false, error: `Item ${code} was not restored — no such row, or it is not visible to this user`, noRows: true };
+  const item = fromRow(resp.data[0]);
+  try {
+    await addItemHistory(resp.data[0].id, {
+      item_code: item.code, item_name: item.name, category: item.category,
+      event_type: "Reactivated", quantity_change: 0,
+      stock_before: Number(item.stock) || 0, stock_after: Number(item.stock) || 0,
+      notes: "Item restored from archive",
+    });
+  } catch (e) { console.warn("[items:restore] history write failed (non-fatal)", e); }
+  console.info("[items:restore] ok");
+  return { success: true, item };
 }
 
 // Capture current user context for history denormalization

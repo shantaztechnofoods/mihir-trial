@@ -8,11 +8,13 @@ import { BOMDrawer, BOMPasteLines, BomChecklistSlots, BomLineCheckPointsModal, B
 import { fmtDate, parseStoreQty, roundQty } from "../../shared/format.js";
 import { Btn, SectionHeader, statusConfig } from "../../shared/ui/primitives.jsx";
 import { Topbar } from "../../shared/ui/Topbar.jsx";
+import ArchivedSection from "../../shared/components/ArchivedSection.jsx";
+import { archivedBomEntries } from "../../utils/archive.js";
 
 // Last "Fill Rack" request the embedded Outward section has acted on.
 export let __lastFillRequestN = 0;
 
-export function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, onCreateBOM, onRenameBOM, outwardLog, onAddOutward, pendingLog, onClearPending, onCreateMachine, onAbortMachine = null, onRaiseNotIssued = null, machineLog = [], canDo = () => true, onRemoveRackMachine, onDuplicateBOM, onDeleteBOM, computeBOMDeletionInfo, settings = {},
+export function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, onCreateBOM, onRenameBOM, outwardLog, onAddOutward, pendingLog, onClearPending, onCreateMachine, onAbortMachine = null, onRaiseNotIssued = null, machineLog = [], canDo = () => true, onRemoveRackMachine, onDuplicateBOM, onDeleteBOM, onRestoreBOM = null, computeBOMDeletionInfo, settings = {},
   // 2026-10-30 — embedded: render only the BOM Outward section (with every
   // modal it opens) so Machine Tracker can issue a BOM through this exact
   // component — same BOM data, serial check, popups and issue logic. The
@@ -396,7 +398,7 @@ export function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, on
         </div>
       )}
 
-      {/* 2026-06-02d — Safe BOM delete confirmation */}
+      {/* 2026-06-02d — Safe BOM archive confirmation (2026-11-05: archive, never delete) */}
       {confirmDeleteBOM && (
         <div className="modal-backdrop fixed inset-0 z-[85] flex items-center justify-center p-4"
              style={{ background: "rgba(17,24,39,0.45)", backdropFilter: "blur(12px)" }}
@@ -406,7 +408,7 @@ export function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, on
             <div className="px-5 py-4 border-b border-slate-200"
                  style={{ background: confirmDeleteBOM.info.canDelete ? "rgba(239,68,68,0.06)" : "rgba(245,158,11,0.06)" }}>
               <div className={`text-sm font-black ${confirmDeleteBOM.info.canDelete ? "text-red-400" : "text-amber-300"}`}>
-                {confirmDeleteBOM.info.canDelete ? "🗑 Delete BOM?" : "⚠ Cannot Delete BOM"}
+                {confirmDeleteBOM.info.canDelete ? `Archive BOM '${confirmDeleteBOM.key}'?` : "⚠ Cannot Archive BOM"}
               </div>
               <div className="text-[10px] text-slate-500 mt-0.5">
                 {confirmDeleteBOM.key} · {confirmDeleteBOM.label}
@@ -416,7 +418,7 @@ export function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, on
               {!confirmDeleteBOM.info.canDelete ? (
                 <>
                   <div className="text-slate-500">
-                    This BOM has <span className="font-bold text-slate-900">{confirmDeleteBOM.info.active.length}</span> active production build{confirmDeleteBOM.info.active.length !== 1 ? "s" : ""} past the rack stage. Complete or cancel them first, then delete.
+                    This BOM has <span className="font-bold text-slate-900">{confirmDeleteBOM.info.active.length}</span> active production build{confirmDeleteBOM.info.active.length !== 1 ? "s" : ""} past the rack stage. Complete or cancel them first, then archive.
                   </div>
                   <div className="max-h-32 overflow-y-auto rounded-lg" style={{ background: "#f8f9fb", border: "1px solid rgba(17,24,39,0.04)" }}>
                     {confirmDeleteBOM.info.active.slice(0, 10).map((m) => (
@@ -441,7 +443,7 @@ export function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, on
                         <li className="flex gap-2"><span className="text-emerald-400">✓</span><span className="text-slate-400">Reverse stock for {confirmDeleteBOM.info.rack.length} rack build{confirmDeleteBOM.info.rack.length !== 1 ? "s" : ""}</span></li>
                         <li className="flex gap-2"><span className="text-emerald-400">✓</span><span className="text-slate-400">Clear pending materials for these issues</span></li>
                         <li className="flex gap-2"><span className="text-emerald-400">✓</span><span className="text-slate-400">Remove outward entries from reports</span></li>
-                        <li className="flex gap-2"><span className="text-emerald-400">✓</span><span className="text-slate-400">Delete the BOM definition</span></li>
+                        <li className="flex gap-2"><span className="text-emerald-400">✓</span><span className="text-slate-400">Archive the BOM — it stays saved with its checklists and can be restored</span></li>
                         {confirmDeleteBOM.info.completed.length > 0 && (
                           <li className="flex gap-2"><span className="text-blue-400">ℹ</span><span className="text-slate-400">{confirmDeleteBOM.info.completed.length} completed build{confirmDeleteBOM.info.completed.length !== 1 ? "s" : ""} stay in history</span></li>
                         )}
@@ -449,14 +451,14 @@ export function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, on
                     </>
                   ) : confirmDeleteBOM.info.completed.length > 0 ? (
                     <div className="text-slate-500">
-                      BOM has <span className="font-bold text-slate-900">{confirmDeleteBOM.info.completed.length}</span> completed build{confirmDeleteBOM.info.completed.length !== 1 ? "s" : ""} in history. They will remain visible in Machine Tracker after deletion (history is denormalised).
+                      BOM has <span className="font-bold text-slate-900">{confirmDeleteBOM.info.completed.length}</span> completed build{confirmDeleteBOM.info.completed.length !== 1 ? "s" : ""} in history. They stay visible in Machine Tracker. The BOM is archived, not deleted.
                     </div>
                   ) : (
                     <div className="text-slate-500">
-                      This BOM has never been issued. Safe to delete directly.
+                      This BOM has never been issued. It will be archived: hidden from the BOM list and issuing, kept with its checklists, and restorable from Archived.
                     </div>
                   )}
-                  <div className="text-[10px] text-slate-500 pt-1">This action cannot be undone.</div>
+                  <div className="text-[10px] text-slate-500 pt-1">Nothing is deleted. Restore it any time from the Archived list below the BOMs.</div>
                 </>
               )}
             </div>
@@ -477,16 +479,16 @@ export function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, on
                               if (res.rackCount > 0)      parts.push(`${res.rackCount} rack build${res.rackCount !== 1 ? "s" : ""} cleared`);
                               if (res.restored > 0)       parts.push(`${res.restored} component${res.restored !== 1 ? "s" : ""} returned to stock`);
                               if (res.completedCount > 0) parts.push(`${res.completedCount} completed retained in history`);
-                              setBomActionToast({ text: `BOM Deleted: ${cfm.key}`, sub: parts.join(" · ") || cfm.label });
+                              setBomActionToast({ text: `BOM Archived: ${cfm.key}`, sub: parts.join(" · ") || cfm.label });
                               setTimeout(() => setBomActionToast(null), 4500);
                             } else {
-                              setBomActionToast({ text: `Failed to delete ${cfm.key}`, sub: res?.error || "unknown error" });
+                              setBomActionToast({ text: `Failed to archive ${cfm.key}`, sub: res?.error || "unknown error" });
                               setTimeout(() => setBomActionToast(null), 4500);
                             }
                           }}
                         className="inline-flex items-center gap-1.5 text-[11px] font-bold rounded-lg px-4 py-1.5 text-white border transition-all"
-                        style={{ background: "#b91c1c", borderColor: "rgba(239,68,68,0.5)", color: "#ffffff" }}>
-                  <LeadIcon e="🗑" />Delete BOM
+                        style={{ background: "#b45309", borderColor: "rgba(217,119,6,0.5)", color: "#ffffff" }}>
+                  <LeadIcon e="🗄" />Archive BOM
                 </button>
               )}
             </div>
@@ -857,7 +859,8 @@ export function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, on
                                 <span>📑</span>Duplicate BOM
                               </button>
                             )}
-                            {/* Delete BOM — gating mirrors Duplicate so the
+                            {/* Archive BOM (was Delete BOM; 2026-11-05 nothing is
+                                ever deleted — the BOM gets retired_at). Gating mirrors Duplicate so the
                                 two destructive/configuration actions follow
                                 the same permission rule. handleDeleteBOM in
                                 App.jsx enforces:
@@ -879,7 +882,7 @@ export function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, on
                                         setConfirmDeleteBOM({ key: bomKey, label: bom.label, info });
                                       }}
                                       className="w-full text-left px-3 py-2 text-[11px] font-bold text-red-400 hover:bg-red-500/10 transition-all flex items-center gap-2 border-t border-slate-200">
-                                <span><Glyph e="🗑" size={14} /></span>Delete BOM
+                                <span><Glyph e="🗄" size={14} /></span>Archive BOM
                               </button>
                             )}
                           </div>
@@ -970,6 +973,21 @@ export function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, on
               );
             })}
           </div>
+          {/* 2026-11-05 — archived BOMs (never deleted): collapsed, Restore guarded
+              by the same permission as Archive. Not on the embedded Machine
+              Tracker strip. KM10/KM15/KM20 (replaced by M-10/M-15/M-20) are
+              listed for reference but not restorable. */}
+          {!embedded && (
+            <ArchivedSection kind="BOM" testId="boms" rows={archivedBomEntries(bomDefs)}
+                             getKey={([k]) => k} getName={([k, b]) => `${k}${b?.label && b.label !== k ? ` · ${b.label}` : ""}`}
+                             getMeta={([, b]) => `${b?.replacedBy ? `Replaced by ${b.replacedBy} · ` : ""}Archived ${b?.retiredAt ? fmtDate(new Date(b.retiredAt)) : ""} · ${(b?.items || []).length} components`}
+                             canRestore={!!onRestoreBOM && canDo("outward","bom")} canRestoreRow={([, b]) => !b?.replacedBy}
+                             onRestore={async ([k]) => {
+                               const res = await onRestoreBOM(k);
+                               if (res?.success) { setBomActionToast({ text: `BOM Restored: ${k}`, sub: "Back in the BOM list" }); setTimeout(() => setBomActionToast(null), 3500); }
+                               return res;
+                             }} />
+          )}
         </div>
 
         {/* ── Pending Stock banner ── */}

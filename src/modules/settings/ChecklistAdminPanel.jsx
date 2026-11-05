@@ -57,6 +57,13 @@ export function ChecklistAdminPanel({ templates = [], canConfig = false, onCreat
     if (res && res.success === false) alert(res.error || "Switch off failed.");
   };
 
+  // 2026-11-05 — restore = switch back on (audited as checklist_template_restored).
+  const switchOn = async (t) => {
+    if (!window.confirm(`Restore checklist '${t.name}'?\n\nIt is switched on again with the same items.`)) return;
+    const res = await onUpdate?.(t.id, { active: true, name: t.name });
+    if (res && res.success === false) alert(res.error || "Restore failed.");
+  };
+
   const renderRow = (t) => (
             <div key={t.id} className="rounded-lg px-3 py-2 flex items-center gap-3 flex-wrap"
                  style={{ background: t.active === false ? "rgba(17,24,39,0.03)" : "rgba(46, 80, 214,0.05)", border: `1px solid ${t.active === false ? "rgba(17,24,39,0.06)" : "rgba(46, 80, 214,0.25)"}` }}>
@@ -68,6 +75,7 @@ export function ChecklistAdminPanel({ templates = [], canConfig = false, onCreat
               {canConfig && (
                 <>
                   <button onClick={() => start(t)} className="text-[10px] font-bold text-blue-300 hover:text-blue-200 px-2 py-0.5 rounded border border-blue-500/30 bg-blue-500/10">Edit</button>
+                  {t.active === false && <button onClick={() => switchOn(t)} data-cl-switch-on className="text-[10px] font-bold text-emerald-700 hover:text-emerald-800 px-2 py-0.5 rounded border border-emerald-500/30 bg-emerald-500/10">Restore</button>}
                   {t.active !== false && <button onClick={() => switchOff(t)} data-cl-switch-off className="text-[10px] font-bold text-red-300 hover:text-red-200 px-2 py-0.5 rounded border border-red-500/30 bg-red-500/10">Switch off</button>}
                 </>
               )}
