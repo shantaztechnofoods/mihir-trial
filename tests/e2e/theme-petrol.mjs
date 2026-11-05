@@ -1,5 +1,6 @@
 // Petrol Steel theme + Light / Dark / Auto switch (2026-11-05). LOCAL TEST DATA ONLY.
-// Checks: Auto follows the device; the header switch sets <html data-theme>, is remembered
+// Checks: first visit opens LIGHT even on a dark device (owner rule; Auto is an option, not the
+// default); Auto follows the device; light mode is the pre-Petrol blue/white look (light-restore); the header switch sets <html data-theme>, is remembered
 // per browser (reload) and recolours the page; switching moves nothing (no layout change);
 // Settings → Appearance has the same switch; on a phone the header shows one button that
 // steps through the modes; the login screen stays as it was.
@@ -18,16 +19,20 @@ async function open(viewport, colorScheme, mobile = false) {
 const theme = (p) => p.evaluate(() => document.documentElement.getAttribute("data-theme"));
 const bodyBg = (p) => p.evaluate(() => getComputedStyle(document.body).backgroundColor);
 
-// Desktop, device in dark: Auto (default) is dark before and after sign-in.
+// Desktop, device in dark: first visit is LIGHT (default), the old blue/white look; Auto → dark.
 {
   const { p, ctx, errs } = await open({ width: 1440, height: 900 }, "dark");
-  ok("auto: device dark → data-theme dark on the login page", await theme(p) === "dark");
+  ok("first visit: device dark → still data-theme light on the login page", await theme(p) === "light");
   ok("login stays as it was: Sign In button keeps its cobalt", await p.getByRole("button", { name: "Sign In" }).evaluate((e) => getComputedStyle(e).backgroundColor) === "rgb(47, 91, 234)");
   await loginAdmin(p);
-  ok("auto: signed in, page is the petrol dark background", await bodyBg(p) === "rgb(8, 19, 21)", await bodyBg(p));
+  ok("first visit: signed in, page is the old light background", await bodyBg(p) === "rgb(244, 246, 250)", await bodyBg(p));
   const sw = p.locator(".page-header [data-theme-switch='compact']").first();
   ok("header shows the Light / Dark / Auto switch", await sw.isVisible());
-  ok("Auto is the selected option by default", await sw.locator("[data-theme-option='auto']").getAttribute("aria-checked") === "true");
+  ok("Light is the selected option by default", await sw.locator("[data-theme-option='light']").getAttribute("aria-checked") === "true");
+  ok("nothing saved until the person picks", await p.evaluate(() => localStorage.getItem("erp_theme_mode")) === null);
+  await sw.locator("[data-theme-option='auto']").click(); await p.waitForTimeout(400);
+  ok("Auto: device dark → data-theme dark", await theme(p) === "dark");
+  ok("Auto: page is the petrol dark background", await bodyBg(p) === "rgb(8, 19, 21)", await bodyBg(p));
 
   const rects = () => p.evaluate(() => [...document.querySelectorAll(".page-header, aside, main, .page-header h1, .page-header-actions")].map((e) => { const r = e.getBoundingClientRect(); return [r.x, r.y, r.width, r.height].map(Math.round).join(","); }).join("|"));
   const before = await rects();
@@ -36,11 +41,12 @@ const bodyBg = (p) => p.evaluate(() => getComputedStyle(document.body).backgroun
   ok("cross-fade class is on while switching", await p.evaluate(() => window.__xf));
   await p.waitForTimeout(400);
   ok("Light → data-theme light", await theme(p) === "light");
-  ok("Light → petrol light background", await bodyBg(p) === "rgb(238, 243, 244)", await bodyBg(p));
+  ok("Light → old light background (pre-Petrol)", await bodyBg(p) === "rgb(244, 246, 250)", await bodyBg(p));
   ok("cross-fade class is removed after the fade", !(await p.evaluate(() => document.documentElement.classList.contains("theme-xf"))));
   ok("switching moved nothing (same boxes)", await rects() === before);
   ok("choice saved in this browser", await p.evaluate(() => localStorage.getItem("erp_theme_mode")) === "light");
-  ok("primary button is petrol", await p.evaluate(() => { const e = document.querySelector(".btn-primary-brand"); return !e || getComputedStyle(e).backgroundColor === "rgb(0, 118, 128)"; }));
+  ok("light: primary button is the old blue", await p.evaluate(() => { const e = document.querySelector(".btn-primary-brand"); return !e || getComputedStyle(e).backgroundColor === "rgb(47, 91, 234)"; }));
+  ok("light: sidebar is the old dark slate", await p.evaluate(() => getComputedStyle(document.querySelector("aside")).backgroundColor) === "rgb(13, 17, 24)");
 
   await p.reload({ waitUntil: "networkidle" }); await settle(p, 1500);
   ok("after reload: still Light (device is dark)", await theme(p) === "light");
@@ -58,16 +64,18 @@ const bodyBg = (p) => p.evaluate(() => getComputedStyle(document.body).backgroun
 // Phone, device light: one header button steps Light → Dark → Auto.
 {
   const { p, ctx, errs } = await open({ width: 390, height: 844 }, "light", true);
-  ok("auto: device light → data-theme light", await theme(p) === "light");
+  ok("first visit (phone): data-theme light", await theme(p) === "light");
   await loginAdmin(p);
   const btns = p.locator(".page-header [data-theme-switch='compact'] button:visible");
   ok("phone header shows one mode button", await btns.count() === 1);
   const bx = await btns.first().boundingBox();
   ok("phone mode button is at least 40 px", bx && bx.width >= 40 && bx.height >= 40, bx && `${bx.width}x${bx.height}`);
   await btns.first().click(); await p.waitForTimeout(300);
-  ok("tap: Auto → Light", await p.evaluate(() => localStorage.getItem("erp_theme_mode")) === "light");
+  ok("tap: Light → Dark", await theme(p) === "dark" && await p.evaluate(() => localStorage.getItem("erp_theme_mode")) === "dark");
   await btns.first().click(); await p.waitForTimeout(300);
-  ok("tap: Light → Dark", await theme(p) === "dark");
+  ok("tap: Dark → Auto (device light → light)", await p.evaluate(() => localStorage.getItem("erp_theme_mode")) === "auto" && await theme(p) === "light");
+  await p.reload({ waitUntil: "networkidle" }); await settle(p, 1500);
+  ok("next visit opens in the last choice (Auto)", await p.evaluate(() => document.documentElement.getAttribute("data-theme-mode")) === "auto");
   const over = await p.evaluate(() => document.documentElement.scrollWidth - innerWidth);
   ok("no sideways scroll on the phone", over <= 0, String(over));
   ok("no browser errors (phone)", errs.length === 0, errs.join(" ; "));

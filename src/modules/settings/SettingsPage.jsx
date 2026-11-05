@@ -188,7 +188,7 @@ export function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, on
         )}
         <button onClick={() => handleSave()}
                 className="inline-flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-xl transition-all duration-200"
-                style={{ background: saved ? "var(--p-okBg)" : "var(--p-pri)", color: saved ? "var(--p-okTx)" : "var(--p-onPri)", border: saved ? "1px solid var(--p-okLine)" : "1px solid var(--p-pri)", boxShadow: saved ? "none" : "var(--p-priShadow)" }}>
+                style={{ background: saved ? "var(--st-okBg, rgba(22,163,74,0.12))" : "var(--st-saveBg, #2640B0)", color: saved ? "var(--st-okTx, #15803d)" : "var(--st-saveTx, #fff)", border: saved ? "var(--st-okBorder, 1px solid rgba(22,163,74,0.35))" : "var(--st-saveBorder, 1px solid rgba(38, 64, 176,0.45))", boxShadow: saved ? "none" : "var(--st-saveShadow, 0 0 12px rgba(46, 80, 214,0.3))" }}>
           <LeadLabel text={saved ? "✅ Saved!" : "💾 Save Changes"} />
         </button>
       </Topbar>
@@ -227,9 +227,9 @@ export function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, on
               <button key={t.id} onClick={() => setTab(t.id)}
                       className="text-[12px] font-bold px-3.5 py-2.5 -mb-px transition-all whitespace-nowrap"
                       style={{
-                        color:       sel ? "var(--p-priTx)" : "var(--p-tx3)",
-                        background:  sel ? "var(--p-priWash)" : "transparent",
-                        borderBottom: `2px solid ${sel ? "var(--p-pri)" : "transparent"}`,
+                        color:       sel ? "var(--st-tabTx, #2E50D6)" : "var(--st-tabMuted, #6b7280)",
+                        background:  sel ? "var(--st-tabWash, rgba(46, 80, 214,0.07))" : "transparent",
+                        borderBottom: `2px solid ${sel ? "var(--st-tabLine, #2E50D6)" : "transparent"}`,
                       }}>
                 <LeadLabel text={t.label} />
               </button>
