@@ -53,7 +53,9 @@ Promote the folder first, then switch the module on.
    handler, page, nav id, audit type, user-visible string and store export
    across all of `src/`, plus the size floor of every module folder).
 7. `scripts/ship.sh check` — unit + build + every browser suite. All green or stop.
-8. Apply new migrations to Live's Supabase (verify the project name first;
+8. Before touching Live, run the release dress rehearsal on a fresh Live backup
+   (`scripts/rehearse-release.sh`, see `docs/RELEASE.md`) — it must say PASS.
+   Then apply new migrations to Live's Supabase (verify the project name first;
    note row counts; additive only), deploy changed Edge Functions.
 9. `scripts/ship.sh pr "Promote <module> from Trial" body.md`, CI green, merge.
    Vercel deploys `main`. Check the live site: new build tag, the module's pages

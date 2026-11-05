@@ -37,3 +37,8 @@ pnpm-debug.log*
 
 # Supabase CLI link state (points at a specific project — never commit)
 supabase/.temp/
+
+# Release dress rehearsal output and any Live backup copy (Live data — never commit)
+.rehearsal/
+rehearsal-report.md
+live-backup*/
