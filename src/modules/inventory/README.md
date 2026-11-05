@@ -42,7 +42,7 @@ The screens here are presentational: state and every write (handler) still live 
 | `<InwardPage>` | `handleUpdateStock` | `handleUpdateStock` |
 | `<InwardPage>` | `onInwardComplete` | `handleInwardComplete` |
 | `<InwardPage>` | `onAddInward` | `logAudit` |
-| `<OutwardPage>` | `...spread` | `handleUpdateStock`, `handleSetItemDefaultRate`, `handleUpdateBOM`, `handleCreateBOM`, `handleRenameBOM`, `handleAddOutward`, `raiseNotIssuedJobs`, `handleClearPending`, `handleCreateMachine`, `handleAbortMachineCreate`, `handleRemoveRackMachine`, `handleDuplicateBOM`, `handleDeleteBOM`, `computeBOMDeletionInfo`, `handleCreateChecklistTemplate`, `handleUpdateChecklistTemplate`, `handleDeleteChecklistTemplate`, `flashSaveError` |
+| `<OutwardPage>` | `...spread` | `handleUpdateStock`, `handleSetItemDefaultRate`, `handleUpdateBOM`, `handleCreateBOM`, `handleRenameBOM`, `handleAddOutward`, `raiseNotIssuedJobs`, `handleClearPending`, `handleCreateMachine`, `handleAbortMachineCreate`, `handleRemoveRackMachine`, `handleDuplicateBOM`, `handleDeleteBOM`, `computeBOMDeletionInfo`, `handleCreateChecklistTemplate`, `handleUpdateChecklistTemplate`, `handleDeleteChecklistTemplate`, `handleSaveBomChecklist`, `flashSaveError` |
 | `<PendingPage>` | `onFulfillPending` | `handleFulfillPending` |
 | `<PendingPage>` | `onFulfillGroup` | `handleFulfillGroup` |
 | `<PendingPage>` | `handleUpdateStock` | `handleUpdateStock` |

@@ -188,6 +188,8 @@ const APP_HANDLERS = [
   "handleCreateChecklistTemplate",
   "handleUpdateChecklistTemplate",
   "handleDeleteChecklistTemplate",
+  // 2026-11-05 — BOM screen → Checklists (one BOM's own list, point by point).
+  "handleSaveBomChecklist",
   "handleResolvePendingItem",
   "handleUploadAttachment",
   "handleDeleteAttachment",
@@ -233,6 +235,7 @@ const PAGE_COMPONENTS = [
   // Phase B / Phase C
   "AttachmentLink",
   "ChecklistAdminPanel",
+  "BomChecklistsPanel",
   "ReportCenterPage",
   "WhatsAppPage",
   "ReportKPI",
@@ -312,6 +315,8 @@ const AUDIT_EVENT_TYPES = [
   "checklist_submitted_finish", "checklist_submitted_accept", "checklist_submitted_during_work",
   // 2026-11-03 — Assembly "Before Starting Work" checklist at rack Assemble.
   "checklist_submitted_assembly_start",
+  // 2026-11-05 — BOM screen → Checklists edits (add / edit / remove / reorder / copy).
+  "bom_checklist_changed",
   // Migration 029 — department-employees admin audit.
   "user_departments_updated",
 ];
@@ -443,6 +448,12 @@ const USER_FACING_STRINGS = [
   "Critical Items in this BOM",
   "Department Checklists for ",
   "Open Inventory to edit",
+  // 2026-11-05 — BOM screen → Checklists + Settings switched-off fold.
+  "Make a list for this BOM",
+  "Copy to other BOMs…",
+  "Before receive",
+  "Before transfer",
+  "Switched off (",
   // A-to-Z Machine Report (2026-10-23). The tab that opens it is now labelled
   // "One machine"; the report's own heading is unchanged.
   "A-to-Z Machine Report",

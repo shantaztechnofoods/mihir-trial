@@ -167,3 +167,54 @@ export function duplicateTemplateItems(items) {
     required: !!(it && it.required),
   }));
 }
+
+// ─── BOM screen → Checklists section (2026-11-05) ───────────────────────────
+// What the worker sees for one (BOM, department, stage) slot, split for the
+// BOM screen. Runtime is NOT changed: pickTemplate still decides, and a BOM's
+// own row REPLACES the common row (it is never merged). These helpers only
+// tell the BOM screen which row that is, so it edits exactly the list the
+// worker gets at Accept / Finish & Transfer.
+//   own          — this BOM's active row for the slot (what pickTemplate picks
+//                  first), or null
+//   fallback     — when `own` is null: the common / legacy row pickTemplate
+//                  falls back to (shown greyed), or null
+//   inactiveOwn  — newest switched-off row of this BOM for the slot (re-used
+//                  instead of creating another row), or null
+// Invariant (unit-tested): (own || fallback) === pickTemplate(...).
+export function bomChecklistSlot(templates, bomKey, department, stage) {
+  const list = Array.isArray(templates) ? templates.filter(Boolean) : [];
+  const scoped = bomKey ? list.filter((t) => t.bomKey === bomKey && t.stage === stage && t.department === department) : [];
+  const own = pickTemplate(scoped, bomKey, department, stage);
+  const fallback = own ? null : pickTemplate(list, bomKey, department, stage);
+  const off = scoped.filter((t) => t.active === false).sort((a, b) => {
+    const au = a.updatedAt ? Date.parse(a.updatedAt) : 0;
+    const bu = b.updatedAt ? Date.parse(b.updatedAt) : 0;
+    if (bu !== au) return bu - au;
+    return (b.id || 0) - (a.id || 0);
+  });
+  return { own, fallback, inactiveOwn: off[0] || null };
+}
+
+const newPointId = (n = 0) => `i${Date.now()}-${n}-${Math.random().toString(36).slice(2, 6)}`;
+
+// Add one point at the end. Blank text is ignored (returns the same items).
+export function addChecklistPoint(items, text) {
+  const label = String(text || "").trim();
+  const base = Array.isArray(items) ? items : [];
+  if (!label) return base;
+  return [...base, { id: newPointId(base.length), label, required: false }];
+}
+// Change the text of point `idx`; keeps its id and "Must do" flag.
+export function editChecklistPoint(items, idx, text) {
+  const label = String(text || "").trim();
+  return (items || []).map((it, i) => (i === idx && label ? { ...it, label } : it));
+}
+export function removeChecklistPoint(items, idx) {
+  return (items || []).filter((_, i) => i !== idx);
+}
+export function moveChecklistPoint(items, idx, dir) {
+  const out = [...(items || [])]; const t = idx + dir;
+  if (idx < 0 || idx >= out.length || t < 0 || t >= out.length) return out;
+  [out[idx], out[t]] = [out[t], out[idx]];
+  return out;
+}
