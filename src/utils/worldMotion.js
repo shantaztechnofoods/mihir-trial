@@ -1,9 +1,14 @@
 // World UI motion helpers (2026-11-04). Visual only — nothing here reads or
 // writes ERP data, and nothing waits for an animation before an action runs.
 //
-// celebrate(label)   a check-seal pop + a small confetti burst (≤1.2s) for the
-//                    rare moments: machine accepted, sent on, Ready. Never on
-//                    repeated per-item actions. Reduced motion: seal fades, no confetti.
+// celebrate(label, { big })  a check-seal pop (0.9 s) for the rare moments:
+//                    machine accepted, sent on, Ready. Confetti only with
+//                    { big: true } (machine Ready). Never on repeated per-item
+//                    actions. Reduced motion / cheap phone (wu-lite): no confetti.
+//                    No vibration here: the success toast (shared/ui/toast.js)
+//                    gives the one 10 ms haptic tick.
+// installLiteMode()  html.wu-lite on low-memory / data-saver phones: CSS drops
+//                    blur and confetti there (world-ui.css / mtMotion.css).
 // installSheetGestures()  on a phone, a dialog panel can be dragged down by its
 //                    header and let go to close: it presses the dialog's own
 //                    Close / Cancel button, so the existing close rules apply
@@ -12,7 +17,20 @@
 const reduced = () => { try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { return false; } };
 const COLORS = ["#15803D", "#2E50D6", "#E8962E", "#4F3FC4", "#22A05A", "#8FA6FF"];
 
-export function celebrate(label = "Done") {
+export function isLiteDevice(nav = typeof navigator !== "undefined" ? navigator : undefined, win = typeof window !== "undefined" ? window : undefined) {
+  try {
+    if (win && win.matchMedia && win.matchMedia("(prefers-reduced-data: reduce)").matches) return true;
+    if (!nav) return false;
+    if (nav.connection && nav.connection.saveData) return true;
+    return typeof nav.deviceMemory === "number" && nav.deviceMemory <= 2;
+  } catch { return false; }
+}
+
+export function installLiteMode() {
+  try { if (typeof document !== "undefined" && isLiteDevice()) document.documentElement.classList.add("wu-lite"); } catch { /* ignore */ }
+}
+
+export function celebrate(label = "Done", { big = false } = {}) {
   if (typeof document === "undefined" || !document.body) return;
   try {
     const root = document.createElement("div");
@@ -25,7 +43,7 @@ export function celebrate(label = "Done") {
     seal.appendChild(svg);
     const t = document.createElement("span"); t.textContent = String(label).slice(0, 18); seal.appendChild(t);
     root.appendChild(seal);
-    if (!reduced()) {
+    if (big && !reduced() && !isLiteDevice()) {
       for (let i = 0; i < 26; i++) {
         const c = document.createElement("i"); c.className = "wu-confetti";
         const a = (Math.PI * 2 * i) / 26 + Math.random() * 0.4; const r = 90 + Math.random() * 90;
@@ -36,8 +54,7 @@ export function celebrate(label = "Done") {
       }
     }
     document.body.appendChild(root);
-    try { if (navigator.vibrate) navigator.vibrate(18); } catch { /* not supported */ }
-    setTimeout(() => { try { root.remove(); } catch { /* gone */ } }, 1250);
+    setTimeout(() => { try { root.remove(); } catch { /* gone */ } }, big ? 1250 : 950);
   } catch { /* decoration must never break an action */ }
 }
 

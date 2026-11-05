@@ -1,0 +1,122 @@
+/* Machine Tracker motion + polish (Phase 1 motion, 2026-11-05). VISUAL ONLY.
+   Loaded with the Machine Tracker screen (src/modules/machine-tracker), never
+   on the login screen. Tokens: world-ui.css (--ease-*, --dur-*, --ok, --bad).
+   Rules: transform + opacity only (the reason row is the one small height
+   reveal); every rule has a reduced-motion fallback at the bottom; cheap
+   phones (html.wu-lite) lose blur and confetti. Meaning is always in words +
+   icon — colour and motion only repeat it. */
+
+@media screen {
+  :root { --dur-out: 180ms; --dur-move: 240ms; --ring-ok: rgba(21, 128, 61, .55); }
+
+  /* ── Press: 0.98 in 100 ms (calm, never a bounce) ─────────────────────── */
+  .mt-premium button:not(:disabled) { transition-property: transform, background-color, box-shadow, border-color, color, opacity; }
+  .mt-premium button:not(:disabled):active { transform: scale(.98); transition-duration: 100ms; }
+  .mt-premium .wu-step:not(:disabled):active { transform: scale(.98); }
+
+  /* ── Card entrance: 260 ms, first 4 cards stagger, the rest come at once ─ */
+  [data-staff-section] .mt-card { animation-duration: 260ms !important; }
+  [data-staff-section] .grid > :nth-child(2) .mt-card, [data-staff-section] .grid > .mt-card:nth-child(2) { animation-delay: 40ms; }
+  [data-staff-section] .grid > :nth-child(3) .mt-card, [data-staff-section] .grid > .mt-card:nth-child(3) { animation-delay: 80ms; }
+  [data-staff-section] .grid > :nth-child(4) .mt-card, [data-staff-section] .grid > .mt-card:nth-child(4) { animation-delay: 120ms; }
+
+  /* ── Card arrived in its new section: one soft green ring (opacity only) ─ */
+  .mt-arrive { position: relative; }
+  .mt-arrive::after {
+    content: ""; position: absolute; inset: -3px; border-radius: calc(var(--r-card, 18px) + 3px); pointer-events: none;
+    box-shadow: 0 0 0 3px var(--ring-ok), 0 0 0 7px rgba(21, 128, 61, .10); opacity: 0;
+    animation: mt-ring 1100ms var(--ease-enter) 140ms;
+  }
+  @keyframes mt-ring { 0% { opacity: 0; } 18% { opacity: 1; } 60% { opacity: 1; } 100% { opacity: 0; } }
+  .wu-sent.mt-arrive::after { border-radius: 14px; }
+
+  /* ── Route pill glides (Rack → Accept → Work → Send) ──────────────────── */
+  .wu-route[data-glide]::before {
+    content: ""; position: absolute; z-index: 0; top: 3px; bottom: 3px; left: 0;
+    width: var(--pill-w, 0); transform: translateX(var(--pill-x, 0));
+    border-radius: 11px; background: var(--paper);
+    box-shadow: 0 1px 3px rgba(11, 18, 32, .10), 0 0 0 .5px rgba(11, 18, 32, .06);
+  }
+  .wu-route[data-glide="on"]::before { transition: transform var(--dur-move) var(--ease-move), width var(--dur-move) var(--ease-move); }
+  .wu-route[data-glide] .wu-step { position: relative; z-index: 1; }
+  .wu-route[data-glide] .wu-step.is-now { background: transparent; box-shadow: none; }
+  .wu-step .wu-step-n, .wu-step .wu-step-l { transition: color var(--dur-ui) var(--ease-enter); }
+  /* rolling numbers keep the exact box of the plain number (no height jump) */
+  .wu-step-n { display: inline-flex; align-items: center; justify-content: center; height: 20px; }
+  .wu-step-n number-flow-react, .wu-count number-flow-react { font: inherit; color: inherit; line-height: 1; --number-flow-mask-height: .12em; }
+  .wu-count { transition: background-color var(--dur-ui) var(--ease-enter), color var(--dur-ui) var(--ease-enter); }
+
+  /* ── Status changes happen in place ──────────────────────────────────── */
+  .wu-timer { transition: background-color 200ms var(--ease-enter), color 200ms var(--ease-enter); }
+  .wu-hold-badge, .wu-held, .wu-note-bad { animation: mt-reveal 200ms var(--ease-enter) backwards; transform-origin: top center; }
+  @keyframes mt-reveal { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+
+  /* ── Confirm becomes possible: ONE ring, then calm (was an endless glow) ─ */
+  .accept-ready, .modal-backdrop button[data-finish-confirm]:not(:disabled) { animation: mt-ready 700ms var(--ease-enter) 1 !important; }
+  @keyframes mt-ready { from { box-shadow: 0 0 0 0 rgba(21, 128, 61, .45); } to { box-shadow: 0 0 0 10px rgba(21, 128, 61, 0); } }
+  .modal-backdrop button[data-accept-confirm], .modal-backdrop button[data-finish-confirm] { transition: background-color 200ms var(--ease-enter), color 200ms var(--ease-enter), transform 100ms var(--ease-enter); }
+
+  /* "1 check left · then sign" under a grey Confirm (display only) */
+  .mt-left { display: flex; align-items: center; gap: 6px; padding: 8px 20px 0; font-size: 13px; font-weight: 500; line-height: 1.35; color: var(--ink-3, #5b6474);
+    animation: mt-reveal 200ms var(--ease-enter) backwards; }
+  .mt-left svg { flex-shrink: 0; color: var(--wait, #b45309); }
+  .mt-left + div { border-top: 0 !important; }
+
+  /* ── Checklist ✗: the reason row opens in place (200 ms, no jump) ─────── */
+  .ck-reason { display: grid; grid-template-rows: 1fr; animation: mt-ck-open 200ms var(--ease-enter) both; }
+  .ck-reason > * { min-height: 0; overflow: hidden; padding: 6px; margin: -6px; }
+  @keyframes mt-ck-open { from { grid-template-rows: 0fr; opacity: 0; padding-bottom: 0; } to { grid-template-rows: 1fr; opacity: 1; } }
+  .ck-no { transition: background-color 150ms, color 150ms, border-color 150ms, transform 100ms var(--ease-enter); }
+  .ck-no[aria-pressed="true"] { animation: mt-ck-x 200ms var(--ease-pop); }
+  @keyframes mt-ck-x { from { transform: scale(.88); } to { transform: none; } }
+  /* 🎤 pops in just after the box opens */
+  .ck-reason .vn-mic:not(.vn-mic-busy) { animation: mt-mic-in 180ms var(--ease-pop) 60ms backwards; }
+  @keyframes mt-mic-in { from { opacity: 0; transform: translateY(-50%) scale(.6); } to { opacity: 1; transform: translateY(-50%); } }
+  /* listening = red ring around the box (a live state, so it may breathe) */
+  .modal-backdrop .vn-bar { box-shadow: 0 0 0 3px rgba(220, 38, 38, .16); animation: mt-listen 1.4s ease-in-out infinite; }
+  @keyframes mt-listen { 0%, 100% { box-shadow: 0 0 0 2px rgba(220, 38, 38, .14); } 50% { box-shadow: 0 0 0 5px rgba(220, 38, 38, .22); } }
+  /* writing = a quiet shimmer across the box while the words are made */
+  .modal-backdrop .vn-field:has(> .vn-mic-busy) > input, .modal-backdrop .vn-field:has(> .vn-mic-busy) > textarea {
+    background-image: linear-gradient(100deg, transparent 30%, rgba(38, 64, 176, .07) 50%, transparent 70%) !important;
+    background-size: 220% 100% !important; animation: wu-shimmer 1.2s linear infinite;
+  }
+  /* the written words fade in when writing ends */
+  .modal-backdrop .vn-field > input, .modal-backdrop .vn-field > textarea { animation: mt-text-in 200ms var(--ease-enter); }
+  @keyframes mt-text-in { from { opacity: .35; } to { opacity: 1; } }
+  .modal-backdrop .vn-writing { animation: mt-reveal 200ms var(--ease-enter) backwards; }
+
+  /* ── Ghost host (exiting cards / sheets) ─────────────────────────────── */
+  .mt-ghost-host { display: contents; }
+  .mt-ghost-host > .mt-card { box-shadow: var(--e2, 0 8px 24px rgba(11, 18, 32, .12)) !important; }
+}
+
+/* ── Phone header: build tag never sits on the page title ────────────── */
+@media screen and (max-width: 767px) {
+  /* a small tab hanging from the top edge (12 px tall), clear of the title */
+  body:has(.mt-premium) #erp-build-badge { top: 0 !important; right: 10px !important; font-size: 8.5px !important; line-height: 11px !important; padding: 0 6px 1px !important;
+    border-radius: 0 0 6px 6px !important; opacity: .6; pointer-events: none; }
+  body:has(.mt-premium .modal-backdrop) #erp-build-badge, body:has(.mt-ghost-host .modal-backdrop) #erp-build-badge { display: none !important; }
+}
+
+/* ── Cheap Android: no blur, no confetti ─────────────────────────────── */
+html.wu-lite .modal-backdrop, html.wu-lite .mobile-tabbar, html.wu-lite .page-header { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+html.wu-lite .wu-confetti { display: none !important; }
+@media (prefers-reduced-data: reduce) {
+  .modal-backdrop { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+  .wu-confetti { display: none !important; }
+}
+
+/* ── Reduced motion: opacity only ────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .mt-premium button:not(:disabled):active, .mt-premium .wu-step:not(:disabled):active { transform: none; }
+  .wu-route[data-glide="on"]::before { transition: none; }
+  .mt-arrive::after { animation: mt-ring-calm 900ms ease 1; }
+  @keyframes mt-ring-calm { 0%, 100% { opacity: 0; } 30%, 70% { opacity: .8; } }
+  .wu-hold-badge, .wu-held, .wu-note-bad, .mt-left, .modal-backdrop .vn-writing { animation: wu-fade 120ms ease backwards; }
+  .accept-ready, .modal-backdrop button[data-finish-confirm]:not(:disabled) { animation: none !important; }
+  .ck-reason { animation: wu-fade 120ms ease both; }
+  .ck-no[aria-pressed="true"], .ck-reason .vn-mic:not(.vn-mic-busy) { animation: none; }
+  .modal-backdrop .vn-bar { animation: none; }
+  .modal-backdrop .vn-field:has(> .vn-mic-busy) > input, .modal-backdrop .vn-field:has(> .vn-mic-busy) > textarea { animation: none; }
+  .modal-backdrop .vn-field > input, .modal-backdrop .vn-field > textarea { animation: mt-text-in 120ms ease; }
+}

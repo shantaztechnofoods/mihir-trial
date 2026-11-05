@@ -2,7 +2,7 @@ import React, { Suspense, lazy, useEffect, useState } from 'react'
 import ReactDOM from 'react-dom/client'
 import './index.css'
 import './world-ui.css'
-import { installSheetGestures, installScrollReveal, installHeaderCompact } from './utils/worldMotion.js'
+import { installSheetGestures, installScrollReveal, installHeaderCompact, installLiteMode } from './utils/worldMotion.js'
 import { AuthProvider, useAuth } from './auth/AuthContext.jsx'
 import LoginPage from './app/LoginPage.jsx'
 import { loadApp } from './app/loadApp.js'
@@ -15,7 +15,7 @@ import OfflineBanner from './shared/components/OfflineBanner.jsx'
 // bottom-left corner on EVERY screen (even the login page) + a console banner.
 // If you do NOT see "build 2026-05-29f" bottom-left in production, the served bundle
 // is stale or the URL you opened is not this deployment.
-export const APP_BUILD_TAG = "2026-11-05-dash-line-2";
+export const APP_BUILD_TAG = "2026-11-05-mt-motion";
 if (typeof console !== "undefined") {
   console.warn(`%c[APP BUILD] ${APP_BUILD_TAG}`, "background:#16a34a;color:#fff;padding:2px 6px;border-radius:4px;font-weight:bold");
 }
@@ -35,7 +35,7 @@ try {
 // failure mode). The per-page PageErrorBoundary inside App is still the
 // preferred catch site — this is the last-resort safety net.
 // World UI: drag a phone sheet down by its header to close it (presses its own Close).
-installSheetGestures(); installScrollReveal(); installHeaderCompact();
+installSheetGestures(); installScrollReveal(); installHeaderCompact(); installLiteMode();
 
 // ── Login does not wait for the app (2026-11-04, perf/login-fast) ─────────────
 // The signed-in app (src/app/App.jsx + every module) is its own chunk. While
