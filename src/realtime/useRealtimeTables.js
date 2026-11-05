@@ -177,12 +177,12 @@ export function useRealtimeTables({
     // supabase-js rejoins a dropped channel by itself, but events sent while
     // it was down are not replayed — refetch once when it comes back.
     let hadError = false;
-    ch.subscribe((status) => {
+    ch.subscribe((status, err) => {
       if (status === "SUBSCRIBED") {
         console.info(`[realtime] subscribed to ${wired.length} tables:`, wired.join(", "));
         if (hadError) { hadError = false; try { catchUpRef.current?.("resubscribed"); } catch {} }
       }
-      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") { hadError = true; console.error(`[realtime] channel ${status}`); }
+      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") { hadError = true; console.warn(`[realtime] channel ${status} (auto-retrying)`, err?.message || err); }
     });
 
     return () => {

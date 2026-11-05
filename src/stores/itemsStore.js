@@ -63,7 +63,10 @@ function fromRow(r) {
     reorderLevel:     Number(r.reorder_level) || 0,
     min:              Number(r.min_stock) || 0,
     max:              r.max_stock != null ? Number(r.max_stock) : 0,
-    status:           r.status || recomputeStatus(stock, r.min_stock),
+    // Always derived from stock vs min — a stored status goes stale when
+    // min_stock is edited (updateItem never rewrites status), e.g. stock 0 /
+    // min 10 stored as 'safe'.
+    status:           recomputeStatus(stock, Number(r.min_stock) || 0),
     location:         r.location || "",
     lastPurchaseRate: r.last_purchase_rate || 0,
     vendor:           "",                          // derived at render time from vendorLinks
