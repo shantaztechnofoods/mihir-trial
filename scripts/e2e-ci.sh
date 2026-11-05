@@ -22,11 +22,14 @@ run_one(){ local s=$1 t0 rc; t0=$(date +%s)
   setsid timeout -k 10 420 node "tests/e2e/$s.mjs" >"$LOGS/$s.log" 2>&1 & local pid=$!
   wait $pid; rc=$?; kill -KILL -- "-$pid" 2>/dev/null
   echo "$rc $(( $(date +%s) - t0 ))" >"$LOGS/$s.rc"; }
+SOLO=" frame-budget "   # frame-time suites run alone, after the others (no second browser on the box)
 for s in "${SUITES[@]}"; do
+  [[ "$SOLO" == *" $s "* ]] && continue
   while [ "$(jobs -rp | wc -l)" -ge $(( PAR + 1 )) ]; do wait -n 2>/dev/null || true; done   # +1: the preview server
   run_one "$s" &
 done
 while [ "$(jobs -rp | wc -l)" -gt 1 ]; do wait -n 2>/dev/null || true; done
+for s in "${SUITES[@]}"; do [[ "$SOLO" == *" $s "* ]] && run_one "$s"; done
 
 bad=0
 for s in "${SUITES[@]}"; do

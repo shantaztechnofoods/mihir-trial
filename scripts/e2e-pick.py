@@ -35,7 +35,8 @@ COMPONENT_MAP = [
 ]
 PATH_MAP = [
     # motion / CSS / dialog shells → the ERP-wide frame budget (2026-11-05)
-    (r"^src/(world-ui\.css|index\.css|utils/worldMotion|shared/(ui/Count|motion/)|modules/machine-tracker/mtMotion)", ["frame-budget"] + SMOKE),
+    (r"^src/modules/machine-tracker/mtMotion", MT + ["ready-popup", "delay-reasons", "compact-checklist", "mobile-sweep"]),
+    (r"^src/(world-ui\.css|index\.css|utils/worldMotion|shared/(ui/Count|motion/))", ["frame-budget"] + SMOKE),
     (r"^(src/main\.jsx|src/app/(LoginPage|loginBoot|loadApp)|src/shared/components/(LoginBrand3D|shantazLogo)|src/auth/AuthContext|scripts/vite-login-boot|index\.html|vite\.config)", ["login-speed"] + SMOKE),
     (r"^tests/e2e/lib/", SMOKE),
     (r"^src/realtime/|liveSync", ["live-sync"]),

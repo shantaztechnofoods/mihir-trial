@@ -13,7 +13,7 @@ delay-reasons 49
 delete-machine 35
 dept-staff-create 53
 fill-rack-pending-item 28
-frame-budget 95
+frame-budget 150
 go-live-workflows 103
 harden-stress 27
 live-sync 49
