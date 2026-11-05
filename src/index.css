@@ -4328,3 +4328,18 @@ button.rack-btn:disabled { background: #e5e7eb !important; color: #6b7280 !impor
   .bcl-icon-move { display: none; }
   .bcl-copy-actions .bcl-btn { flex: 1; }
 }
+
+/* Settings → Department heads (2026-11-05). Laptop: dept | picker | status in
+   one row. Phone: stacked, full-width 44px controls, no sideways scroll. */
+.dept-head-list { display: flex; flex-direction: column; border: 1px solid rgba(17,24,39,0.10); border-radius: 10px; }
+.dept-head-row { display: grid; grid-template-columns: 140px minmax(0, 1fr) 88px; align-items: center; gap: 8px 16px; padding: 12px 16px; }
+.dept-head-row + .dept-head-row { border-top: 1px solid rgba(17,24,39,0.08); }
+.dept-head-row > :nth-child(2):last-child { grid-column: 2 / -1; }
+.dept-head-ctl { min-width: 0; max-width: 480px; }
+.dept-head-typed { display: flex; gap: 8px; margin-top: 8px; align-items: flex-end; }
+@media (max-width: 639px) {
+  .dept-head-row { grid-template-columns: minmax(0, 1fr); gap: 4px; padding: 12px; }
+  .dept-head-row > :nth-child(2):last-child { grid-column: auto; }
+  .dept-head-ctl { max-width: none; }
+  .dept-head-msg:empty { display: none; }
+}

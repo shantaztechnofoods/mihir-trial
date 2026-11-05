@@ -67,11 +67,11 @@ export function ProductionLinePanel({ machines = [], handovers = [], settings = 
       <div className="dash-line-strip">
         {line.stages.map((st) => {
           const lines = stageStatusLines(st);
-          const label = `${st.label}: ${st.count}${st.key === "Ready" ? " ready today" : ""}. ${lines.map((l) => l.text).join(". ")}. Open Machine Tracker`;
+          const label = `${st.label}${st.head ? `, head ${st.head}` : ""}: ${st.count}${st.key === "Ready" ? " ready today" : ""}. ${lines.map((l) => l.text).join(". ")}. Open Machine Tracker`;
           return (
             <button key={st.key} type="button" className="dash-line-stage" data-stage={st.key} data-tone={st.tone} data-zero={st.count === 0 ? "" : undefined}
                     onClick={() => open(st.filter)} aria-label={label}>
-              <span className="dash-line-label">{st.label}</span>
+              <span className="dash-line-label">{st.label}{st.head && <span className="dash-line-head-name" data-dept-head={st.head}><span className="dash-line-head-sep"> · </span>{st.head}</span>}</span>
               <RollNumber value={st.count} />
               {st.key === "Ready" && <span className="dash-line-sub">{st.readyTotal} ready in total</span>}
               <span className="dash-line-flags">{lines.map((l, i) => <StatusLine key={i} line={l} />)}</span>

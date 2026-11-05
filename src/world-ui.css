@@ -757,6 +757,8 @@
     border-top: 1.5px solid var(--line-strong); border-right: 1.5px solid var(--line-strong); transform: rotate(45deg); background: var(--paper); }
   @media (hover: hover) and (pointer: fine) { .dash-line-stage:hover { background: var(--sunk); } }
   .dash-line-label { font-size: 14px; line-height: 1.4; font-weight: 500; color: var(--ink-3); }
+  .dash-line-label { max-width: 100%; overflow-wrap: break-word; }
+  .dash-line-head-name { color: var(--ink-2); }
   .dash-line-num { display: block; margin: 0 0 4px; font: 600 32px/1.1 var(--font-ui); letter-spacing: -0.02em; color: var(--ink);
     font-variant-numeric: tabular-nums; animation: dash-line-roll var(--dur-ui) var(--ease-enter) both; }
   .dash-line-stage[data-zero] .dash-line-num { color: var(--ink-4); }
@@ -806,6 +808,9 @@
     .dash-line-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 8px; }
     .dash-line-stage:nth-child(4)::before, .dash-line-stage:nth-child(4)::after { display: none; }
     .dash-line-num { font-size: 28px; }
+    /* Narrow card: the head goes on its own line under the department. */
+    .dash-line-head-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dash-line-head-sep { display: none; }
   }
   @container (max-width: 560px) {
     .dash-line-row { grid-template-columns: minmax(0, 1fr) 16px; grid-template-areas: "m go" "d go" "w go"; gap: 4px 12px; padding: 12px; }

@@ -9,6 +9,7 @@ import { REPORT_LANGS } from "../reports/index.js";
 import { AdminCleanupPanel } from "./AdminCleanupPanel.jsx";
 import { ChecklistAdminPanel } from "./ChecklistAdminPanel.jsx";
 import { DeptEmployeesRow, EmployeeMembersPanel } from "./EmployeeMembersPanel.jsx";
+import { DepartmentHeadsPanel } from "./DepartmentHeadsPanel.jsx";
 import { ModulesPanel } from "./ModulesPanel.jsx";
 import { SLabel, Section, Toggle } from "./settingsUi.jsx";
 import { APP_BUILD } from "../../shared/buildInfo.js";
@@ -518,6 +519,12 @@ export function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, on
                 })()}
                 </OrgGroup>
                 )}
+
+                <OrgGroup id="dept-heads" icon="👤" title="Department heads"
+                          hint="Who leads each department. Shown on the Dashboard production line.">
+                  <DepartmentHeadsPanel settings={settings} allUsers={allUsers} canEdit={canConfig}
+                                        onSaveHeads={(heads) => persistPatch("departmentHeads", heads)} />
+                </OrgGroup>
 
                 <OrgGroup id="calendar" icon="📅" title="Working calendar"
                           hint="Weekly off day and holidays. All timers pause on these days.">
