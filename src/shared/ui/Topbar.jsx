@@ -13,14 +13,19 @@ import { MobileNavContext } from "../components/PageHeader.jsx";
 // floating control that overlaps page content.
 // MobileNavContext now lives in components/PageHeader.jsx (shared with src/pages).
 
-export function Topbar({ title, subtitle, children }) {
-  const onMenu = React.useContext(MobileNavContext);
-  const [time, setTime] = useState(new Date());
+// 2026-11-05 (speed): the ticking clock is its own tiny component, so the
+// once-a-second tick re-renders only this text — not the whole page header.
+function TopbarClock() {
+  const [time, setTime] = useState(() => new Date());
   useEffect(() => {
     const t = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
-  const timeStr = time.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  return time.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+
+export function Topbar({ title, subtitle, children }) {
+  const onMenu = React.useContext(MobileNavContext);
 
   return (
     <div className="page-header flex-shrink-0 no-print flex flex-wrap items-center gap-x-3 sm:gap-x-4 gap-y-2.5 px-4 sm:px-6 py-3.5"
@@ -40,7 +45,7 @@ export function Topbar({ title, subtitle, children }) {
       </div>
       <div className="text-[11px] tabular-nums hidden sm:flex items-center gap-1.5 flex-shrink-0 px-3 py-1.5 rounded-lg"
            style={{ fontFamily: "'Inter',system-ui,sans-serif", color: "var(--text-dim)", background: "var(--surface-raised)", border: "1px solid var(--border-subtle)" }}>
-        {timeStr}
+        <TopbarClock />
       </div>
       {children && <div className="page-header-actions flex items-center gap-2 flex-wrap">{children}</div>}
     </div>

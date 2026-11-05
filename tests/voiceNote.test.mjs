@@ -8,6 +8,7 @@ import {
   VOICE_TRANSCRIBE_FN, VOICE_TRANSCRIBE_MAX_BYTES, bytesToBase64, blobToBase64, readTranscribeResult,
   transcribeVoiceBlob, fillTranscript, tidySpoken, appendSpoken, isAppleMobile, VOICE_WRITE_PROMPT,
   isAndroid, canDictateWhileRecording, mergeSpeechResults, encodeWav16, VOICE_WAV_RATE, voiceFailText,
+  canDictateAlone, VOICE_SERVER_WAIT_MS, swapLiveText, trimSilence,
 } from "../src/utils/voiceNote.js";
 
 test("max length is 60 seconds", () => assert.equal(VOICE_MAX_SECONDS, 60));
@@ -211,4 +212,36 @@ test("voiceFailText: friendly mic-blocked text; retry hint only when phone dicta
   assert.equal(voiceFailText("not allowed"), "Mic is off — allow it in the browser");
   assert.equal(voiceFailText("Transcription service error (502)"), VOICE_WRITE_PROMPT);
   assert.equal(voiceFailText("x", true), `${VOICE_WRITE_PROMPT} — or tap 🎤 again`);
+});
+
+// ── 2026-11-05 speed ──
+test("Android dictates alone (instant words); desktop + iPhone do not", () => {
+  assert.equal(canDictateAlone(AND), true);
+  assert.equal(canDictateAlone(WIN), false);
+  assert.equal(canDictateAlone(IPH), false);
+  assert.equal(VOICE_SERVER_WAIT_MS, 6000);
+});
+test("swapLiveText: server text replaces our live words at the end; edited box is left alone", () => {
+  assert.equal(swapLiveText("The belt is loose.", "The belt is loose.", "बेल्ट ढीला है।"), "बेल्ट ढीला है।");
+  assert.equal(swapLiveText("Checked. The belt is loose.", "The belt is loose.", "Belt loose."), "Checked. Belt loose.");
+  assert.equal(swapLiveText("Checked. The belt is loose.  ", "The belt is loose.", "Belt loose."), "Checked. Belt loose.");
+  assert.equal(swapLiveText("The belt is loose. And more typed", "The belt is loose.", "X."), "The belt is loose. And more typed");
+  assert.equal(swapLiveText("Typed over", "The belt is loose.", "X."), "Typed over");
+  assert.equal(swapLiveText("abc", "", "X."), "abc");
+  assert.equal(swapLiveText("abc", "abc", ""), "abc");
+});
+test("trimSilence: cuts quiet lead-in and tail, keeps padding; all-quiet clip unchanged", () => {
+  const rate = 16000;
+  const a = new Float32Array(rate * 5); // 5 s
+  for (let i = rate * 1; i < rate * 3; i++) a[i] = Math.sin(i / 5) * 0.3; // sound from 1 s to 3 s
+  const t = trimSilence(a, rate);
+  const secs = t.length / rate;
+  assert.ok(secs > 2.4 && secs < 2.6, `kept ${secs}s`);
+  assert.ok(Math.abs(t[Math.round(0.25 * rate) + 10]) > 0 || Math.abs(t[Math.round(0.25 * rate) + 20]) > 0);
+  const quiet = new Float32Array(rate);
+  assert.equal(trimSilence(quiet, rate), quiet);
+  const loud = new Float32Array(rate).fill(0.5);
+  assert.equal(trimSilence(loud, rate), loud);
+  assert.equal(trimSilence(new Float32Array(0), rate).length, 0);
+  assert.deepEqual(Array.from(trimSilence([0, 0, 0.5, 0], 1000, { frameMs: 1, padMs: 0 })), [0.5]);
 });

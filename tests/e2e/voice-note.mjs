@@ -16,11 +16,11 @@ const { ok, done } = makeOk();
 
 const fakeMedia = () => {
   window.__played = 0; window.__micBlocked = false; window.__srStarts = 0; window.__srSay = "um the belt is loose uh"; window.__srOff = false;
-  window.__say = "बेल्ट ढीला है।"; window.__fail = false; window.__calls = 0; window.__streamsOpen = 0;
+  window.__say = "बेल्ट ढीला है।"; window.__fail = false; window.__calls = 0; window.__streamsOpen = 0; window.__srvMs = 400; window.__gum = 0;
   navigator.mediaDevices = navigator.mediaDevices || {};
   navigator.mediaDevices.getUserMedia = async () => {
     if (window.__micBlocked) { const e = new Error("Permission denied"); e.name = "NotAllowedError"; throw e; }
-    window.__streamsOpen++;
+    window.__streamsOpen++; window.__gum++;
     return { getTracks: () => [{ stop() { window.__streamsOpen--; } }] };
   };
   class FakeRecorder {
@@ -42,7 +42,7 @@ const fakeMedia = () => {
   }
   window.SpeechRecognition = FakeSR; window.webkitSpeechRecognition = FakeSR;
   window.__erpVoiceTranscribe = async () => {
-    window.__calls++; await new Promise((r) => setTimeout(r, 400));
+    window.__calls++; await new Promise((r) => setTimeout(r, window.__srvMs));
     return window.__fail ? { data: { error: "Transcription service error (500)" }, error: null } : { data: { text: window.__say }, error: null };
   };
   HTMLMediaElement.prototype.play = function () { window.__played++; return Promise.resolve(); };
@@ -84,10 +84,14 @@ ok("tap → 'Listening… 0:0x' with Stop inside the box", /Listening…\s*0:0[1
 const barB = await rec.locator("[data-voice-live]").boundingBox(); const boxB2 = await box.boundingBox();
 ok("listening bar sits inside the box", barB && barB.y >= boxB2.y - 1 && barB.y + barB.height <= boxB2.y + boxB2.height + 1, JSON.stringify({ barB, boxB2 }));
 ok("live words preview while listening", (await rec.locator("[data-voice-preview]").innerText().catch(() => "")).includes("The belt is loose"));
-await rec.locator("[data-voice-stop]").click(); await p.waitForTimeout(150);
-ok("after Stop: 'Writing…' shows", (await rec.locator("[data-voice-writing]").innerText().catch(() => "")).includes("Writing…"));
+// 2026-11-05 (speed): live words go into the box at once; the server's text replaces them
+const tStop = Date.now(); await rec.locator("[data-voice-stop]").click();
+await p.waitForFunction(() => (document.querySelector("#raise-desc") || {}).value, null, { timeout: 3000 }).catch(() => {});
+const instantMs = Date.now() - tStop; const firstText = await box.inputValue();
+ok("after Stop: live words are in the box at once (tidied), no waiting", firstText === "The belt is loose." && instantMs < 700, `${instantMs} ms: ${firstText}`);
+ok("no 'Writing…' wait while the server works", await rec.locator("[data-voice-writing]").count() === 0);
 await p.waitForTimeout(900);
-ok("server words are written INTO the box (Devanagari, no translation)", (await box.inputValue()) === "बेल्ट ढीला है।", await box.inputValue());
+ok("server words then replace the live words in the box (Devanagari, no translation)", (await box.inputValue()) === "बेल्ट ढीला है।", await box.inputValue());
 ok("mic released after Stop", await p.evaluate(() => window.__streamsOpen) === 0);
 ok("no audio saved, no player, no 'saved' chip", await audioCount() === 1 && await rec.locator("[data-voice-player], [data-voice-saved], audio").count() === 0);
 ok("🎤 is back, no error", await rec.locator("[data-voice-record]").count() === 1 && await rec.locator("[data-voice-error], [data-voice-writing]").count() === 0);
@@ -103,6 +107,19 @@ await rec.locator("[data-voice-record]").click(); await p.waitForTimeout(600);
 await rec.locator("[data-voice-stop]").click(); await p.waitForTimeout(1100);
 ok("server failed → live words kept, tidied (filler out, capital, full stop)", (await box.inputValue()) === "Checked. The belt is loose.", await box.inputValue());
 ok("no error shown when live words were kept", await rec.locator("[data-voice-error]").count() === 0);
+// Server slower than 6 s → live words stay; the late answer does not overwrite them
+await box.fill(""); await p.evaluate(() => { window.__fail = false; window.__srvMs = 7500; window.__say = "Late server words."; });
+await rec.locator("[data-voice-record]").click(); await p.waitForTimeout(500);
+await rec.locator("[data-voice-stop]").click(); await p.waitForTimeout(8200);
+ok("server slower than 6 s → live words stay, not replaced late", (await box.inputValue()) === "The belt is loose.", await box.inputValue());
+// Worker edits the live words before the server answers → the edit is kept
+await box.fill(""); await p.evaluate(() => { window.__srvMs = 1200; });
+await rec.locator("[data-voice-record]").click(); await p.waitForTimeout(500);
+await rec.locator("[data-voice-stop]").click(); await p.waitForTimeout(500);
+await box.fill((await box.inputValue()) + " Also oil low.");
+await p.waitForTimeout(1300);
+ok("worker's edit before the server answer is kept", (await box.inputValue()) === "The belt is loose. Also oil low.", await box.inputValue());
+await p.evaluate(() => { window.__srvMs = 400; window.__say = "बेल्ट ढीला है।"; window.__fail = true; });
 // Both fail → red box + short message
 await box.fill(""); await p.evaluate(() => { window.__srOff = true; });
 await rec.locator("[data-voice-record]").click(); await p.waitForTimeout(500);
@@ -174,6 +191,29 @@ if (await issueBtn.count()) {
   await r2.locator("[data-voice-stop]").click(); await p.waitForTimeout(1100);
   ok("admin: words in the box, no Remove / player", (await p.locator("#raise-desc").inputValue()).length > 0 && await r2.locator("[data-voice-remove], [data-voice-player]").count() === 0);
 } else ok("admin Report Issue button found", false);
+
+// ── Android Chrome (2026-11-05): phone dictation ALONE → words at once, recorder not started ──
+{
+  const actx = await b.newContext({ viewport: { width: 1200, height: 1000 }, userAgent: "Mozilla/5.0 (Linux; Android 14; SM-A146B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36" });
+  await actx.addInitScript(fakeMedia);
+  const ap = await actx.newPage(); ap.on("pageerror", (e) => errs.push(String(e).slice(0, 200)));
+  await ap.goto(BASE, { waitUntil: "networkidle" }); await ap.evaluate(seed); await ap.reload({ waitUntil: "networkidle" }); await ap.waitForTimeout(500);
+  await ap.addStyleTag({ content: ".fixed.bottom-0.inset-x-0.z-\\[200\\]{display:none!important}" });
+  await login(ap, "mech", "mech123");
+  await ap.locator("button, a").filter({ hasText: /^Machine Tracker/ }).first().click(); await ap.waitForTimeout(900);
+  await ap.setViewportSize({ width: 390, height: 844 }); await ap.waitForTimeout(400);
+  await ap.locator("[data-staff-issue='1']").click(); await ap.waitForTimeout(500);
+  const arec = ap.locator("[data-voice-recorder='Report Issue']"); const abox = ap.locator("#raise-desc");
+  await ap.evaluate(() => { window.__srSay = "the belt is loose"; });
+  await arec.locator("[data-voice-record]").click(); await ap.waitForTimeout(600);
+  ok("Android: dictation alone — recorder (getUserMedia) not started", (await ap.evaluate(() => window.__gum)) === 0 && (await ap.evaluate(() => window.__srStarts)) === 1);
+  const t0 = Date.now(); await arec.locator("[data-voice-stop]").click();
+  await ap.waitForFunction(() => (document.querySelector("#raise-desc") || {}).value, null, { timeout: 3000 }).catch(() => {});
+  const aMs = Date.now() - t0;
+  ok("Android: words in the box at once after Stop", (await abox.inputValue()) === "The belt is loose." && aMs < 700, `${aMs} ms: ${await abox.inputValue()}`);
+  ok("Android: no server call needed", (await ap.evaluate(() => window.__calls)) === 0);
+  await actx.close();
+}
 
 ok("no page errors", errs.length === 0, errs.join(" | "));
 await done(b);
