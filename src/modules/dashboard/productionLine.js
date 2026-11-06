@@ -107,8 +107,11 @@ export function buildProductionLine({ machines = [], handovers = [], settings = 
   // 3D view (2026-11-06): one entry per machine standing in a work department,
   // with the same words the strip and Needs-attention list use. Display only.
   const onLine = [];
-  const placed = (m, stage, kind, text) => onLine.push({ machine: m, id: m.id, serial: m.serialNo || "", name: m.bomLabel || m.label || m.bomKey || "Machine",
-    bomKey: m.bomKey || "", stage, kind, text });
+  // minutesInDept / targetMinutes (2026-11-06 review): the 3D tag's time bar.
+  const placed = (m, stage, kind, text, minutesInDept = null, targetMinutes = null) => onLine.push({ machine: m, id: m.id, serial: m.serialNo || "", name: m.bomLabel || m.label || m.bomKey || "Machine",
+    bomKey: m.bomKey || "", stage, kind, text, minutesInDept, targetMinutes });
+  // Ready-today machines (3D view shows their own photos on the Ready pad). Display only.
+  const readyList = [];
   const todayKey = localDateKey(now);
   let readyToday = 0, readyTotal = 0, inProduction = 0;
 
@@ -117,7 +120,7 @@ export function buildProductionLine({ machines = [], handovers = [], settings = 
     if (m.status === "completed" || m.stage === "Ready") {
       readyTotal += 1;
       const at = readyAtOf(m);
-      if (at != null && localDateKey(at) === todayKey) readyToday += 1;
+      if (at != null && localDateKey(at) === todayKey) { readyToday += 1; readyList.push({ id: m.id, serial: m.serialNo || "", name: m.bomLabel || m.label || m.bomKey || "Machine", bomKey: m.bomKey || "" }); }
       continue;
     }
     const h = pendingHandoverOf(m, handovers);
@@ -149,9 +152,10 @@ export function buildProductionLine({ machines = [], handovers = [], settings = 
         const row = attnRow(m, h.toDepartment, "hold", waited, null, reason, "hold", overdue ? heldMinutes(h.sentAt, h.acceptTimeoutMinutes, now) : null);
         row.waitingAccept = true;
         attention.push(row);
-        if (to !== "Rack" && to !== "Ready") placed(m, to, "hold", `On hold${reason ? ` – ${reason}` : ""}`);
+        if (to !== "Rack" && to !== "Ready") placed(m, to, "hold", `On hold${reason ? ` – ${reason}` : ""}`, waited, null);
       } else if (to !== "Rack" && to !== "Ready") {
-        placed(m, to, "incoming", `Waiting to accept · ${formatDuration(computeOverrun(h.sentAt, h.acceptTimeoutMinutes, now).actualMinutes)}`);
+        const waited = computeOverrun(h.sentAt, h.acceptTimeoutMinutes, now).actualMinutes;
+        placed(m, to, "incoming", `Waiting to accept · ${formatDuration(waited)}`, waited, h.acceptTimeoutMinutes || null);
       }
       continue;
     }
@@ -165,22 +169,22 @@ export function buildProductionLine({ machines = [], handovers = [], settings = 
       st.hold += 1;
       if (!st.holdReason) st.holdReason = m.holdReason || "";
       attention.push(attnRow(m, here, "hold", t.actualMinutes, target, m.holdReason || "", "hold"));
-      placed(m, here, "hold", `On hold${m.holdReason ? ` – ${String(m.holdReason).trim()}` : ""}`);
+      placed(m, here, "hold", `On hold${m.holdReason ? ` – ${String(m.holdReason).trim()}` : ""}`, m.departmentEnteredAt ? t.actualMinutes : null, target);
       continue;
     }
     if (level === "late") {
       st.late += 1;
       st.worstLateMinutes = Math.max(st.worstLateMinutes, t.overrunMinutes);
       attention.push(attnRow(m, here, "late", t.actualMinutes, target, "", "active", t.overrunMinutes));
-      placed(m, here, "late", `Late ${formatDuration(t.overrunMinutes)}`);
+      placed(m, here, "late", `Late ${formatDuration(t.overrunMinutes)}`, t.actualMinutes, target);
     } else if (level === "near") {
       st.near += 1;
       const left = Math.max(0, target - t.actualMinutes);
       st.nearLeftMinutes = st.nearLeftMinutes == null ? left : Math.min(st.nearLeftMinutes, left);
-      placed(m, here, "near", `Near limit · ${formatDuration(left)} left`);
+      placed(m, here, "near", `Near limit · ${formatDuration(left)} left`, t.actualMinutes, target);
     } else {
       st.ok += 1;
-      placed(m, here, "ok", m.departmentEnteredAt ? `On time · ${formatDuration(t.actualMinutes)} in dept` : "On time");
+      placed(m, here, "ok", m.departmentEnteredAt ? `On time · ${formatDuration(t.actualMinutes)} in dept` : "On time", m.departmentEnteredAt ? t.actualMinutes : null, target);
     }
   }
 
@@ -192,7 +196,7 @@ export function buildProductionLine({ machines = [], handovers = [], settings = 
   attention.sort((a, b) => (a.kind === b.kind ? (b.overMinutes || 0) - (a.overMinutes || 0) : a.kind === "hold" ? -1 : 1));
   const targets = {};
   for (const d of WORK_DEPTS) targets[d] = targetMinutesFor(null, d, wf);
-  return { stages: list, attention, onLine, readyToday, readyTotal, inProduction, targets, legend: lineLegend(targets) };
+  return { stages: list, attention, onLine, readyList, readyToday, readyTotal, inProduction, targets, legend: lineLegend(targets) };
 }
 
 function attnRow(m, department, kind, minutesInDept, targetMinutes, reason, filter, overMinutes = null) {
@@ -245,3 +249,34 @@ export function lineSummary(line) {
   if (parts.length) return parts.join(" · ");
   return (line && line.inProduction > 0) ? "All on time" : "No machines in production";
 }
+
+// ── 3D view helpers (review 2026-11-06). Pure, display only. ──
+const PRIORITY = { hold: 0, late: 1, near: 2, incoming: 3, ok: 4 };
+// Machines shown per department: the most urgent first, at most `cap`; the rest
+// become "+N more". Pure (unit-tested).
+export function visibleOnLine(items, cap) {
+  const by = {};
+  for (const it of items) (by[it.stage] = by[it.stage] || []).push(it);
+  const shown = [], more = {};
+  for (const [stage, list] of Object.entries(by)) {
+    const sorted = list.slice().sort((a, b) => (PRIORITY[a.kind] ?? 9) - (PRIORITY[b.kind] ?? 9));
+    shown.push(...sorted.slice(0, cap));
+    if (sorted.length > cap) more[stage] = sorted.length - cap;
+  }
+  return { shown, more };
+}
+
+// Short words for the one-line tag + the time bar share (time used vs target).
+export function tagStatus(it) {
+  const used = it.minutesInDept, target = it.targetMinutes;
+  const share = used != null && target > 0 ? Math.min(1, used / target) : null;
+  const of = used != null && target > 0 ? `${formatDuration(used)} of ${formatDuration(target)}` : "";
+  let words;
+  if (it.kind === "hold") words = it.text;
+  else if (it.kind === "late") words = it.text;
+  else if (it.kind === "near") words = of ? `Near limit · ${of}` : "Near limit";
+  else if (it.kind === "incoming") words = "Waiting to accept";
+  else words = of || "On time";
+  return { words, share: it.kind === "late" ? 1 : share };
+}
+

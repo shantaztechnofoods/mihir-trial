@@ -213,3 +213,51 @@ test("dashboard 3D: white background cut-out keeps white parts inside the machin
   assert.equal(px[(2 * w + 2) * 4 + 3], 255, "white centre inside the machine stays opaque");
   assert.equal(px[(1 * w + 1) * 4 + 3], 255, "dark machine pixels stay opaque");
 });
+
+// ── 3D view review (2026-11-06): edge cases fixed in the review PR ──
+test("dashboard 3D: tag time bar data + ready-today list come from the same rules", () => {
+  const r = buildProductionLine({ now: NOW, settings: ONE_DAY, machines: [
+    { id: 2, serialNo: "SN-2", bomKey: "M-10", stage: "Assembly", currentDepartment: "Assembly", status: "active", departmentEnteredAt: iso(at(6, 10)) },
+    { id: 3, serialNo: "SN-3", bomKey: "R-10", stage: "Mechanical", currentDepartment: "Mechanical", status: "active", departmentEnteredAt: iso(at(2, 12)) },
+    { id: 4, serialNo: "SN-4", bomKey: "R-10", stage: "Trial", currentDepartment: "Trial", status: "active", holdActive: true, holdReason: "Motor" },
+    { id: 5, serialNo: "SN-5", bomKey: "M-15", stage: "Ready", status: "completed", history: [{ stage: "Ready", at: iso(at(6, 9)) }] },
+    { id: 6, serialNo: "SN-6", bomKey: "M-15", stage: "Ready", status: "completed", history: [{ stage: "Ready", at: iso(at(2, 9)) }] },
+  ] });
+  const by = Object.fromEntries(r.onLine.map((e) => [e.id, e]));
+  assert.equal(by[2].minutesInDept, 120); assert.equal(by[2].targetMinutes, 1440);
+  assert.ok(by[3].minutesInDept > 1440, "late machine carries its time in dept");
+  assert.equal(by[4].minutesInDept, null, "no entry time → no invented time");
+  assert.deepEqual(r.readyList.map((m) => m.id), [5], "only machines ready TODAY stand on the Ready pad");
+  assert.equal(r.readyList.length, r.readyToday);
+});
+
+test("dashboard 3D: tag words + bar share", async () => {
+  const { tagStatus } = await import("../src/modules/dashboard/productionLine.js");
+  assert.deepEqual(tagStatus({ kind: "ok", text: "On time · 2h in dept", minutesInDept: 120, targetMinutes: 1440 }), { words: "2h of 1d", share: 120 / 1440 });
+  assert.equal(tagStatus({ kind: "late", text: "Late 3h", minutesInDept: 1620, targetMinutes: 1440 }).share, 1);
+  assert.equal(tagStatus({ kind: "late", text: "Late 3h", minutesInDept: 1620, targetMinutes: 1440 }).words, "Late 3h");
+  assert.deepEqual(tagStatus({ kind: "hold", text: "On hold – Motor", minutesInDept: null, targetMinutes: null }), { words: "On hold – Motor", share: null });
+  assert.equal(tagStatus({ kind: "ok", text: "On time", minutesInDept: null, targetMinutes: 1440 }).words, "On time");
+});
+
+test("dashboard 3D: 25+ machines in one department → most urgent shown, rest '+N more'; 0 and 1 machines fine", async () => {
+  const { visibleOnLine } = await import("../src/modules/dashboard/productionLine.js");
+  const many = Array.from({ length: 26 }, (_, i) => ({ id: i, stage: "Assembly", kind: i === 20 ? "hold" : i === 21 ? "late" : "ok" }));
+  const v = visibleOnLine([...many, { id: 99, stage: "Trial", kind: "ok" }], 6);
+  assert.equal(v.shown.filter((x) => x.stage === "Assembly").length, 6);
+  assert.equal(v.more.Assembly, 20);
+  assert.deepEqual(v.shown.slice(0, 2).map((x) => x.id), [20, 21], "on hold and late are never hidden behind +N more");
+  assert.equal(v.more.Trial, undefined);
+  assert.deepEqual(visibleOnLine([], 6), { shown: [], more: {} });
+  assert.equal(visibleOnLine([{ id: 1, stage: "Trial", kind: "ok" }], 3).shown.length, 1);
+});
+
+test("dashboard 3D: zone grid packs machines in two staggered rows and grows with the count", async () => {
+  const { zoneGrid } = await import("../src/modules/dashboard/line3d.js");
+  assert.equal(zoneGrid([]).cells.length, 0);
+  assert.equal(zoneGrid(["a"]).rows, 1);
+  const g = zoneGrid(["a", "b", "c", "d", "e", "f"]);
+  assert.equal(g.rows, 2); assert.equal(g.cols, 3);
+  assert.deepEqual(g.cells.map((c) => c.row), [0, 0, 0, 1, 1, 1]);
+  assert.ok(zoneGrid(["a", "b", "c", "d"]).width < g.width && zoneGrid(["a"]).width > 0);
+});
