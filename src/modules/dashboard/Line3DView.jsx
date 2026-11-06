@@ -45,9 +45,9 @@ const isDark = () => document.documentElement.getAttribute("data-theme") === "da
 // counted in the zone chip). Returns nothing; writes transforms.
 const RANK = { hold: 0, late: 1, near: 2, incoming: 3, ok: 4 };
 const TAG_TOP = 50; // the header strip (big numbers) owns the top band
-function layoutTags(host, ms, stageW, onlySn = null) {
+function layoutTags(host, ms, stageW, onlySn = null, top = TAG_TOP) {
   if (!host) return;
-  const GAP = 6, TOP = TAG_TOP;
+  const GAP = 6, TOP = top; let CLEAR = 10; // a leader keeps 10 px clear of every other tag (4 px when a late / on-hold tag would otherwise hide)
   // Zoomed in on one machine: only its tag (the others are off to the side).
   if (onlySn) for (const s of ms) { const el = host.querySelector(`[data-sn="${CSS.escape(s.sn)}"]`); if (el && s.sn !== onlySn) el.setAttribute("data-hidden", ""); }
   const els = ms.filter((s) => !onlySn || s.sn === onlySn).map((s) => ({ ...s, el: host.querySelector(`[data-sn="${CSS.escape(s.sn)}"]`) })).filter((s) => s.el);
@@ -78,8 +78,8 @@ function layoutTags(host, ms, stageW, onlySn = null) {
         const cand = lx(k); if (!fits(cand) && k !== 0) continue;
         const bot = base - r * rowH, top = bot - th;
         const okBoxes = boxes.every((b) => cand + w + GAP <= b.l || cand >= b.r + GAP || bot + 3 <= b.t || top >= b.b + 3);
-        const okMine = boxes.every((b) => s.x < b.l - 4 || s.x > b.r + 4 || b.b <= bot || b.t >= s.y);
-        const okTheirs = leaders.every((L) => L.x < cand - 4 || L.x > cand + w + 4 || top >= L.y1 || bot <= L.y0);
+        const okMine = boxes.every((b) => s.x < b.l - CLEAR || s.x > b.r + CLEAR || b.b <= bot || b.t >= s.y);
+        const okTheirs = leaders.every((L) => L.x < cand - CLEAR || L.x > cand + w + CLEAR || top >= L.y1 || bot <= L.y0);
         if (okBoxes && okMine && okTheirs) { row = r; l = cand; break; }
       }
       if (row < 0) { if (!allowHide) return null; out.push([s, l, -1, 0]); continue; }
@@ -98,8 +98,12 @@ function layoutTags(host, ms, stageW, onlySn = null) {
     const score = (o) => { let urgent = 0, hidden = 0; for (const [s, , r] of o.out) if (r < 0) { hidden++; if (!(s.el.dataset.s === "ok" || s.el.dataset.s === "incoming")) urgent++; } return urgent * 1000 + hidden; };
     let best = null;
     for (const v of variants) { const sc = score(place(v[0], v[1], true, v[2])); if (!best || sc < best.sc) best = { v, sc }; }
+    if (best.sc >= 1000) { CLEAR = 4; best = null; for (const v of variants) { const sc = score(place(v[0], v[1], true, v[2])); if (!best || sc < best.sc) best = { v, sc }; } }
     res = place(best.v[0], best.v[1], true, best.v[2]); // re-apply the chosen variant (sets compact flags)
   }
+  // v8: say how many calm tags had no room, so nothing looks lost
+  const note = host.parentElement?.querySelector("[data-hidden-note]");
+  if (note) { const n = onlySn ? 0 : res.out.filter((o) => o[2] < 0).length; note.textContent = n ? `+${n} more · tap a machine` : ""; note.toggleAttribute("hidden", !n); }
   for (const [s, l, r, y] of res.out) {
     if (r < 0) { s.el.setAttribute("data-hidden", ""); continue; }
     s.el.style.transform = `translate(${l}px,${Math.round(y)}px) translateY(-100%)`;
@@ -143,12 +147,14 @@ export default function Line3DView({ line, bomDefs = {}, onOpenMachine, onFail }
   const [mountN, setMountN] = useState(0);
   const [hot, setHot] = useState(null);
   const [sel, setSel] = useState(null);
+  const kpisRef = useRef(null);
+  const [wb, setWb] = useState(0); // width bucket: plates are re-drawn for a much wider / narrower panel
   const selRef = useRef(null); selRef.current = sel;
 
   // Fewer machines per department when the panel is narrow (tags must fit).
   useEffect(() => {
     const el = stageRef.current; if (!el || typeof ResizeObserver === "undefined") return undefined;
-    const ro = new ResizeObserver(() => setCap(el.clientWidth < 700 ? 3 : el.clientWidth < 1000 ? 4 : 6));
+    const ro = new ResizeObserver(() => { setCap(el.clientWidth < 700 ? 3 : el.clientWidth < 1000 ? 4 : 6); setWb(Math.round(el.clientWidth / 160)); });
     ro.observe(el); return () => ro.disconnect();
   }, []);
   // Follow the light / petrol-dark switch while the 3D view is open.
@@ -206,7 +212,8 @@ export default function Line3DView({ line, bomDefs = {}, onOpenMachine, onFail }
       }
       const ms = api.machineScreen(), mk = ms.map((s) => s.x.toFixed(0) + "," + s.y.toFixed(0)).join("|") + "|" + (stageRef.current?.clientWidth || 0);
       const only = api.isZoomed() ? selRef.current : null;
-      if (mk + only !== tagKey) { tagKey = mk + only; layoutTags(tagsRef.current, ms, stageRef.current?.clientWidth || 1000, only); }
+      const top = (kpisRef.current?.offsetHeight || 46) + 4;
+      if (mk + only + top !== tagKey) { tagKey = mk + only + top; layoutTags(tagsRef.current, ms, stageRef.current?.clientWidth || 1000, only, top); }
     };
     api.kick();
     // Re-run the tag layout when a tag's width changes after it was placed (the web
@@ -217,7 +224,7 @@ export default function Line3DView({ line, bomDefs = {}, onOpenMachine, onFail }
     try { document.fonts?.ready?.then(() => { if (apiRef.current === api) relayout(); }); } catch { /* no font API */ }
     if (typeof window !== "undefined") window.__dash3d = api; // e2e hook (renderer.info)
     return () => { if (tro) tro.disconnect(); api.stop(); if (apiRef.current === api) apiRef.current = null; if (window.__dash3d === api) window.__dash3d = null; };
-  }, [photos, mountN]);
+  }, [photos, mountN, wb]);
 
   // 3. Live data: a dept change glides; anything structural remounts.
   const live = machines.map((m) => `${m.id}:${m.z}:${m.state}:${m.share == null ? "-" : Math.round(m.share * 72)}`).join("|");
@@ -264,7 +271,7 @@ export default function Line3DView({ line, bomDefs = {}, onOpenMachine, onFail }
     <div className="f3-wrap" data-floor-3d>
       <div className={`f3-stage${hot || sel ? " is-focus" : ""}${sel ? " is-zoom" : ""}`} ref={stageRef}>
         <div className="f3-gl" ref={glRef} role="img" aria-label={summary} />
-        <div className="f3-kpis" data-3d-kpis role="group" aria-label={kpis.map((x) => `${x.n} ${x.label.toLowerCase()}`).join(", ")}>
+        <div className="f3-kpis" ref={kpisRef} data-3d-kpis role="group" aria-label={kpis.map((x) => `${x.n} ${x.label.toLowerCase()}`).join(", ")}>
           {kpis.map((x) => (
             <div key={x.k} className="f3-kpi" data-k={x.k} data-zero={x.n === 0 ? "" : undefined}>
               <Odo n={x.n} /><span className="f3-kl">{x.label}</span>
@@ -273,6 +280,7 @@ export default function Line3DView({ line, bomDefs = {}, onOpenMachine, onFail }
           <div className="f3-legend" aria-hidden="true">
             <span data-t="ok">On time</span><span data-t="near">Near limit</span><span data-t="late">Late</span><span data-t="hold">On hold</span>
           </div>
+          <span className="f3-hidden-note" data-hidden-note hidden />
         </div>
         <div className="f3-tags" ref={tagsRef}>
           {items.map((it) => {
@@ -322,7 +330,7 @@ export default function Line3DView({ line, bomDefs = {}, onOpenMachine, onFail }
           return (
             <div key={st.key} className="f3-chip" data-t={c.t} data-chip={st.key} title={`${st.label}: ${st.count} · ${c.s}`} aria-label={`${st.label}: ${st.count}, ${c.s}`}>
               <em>{st.count}</em>
-              <span className="f3-cs">{ICON[c.t] && <u aria-hidden="true">{ICON[c.t]}</u>}{c.s}</span>
+              <span className="f3-cs">{ICON[c.t] && <u aria-hidden="true">{ICON[c.t]}</u>}{String(c.s).split(" – ")[0]}</span>
             </div>
           );
         })}
