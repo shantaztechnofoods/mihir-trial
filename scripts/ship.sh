@@ -60,7 +60,7 @@ guards(){
   [ "$a" = "$t" ] || die "build tags differ: src/shared/buildInfo.js=$a main.jsx=$t"
   say "guards ok (screen code removed=$removed, build tag=$a)"
 }
-cmd_bump(){ [ -n "${1:-}" ] || die "usage: bump <tag>"; sed -i -E "s/(APP_BUILD = \")[^\"]*(\")/\1$1\2/" src/shared/buildInfo.js; sed -i -E "s/(APP_BUILD_TAG = \")[^\"]*(\")/\1$1\2/" src/main.jsx; guards; }
+cmd_bump(){ echo "note: the build tag is automatic now (scripts/vite-build-id.mjs); keep both source constants at \"auto\". bump is only for an emergency manual tag."; [ -n "${1:-}" ] || die "usage: bump <tag>"; sed -i -E "s/(APP_BUILD = \")[^\"]*(\")/\1$1\2/" src/shared/buildInfo.js; sed -i -E "s/(APP_BUILD_TAG = \")[^\"]*(\")/\1$1\2/" src/main.jsx; guards; }
 
 # ── shared heavy-job lock: builds + browser suites take turns on the shared CPUs ──
 LOCK="${SHIP_LOCK:-/tmp/aud/heavy.lock}"
