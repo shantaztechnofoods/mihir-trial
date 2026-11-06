@@ -35,6 +35,7 @@ bad=0
 for s in "${SUITES[@]}"; do
   read -r rc secs <"$LOGS/$s.rc" 2>/dev/null || { rc=99; secs=0; }
   printf '%-30s %4ss  %s\n' "$s" "$secs" "$(tail -1 "$LOGS/$s.log" | tr -d '\n')"
+  grep -h "^cpu benchmark" "$LOGS/$s.log" 2>/dev/null | sort -u | sed "s/^/  /" || true
   if [ "$rc" != 0 ]; then bad=1; echo "::group::FAILED $s (exit $rc)"; grep -E "FAIL|Error|error" "$LOGS/$s.log" | head -40; tail -30 "$LOGS/$s.log"; echo "::endgroup::"; echo "::error::e2e suite $s failed (exit $rc)"; fi
 done
 exit $bad
