@@ -104,5 +104,11 @@
 .f3-legend [data-t="near"]::before { background: var(--wait, #d97706); }
 .f3-legend [data-t="late"]::before { background: var(--bad, #dc2626); }
 .f3-legend [data-t="hold"]::before { background: #7c3aed; }
-@container (max-width: 900px) { .f3-kpis { gap: 12px; padding: 0 12px; } .f3-kpi + .f3-kpi { padding-left: 12px; } .f3-odo { font-size: 20px; } .f3-kl { font-size: 10px; } .f3-legend { display: none; } }
+@container (max-width: 900px) {
+  .f3-kpis { gap: 4px 12px; padding: 6px 12px 0; height: auto; flex-wrap: wrap; align-items: baseline; } .f3-kpi + .f3-kpi { padding-left: 12px; } .f3-odo { font-size: 20px; } .f3-kl { font-size: 10px; }
+  /* v8: compact legend on its own line instead of hidden */
+  .f3-legend { order: 9; margin-left: 0; gap: 10px; font-size: 10px; } .f3-hidden-note { order: 10; margin-left: auto; }
+}
+.f3-hidden-note { font: 500 10.5px/1 var(--font-ui, Inter, sans-serif); color: var(--ink-3, #64748b); white-space: nowrap; }
+.f3-hidden-note[hidden] { display: none; }
 @media (prefers-reduced-motion: reduce) { .f3-od > span { transition: none; } }
