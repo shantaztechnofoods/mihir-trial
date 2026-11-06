@@ -64,7 +64,12 @@ test("beforeSend scrubs emails, phones, passwords, tokens and Supabase keys", ()
   assert.equal(ev.request.headers["User-Agent"], "UA");
   assert.equal(ev.extra.count, 12);
   assert.match(ev.exception.values[0].type, /^Error$/);
-  // ordinary numbers / quantities survive
+  // trace ids keep their digits (no mid-word phone match), quantities survive
+  const t = scrubEvent({ contexts: { trace: { trace_id: "ab12345678901234567890cdef123456", span_id: "a1234567890bcdef" } }, message: "id x1234567890 ok" });
+  assert.equal(t.contexts.trace.trace_id, "ab12345678901234567890cdef123456");
+  assert.equal(t.contexts.trace.span_id, "a1234567890bcdef");
+  assert.equal(t.message, "id x1234567890 ok");
+  assert.equal(scrubString("call (022) 2345-6789 now"), "call [phone] now");
   assert.equal(scrubString("Qty 250 of item 1042 at 14:05"), "Qty 250 of item 1042 at 14:05");
 });
 

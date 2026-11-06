@@ -56,7 +56,8 @@ const RULES = [
   [/\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]{8,}/gi, "$1 " + F],
   [/((?:pass(?:word|wd)?|pwd|token|secret|api[-_]?key|apikey|access_token|refresh_token|auth)["']?\s*[:=]\s*["']?)[^\s"'&,;}]+/gi, "$1" + F],
   [/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, "[email]"],
-  [/(?:\+?\d{1,3}[\s-]?)?(?:\(?\d{2,5}\)?[\s-]?)?\d{3,5}[\s-]?\d{4,5}\b/g, (m) => (m.replace(/\D/g, "").length >= 10 ? "[phone]" : m)],
+  // phone numbers: 10-13 digits with optional + / spaces / dashes / brackets, never inside a word or hex id
+  [/(^|[^\w+])(\+?\(?\d[\d\s()-]{8,20}\d)(?![\w])/g, (m, pre, num) => { const n = num.replace(/\D/g, "").length; return n >= 10 && n <= 13 ? pre + "[phone]" : m; }],
 ];
 
 export function scrubString(s) {
@@ -66,12 +67,15 @@ export function scrubString(s) {
   return out;
 }
 
+// ids and SDK fields that must reach Sentry unchanged (trace linking, grouping)
+const KEEP_KEY = /^(trace_id|span_id|parent_span_id|event_id|replay_id|profile_id|release|environment|platform|sdk|timestamp|start_timestamp|lineno|colno|function|module|filename|abs_path)$/;
+
 export function scrubValue(v, depth = 0) {
   if (typeof v === "string") return scrubString(v);
   if (!v || typeof v !== "object" || depth > 8) return v;
   if (Array.isArray(v)) return v.map((x) => scrubValue(x, depth + 1));
   const out = {};
-  for (const [k, x] of Object.entries(v)) out[k] = SENSITIVE_KEY.test(k) && x != null && typeof x !== "object" ? F : scrubValue(x, depth + 1);
+  for (const [k, x] of Object.entries(v)) out[k] = KEEP_KEY.test(k) ? x : SENSITIVE_KEY.test(k) && x != null && typeof x !== "object" ? F : scrubValue(x, depth + 1);
   return out;
 }
 
