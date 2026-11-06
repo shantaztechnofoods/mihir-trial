@@ -291,6 +291,9 @@ export function mountLine(host, { zones, machines, ready = [], rackCount = 0, da
       const measure = () => { g.font = `800 ${fs}px ${font}`; const nw = [...name].reduce((a, c) => a + g.measureText(c).width + sp(), 0); g.font = `500 ${fs * 0.82}px ${font}`; return nw + (head ? g.measureText("   " + head).width : 0); };
       const avail = w - h * 0.62;
       if (measure() > avail && head) head = ""; // the name stays big; the head is in the tag + summary too
+      // v8: the head's name only when it renders at 11 px or more on this screen (else it is in the tag + summary)
+      const ppu = Math.max(1, host.clientWidth || 1000) * 0.96 / TOT, pxPerTexel = (sh * ppu * 0.91) / h;
+      if (head && fs * 0.82 * pxPerTexel < 11) head = "";
       if (measure() > avail) fs *= avail / measure();
       let x = h * 0.5; g.font = `800 ${fs}px ${font}`; g.fillStyle = "#ffffff";
       for (const c of name) { g.fillText(c, x, h / 2 + 1); x += g.measureText(c).width + sp(); }
