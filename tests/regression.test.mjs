@@ -577,6 +577,11 @@ const USER_FACING_STRINGS = [
   "Must do",
   "data-voice-record",
   "data-voice-stop",
+  // 2026-11-06 — voice search: mic inside the global search (lazy-loaded)
+  "data-voice-search",
+  "Search by voice",
+  "Tap the mic to stop",
+  "createSearchVoice(",
 ];
 
 for (const s of USER_FACING_STRINGS) {
