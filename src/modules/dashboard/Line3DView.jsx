@@ -39,7 +39,8 @@ const isDark = () => document.documentElement.getAttribute("data-theme") === "da
   || (document.documentElement.getAttribute("data-theme") !== "light" && !!window.matchMedia?.("(prefers-color-scheme: dark)").matches);
 
 // Tags never overlap and never leave the stage. Late / on hold tags are placed
-// first (nearest their machine), then the calm ones (compact from the start). When the rows do not fit, calm tags go compact, then all; a calm
+// first (nearest their machine), then the calm ones (compact from the start).
+// Leaders are vertical and never cross a tag (v7). When the rows do not fit, calm tags go compact, then all; a calm
 // tag that still has no room is hidden (its machine stays clickable and is
 // counted in the zone chip). Returns nothing; writes transforms.
 const RANK = { hold: 0, late: 1, near: 2, incoming: 3, ok: 4 };
@@ -52,25 +53,53 @@ function layoutTags(host, ms, stageW, onlySn = null) {
   const els = ms.filter((s) => !onlySn || s.sn === onlySn).map((s) => ({ ...s, el: host.querySelector(`[data-sn="${CSS.escape(s.sn)}"]`) })).filter((s) => s.el);
   if (!els.length) return;
   const order = els.slice().sort((a, b) => (RANK[a.el.dataset.s] ?? 9) - (RANK[b.el.dataset.s] ?? 9) || a.x - b.x);
-  // v6: each tag stacks up from its OWN machine (the 3/4 view puts machines at
-  // different heights), first free slot without touching another tag.
-  const place = (compactCalm, compactAll, allowHide) => {
+  // v7: neat rows on one baseline above the machines. Every leader drops straight
+  // down from its tag to its machine; a tag never sits on another tag's leader and
+  // a leader never runs behind another tag (vertical lines cannot cross).
+  const byX = els.slice().sort((a, b) => a.x - b.x);
+  const place = (compactCalm, compactAll, allowHide, seq = order) => {
     for (const s of els) { const calm = s.el.dataset.s === "ok" || s.el.dataset.s === "incoming"; s.el.toggleAttribute("data-compact", compactAll || (compactCalm && calm)); s.el.removeAttribute("data-hidden"); }
-    const rowH = Math.max(...els.map((s) => s.el.offsetHeight)) + 5, th = rowH - 5;
-    const boxes = [], out = [];
-    for (const s of order) {
-      const w = s.el.offsetWidth, l = Math.round(Math.min(Math.max(4, s.x - w / 2), stageW - w - 4));
-      let y = null, r = 0;
-      for (let yy = Math.max(TOP + th, s.y - 6); yy - th >= TOP; yy -= rowH, r++) {
-        if (boxes.every(([a, t, b, bt]) => l + w + GAP <= a || l >= b + GAP || yy + 3 <= t || yy - th >= bt + 3)) { y = yy; break; }
+    const th = Math.max(...els.map((s) => s.el.offsetHeight)), rowH = th + 5;
+    const base = Math.min(...els.map((s) => s.y)) - 6;
+    const maxRows = Math.max(1, Math.floor((base - TOP) / rowH));
+    const boxes = [], leaders = [], out = [];
+    for (const s of seq) {
+      const w = s.el.offsetWidth;
+      // The tag may slide sideways (its leader stays inside it, still vertical).
+      // Left to right, a tag first leans LEFT (leader near its right end) so it
+      // never covers the next machine's leader; rows go up as needed.
+      const lx = (k) => Math.round(Math.min(Math.max(4, s.x - w / 2 + k * w), stageW - w - 4));
+      const fits = (v) => s.x >= v + 10 && s.x <= v + w - 10;
+      const tries = [];
+      if (seq === byX) { for (const k of [-0.42, -0.3, 0]) for (let r = 0; r < maxRows; r++) tries.push([r, k]); for (const k of [0.3, 0.42]) for (let r = 0; r < maxRows; r++) tries.push([r, k]); }
+      else for (let r = 0; r < maxRows; r++) for (const k of [0, -0.3, 0.3, -0.42, 0.42]) tries.push([r, k]);
+      let row = -1, l = lx(0);
+      for (const [r, k] of tries) {
+        const cand = lx(k); if (!fits(cand) && k !== 0) continue;
+        const bot = base - r * rowH, top = bot - th;
+        const okBoxes = boxes.every((b) => cand + w + GAP <= b.l || cand >= b.r + GAP || bot + 3 <= b.t || top >= b.b + 3);
+        const okMine = boxes.every((b) => s.x < b.l - 4 || s.x > b.r + 4 || b.b <= bot || b.t >= s.y);
+        const okTheirs = leaders.every((L) => L.x < cand - 4 || L.x > cand + w + 4 || top >= L.y1 || bot <= L.y0);
+        if (okBoxes && okMine && okTheirs) { row = r; l = cand; break; }
       }
-      if (y == null) { if (!allowHide) return null; out.push([s, l, -1, 0]); continue; }
-      boxes.push([l, y - th, l + w, y]); out.push([s, l, r, y]);
+      if (row < 0) { if (!allowHide) return null; out.push([s, l, -1, 0]); continue; }
+      const y = base - row * rowH;
+      boxes.push({ l, r: l + w, t: y - th, b: y }); leaders.push({ x: s.x, y0: y, y1: s.y }); out.push([s, l, row, y]);
     }
     return { out, rowH };
   };
   // Calm (on time / waiting) tags start compact; late and on hold stay full.
-  const res = place(true, false, false) || place(true, true, false) || place(true, true, true);
+  // Left to right first (neighbours fall into alternating rows, so every tag fits);
+  // when space is short, the most urgent are placed first and a calm one may hide.
+  let res = place(true, false, false, byX) || place(true, false, false) || place(true, true, false, byX) || place(true, true, false);
+  if (!res) {
+    // Not every tag fits: keep the variant that hides no late / on hold / near tag and the fewest calm ones.
+    const variants = [[true, false, byX], [true, false, order], [true, true, byX], [true, true, order]];
+    const score = (o) => { let urgent = 0, hidden = 0; for (const [s, , r] of o.out) if (r < 0) { hidden++; if (!(s.el.dataset.s === "ok" || s.el.dataset.s === "incoming")) urgent++; } return urgent * 1000 + hidden; };
+    let best = null;
+    for (const v of variants) { const sc = score(place(v[0], v[1], true, v[2])); if (!best || sc < best.sc) best = { v, sc }; }
+    res = place(best.v[0], best.v[1], true, best.v[2]); // re-apply the chosen variant (sets compact flags)
+  }
   for (const [s, l, r, y] of res.out) {
     if (r < 0) { s.el.setAttribute("data-hidden", ""); continue; }
     s.el.style.transform = `translate(${l}px,${Math.round(y)}px) translateY(-100%)`;
