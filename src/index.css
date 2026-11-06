@@ -4347,3 +4347,25 @@ button.rack-btn:disabled { background: #e5e7eb !important; color: #6b7280 !impor
   .dept-head-ctl { max-width: none; }
   .dept-head-msg:empty { display: none; }
 }
+
+/* ── Voice search mic in the global search (2026-11-06) ─────────────────────
+   44px target, brand-coloured; listening = filled + a calm breathing ring.
+   Colours come from the theme tokens, so light and dark both work. */
+.gs-mic{flex-shrink:0;width:44px;height:44px;min-height:44px!important;min-width:44px;margin:-6px 0;padding:0;border:0;border-radius:999px;
+  display:inline-flex;align-items:center;justify-content:center;background:transparent;color:var(--brand);cursor:pointer;position:relative;
+  transition:background-color .18s cubic-bezier(.16,1,.3,1),color .18s cubic-bezier(.16,1,.3,1),transform .12s ease-out}
+.gs-mic:hover{background:var(--brand-wash)}
+.gs-mic:active{transform:scale(.94)}
+.gs-mic:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.gs-mic:disabled{cursor:default;opacity:.8}
+.gs-mic-on,.gs-mic-on:hover{background:var(--brand);color:#fff}
+.gs-mic-on::after{content:"";position:absolute;inset:0;border-radius:inherit;box-shadow:0 0 0 0 rgba(var(--brand-rgb),.38);animation:gsMicRing 1.8s cubic-bezier(.16,1,.3,1) infinite;pointer-events:none}
+@keyframes gsMicRing{0%{box-shadow:0 0 0 0 rgba(var(--brand-rgb),.38)}70%{box-shadow:0 0 0 10px rgba(var(--brand-rgb),0)}100%{box-shadow:0 0 0 0 rgba(var(--brand-rgb),0)}}
+.gs-voice-status{display:flex;align-items:center;gap:8px;padding:8px 16px;font-size:13px;color:var(--brand);background:var(--brand-wash);border-bottom:1px solid var(--border-subtle)}
+.gs-voice-hint{margin-left:auto;font-size:12px;color:var(--text-muted)}
+.gs-voice-dot{width:8px;height:8px;border-radius:999px;background:var(--brand);flex-shrink:0;animation:gsVoiceDot 1.8s ease-in-out infinite}
+@keyframes gsVoiceDot{0%,100%{opacity:1}50%{opacity:.35}}
+.gs-voice-err{color:#b91c1c;background:rgba(220,38,38,.07)}
+:root[data-theme="dark"] .gs-voice-err{color:#fca5a5;background:rgba(248,113,113,.10)}
+@media (max-width:767px){.gs-esc{display:none}}
+@media (prefers-reduced-motion:reduce){.gs-mic-on::after,.gs-voice-dot{animation:none}.gs-mic-on::after{box-shadow:0 0 0 4px rgba(var(--brand-rgb),.25)}.gs-mic{transition:none}}

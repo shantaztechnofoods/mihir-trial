@@ -197,6 +197,17 @@ jobs:
             ${{ runner.temp }}/pw
           key: pw2-${{ runner.os }}-${{ env.PW_VERSION }}
 
+      - name: Cache Playwright OS packages (.deb)
+        # The Ubuntu package mirror is sometimes very slow (measured 6 Nov:
+        # 14.6 MB took 12m47s on one shard, which made the whole run ~17 min
+        # instead of ~4). Keep the downloaded .deb files so the next runs
+        # install them from disk. Same packages, same install, no download.
+        id: aptpw
+        uses: actions/cache@v4
+        with:
+          path: ~/.apt-pw
+          key: aptpw-${{ runner.os }}-${{ env.PW_VERSION }}
+
       - name: Install Playwright where the suites import it
         # The suites import /usr/local/lib/node_modules_global/playwright/index.js
         # (the dev box's global install); recreate that path here. One frozen
@@ -210,7 +221,14 @@ jobs:
           sudo mkdir -p /usr/local/lib/node_modules_global /home/claude/work
           sudo ln -sfn "$RUNNER_TEMP/pw/node_modules/playwright" /usr/local/lib/node_modules_global/playwright
           sudo chown -R "$USER" /home/claude
+          if ls "$HOME"/.apt-pw/*.deb >/dev/null 2>&1; then
+            sudo cp -n "$HOME"/.apt-pw/*.deb /var/cache/apt/archives/ || true
+          fi
           "$RUNNER_TEMP/pw/node_modules/.bin/playwright" install --with-deps chromium
+          if [ "${{ steps.aptpw.outputs.cache-hit }}" != "true" ] && ls /var/cache/apt/archives/*.deb >/dev/null 2>&1; then
+            mkdir -p "$HOME/.apt-pw" && cp /var/cache/apt/archives/*.deb "$HOME/.apt-pw/"
+            echo "kept $(ls "$HOME"/.apt-pw | wc -l) .deb files for the next runs"
+          fi
 
       - name: Wait for the e2e build job
         env:
@@ -249,6 +267,7 @@ jobs:
     if: always() && github.event_name == 'push'
     needs: [e2e-build, e2e-shard]
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: All e2e shards passed
         # e2e-shard is a matrix: its result is success only when all 8 shards succeeded.

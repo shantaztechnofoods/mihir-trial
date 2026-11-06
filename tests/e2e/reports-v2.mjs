@@ -94,7 +94,7 @@ const pre = await p.locator('[data-report-customer-precheck="issues"]').innerTex
 ok("customer: pre-send check names the open point and the open job", pre.includes("Guard fitted (Assembly)") && pre.includes("Warning label to be stuck"), pre.replace(/\n/g, " | ").slice(0, 400));
 ok("customer: pre-send check is not printed", await p.evaluate(async () => { const el = document.querySelector("[data-report-customer-precheck]"); return !!el && !el.closest(".mr-doc"); }));
 const sum = await p.locator("[data-report-customer-summary]").innerText();
-ok("customer: build summary in full sentences", /was built and checked\./.test(sum) && /10 of 11 quality check points have been completed; 1 point is still open and will be closed before dispatch\./.test(sum) && /trial certificate is included in section 04\./.test(sum), sum.replace(/\n/g, " | "));
+ok("customer: build summary in full sentences", /was built and checked\./.test(sum) && /10 of 11 quality check points have been completed; 1 point is still open and will be closed before dispatch\./.test(sum) && /the full trial certificate is section 3 of this report\./.test(sum), sum.replace(/\n/g, " | "));
 ok("customer: no invented trial result", !/Passed/.test(doc) && /Certificate issued/.test(doc));
 ok("customer: Mechanical before-receive checklist listed", (await p.locator('[data-report-dept="Mechanical"]').innerText()).includes("Frame received square"));
 ok("customer: Trial and Ready checklists listed", (await p.locator('[data-report-dept="Trial"]').innerText()).includes("Machine clean for trial") && (await p.locator('[data-report-dept="Ready"]').innerText()).includes("Name plate fixed"));
@@ -148,10 +148,13 @@ ok("company: comments grouped by department (Mechanical, Electrical)",
   await p.locator('[data-report-comments-dept="Mechanical"]').count() === 1 && await p.locator('[data-report-comments-dept="Electrical"]').count() === 1);
 const ce = await p.locator('[data-report-comments-dept="Electrical"]').innerText();
 ok("company: comment shows completion remark and the open one", ce.includes("Resolution: Re-tied with clamp") && ce.includes("Warning label to be stuck") && ce.includes("Closed") && ce.includes("Open — assigned to Electrical") && ce.includes("by Super Admin"), ce.replace(/\n/g, " | ").slice(0, 300));
-ok("company: each job printed once", (doc.match(/Side cover not painted/g) || []).length === 1);
+// 2026-11-06 (reports v4) — a job is traced once in section 3, and its raise / close are steps of the journey.
+ok("company: each job traced once in Pending jobs", (( await p.locator("[data-report-issues]").innerText()).match(/Side cover not painted/g) || []).length === 1);
+ok("company: the journey shows the job being raised and closed", ((await p.locator('[data-report-timeline-dept="Mechanical"]').innerText()).match(/Side cover not painted/g) || []).length === 2);
+// 2026-11-06 (reports v4) — every checklist answer prints inside its department in the journey (the old Appendix A).
 for (const d of ["Assembly", "Mechanical", "Electrical", "Trial", "Ready"])
-  ok(`company: appendix has department ${d}`, await p.locator(`[data-report-appendix-dept="${d}"]`).count() === 1);
-ok("company: appendix lists during-work checklist", (await p.locator('[data-report-appendix-dept="Electrical"]').innerText()).includes("Earthing continuity"));
+  ok(`company: journey has department ${d} with its checklists`, await p.locator(`[data-report-timeline-dept="${d}"] [data-report-checklist]`).count() >= 1);
+ok("company: journey lists the during-work checklist", (await p.locator('[data-report-timeline-dept="Electrical"] [data-report-checklist="during_work"]').innerText()).includes("Earthing continuity"));
 await close();
 
 // ── Trial certificate: company box reads the Settings name ──
