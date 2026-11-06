@@ -77,7 +77,7 @@ await p.evaluate(() => {
 await p.reload({ waitUntil: "networkidle" }); await p.waitForTimeout(900);
 if (await p.locator("#login-username").count()) await loginAdmin(p);
 await gotoMachineTracker(p);
-ok("corrupt cache values do not white-screen the app", (await p.getByText("The app hit an unrecoverable render error").count()) === 0 && (await p.getByText("Something went wrong on this page").count()) === 0);
+ok("corrupt cache values do not white-screen the app", (await p.getByText("The app hit an unrecoverable render error").count()) === 0 && (await p.getByText("Something went wrong on this page").count()) === 0 && (await p.getByText("Something went wrong. Tap to reload.").count()) === 0);
 ok("Machine Tracker still lists machines after corrupt cache", (await p.locator("[data-card-hold], [data-card-release-hold]").count()) >= 1);
 
 const fatal = errs.filter((e) => !/ResizeObserver/.test(e));

@@ -6,6 +6,7 @@ A change here affects every module — run the full `scripts/ship.sh check`.
 | path | what |
 |---|---|
 | `buildInfo.js` | `APP_BUILD` (= `APP_BUILD_TAG` in `src/main.jsx`) |
+| `sentry.js`, `sentrySdk.js` | Sentry error reporting (Trial production builds only; `@sentry/react` loads after first paint via `sentrySdk.js`, early errors queued; PII scrubbed in `beforeSend`). `components/AppErrorBoundary.jsx` reports root render errors |
 | `format.js` | qty / date / currency / status helpers (`roundQty`, `fmtDate`, `parseDate`, …) |
 | `printFormat.js` | date + company-name formatting used by every printed sheet (`rptFmtD`, `rptFmtDT`, `RPT_LEGAL_NAME`) |
 | `machineStages.js` | `MACHINE_STAGES`, display stages, stage colours |

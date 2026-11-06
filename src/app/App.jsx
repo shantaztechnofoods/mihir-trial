@@ -71,6 +71,7 @@ import { SETTINGS_DEFAULTS } from "../shared/settingsDefaults.js";
 import { SkeletonLoader, PageSkeleton } from "../shared/ui/primitives.jsx";
 import { Topbar } from "../shared/ui/Topbar.jsx";
 import { LazyAppToaster } from "../shared/ui/lazyUi.js";
+import { setSentryPage } from "../shared/sentry.js";
 
 // 2026-11-04 (fix/perf-1) — admin-only pages load on first open (smaller first bundle).
 export const UserManagementPage = React.lazy(() => importWithReload(() => import("../modules/users-roles/UserManagementPage.jsx")));
@@ -103,6 +104,7 @@ export default function App() {
   const SEED_DEMO = ALLOW_DEMO && !SUPA;
 
   const [activePage,    setActivePage]    = useState("dashboard");
+  useEffect(() => { setSentryPage(activePage); }, [activePage]);   // Sentry tag only (src/shared/sentry.js)
   // Everyone landed on "dashboard" after signing in, including the department
   // logins that have no permission to open it. On a laptop that was a stumble —
   // you saw Access Denied and clicked Machine Tracker in the sidebar. On a
