@@ -2,10 +2,42 @@
 // Read-only view of the machines + hand-overs already in app state; all rules
 // live in productionLine.js (pure, unit-tested). Every coloured state also
 // carries an icon + words, so colour never has to be remembered.
-import React, { useEffect, useMemo, useState } from "react";
+import React, { Suspense, lazy, useEffect, useMemo, useState } from "react";
 import { Check, Timer, AlertTriangle, PauseCircle, Inbox, ChevronRight } from "lucide-react";
 import { buildProductionLine, stageStatusLines, lineSummary } from "./productionLine.js";
 import { formatDuration } from "../../utils/handoverLogic.js";
+
+// 3D view (2026-11-06): three.js + the scene load ONLY when "3D view" is tapped
+// (own chunk via dynamic import). The panel always opens on "Line"; the choice
+// is never remembered.
+const Line3DView = lazy(() => import("./Line3DView.jsx"));
+const MIN_3D_WIDTH = 420; // phones below this stay on Line (no 3D button)
+
+class Line3DBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { failed: false }; }
+  static getDerivedStateFromError() { return { failed: true }; }
+  componentDidCatch(err) { console.warn("[dashboard-3d] failed to load", err); this.props.onFail?.("3D view could not load. Showing Line."); }
+  render() { return this.state.failed ? null : this.props.children; }
+}
+
+// Small "today's output" ring for the header while 3D is on: ready today out of
+// ready today + in production, with late / on hold in words.
+function OutputRing({ line }) {
+  const late = line.attention.filter((a) => a.kind === "late").length;
+  const hold = line.attention.filter((a) => a.kind === "hold").length;
+  const total = line.readyToday + line.inProduction;
+  const R = 15, C = 2 * Math.PI * R, share = total > 0 ? line.readyToday / total : 0;
+  return (
+    <div className="f3-ring" data-output-ring role="group" aria-label={`Today's output: ${line.readyToday} ready today, ${line.inProduction} in production, ${late} late, ${hold} on hold`}>
+      <svg width="36" height="36" viewBox="0 0 40 40" aria-hidden="true">
+        <circle cx="20" cy="20" r={R} fill="none" className="f3-ring-track" strokeWidth="4" />
+        <circle cx="20" cy="20" r={R} fill="none" className="f3-ring-fill" strokeWidth="4" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={C * (1 - share)} transform="rotate(-90 20 20)" />
+        <text x="20" y="24" textAnchor="middle">{line.readyToday}</text>
+      </svg>
+      <span><b>Today's output</b><small>{line.readyToday} ready today · {line.inProduction} in production{late > 0 && <> · <em data-tone="late">{late} late</em></>}{hold > 0 && <> · <em data-tone="hold">{hold} on hold</em></>}</small></span>
+    </div>
+  );
+}
 
 const ICONS = { ok: Check, near: Timer, late: AlertTriangle, hold: PauseCircle, incoming: Inbox };
 
@@ -24,7 +56,7 @@ function RollNumber({ value }) {
   return <span className="dash-line-num" key={value} data-count={value}>{value}</span>;
 }
 
-export function ProductionLinePanel({ machines = [], handovers = [], settings = null, onOpenMachines }) {
+export function ProductionLinePanel({ machines = [], handovers = [], settings = null, bomDefs = null, onOpenMachines }) {
   // Department timers move on their own: re-read the clock once a minute.
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -42,6 +74,19 @@ export function ProductionLinePanel({ machines = [], handovers = [], settings = 
     try { const v = localStorage.getItem("erp_dash_line_open"); if (v !== null) return v === "1"; } catch {}
     return typeof window === "undefined" || window.innerWidth >= 768;
   });
+  // Line is the default for everyone on every page open; 3D only after a tap.
+  const [view, setView] = useState("line");
+  const [note3d, setNote3d] = useState("");
+  const [wide, setWide] = useState(() => typeof window === "undefined" || window.innerWidth >= MIN_3D_WIDTH);
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return undefined;
+    const mq = window.matchMedia(`(min-width: ${MIN_3D_WIDTH}px)`);
+    const on = () => { setWide(mq.matches); if (!mq.matches) setView("line"); };
+    on(); mq.addEventListener?.("change", on);
+    return () => mq.removeEventListener?.("change", on);
+  }, []);
+  const show3d = view === "3d" && wide && isOpen;
+  const fail3d = (msg) => { setView("line"); setNote3d(msg); };
   const toggle = () => setIsOpen((v) => { try { localStorage.setItem("erp_dash_line_open", v ? "0" : "1"); } catch {} return !v; });
 
   return (
@@ -62,8 +107,25 @@ export function ProductionLinePanel({ machines = [], handovers = [], settings = 
       </h2>
 
       {isOpen && <div id="dash-line-body" className="dash-line-body" data-line-body>
-      <div className="dash-line-meta">{lg.same ? `Target: ${lg.target} in each department` : "Target per department (Settings)"} · tap a stage</div>
+      <div className="dash-line-meta dash-line-meta-row">
+        <span>{lg.same ? `Target: ${lg.target} in each department` : "Target per department (Settings)"} · {show3d ? "tap a machine" : "tap a stage"}</span>
+        {show3d && <OutputRing line={line} />}
+        {wide && (
+          <span className="dash-line-views" role="group" aria-label="Production line view" data-line-views>
+            <button type="button" aria-pressed={!show3d} data-view="line" onClick={() => setView("line")}>Line</button>
+            <button type="button" aria-pressed={show3d} data-view="3d" onClick={() => { setNote3d(""); setView("3d"); }}>3D view</button>
+          </span>
+        )}
+      </div>
+      {note3d && <div className="dash-line-note" role="status" data-line-3d-note>{note3d}</div>}
 
+      {show3d ? (
+        <Line3DBoundary onFail={fail3d}>
+          <Suspense fallback={<div className="dash-line-3d-loading" role="status">Loading 3D view…</div>}>
+            <Line3DView line={line} bomDefs={bomDefs || {}} onFail={fail3d} onOpenMachine={(filter) => open(filter)} />
+          </Suspense>
+        </Line3DBoundary>
+      ) : (<>
       <div className="dash-line-strip">
         {line.stages.map((st) => {
           const lines = stageStatusLines(st);
@@ -86,6 +148,7 @@ export function ProductionLinePanel({ machines = [], handovers = [], settings = 
         <span data-tone="late"><AlertTriangle size={12} strokeWidth={2.5} aria-hidden="true" />Late ({lg.late})</span>
         <span data-tone="late"><PauseCircle size={12} strokeWidth={2.5} aria-hidden="true" />On hold (stopped, see reason)</span>
       </div>
+      </>)}
 
       <div className="dash-line-attn" data-needs-attention>
         <div className="dash-line-attn-head">

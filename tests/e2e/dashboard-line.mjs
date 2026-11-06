@@ -51,6 +51,8 @@ const openDashboard = async (p) => { await p.locator("button, a").filter({ hasTe
 // ── Admin ───────────────────────────────────────────────────────────────────
 {
   const { b, p, errs } = await launch(`(${seed})();`, { width: 1440, height: 900 });
+  const reqs = []; p.on("request", (r) => reqs.push(r.url()));
+  const lazy3d = () => reqs.filter((u) => /three\.module|Line3DView/.test(u));
   await loginAdmin(p); await openDashboard(p);
   const panel = p.locator("[data-production-line]");
   ok("admin: panel shows on the Dashboard", await panel.count() === 1);
@@ -75,6 +77,46 @@ const openDashboard = async (p) => { await p.locator("button, a").filter({ hasTe
   ok("no sideways scroll at 1440", await noOverflow(p));
   await p.mouse.move(0, 0); await p.waitForTimeout(300);
   await p.screenshot({ path: `${shots}/dashboard-line-1440x900.png` });
+
+  // ── 3D view (2026-11-06): Line by default, three.js only after the tap ──
+  ok("3d: opens on Line (Line pressed, strip shown, no 3D scene)", await p.locator('[data-line-views] [data-view="line"]').getAttribute("aria-pressed") === "true"
+    && await p.locator("[data-production-line] [data-stage]").count() === 6 && await p.locator("[data-floor-3d]").count() === 0);
+  ok("3d: three.js / 3D chunk NOT downloaded before the tap", lazy3d().length === 0, lazy3d().join(" "));
+  const jsBefore = new Set(reqs.filter((u) => /\.js(\?|$)/.test(u)));
+  await p.locator('[data-line-views] [data-view="3d"]').click();
+  await p.waitForFunction(() => document.querySelector("[data-floor-3d] canvas") || document.querySelector("[data-line-3d-note]"), null, { timeout: 15000 }).catch(() => {});
+  await settle(p, 800);
+  // The 3D view's own chunk arrives only now. three.js itself may already be in the browser from the
+  // login logo (shared lazy chunk; never in the first download — health "bundle" check guards that).
+  const jsAfter = reqs.filter((u) => /\.js(\?|$)/.test(u) && !jsBefore.has(u));
+  ok("3d: tap downloads the lazy 3D view chunk", jsAfter.some((u) => /Line3DView/.test(u)) && ![...jsBefore].some((u) => /Line3DView/.test(u)), jsAfter.join(" "));
+  const hasGl = await p.locator("[data-floor-3d] canvas").count() === 1;
+  if (hasGl) {
+    ok("3d: the three.js scene is running after the tap", await p.evaluate(() => !!(window.__dash3d && window.__dash3d.info().calls >= 0)));
+    ok("3d: Line strip hidden, scene shown", await p.locator("[data-production-line] [data-stage]").count() === 0);
+    const tags = await p.locator("[data-floor-3d] .f3-tag").evaluateAll((els) => els.map((e) => e.innerText.replace(/\s+/g, " ")));
+    ok("3d: one tag per machine in a work department (5)", tags.length === 5, tags.join(" | "));
+    ok("3d: hold tag says why, in words", tags.some((t) => /SN-106.*On hold – Heater awaited/.test(t)), tags.join(" | "));
+    ok("3d: late tag says Late in words", tags.some((t) => /SN-104.*Late \d/.test(t)), tags.join(" | "));
+    ok("3d: six zone chips with words", await p.locator("[data-floor-3d] [data-chip]").count() === 6 && /Late/.test(await p.locator('[data-chip="Mechanical"]').innerText()));
+    ok("3d: output ring in the header", /ready today/.test(await p.locator("[data-output-ring]").innerText()));
+    const over = await p.locator("[data-floor-3d] .f3-tag").evaluateAll((els) => { const r = els.map((e) => e.getBoundingClientRect()); for (let i = 0; i < r.length; i++) for (let j = i + 1; j < r.length; j++) { const a = r[i], c = r[j]; if (a.left < c.right - 1 && c.left < a.right - 1 && a.top < c.bottom - 1 && c.top < a.bottom - 1) return true; } return false; });
+    ok("3d: tags never overlap", !over);
+    await p.mouse.move(0, 0); await p.waitForTimeout(400);
+    await p.screenshot({ path: `${shots}/dashboard-3d-1440x900.png` });
+    await p.locator('[data-floor-3d] .f3-tag[data-s="hold"]').click(); await settle(p, 1200);
+    ok("3d: a machine tag opens Machine Tracker (same navigation as the Line view)", await p.locator("[data-production-line]").count() === 0);
+    await openDashboard(p);
+    ok("3d: back on the Dashboard it is Line again", await p.locator("[data-floor-3d]").count() === 0 && await p.locator("[data-production-line] [data-stage]").count() === 6);
+    await p.locator('[data-line-views] [data-view="3d"]').click(); await p.waitForSelector("[data-floor-3d] canvas", { timeout: 15000 }).catch(() => {});
+    await p.locator('[data-line-views] [data-view="line"]').click(); await settle(p, 400);
+    ok("3d: Line button removes the scene (canvas disposed)", await p.locator("[data-floor-3d], .f3-gl canvas").count() === 0 && await p.locator("[data-production-line] [data-stage]").count() === 6);
+  } else {
+    ok("3d: no WebGL → short message, back on Line", /WebGL|could not/.test(await p.locator("[data-line-3d-note]").innerText()) && await p.locator("[data-production-line] [data-stage]").count() === 6);
+  }
+  await p.reload({ waitUntil: "networkidle" }); await settle(p, 800);
+  if (await p.locator("[data-line-views]").count() === 0) await openDashboard(p);
+  ok("3d: after reload the panel opens on Line again (never remembered)", await p.locator('[data-line-views] [data-view="line"]').getAttribute("aria-pressed") === "true" && await p.locator("[data-floor-3d]").count() === 0);
 
   // ── Fold / unfold (2026-11-05): like Machine Tracker's "Issue a BOM" ──
   const tog = p.locator("[data-line-toggle]");
@@ -117,6 +159,7 @@ const openDashboard = async (p) => { await p.locator("button, a").filter({ hasTe
   for (const [w, hgt] of [[390, 844], [360, 780]]) {
     await p.setViewportSize({ width: w, height: hgt }); await p.waitForTimeout(400);
     ok(`no sideways scroll at ${w}`, await noOverflow(p));
+    ok(`no 3D button on a phone at ${w}`, await p.locator("[data-line-views]").count() === 0);
     const box = await p.locator("[data-production-line]").boundingBox();
     ok(`panel fits the phone at ${w}`, box && box.x >= 0 && box.x + box.width <= w + 0.5, JSON.stringify(box));
     const cols = await p.locator('[data-production-line] [data-stage]').evaluateAll((els) => new Set(els.map((e) => Math.round(e.getBoundingClientRect().top))).size);

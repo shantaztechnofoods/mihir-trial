@@ -57,7 +57,7 @@ export function CountUpValue({ value, className, style }) {
 export function DashboardPage({ items = {}, pos = [], vendorList = [], machineLog = [], pendingLog = [], followUps = [], handovers = [], pendingHandoverItems = [], onNavigate, settings = SETTINGS_DEFAULTS, canView = null,
   // 2026-11-05 — opens Machine Tracker on one of its filters ("active",
   // "onRack", "completed", "hold"); falls back to plain navigation.
-  onOpenMachines = null }) {
+  onOpenMachines = null, bomDefs = null }) {
   // 2026-11-04 — a login that may not open a page (e.g. a Production Head and
   // Order Pipeline) used to get buttons that silently did nothing.
   const canOpen = (id) => typeof canView !== "function" || canView(id);
@@ -183,7 +183,7 @@ export function DashboardPage({ items = {}, pos = [], vendorList = [], machineLo
         {/* ── 2026-11-05 Production line today — only for logins that may open
              Machine Tracker (same gate as its nav item: canView("machines")). ── */}
         {typeof canView === "function" && canView("machines") && (
-          <ProductionLinePanel machines={machineLog} handovers={handovers} settings={settings}
+          <ProductionLinePanel machines={machineLog} handovers={handovers} settings={settings} bomDefs={bomDefs}
             onOpenMachines={(filter) => (onOpenMachines ? onOpenMachines(filter) : onNavigate?.("machines"))} />
         )}
 

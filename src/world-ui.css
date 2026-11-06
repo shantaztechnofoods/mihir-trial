@@ -798,6 +798,25 @@
   .dash-line-legend > span[data-tone="ok"] > svg { color: var(--ok); }
   .dash-line-legend > span[data-tone="near"] > svg { color: var(--wait); }
   .dash-line-legend > span[data-tone="late"] > svg { color: var(--bad); }
+  /* Line / 3D view toggle (2026-11-06). Line is always the default; the 3D scene is a lazy chunk (line3d.css). */
+  .dash-line-meta-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .dash-line-views { display: inline-flex; margin-left: auto; padding: 2px; gap: 2px; border: 1px solid var(--line); border-radius: 10px; background: var(--sunk); }
+  .dash-line-views > button { min-height: 32px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: var(--ink-3); font: 600 13px/1 var(--font-ui); cursor: pointer; }
+  .dash-line-views > button[aria-pressed="true"] { background: var(--paper); color: var(--ink); box-shadow: var(--e1); }
+  .dash-line-views > button:focus-visible { outline: 2px solid var(--action); outline-offset: 1px; }
+  .dash-line-note, .dash-line-3d-loading { margin: 0 0 8px; font-size: 13px; font-weight: 500; color: var(--ink-3); }
+  .dash-line-3d-loading { display: flex; align-items: center; justify-content: center; height: 190px; border-radius: 16px; background: var(--sunk); }
+  .f3-ring { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; padding: 2px 12px 2px 2px; border-radius: 999px; background: var(--sunk); border: 1px solid var(--line); }
+  .f3-ring + .dash-line-views { margin-left: 0; }
+  .f3-ring svg text { font: 700 11px var(--font-ui); fill: var(--ink); font-variant-numeric: tabular-nums; }
+  .f3-ring-track { stroke: var(--line); }
+  .f3-ring-fill { stroke: var(--ok); transition: stroke-dashoffset var(--dur-ui, .2s) var(--ease-enter, ease-out); }
+  .f3-ring b { display: block; font: 600 12px/1.2 var(--font-ui); color: var(--ink); }
+  .f3-ring small { display: block; font: 500 11.5px/1.3 var(--font-ui); color: var(--ink-3); font-variant-numeric: tabular-nums; }
+  .f3-ring em { font-style: normal; font-weight: 600; color: var(--bad); }
+  .f3-ring em[data-tone="hold"] { color: #6d28d9; }
+  :root[data-theme="dark"] .f3-ring em[data-tone="hold"] { color: var(--p-infoTx); }
+  @media (max-width: 767px) { .f3-ring small { display: none; } }
 
   .dash-line-attn { margin-top: 16px; }
   .dash-line-attn-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }

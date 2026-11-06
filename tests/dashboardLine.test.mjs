@@ -182,3 +182,34 @@ test("dashboard line: folded header summary — late · on hold · near, else al
   ] });
   assert.equal(lineSummary(r), "1 late · 1 on hold");
 });
+
+// ── 3D view (2026-11-06): one entry per machine in a work department, same words ──
+test("dashboard line: onLine lists machines in work departments with the Line words", async () => {
+  const r = buildProductionLine({ now: NOW, settings: ONE_DAY, machines: [
+    { id: 1, serialNo: "SN-1", bomKey: "M-10", bomLabel: "Kneader", stage: "BOM Issued", status: "active" },
+    { id: 2, serialNo: "SN-2", bomKey: "M-10", bomLabel: "Kneader", stage: "Assembly", currentDepartment: "Assembly", status: "active", departmentEnteredAt: iso(at(6, 10)) },
+    { id: 3, serialNo: "SN-3", bomKey: "R-10", bomLabel: "Roaster", stage: "Mechanical", currentDepartment: "Mechanical", status: "active", departmentEnteredAt: iso(at(2, 12)) },
+    { id: 4, serialNo: "SN-4", bomKey: "R-10", bomLabel: "Roaster", stage: "Trial", currentDepartment: "Trial", status: "active", departmentEnteredAt: iso(at(6, 11)), holdActive: true, holdReason: "Motor" },
+    { id: 5, serialNo: "SN-5", bomKey: "M-10", stage: "Ready", status: "completed" },
+  ] });
+  const by = Object.fromEntries(r.onLine.map((e) => [e.id, e]));
+  assert.deepEqual(r.onLine.map((e) => e.id).sort(), [2, 3, 4], "rack + ready machines are not on the belt");
+  assert.equal(by[2].stage, "Assembly"); assert.equal(by[2].kind, "ok"); assert.match(by[2].text, /^On time · 2h/);
+  assert.equal(by[3].kind, "late"); assert.match(by[3].text, /^Late /);
+  assert.equal(by[4].kind, "hold"); assert.equal(by[4].text, "On hold – Motor");
+  assert.equal(by[2].serial, "SN-2"); assert.equal(by[2].name, "Kneader"); assert.equal(by[2].bomKey, "M-10");
+});
+
+test("dashboard 3D: white background cut-out keeps white parts inside the machine", async () => {
+  const { cutWhiteBackground } = await import("../src/modules/dashboard/photoCutout.js");
+  // 5×5: white border ring, dark ring, white centre (inside the machine → must stay).
+  const w = 5, h = 5, px = new Uint8ClampedArray(w * h * 4);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const o = (y * w + x) * 4, edge = x === 0 || y === 0 || x === w - 1 || y === h - 1, centre = x === 2 && y === 2;
+    const v = edge || centre ? 250 : 40; px[o] = px[o + 1] = px[o + 2] = v; px[o + 3] = 255;
+  }
+  const n = cutWhiteBackground(px, w, h);
+  assert.equal(n, 16, "the 16 border pixels are cleared");
+  assert.equal(px[(2 * w + 2) * 4 + 3], 255, "white centre inside the machine stays opaque");
+  assert.equal(px[(1 * w + 1) * 4 + 3], 255, "dark machine pixels stay opaque");
+});

@@ -82,3 +82,10 @@ See `docs/MODULE-PROMOTION.md`. In short:
 3. If the Trial change also touched the handlers listed above, copy those handler changes in `src/app/App.jsx` too (handlers are not inside the folder yet).
 4. Apply any NEW migration the change needs (additive, in number order, BEFORE merging) and redeploy any Edge Function listed above that changed.
 5. `npm test`, `npm run build`, the browser suites listed above, then merge; Vercel deploys `main`.
+
+## 3D view (2026-11-06)
+"Production line today" always opens on **Line**; **3D view** is an optional tap (never remembered,
+hidden below 420 px). `Line3DView.jsx` + `line3d.js` (three.js) + `photoCutout.js` + `line3d.css` load
+only via `React.lazy` / dynamic `import()` when tapped. Data = `buildProductionLine().onLine` (same rules
+and words as the strip) + `bomDefs[bomKey].photoUrl`. Click → the same `onOpenMachines(filter)` the Line
+view uses. Scene renders only while visible, disposes on Line / unmount; no WebGL → back to Line with a note.
