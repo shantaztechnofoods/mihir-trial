@@ -229,6 +229,10 @@ const PAGE_COMPONENTS = [
   "POModal",
   "POSearchCenter",
 
+  // 2026-11-06 MT UX pack — one next step per card, heads' near-limit strip and "My work today".
+  "NextStepButton",
+  "NearLimitStrip",
+  "MyWorkPanel",
   // Phase A — Signature Pad component (module-scope). Protects against the
   // Finish & Transfer / Accept modals losing their signature capture surface.
   "SignaturePad",
@@ -443,6 +447,12 @@ const USER_FACING_STRINGS = [
   "During Work",
   "Before Transfer",
   "During-Work Checks",
+  // MT UX pack (2026-11-06) — next step, hold chips, My work today
+  "Fill checklist (",
+  "Material not arrived",
+  "My work today",
+  "All departments",
+  "Today you sent ",
   "Save Checklist",
   "+ Add Step",
   "Must do",
