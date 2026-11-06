@@ -76,7 +76,10 @@ async function build(src) {
   const c = document.createElement("canvas"); c.width = w; c.height = h;
   const g = c.getContext("2d", { willReadFrequently: true });
   if (!g) return { image: im, aspect: nw / nh, cut: false };
+  // v9: a little more contrast + colour so the machine does not look washed out on the light floor
+  try { g.filter = "contrast(1.14) saturate(1.12) brightness(0.97)"; } catch { /* no canvas filter */ }
   g.drawImage(im, 0, 0, w, h);
+  try { g.filter = "none"; } catch { /* ignore */ }
   let data;
   try { data = g.getImageData(0, 0, w, h); } catch { return { image: im, aspect: nw / nh, cut: false }; } // tainted canvas
   cutWhiteBackground(data.data, w, h);

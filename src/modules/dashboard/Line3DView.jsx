@@ -56,7 +56,7 @@ function layoutTags(host, ms, stageW, onlySn = null, top = TAG_TOP) {
   // v7: neat rows on one baseline above the machines. Every leader drops straight
   // down from its tag to its machine; a tag never sits on another tag's leader and
   // a leader never runs behind another tag (vertical lines cannot cross).
-  const byX = els.slice().sort((a, b) => a.x - b.x);
+  const byX = els.slice().sort((a, b) => a.x - b.x), byX0 = byX.slice(); // byX0: same order, centred tags first
   const place = (compactCalm, compactAll, allowHide, seq = order) => {
     for (const s of els) { const calm = s.el.dataset.s === "ok" || s.el.dataset.s === "incoming"; s.el.toggleAttribute("data-compact", compactAll || (compactCalm && calm)); s.el.removeAttribute("data-hidden"); }
     const th = Math.max(...els.map((s) => s.el.offsetHeight)), rowH = th + 5;
@@ -71,7 +71,8 @@ function layoutTags(host, ms, stageW, onlySn = null, top = TAG_TOP) {
       const lx = (k) => Math.round(Math.min(Math.max(4, s.x - w / 2 + k * w), stageW - w - 4));
       const fits = (v) => s.x >= v + 10 && s.x <= v + w - 10;
       const tries = [];
-      if (seq === byX) { for (const k of [-0.42, -0.3, 0]) for (let r = 0; r < maxRows; r++) tries.push([r, k]); for (const k of [0.3, 0.42]) for (let r = 0; r < maxRows; r++) tries.push([r, k]); }
+      if (seq === byX0) { for (let r = 0; r < maxRows; r++) tries.push([r, 0]); for (const k of [-0.3, -0.42, 0.3, 0.42]) for (let r = 0; r < maxRows; r++) tries.push([r, k]); }
+      else if (seq === byX) { for (const k of [-0.42, -0.3, 0]) for (let r = 0; r < maxRows; r++) tries.push([r, k]); for (const k of [0.3, 0.42]) for (let r = 0; r < maxRows; r++) tries.push([r, k]); }
       else for (let r = 0; r < maxRows; r++) for (const k of [0, -0.3, 0.3, -0.42, 0.42]) tries.push([r, k]);
       let row = -1, l = lx(0);
       for (const [r, k] of tries) {
@@ -91,10 +92,11 @@ function layoutTags(host, ms, stageW, onlySn = null, top = TAG_TOP) {
   // Calm (on time / waiting) tags start compact; late and on hold stay full.
   // Left to right first (neighbours fall into alternating rows, so every tag fits);
   // when space is short, the most urgent are placed first and a calm one may hide.
-  let res = place(true, false, false, byX) || place(true, false, false) || place(true, true, false, byX) || place(true, true, false);
+  // v9: a tag sits centred over its machine whenever everything fits that way.
+  let res = place(true, false, false, byX0) || place(true, false, false, byX) || place(true, false, false) || place(true, true, false, byX) || place(true, true, false);
   if (!res) {
     // Not every tag fits: keep the variant that hides no late / on hold / near tag and the fewest calm ones.
-    const variants = [[true, false, byX], [true, false, order], [true, true, byX], [true, true, order]];
+    const variants = [[true, false, byX0], [true, false, byX], [true, false, order], [true, true, byX], [true, true, order]];
     const score = (o) => { let urgent = 0, hidden = 0; for (const [s, , r] of o.out) if (r < 0) { hidden++; if (!(s.el.dataset.s === "ok" || s.el.dataset.s === "incoming")) urgent++; } return urgent * 1000 + hidden; };
     let best = null;
     for (const v of variants) { const sc = score(place(v[0], v[1], true, v[2])); if (!best || sc < best.sc) best = { v, sc }; }
@@ -208,6 +210,8 @@ export default function Line3DView({ line, bomDefs = {}, onOpenMachine, onFail }
         for (let i = 0; i < n; i++) ls[i] = Math.max(i ? ls[i - 1] + ws[i - 1] + 4 : 2, ls[i]);
         for (let i = n - 1; i >= 0; i--) ls[i] = Math.min(i < n - 1 ? ls[i + 1] - ws[i] - 4 : sw - ws[i] - 2, ls[i]);
         for (let i = 0; i < n; i++) { kids[i].style.width = ws[i] + "px"; kids[i].style.left = Math.round(ls[i]) + "px"; }
+        // v9: the department head's name (11 px) on its own line; left out when the chip is too narrow for it
+        for (let i = 0; i < n; i++) { const hd = kids[i].querySelector("[data-chip-head]"); if (hd) hd.hidden = ws[i] - 14 < Math.ceil(hd.textContent.length * 6.6); }
         stageRef.current?.querySelectorAll("[data-more]").forEach((b) => { const z = zs[Number(b.dataset.more)]; if (z) { b.style.left = z.x + "px"; b.style.top = Math.round(z.y + 4) + "px"; } });
       }
       const ms = api.machineScreen(), mk = ms.map((s) => s.x.toFixed(0) + "," + s.y.toFixed(0)).join("|") + "|" + (stageRef.current?.clientWidth || 0);
@@ -297,7 +301,6 @@ export default function Line3DView({ line, bomDefs = {}, onOpenMachine, onFail }
                   <span className="f3-ts" data-s={it.kind}><span aria-hidden="true">{ICON[it.kind]}</span><span className="f3-tt">{st.words}</span></span>
                   {head && <abbr title={head}>{initials(head)}</abbr>}
                 </span>
-                {st.share != null && <span className="f3-bar" data-s={it.kind} aria-hidden="true"><i style={{ width: `${Math.round(st.share * 100)}%` }} /></span>}
               </button>
             );
           })}
@@ -330,6 +333,7 @@ export default function Line3DView({ line, bomDefs = {}, onOpenMachine, onFail }
           return (
             <div key={st.key} className="f3-chip" data-t={c.t} data-chip={st.key} title={`${st.label}: ${st.count} · ${c.s}`} aria-label={`${st.label}: ${st.count}, ${c.s}`}>
               <em>{st.count}</em>
+              {st.head && <span className="f3-ch" data-chip-head>{st.head}</span>}
               <span className="f3-cs">{ICON[c.t] && <u aria-hidden="true">{ICON[c.t]}</u>}{String(c.s).split(" – ")[0]}</span>
             </div>
           );
