@@ -209,8 +209,14 @@ export default function Line3DView({ line, bomDefs = {}, onOpenMachine, onFail }
       if (mk + only !== tagKey) { tagKey = mk + only; layoutTags(tagsRef.current, ms, stageRef.current?.clientWidth || 1000, only); }
     };
     api.kick();
+    // Re-run the tag layout when a tag's width changes after it was placed (the web
+    // font arriving late, new words), so tags never end up overlapping.
+    const relayout = () => { tagKey = ""; api.kick(); };
+    let tro = null;
+    if (typeof ResizeObserver !== "undefined" && tagsRef.current) { tro = new ResizeObserver(relayout); tagsRef.current.querySelectorAll(".f3-tag").forEach((t) => tro.observe(t)); }
+    try { document.fonts?.ready?.then(() => { if (apiRef.current === api) relayout(); }); } catch { /* no font API */ }
     if (typeof window !== "undefined") window.__dash3d = api; // e2e hook (renderer.info)
-    return () => { api.stop(); if (apiRef.current === api) apiRef.current = null; if (window.__dash3d === api) window.__dash3d = null; };
+    return () => { if (tro) tro.disconnect(); api.stop(); if (apiRef.current === api) apiRef.current = null; if (window.__dash3d === api) window.__dash3d = null; };
   }, [photos, mountN]);
 
   // 3. Live data: a dept change glides; anything structural remounts.
