@@ -99,7 +99,8 @@ const openDashboard = async (p) => { await p.locator("button, a").filter({ hasTe
     ok("3d: hold tag says why, in words", tags.some((t) => /SN-106.*On hold – Heater awaited/.test(t)), tags.join(" | "));
     ok("3d: late tag says Late in words", tags.some((t) => /SN-104.*Late \d/.test(t)), tags.join(" | "));
     ok("3d: six zone chips with words", await p.locator("[data-floor-3d] [data-chip]").count() === 6 && /Late/.test(await p.locator('[data-chip="Mechanical"]').innerText()));
-    ok("3d: output ring in the header", /ready today/.test(await p.locator("[data-output-ring]").innerText()));
+    // v6: the header strip inside the 3D card replaced the "Today's output" pill (same counts, same words).
+    ok("3d: header strip with the four counts in words", /^\d+ in production, 1 late, 1 on hold, \d+ ready today$/.test(await p.locator("[data-3d-kpis]").getAttribute("aria-label") || ""), await p.locator("[data-3d-kpis]").getAttribute("aria-label"));
     const over = await p.locator("[data-floor-3d] .f3-tag:not([data-hidden])").evaluateAll((els) => { const r = els.map((e) => e.getBoundingClientRect()); for (let i = 0; i < r.length; i++) for (let j = i + 1; j < r.length; j++) { const a = r[i], c = r[j]; if (a.left < c.right - 1 && c.left < a.right - 1 && a.top < c.bottom - 1 && c.top < a.bottom - 1) return true; } return false; });
     ok("3d: tags never overlap", !over);
     await p.mouse.move(0, 0); await p.waitForTimeout(400);
