@@ -2,6 +2,7 @@
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
 import React from "react";
 import { Glyph } from "../components/LeadIcon.jsx";
+import Count from "./Count.jsx";
 
 export const statusConfig = {
   critical: { label: "CRITICAL",  bg: "", text: "", border: "", dot: "#dc2626",   style: { background: "rgba(220,38,38,0.08)",   color: "#dc2626", border: "1px solid rgba(220,38,38,0.22)" } },
@@ -118,7 +119,7 @@ export function MetricCard({ label, value, delta, deltaUp, icon, barPct, barColo
       </div>
       <div className="text-[25px] font-extrabold leading-none tabular-nums tracking-[-0.025em] kpi-value"
            style={{ color: valueColor || "var(--text-strong)" }}>
-        {value}
+        <Count value={value} format={{ useGrouping: false, maximumFractionDigits: 20 }} />
       </div>
       {delta && (
         <div className={`text-[10px] font-bold flex items-center gap-1 mt-1.5 ${
@@ -164,6 +165,40 @@ export function SkeletonLoader({ rows = 3, type = "text" }) {
     <div className="space-y-3">
       {Array.from({ length: rows }).map((_, i) => (
         <div key={i} className="skeleton skeleton-text" style={{ width: i === 0 ? "100%" : i === rows - 1 ? "60%" : "80%" }} />
+      ))}
+    </div>
+  );
+}
+
+// motion-a (2026-11-06) — a page-shaped placeholder (title, 3 stat cards, table
+// rows) while a page's code loads. It stays invisible for the first 300 ms
+// (world-ui.css .wu-page-sk), so a quick load shows nothing at all.
+export function PageSkeleton() {
+  return (
+    <div className="wu-page-sk" aria-hidden="true">
+      <div className="wu-sk" style={{ height: 22, width: 200 }} />
+      <div className="wu-page-sk-cards">
+        {[0, 1, 2].map((i) => <div key={i} className="wu-sk" style={{ height: 92, borderRadius: 16 }} />)}
+      </div>
+      <div className="wu-page-sk-table">
+        {[92, 78, 86, 70, 82, 64].map((w, i) => <div key={i} className="wu-sk" style={{ height: 14, width: `${w}%` }} />)}
+      </div>
+    </div>
+  );
+}
+
+// motion-a — list-shaped placeholder (avatar/icon + two lines) for a list that is loading.
+export function ListSkeleton({ rows = 5 }) {
+  return (
+    <div className="wu-list-sk" aria-hidden="true">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="wu-list-sk-row">
+          <div className="wu-sk" style={{ width: 36, height: 36, borderRadius: 999, flex: "0 0 auto" }} />
+          <div style={{ flex: 1, display: "grid", gap: 6 }}>
+            <div className="wu-sk" style={{ height: 12, width: `${60 + ((i * 13) % 30)}%` }} />
+            <div className="wu-sk" style={{ height: 10, width: `${35 + ((i * 17) % 25)}%` }} />
+          </div>
+        </div>
       ))}
     </div>
   );

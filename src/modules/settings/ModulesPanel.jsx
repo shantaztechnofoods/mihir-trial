@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { ENABLED_MODULES_ENV } from "../../config/env.js";
 import { MODULES, ALWAYS_ON_MODULES, effectiveEnabledModules, isModuleOn, envLockedModules } from "../../utils/modules.js";
 import { Section, Toggle } from "./settingsUi.jsx";
+import SaveMorph from "../../shared/ui/SaveMorph.jsx";
 
 // Go-live 2026-11-04 — Settings → Modules (super admin only). One switch per
 // module; turning one OFF asks "Are you sure?". Saves through onSaveModules
@@ -60,7 +61,7 @@ export function ModulesPanel({ settings, onSaveModules }) {
         <button type="button" data-save-modules disabled={busy || !dirty} onClick={save}
                 className="text-xs font-bold px-4 py-2 rounded-xl"
                 style={{ background: dirty ? "#2640B0" : "rgba(17,24,39,0.08)", color: dirty ? "#fff" : "#6b7280", minHeight: 40 }}>
-          {busy ? "Saving…" : "💾 Save modules"}
+          <SaveMorph busy={busy} saved={msg.startsWith("Saved") ? msg : null}>💾 Save modules</SaveMorph>
         </button>
         {msg && <span className="text-[12px] font-semibold" style={{ color: msg.startsWith("Saved") ? "#15803d" : "#b91c1c" }}>{msg}</span>}
       </div>

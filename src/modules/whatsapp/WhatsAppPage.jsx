@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { RefreshCw, Settings, User, Menu, X, MessagesSquare, FileText, Sparkles, Search, Send, Paperclip, ArrowLeft, Check, CheckCheck, Clock, AlertCircle, MessageSquarePlus, Image as ImageIcon, Mic, FileDown, Trash2, Plus } from "lucide-react";
 import { MobileNavContext } from "../../shared/components/PageHeader.jsx";
 import { waAvatarColor, waParseDirectory, waPhoneKey, waReadSeen, waUnreadCount, waWriteSeen } from "./waHelpers.js";
+import { ListSkeleton } from "../../shared/ui/primitives.jsx";
 
 // ─── WHATSAPP PAGE ───────────────────────────────────────────────────────────
 
@@ -924,6 +925,7 @@ export function WhatsAppPage({ settings = {}, onSave, canDo = () => false }) {
                   </div>
                 )}
 
+                {chatsLoading && visibleChats.length === 0 && <div role="status" aria-label="Loading chats"><ListSkeleton rows={6} /></div>}
                 {!chatsLoading && !chatsErr && visibleChats.length === 0 && (
                   <div className="px-8 py-14 text-center">
                     <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center"
@@ -1043,7 +1045,7 @@ export function WhatsAppPage({ settings = {}, onSave, canDo = () => false }) {
 
                 <div className="flex-1 overflow-y-auto px-6 py-4 flex flex-col wa-thread">
                   {msgsLoading && messages.length === 0 && (
-                    <div className="m-auto text-[12.5px]" style={{ color: "var(--wa-ink-2)" }}>Loading messages…</div>
+                    <div className="w-full" role="status" aria-label="Loading messages…"><ListSkeleton rows={4} /></div>
                   )}
                   {!msgsLoading && messages.length === 0 && !msgsErr && (
                     <div className="m-auto text-[12.5px] text-center" style={{ color: "var(--wa-ink-2)" }}>

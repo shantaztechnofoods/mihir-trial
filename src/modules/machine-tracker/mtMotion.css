@@ -98,6 +98,31 @@
      a dialog opened, on every field at once, on top of the sheet slide) */
   .modal-backdrop .vn-writing { animation: mt-reveal 200ms var(--ease-enter) backwards; }
 
+  /* ── motion-b (2026-11-06) ──────────────────────────────────────────────
+     Checklist bar: fills as points are ticked (the shared .wu-progress-track
+     320 ms scaleX transition). Last point ticked: the bar glows once and a ✓
+     pops next to "5 of 5" (≤ 520 ms, opacity / transform only). */
+  .ck-prog { display: flex; align-items: center; gap: 10px; margin: 2px 0 10px; }
+  .ck-prog-bar { position: relative; flex: 1; display: flex; }
+  .ck-prog-bar .ck-prog-track { flex: 1; height: 6px; }
+  .ck-prog-glow { position: absolute; inset: -3px; border-radius: 6px; pointer-events: none; opacity: 0;
+    box-shadow: 0 0 0 3px rgba(21, 128, 61, .28), 0 0 12px 2px rgba(21, 128, 61, .35); animation: ck-glow 520ms var(--ease-enter) 1; }
+  @keyframes ck-glow { 0% { opacity: 0; } 35% { opacity: 1; } 100% { opacity: 0; } }
+  .ck-prog-n { font-size: 13px; font-weight: 600; color: var(--ink-3, #5b6474); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .ck-prog[data-ck-progress="full"] .ck-prog-n { color: var(--ok, #15803d); }
+  .ck-prog-tick { display: inline-block; font-weight: 700; }
+  .ck-prog-pop { animation: ck-pop 300ms var(--ease-pop) 120ms backwards; }
+  @keyframes ck-pop { from { opacity: 0; transform: scale(.3); } to { opacity: 1; transform: none; } }
+
+  /* Late machine: a calm red dot that breathes (1.6 s; transform/opacity of a
+     pseudo-element only) in front of the existing "⏰ Late by 6h" words. */
+  .wu-timer.is-bad::before { content: ""; position: relative; flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%;
+    background: var(--bad, #c8282e); box-shadow: 0 0 0 0 transparent; }
+  .wu-timer.is-bad { position: relative; }
+  .wu-timer.is-bad::after { content: ""; position: absolute; left: 10px; top: 50%; width: 8px; height: 8px; margin-top: -4px; border-radius: 50%;
+    background: var(--bad, #c8282e); pointer-events: none; opacity: 0; animation: mt-late 1.6s ease-out infinite; }
+  @keyframes mt-late { 0% { opacity: .55; transform: scale(1); } 70%, 100% { opacity: 0; transform: scale(2.6); } }
+
   /* ── Ghost host (exiting cards / sheets) ─────────────────────────────── */
   .mt-ghost-host { display: contents; }
   .mt-ghost-host > .mt-card { box-shadow: var(--e2, 0 8px 24px rgba(11, 18, 32, .12)) !important; }
@@ -131,4 +156,7 @@ html.wu-lite .wu-confetti { display: none !important; }
   .ck-no[aria-pressed="true"], .ck-reason .vn-mic:not(.vn-mic-busy) { animation: none; }
   .modal-backdrop .vn-bar::after { animation: none; opacity: .6; }
   .modal-backdrop .vn-field:has(> .vn-mic-busy) > input, .modal-backdrop .vn-field:has(> .vn-mic-busy) > textarea { animation: none; }
+  .ck-prog-pop { animation: wu-fade 120ms ease backwards; }
+  .ck-prog-glow { animation: ck-glow 400ms ease 1; }
+  .wu-timer.is-bad::after { animation: none; }
 }

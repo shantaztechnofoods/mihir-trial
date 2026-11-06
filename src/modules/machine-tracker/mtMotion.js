@@ -7,7 +7,8 @@
 //
 // What it does (MOTION-PLAN.md MT-2 / MT-4 / MT-5 / MT-12):
 //   * Card moves: a machine card that leaves a section (Accept → Work, Work →
-//     Sent on) exits in 180 ms (a detached copy fades up and out), the cards
+//     Sent on) exits in 300 ms (a detached copy flies toward its new card, or
+//     slides on toward the next department, and fades — motion-b), the cards
 //     around it glide into the gap in 240 ms (FLIP, transform only), and the
 //     card that arrived in its new section gets a soft green ring (1.1 s).
 //     Cards are found by data-mt-mid (machine id) + their section.
@@ -34,7 +35,7 @@
 
 import { useEffect, useLayoutEffect, useRef } from "react";
 
-const DUR = { out: 180, move: 240, ring: 1100, sheet: 200, dialog: 160, fade: 120 };
+const DUR = { out: 180, fly: 300, move: 240, ring: 1100, sheet: 200, dialog: 160, fade: 120 };
 const EASE_MOVE = "cubic-bezier(.65, 0, .35, 1)";
 const EASE_IN = "cubic-bezier(.4, 0, 1, 1)";
 const EASE_DRAWER = "cubic-bezier(.32, .72, 0, 1)";
@@ -81,7 +82,10 @@ function dropLater(node, ms) {
 }
 
 // ── Card exit ghost ───────────────────────────────────────────────────────
-function cardGhost(node, vp) {
+// motion-b (2026-11-06): the copy now travels TOWARD where the machine went —
+// to its new card when that is on screen (Accept → Work), else a short slide
+// down-right ("sent on" to the next department, Finish & Transfer).
+function cardGhost(node, vp, to) {
   if (!node || node.isConnected || !canAnimate(node)) return;
   try {
     neuter(node);
@@ -95,10 +99,12 @@ function cardGhost(node, vp) {
     node.animate(
       reduce
         ? [{ opacity: 1 }, { opacity: 0 }]
-        : [{ opacity: 1, transform: "none" }, { opacity: 0, transform: "translateY(-6px) scale(.98)" }],
-      { duration: reduce ? DUR.fade : DUR.out, easing: EASE_IN, fill: "forwards" },
+        : [{ opacity: 1, transform: "none" },
+           { opacity: .9, transform: `translate(${to ? to.dx * 0.6 : 24}px, ${to ? to.dy * 0.6 : 10}px) scale(.97)`, offset: 0.6 },
+           { opacity: 0, transform: `translate(${to ? to.dx : 48}px, ${to ? to.dy : 20}px) scale(.94)` }],
+      { duration: reduce ? DUR.fade : DUR.fly, easing: EASE_MOVE, fill: "forwards" },
     );
-    dropLater(node, reduce ? DUR.fade : DUR.out);
+    dropLater(node, reduce ? DUR.fade : DUR.fly);
   } catch { try { node.remove(); } catch { /* ignore */ } }
 }
 
@@ -232,7 +238,11 @@ function playMoves(root, s) {
     if (v.el.isConnected) continue;
     const y = v.y - vw.st + vw.top;
     if (y > window.innerHeight || y + v.h < 0) continue;     // off screen: nothing to see
-    cardGhost(v.el, { x: v.x + vw.left, y, w: v.w, h: v.h });
+    // Same machine arrived in another section on screen → fly toward it (layout numbers already read above)
+    const dest = came.find((c) => c.mid === v.mid);
+    const destY = dest ? dest.y - vw.st + vw.top : 0;
+    const to = dest && destY < window.innerHeight && destY + dest.h > 0 ? { dx: dest.x - v.x, dy: dest.y - v.y } : null;
+    cardGhost(v.el, { x: v.x + vw.left, y, w: v.w, h: v.h }, to);
   }
   // 2. The same machine in its new section: soft ring (opacity only).
   const goneMids = new Set(gone.map((v) => v.mid));

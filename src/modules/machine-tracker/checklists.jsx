@@ -88,7 +88,30 @@ export function ChecklistRows({ answers, onToggle, onRemark, voice = null, place
     return () => window.removeEventListener(CHECKLIST_FLAG_EVENT, on);
   }, []);
   const list = Array.isArray(answers) ? answers : [];
+  // motion-b (2026-11-06) — display only: a bar that fills as points are
+  // ticked; the moment the LAST point is ticked the bar glows once and a ✓
+  // pops (≤ 600 ms). Already complete when the list opens = no celebration.
+  const total = list.length;
+  const ticked = list.filter((a) => a && a.checked).length;
+  const full = total > 0 && ticked === total;
+  const wasFull = useRef(full);
+  const [cheer, setCheer] = useState(0);
+  useEffect(() => {
+    if (full && !wasFull.current) setCheer((n) => n + 1);
+    wasFull.current = full;
+  }, [full]);
   return (
+    <>
+    {total > 0 && (
+      <div className="ck-prog" data-ck-progress={full ? "full" : "part"} aria-label={`${ticked} of ${total} points ticked`}>
+        <div className="ck-prog-bar">
+          <div className="wu-progress-track ck-prog-track"><i style={{ transform: `scaleX(${ticked / total})` }} /></div>
+          {full && cheer > 0 && <b key={cheer} className="ck-prog-glow" aria-hidden="true" />}
+        </div>
+        {/* the "2 / 4 ticked" count is already in the bar above; this only adds the ✓ at 100% */}
+        <span className="ck-prog-n" aria-hidden="true">{full && <span key={cheer} className={cheer ? "ck-prog-tick ck-prog-pop" : "ck-prog-tick"}>✓ All done</span>}</span>
+      </div>
+    )}
     <div className="ck-list" ref={listRef} data-checklist-rows>
       {list.map((a, i) => {
         const hasWhy = !!String(a.remark || "").trim();
@@ -137,5 +160,6 @@ export function ChecklistRows({ answers, onToggle, onRemark, voice = null, place
         );
       })}
     </div>
+    </>
   );
 }
