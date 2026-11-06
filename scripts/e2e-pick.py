@@ -30,7 +30,8 @@ COMPONENT_MAP = [
     (r"^(DashboardPage|MyDashboard\w*)$", ["dashboard-line", "my-dashboard", "go-live-workflows"]),
     (r"^(SettingsPage|Settings\w*|Checklist\w*)$", ["settings-bom-organised", "compact-checklist", "dept-staff-create"]),
     (r"^(Machine\w*|MT\w*|Mt\w*|Rack\w*|Trial\w*|Handover\w*|Accept\w*|Finish\w*|Hold\w*|Ready\w*|Delay\w*)$", MT + ["ready-popup", "delay-reasons", "trial-signature-report"]),
-    (r"^(Voice\w*|Mic\w*)$", ["voice-note", "voice-transcribe"]),
+    (r"^(Voice\w*|Mic\w*)$", ["voice-note", "voice-transcribe", "voice-search"]),
+    (r"^(GlobalSearch|createSearchVoice|normalizeVoiceQuery)$", ["voice-search"]),
     (r"^(LoginPage|Login\w*|readBootShell|adoptBootAnimations|probeHero|heroMode)$", ["login-speed"]),
 ]
 PATH_MAP = [
@@ -41,7 +42,7 @@ PATH_MAP = [
     (r"^tests/e2e/lib/", SMOKE),
     (r"^src/realtime/|liveSync", ["live-sync"]),
     (r"online|offline", ["offline"]),
-    (r"voice", ["voice-note", "voice-transcribe"]),
+    (r"voice|GlobalSearch", ["voice-note", "voice-transcribe", "voice-search"]),
     (r"^src/modules/users-roles/|^src/auth/|^src/stores/admin", ["dept-staff-create"]),
     (r"^src/modules/audit-trail/|^src/auth/audit", ["perf-budget"]),
     (r"^src/utils/(handover|rackSlots|pendingJobs|workCalendar|checklist|bomCost)", MT + ["bom-unselected", "assembly-start-checklist"]),
