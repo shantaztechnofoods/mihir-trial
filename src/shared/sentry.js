@@ -3,8 +3,9 @@
 // * MIHIR TRIAL only, production builds only. Off in `npm run dev`, in CI / e2e
 //   (VITE_USE_SUPABASE=false), under a WebDriver-driven browser, and whenever
 //   VITE_SENTRY_DISABLED=true.
-// * DSN: VITE_SENTRY_DSN, else the Trial project's DSN ONLY when
-//   VITE_ERP_INSTANCE=trial. ERP LIVE (no instance flag) stays OFF until it gets
+// * DSN: VITE_SENTRY_DSN, else the Trial project's DSN ONLY for a Trial build
+//   (isTrialBuild: VITE_ERP_INSTANCE=trial, or no instance flag and the Trial
+//   Supabase project URL). ERP LIVE stays OFF until it gets
 //   its own Sentry project + VITE_SENTRY_DSN, and can never send to the Trial
 //   project even if that DSN is copied there by mistake.
 // * @sentry/react is NOT in the entry bundle: it is imported after first paint.
@@ -19,11 +20,20 @@ export const SENTRY_TEST_MESSAGE = "Sentry test from Trial";
 
 const viteEnv = (() => { try { return import.meta.env || {}; } catch { return {}; } })();
 
-export function sentrySettings(env = viteEnv, nav = typeof navigator !== "undefined" ? navigator : null) {
+// Which build is MIHIR TRIAL: VITE_ERP_INSTANCE=trial, or (the Trial Vercel
+// project sets no instance flag) a build pointed at the Trial Supabase project.
+const TRIAL_SUPABASE_REF = "kneklzurkwayfpawtdvf";
+export function isTrialBuild(env = viteEnv) {
   const instance = String(env.VITE_ERP_INSTANCE || "").trim().toLowerCase();
+  if (instance) return instance === "trial";
+  return String(env.VITE_SUPABASE_URL || "").includes(`${TRIAL_SUPABASE_REF}.supabase.co`);
+}
+
+export function sentrySettings(env = viteEnv, nav = typeof navigator !== "undefined" ? navigator : null) {
+  const trial = isTrialBuild(env);
   const ownDsn = String(env.VITE_SENTRY_DSN || "").trim();
-  let dsn = ownDsn || (instance === "trial" ? TRIAL_SENTRY_DSN : "");
-  if (instance !== "trial" && dsn === TRIAL_SENTRY_DSN) dsn = "";   // Live never reports to Trial
+  let dsn = ownDsn || (trial ? TRIAL_SENTRY_DSN : "");
+  if (!trial && dsn === TRIAL_SENTRY_DSN) dsn = "";   // Live never reports to Trial
   const prod = !!env.PROD && !env.DEV && env.MODE !== "test";
   const supabase = String(env.VITE_USE_SUPABASE || "").trim().toLowerCase() === "true";
   const disabled = String(env.VITE_SENTRY_DISABLED || "").trim().toLowerCase() === "true";
@@ -31,7 +41,7 @@ export function sentrySettings(env = viteEnv, nav = typeof navigator !== "undefi
   return {
     enabled: prod && supabase && !disabled && !automated && !!dsn,
     dsn,
-    environment: instance === "trial" ? "trial" : (String(env.VITE_SENTRY_ENVIRONMENT || "").trim() || "live"),
+    environment: trial ? "trial" : (String(env.VITE_SENTRY_ENVIRONMENT || "").trim() || "live"),
   };
 }
 

@@ -27,8 +27,17 @@ test("init is skipped in dev, test, CI/e2e (Supabase off), under WebDriver, and 
   assert.equal(sentrySettings({}, {}).enabled, false);   // plain node / no Vite env
 });
 
+test("Trial is also recognised by its Supabase project when no instance flag is set (Trial Vercel env)", () => {
+  const byUrl = { PROD: true, DEV: false, MODE: "production", VITE_USE_SUPABASE: "true", VITE_SUPABASE_URL: "https://kneklzurkwayfpawtdvf.supabase.co" };
+  assert.equal(sentrySettings(byUrl, {}).enabled, true);
+  assert.equal(sentrySettings(byUrl, {}).environment, "trial");
+  // ERP LIVE's own Supabase project, or an explicit non-trial instance, is never Trial
+  assert.equal(sentrySettings({ ...byUrl, VITE_SUPABASE_URL: "https://nwjlbrwqwdmrijnqeojy.supabase.co" }, {}).enabled, false);
+  assert.equal(sentrySettings({ ...byUrl, VITE_ERP_INSTANCE: "live" }, {}).enabled, false);
+});
+
 test("ERP LIVE stays off without its own DSN and can never use the Trial DSN", () => {
-  const live = { ...PROD_TRIAL, VITE_ERP_INSTANCE: "" };
+  const live = { ...PROD_TRIAL, VITE_ERP_INSTANCE: "", VITE_SUPABASE_URL: "https://nwjlbrwqwdmrijnqeojy.supabase.co" };
   assert.equal(sentrySettings(live, {}).enabled, false);
   assert.equal(sentrySettings({ ...live, VITE_SENTRY_DSN: TRIAL_SENTRY_DSN }, {}).enabled, false);
   const own = sentrySettings({ ...live, VITE_SENTRY_DSN: "https://abc@o1.ingest.sentry.io/2" }, {});
