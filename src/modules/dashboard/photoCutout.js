@@ -7,7 +7,7 @@
 // scene shows the neutral "No photo · add in BOM" placeholder.
 
 const cache = new Map();
-const MAX_SIDE = 512;
+const MAX_SIDE = 1024; // crisp at DPR 2 (review 2026-11-06; was 512)
 
 // Pure: clears the background in an RGBA pixel array (Uint8ClampedArray) in place.
 // Returns the number of pixels made transparent.

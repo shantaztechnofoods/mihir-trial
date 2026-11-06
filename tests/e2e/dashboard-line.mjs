@@ -100,12 +100,24 @@ const openDashboard = async (p) => { await p.locator("button, a").filter({ hasTe
     ok("3d: late tag says Late in words", tags.some((t) => /SN-104.*Late \d/.test(t)), tags.join(" | "));
     ok("3d: six zone chips with words", await p.locator("[data-floor-3d] [data-chip]").count() === 6 && /Late/.test(await p.locator('[data-chip="Mechanical"]').innerText()));
     ok("3d: output ring in the header", /ready today/.test(await p.locator("[data-output-ring]").innerText()));
-    const over = await p.locator("[data-floor-3d] .f3-tag").evaluateAll((els) => { const r = els.map((e) => e.getBoundingClientRect()); for (let i = 0; i < r.length; i++) for (let j = i + 1; j < r.length; j++) { const a = r[i], c = r[j]; if (a.left < c.right - 1 && c.left < a.right - 1 && a.top < c.bottom - 1 && c.top < a.bottom - 1) return true; } return false; });
+    const over = await p.locator("[data-floor-3d] .f3-tag:not([data-hidden])").evaluateAll((els) => { const r = els.map((e) => e.getBoundingClientRect()); for (let i = 0; i < r.length; i++) for (let j = i + 1; j < r.length; j++) { const a = r[i], c = r[j]; if (a.left < c.right - 1 && c.left < a.right - 1 && a.top < c.bottom - 1 && c.top < a.bottom - 1) return true; } return false; });
     ok("3d: tags never overlap", !over);
     await p.mouse.move(0, 0); await p.waitForTimeout(400);
     await p.screenshot({ path: `${shots}/dashboard-3d-1440x900.png` });
-    await p.locator('[data-floor-3d] .f3-tag[data-s="hold"]').click(); await settle(p, 1200);
-    ok("3d: a machine tag opens Machine Tracker (same navigation as the Line view)", await p.locator("[data-production-line]").count() === 0);
+    // Review 2026-11-06: idle = no render loop; DPR capped; tap → in-place summary → Open in Machine Tracker.
+    const f0 = await p.evaluate(() => window.__dash3d.frames); await p.waitForTimeout(1500);
+    ok("3d: idle scene draws no frames (no render loop when nothing moves)", await p.evaluate(() => window.__dash3d.frames) === f0);
+    ok("3d: pixel ratio capped at 2", await p.evaluate(() => window.__dash3d.info().dpr <= 2));
+    ok("3d: canvas has a spoken summary with every department", /Rack: 2.*Mechanical.*Late.*Trial.*On hold – Heater awaited/s.test(await p.locator(".f3-gl").getAttribute("aria-label") || ""));
+    await p.locator('[data-floor-3d] .f3-tag[data-s="hold"]').click(); await settle(p, 600);
+    const pop = p.locator("[data-3d-popover]");
+    ok("3d: tapping a machine shows its summary in place (no jump)", await pop.count() === 1 && await p.locator("[data-production-line]").count() === 1
+      && /SN-106/.test(await pop.innerText()) && /Trial/.test(await pop.innerText()) && /On hold – Heater awaited/.test(await pop.innerText()));
+    await p.keyboard.press("Escape"); await settle(p, 300);
+    ok("3d: Esc closes the summary", await pop.count() === 0);
+    await p.locator('[data-floor-3d] .f3-tag[data-s="hold"]').click(); await settle(p, 600);
+    await p.locator("[data-3d-popover] [data-open-mt]").click(); await settle(p, 1200);
+    ok("3d: 'Open in Machine Tracker' opens Machine Tracker (same navigation as the Line view)", await p.locator("[data-production-line]").count() === 0);
     await openDashboard(p);
     ok("3d: back on the Dashboard it is Line again", await p.locator("[data-floor-3d]").count() === 0 && await p.locator("[data-production-line] [data-stage]").count() === 6);
     await p.locator('[data-line-views] [data-view="3d"]').click(); await p.waitForSelector("[data-floor-3d] canvas", { timeout: 15000 }).catch(() => {});
