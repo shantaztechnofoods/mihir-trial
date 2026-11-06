@@ -453,6 +453,10 @@ const USER_FACING_STRINGS = [
   "My work today",
   "All departments",
   "Today you sent ",
+  // Worker-ease pack (2026-11-06) — Today line, offline draft note, tap vibration switch
+  "sent forward",
+  "Restored your unsaved entry from earlier",
+  "Tap vibration",
   "Save Checklist",
   "+ Add Step",
   "Must do",
