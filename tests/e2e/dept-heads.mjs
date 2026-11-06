@@ -130,5 +130,96 @@ const label = (p, k) => p.locator(`[data-production-line] [data-stage="${k}"] .d
   await gotoMachineTracker(p);
   ok("production head has no Machine Tracker Settings button (canDo machines.configDept)", await p.locator("button[data-mt-settings]").count() === 0);
   ok("no page errors (head)", errs.length === 0, errs.join(" | "));
-  await done(b);
+  await b.close();
+}
+
+// ── MT UX pack (2026-11-06): head's "My work today", next step, near-limit strip ──
+const headSeed = `(${seed})(); (() => {
+  const pw = (s) => btoa(unescape(encodeURIComponent(s)));
+  const us = JSON.parse(localStorage.getItem("erp_users"));
+  us.push({ id: "u_ravi", username: "ravi", password: pw("ravi123"), fullName: "Ravi (Mechanical head)", role: "Production", status: "active", departments: ["Mechanical"] });
+  localStorage.setItem("erp_users", JSON.stringify(us));
+  const ago = (min) => new Date(Date.now() - min * 60000).toISOString();
+  localStorage.setItem("erp_machines", JSON.stringify([
+    { id: 1, bomKey: "M-10", bomLabel: "Kneading Machine 10kg", serialNo: "SN-101", status: "active", stage: "Mechanical", currentDepartment: "Mechanical", departmentEnteredAt: ago(124), deptDurations: { Mechanical: { minutes: 150 } }, createdDate: "30 Oct 2026", history: [] },
+    { id: 2, bomKey: "M-10", bomLabel: "Kneading Machine 10kg", serialNo: "SN-102", status: "active", stage: "Mechanical", currentDepartment: "Mechanical", departmentEnteredAt: ago(120), deptDurations: { Mechanical: { minutes: 60 } }, createdDate: "30 Oct 2026", history: [] },
+    { id: 3, bomKey: "M-10", bomLabel: "Kneading Machine 10kg", serialNo: "SN-103", status: "active", stage: "Assembly", currentDepartment: "Assembly", departmentEnteredAt: ago(300), pendingHandoverId: 31, createdDate: "30 Oct 2026", history: [] },
+    { id: 4, bomKey: "M-10", bomLabel: "Kneading Machine 10kg", serialNo: "SN-104", status: "active", stage: "Electrical", currentDepartment: "Electrical", departmentEnteredAt: ago(50), createdDate: "30 Oct 2026", history: [] },
+  ]));
+  localStorage.setItem("erp_handovers", JSON.stringify([
+    { id: 31, machineId: 3, bomKey: "M-10", serialNo: "SN-103", fromDepartment: "Assembly", toDepartment: "Mechanical", status: "pending", sentAt: ago(10), acceptTimeoutMinutes: 240 },
+    { id: 32, machineId: 4, bomKey: "M-10", serialNo: "SN-104", fromDepartment: "Mechanical", toDepartment: "Electrical", status: "accepted", sentAt: ago(60), acceptedAt: ago(50), acceptTimeoutMinutes: 240 },
+  ]));
+  localStorage.setItem("erp_checklist_templates", JSON.stringify([{ id: 901, name: "Mechanical checks", department: "Mechanical", stage: "during_work", bomKey: null, active: true, version: 1,
+    items: [{ id: "a", text: "Belt tension" }, { id: "b", text: "Bolts tight" }, { id: "c", text: "Guard fitted" }] }]));
+  const s = JSON.parse(localStorage.getItem("erp_settings") || "{}");
+  s.departmentHeads = { Mechanical: { userId: "u_ravi", name: "Ravi" }, Electrical: { userId: "super_admin_001", name: "Super Admin" } };
+  s.department_workflow = { ...(s.department_workflow || {}), weekly_off_days: [], holidays: [] };
+  localStorage.setItem("erp_settings", JSON.stringify(s));
+})();`;
+{
+  const { b, p, errs } = await launch(headSeed, { width: 1440, height: 900 });
+  await login(p, "ravi", "ravi123"); await gotoMachineTracker(p);
+  const panel = p.locator("[data-mywork]");
+  ok("head: 'My work today' opens on Machine Tracker", await panel.count() === 1 && /My work today/.test(await panel.innerText()));
+  ok("head: summary '3 machines · 1 late · 1 to accept'", /Mechanical · 3 machines · 1 late · 1 to accept/.test(await p.locator("[data-mywork-summary]").innerText()), await p.locator("[data-mywork-summary]").innerText());
+  const order = await p.locator("[data-mywork-card]").evaluateAll((els) => els.map((e) => e.getAttribute("data-mywork-card")));
+  ok("head: most urgent first (late SN-102, then the one to accept)", order.join(",") === "2,3,1", order.join(","));
+  ok("head: to-accept machine's next step is Accept into Mechanical", (await p.locator('[data-mywork-next="3"]').innerText()).trim() === "Accept into Mechanical");
+  ok("head: working machine's next step is 'Fill checklist (3 left)'", (await p.locator('[data-mywork-next="1"]').innerText()).trim() === "Fill checklist (3 left)");
+  ok("staff card: same next step, Finish becomes a secondary", (await p.locator('[data-staff-during="1"]').getAttribute("data-next-step")) === "checklist" && await p.locator('[data-staff-actions="1"] .mtx-sec-row [data-staff-finish="1"]').count() === 1);
+  ok("head: footer 'Today you sent 1 machine forward'", /Today you sent 1 machine forward/.test(await p.locator("[data-mywork-sent]").innerText()));
+  ok("head (floor login): no All departments toggle — cannot widen a department login", await p.locator("[data-mywork-scope]").count() === 0);
+  const strip = p.locator("[data-near-limit]");
+  ok("near-limit strip: one strip with a count for 2 machines", await strip.count() === 1 && (await strip.getAttribute("data-near-limit-count")) === "2");
+  ok("near-limit strip: least time left first, calm text", /^M-10 \(SN-102\) · late by 1h in Mechanical$/.test((await p.locator("[data-near-limit-open]").innerText()).trim()), await p.locator("[data-near-limit-open]").innerText());
+  ok("near-limit strip: '+1 more'", /\+1 more/.test(await p.locator("[data-near-limit-more]").innerText()));
+  ok("near-limit: no modal opened", await p.locator(".modal-backdrop").count() === 0);
+  await p.mouse.move(0, 0); await p.waitForTimeout(300);
+  await p.screenshot({ path: `${shots}/mywork-head-1440.png` });
+  await p.locator('[data-mywork-next="1"]').click(); await p.waitForTimeout(400);
+  ok("next step opens the same During-Work Checks sheet", await p.locator("[data-during-checklist]").count() > 0);
+  await p.keyboard.press("Escape"); await p.waitForTimeout(400);
+  await p.locator("[data-near-limit-dismiss]").click(); await p.waitForTimeout(300);
+  ok("dismiss hides the strip", await p.locator("[data-near-limit]").count() === 0);
+  await p.reload({ waitUntil: "networkidle" }); await settle(p, 1500);
+  if (await p.locator("#login-username").count()) await login(p, "ravi", "ravi123");
+  await gotoMachineTracker(p);
+  ok("dismissal remembered after reload (once per machine per stage)", await p.locator("[data-near-limit]").count() === 0 && await p.locator("[data-mywork]").count() === 1);
+  await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(500);
+  ok("390: no sideways scroll on Machine Tracker", await noOverflow(p));
+  const nb = await p.locator('[data-mywork-next="2"]').boundingBox();
+  ok("390: next step is full width and >= 48px", nb && nb.height >= 48 && nb.width >= 320, JSON.stringify(nb));
+  const firstTop = await p.locator("[data-mywork-card]").first().boundingBox();
+  ok("390: own machines are at the top (first card within the first screen)", firstTop && firstTop.y < 844, JSON.stringify(firstTop));
+  await p.screenshot({ path: `${shots}/mywork-head-390.png` });
+  ok("no page errors (dept head)", errs.length === 0, errs.join(" | "));
+  await b.close();
+}
+{
+  // An admin picked as a department head: his department by default, toggle to All departments.
+  const { b, p, errs } = await launch(headSeed, { width: 1440, height: 900 });
+  await loginAdmin(p); await gotoMachineTracker(p);
+  ok("admin head: My work today for Electrical", await p.locator("[data-mywork-head]").count() === 1 && /Electrical · 1 machine/.test(await p.locator("[data-mywork-summary]").innerText()));
+  ok("admin head: default is My department", (await p.locator('[data-mywork-scope="mine"]').getAttribute("aria-pressed")) === "true");
+  await p.locator('[data-mywork-scope="all"]').click(); await settle(p, 800);
+  ok("admin head: All departments brings back every machine", (await p.locator('[data-mywork-scope="all"]').getAttribute("aria-pressed")) === "true" && await p.locator("[data-mywork-card]").count() === 0);
+  ok("no page errors (admin head)", errs.length === 0, errs.join(" | "));
+  await b.close();
+}
+{
+  // An admin who is NOT a head keeps today's default; a plain department user gets own machines on the phone only.
+  const plain = headSeed.replace('Electrical: { userId: "super_admin_001", name: "Super Admin" }', "").replace('Mechanical: { userId: "u_ravi", name: "Ravi" }, ', "");
+  const { b, p, errs } = await launch(plain, { width: 1440, height: 900 });
+  await loginAdmin(p); await gotoMachineTracker(p);
+  ok("admin (not a head): no My work panel, current default kept", await p.locator("[data-mywork]").count() === 0);
+  await b.close();
+  const r = await launch(plain, { width: 1440, height: 900 });
+  await login(r.p, "ravi", "ravi123"); await gotoMachineTracker(r.p);
+  ok("department user at 1440: own-machines strip hidden (phone only)", await r.p.locator("[data-mywork]").evaluate((e) => getComputedStyle(e).display) === "none");
+  ok("department user: no near-limit strip (heads only)", await r.p.locator("[data-near-limit]").count() === 0);
+  await r.p.setViewportSize({ width: 390, height: 844 }); await r.p.waitForTimeout(500);
+  ok("department user at 390: 'Your machines' cards at the top", await r.p.locator("[data-mywork]").isVisible() && await r.p.locator("[data-mywork-card]").count() === 3 && await r.p.locator("[data-mywork-sent]").count() === 0);
+  ok("no page errors (plain)", errs.length === 0 && r.errs.length === 0, [...errs, ...r.errs].join(" | "));
+  await done(r.b);
 }

@@ -34,6 +34,9 @@ import Count from "../../shared/ui/Count.jsx";
 import { toast as sonnerToast } from "../../shared/ui/toast.js";
 import { useMtMotion, leftToDoText } from "./mtMotion.js";
 import "./mtMotion.css";
+import { nextStepFor, checklistLeftFor, HOLD_REASON_CHIPS, HOLD_OTHER, composeHoldReason, holdReasonError, nearLimitList, readDismissed, writeDismissed, headDepartmentsFor, sortByUrgency, myWorkSummary, sentTodayCount, shortLeft } from "./mtUx.js";
+import { NextStepButton, NearLimitStrip, MyWorkPanel } from "./MyWork.jsx";
+import { readDepartmentHeads } from "../../utils/departmentHeads.js";
 
 // Staff view building blocks (phone first). Defined once at module level so a
 // re-render (the 60 s timer tick, a toast, a dialog opening) updates the cards
@@ -681,7 +684,17 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
   // belongs where, it just was not being used to scope this page.
   // myDepartments is empty for admins and for anyone not assigned to a
   // department, and those users see everything exactly as before.
-  const myDepartments = Array.isArray(currentUser?.departments) ? currentUser.departments.filter(Boolean) : [];
+  const assignedDepartments = Array.isArray(currentUser?.departments) ? currentUser.departments.filter(Boolean) : [];
+  // 2026-11-06 (MT UX pack) — department heads: picked in Settings →
+  // Department heads, or a head role with departments. An ADMIN picked as a
+  // head (no department assignment of his own) gets that department as "my
+  // work" so his default view is his department; the All departments toggle
+  // brings back the full tracker. Never widens anyone: non-admins keep their
+  // assignment only (the database scopes them anyway).
+  const headDepartments = headDepartmentsFor(currentUser, readDepartmentHeads(settings), assignedDepartments);
+  const isDeptHead = headDepartments.length > 0;
+  const myDepartments = assignedDepartments.length ? assignedDepartments
+    : (isAdminUser && isDeptHead ? headDepartments : []);
   const hasDepartments = myDepartments.length > 0;
   // 2026-11-02 — who may press "Part received" on a job. Mirrors
   // receive_pending_part() (migration 055): Admin — any job; others need
@@ -830,7 +843,12 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
   // it from the rack. Derived, so adding a stage ahead of Assembly keeps this
   // correct.
   const FIRST_WORK_DEPARTMENT = DEPARTMENT_SEQUENCE.find((d) => d !== "BOM Issued");
-  const [scope, setScope] = useState(() => (!isAdminUser && hasDepartments) ? "mine" : "all");
+  const [scope, setScope] = useState(() => ((!isAdminUser && hasDepartments) || isDeptHead) ? "mine" : "all");
+  // Settings (department heads) can arrive after the first render: a head's
+  // default becomes his department once, unless he already picked a scope.
+  const scopeTouchedRef = useRef(false);
+  const pickScope = (v) => { scopeTouchedRef.current = true; setScope(v); };
+  useEffect(() => { if (isDeptHead && hasDepartments && !scopeTouchedRef.current) setScope("mine"); }, [isDeptHead, hasDepartments]);
   const scopeMine = isFloorLogin || (scope === "mine" && hasDepartments);
   // Only office and admin logins get to switch; a floor login has nothing to
   // switch to.
@@ -941,6 +959,75 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
     if (late) ringAlert(`${name} ${serial} का समय खत्म हो गया है`, `${name} ${serial} time is over`);
     else ringAlert(`${name} ${serial} का समय खत्म होने वाला है, ${hiLeft}`, `${name} ${serial} time is almost over, ${enLeft}`);
   }, [deadlineKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── 2026-11-06 MT UX pack: next step · near-limit strip · My work today ──
+  // Display + navigation only: each next step opens the SAME modal the
+  // existing button opens (Accept / During-Work / Finish & Transfer / Release
+  // hold), behind the same permission checks as those buttons.
+  const canHoldAny = !!onSetMachineHold && (isAdminUser || canFinishTransfer(canDo) || canDo("machines", "updateStage"));
+  const duringTemplateOf = (m) => (onSubmitDuringWorkChecklist ? pickTemplate(checklistTemplates, m.bomKey, m.currentDepartment || m.stage, "during_work") : null);
+  const checklistLeftOf = (m) => checklistLeftFor(duringTemplateOf(m), checklistResponses, m);
+  const stepForWorking = (m) => nextStepFor({
+    held: !!m.holdActive, canResume: canHoldAny,
+    checklistLeft: checklistLeftOf(m),
+    nextDept: nextDepartment(m.currentDepartment || m.stage), canFinish: canFinishTransfer(canDo) && !!onFinishTransfer,
+  });
+  const stepForAccept = (m, h) => nextStepFor({
+    held: !!(m && m.holdActive), canResume: canHoldAny,
+    toAccept: true, canAccept: canAcceptHandover(canDo, h.toDepartment) && !!onAcceptHandover, acceptDept: h.toDepartment,
+  });
+  const runStep = (step, m, h) => {
+    if (!step) return;
+    if (step.kind === "resume") setHoldModal({ machine: m, release: true, reason: "", chip: "", busy: false, error: "" });
+    else if (step.kind === "accept") { if (!acceptModal) openAcceptModal(h); }
+    else if (step.kind === "checklist") openDuringWorkModal(m);
+    else if (step.kind === "finish") openFinishModal(m);
+  };
+  // Own machines: in my department(s), or handed to them and released.
+  const ownRows = (() => {
+    if (isProdHead || !hasDepartments) return [];
+    const rows = [];
+    const seen = new Set();
+    for (const h of askableHandovers) {
+      if (!myDepartments.includes(h.toDepartment)) continue;
+      const m = (machineLog || []).find((x) => String(x.id) === String(h.machineId));
+      if (!m || m.status === "completed" || seen.has(String(m.id))) continue;
+      seen.add(String(m.id));
+      const late = isHoldOverdue(h.sentAt, h.acceptTimeoutMinutes, nowTick);
+      rows.push({ key: `a${h.id}`, m, h, dept: h.toDepartment, toAccept: true, late, held: !!m.holdActive,
+        status: m.holdActive ? "On hold" : late ? `Accept overdue · from ${h.fromDepartment}` : `To accept · from ${h.fromDepartment}`,
+        tone: m.holdActive || late ? "bad" : "wait", step: stepForAccept(m, h) });
+    }
+    for (const m of myWorking) {
+      if (seen.has(String(m.id))) continue;
+      seen.add(String(m.id));
+      const { dept, target, t, level, leftMinutes } = deptTimerOf(m);
+      const late = !!(t && t.isOverrun);
+      rows.push({ key: `w${m.id}`, m, dept, target, t, late, held: !!m.holdActive,
+        status: m.holdActive ? "On hold" : late ? `Late in ${dept} · ${shortLeft(t.overrunMinutes, true)}` : level === 80 ? `In ${dept} · ${shortLeft(leftMinutes)}` : `In ${dept}${t && target ? ` · ${shortLeft(leftMinutes)}` : ""}`,
+        tone: m.holdActive || late ? "bad" : level === 80 ? "wait" : "ok", step: stepForWorking(m) });
+    }
+    return sortByUrgency(rows).map((r) => ({ ...r,
+      title: `${r.m.serialNo || r.m.bomKey || "Machine"}`,
+      sub: [r.m.serialNo ? r.m.bomKey : "", r.m.bomLabel].filter(Boolean).join(" · "),
+      photoUrl: (bomDefs || {})[r.m.bomKey]?.photoUrl,
+      run: () => runStep(r.step, r.m, r.h) }));
+  })();
+  const ownSummary = myWorkSummary(ownRows);
+  const sentToday = isDeptHead ? sentTodayCount(handovers, myDepartments, new Date(nowTick)) : 0;
+  // Near-limit strip (heads only): no sound, no modal; dismissed once per
+  // machine per stage, remembered per user in this browser.
+  const [nearDismissed, setNearDismissed] = useState(() => { try { return readDismissed(window.localStorage, currentUser?.id); } catch { return new Set(); } });
+  const nearRows = isDeptHead && hasDepartments
+    ? nearLimitList(myWorking.filter((m) => myDepartments.includes(m.currentDepartment || m.stage)).map((m) => ({ m, ...deptTimerOf(m) })), nearDismissed)
+    : [];
+  const dismissNear = (keys) => setNearDismissed((prev) => { let st = null; try { st = window.localStorage; } catch { st = null; } return writeDismissed(st, currentUser?.id, prev, keys); });
+  const openOwnCard = (m) => {
+    try {
+      const el = document.querySelector(`[data-mywork-card="${m.id}"]`) || document.querySelector(`[data-staff-timer="${m.id}"]`) || document.querySelector(`[data-mt-mid="${m.id}"]`);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    } catch { /* ignore */ }
+  };
   // Transfer & Accept lists every machine still moving through the line —
   // the ones to finish & transfer, release, or accept — whatever summary
   // tile was last clicked on the Production tab.
@@ -1470,6 +1557,16 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
 
       <div className="p-4 sm:p-6 space-y-5">
 
+        {/* 2026-11-06 MT UX pack — heads: calm near-limit strip, then "My work
+            today" (all widths). Everyone with a department: own machines first
+            on a phone. Display + the same modals as the existing buttons. */}
+        <NearLimitStrip rows={nearRows} onDismiss={dismissNear} onOpen={openOwnCard} />
+        {(isDeptHead || ownRows.length > 0) && (
+          <MyWorkPanel rows={ownRows} isHead={isDeptHead} depts={myDepartments} summary={ownSummary} sentToday={sentToday}
+                       phoneOnly={!isDeptHead} showToggle={isDeptHead && !staffMode && showScopeSwitch}
+                       allDepts={isDeptHead && !staffMode && !scopeMine} onToggle={(all) => pickScope(all ? "all" : "mine")} />
+        )}
+
         {/* Search: type a machine name or serial number, the list shows it. */}
         {!staffMode && (
           <div className="relative" data-mt-search>
@@ -1609,13 +1706,17 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
               <LeadIcon e="⏸" />ON HOLD{m.holdReason ? ` · ${m.holdReason}` : ""}
             </div>
           ) : null;
-          const holdBtn = (m) => (canHoldM && m) ? (
-            <button data-needs-net type="button" className={`${btn} ${m.holdActive ? "wu-soft-ok" : "wu-soft"}`}
-                    {...(m.holdActive ? { "data-staff-release-hold": m.id } : { "data-staff-hold": m.id })}
-                    onClick={() => setHoldModal({ machine: m, release: !!m.holdActive, reason: "", busy: false, error: "" })}>
-              <LeadLabel text={m.holdActive ? "▶ Release ON HOLD" : "⏸ ON HOLD"} />
+          // 2026-11-06 MT UX pack — a held machine's ONE next step is Resume
+          // (same Release ON HOLD modal); putting on hold is a quiet secondary.
+          const holdBtn = (m) => (canHoldM && m) ? (m.holdActive ? (
+            <NextStepButton step={{ kind: "resume", label: "Resume" }} data-staff-release-hold={m.id} title="Release ON HOLD"
+                            onClick={() => setHoldModal({ machine: m, release: true, reason: "", chip: "", busy: false, error: "" })} />
+          ) : (
+            <button data-needs-net type="button" className="mtx-sec" data-staff-hold={m.id}
+                    onClick={() => setHoldModal({ machine: m, release: false, reason: "", chip: "", busy: false, error: "" })}>
+              Put on hold
             </button>
-          ) : null;
+          )) : null;
           const heldNote = (m, what) => (
             <div data-staff-held={m.id} className="wu-held">
               <LeadIcon e="⏸" />On hold — release the hold to {what}
@@ -1801,10 +1902,8 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                           {canAccept && m && m.holdActive && heldNote(m, "accept it")}
                           {m && m.holdActive && holdBtn(m)}
                           {canAccept && !(m && m.holdActive) && (
-                            <button data-needs-net type="button" data-staff-accept={h.id} className={`${btn} wu-ok wu-main`}
-                                    disabled={!!acceptModal} onClick={() => { if (!acceptModal) openAcceptModal(h); }}>
-                              ✓ Accept into {h.toDepartment}
-                            </button>
+                            <NextStepButton data-needs-net step={{ kind: "accept", label: `Accept into ${h.toDepartment}` }} data-staff-accept={h.id}
+                                            disabled={!!acceptModal} onClick={() => { if (!acceptModal) openAcceptModal(h); }} />
                           )}
                         </Card>
                       );
@@ -1824,6 +1923,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                       const { target, t, level, leftMinutes } = deptTimerOf(m);
                       const jobs   = openJobsOf(m);
                       const during = !!onSubmitDuringWorkChecklist && !!pickTemplate(checklistTemplates, m.bomKey, dept, "during_work");
+                      const step   = stepForWorking(m);
                       return (
                         <Card key={m.id} mid={m.id}>
                           {withPhoto(m, null, <div>
@@ -1848,31 +1948,43 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                             </div>
                             {holdBadge(m)}
                           </div>)}
-                          <div className="wu-actions">
-                            {during && (
-                              <button type="button" data-staff-during={m.id} className={`${btn} wu-soft`} onClick={() => openDuringWorkModal(m)}>
-                                <LeadIcon e="📋" />During-Work Checks
-                              </button>
-                            )}
-                            {canReport && (
-                              <button type="button" data-staff-issue={m.id} className={`${btn} wu-soft-bad`}
-                                      onClick={() => { setRaiseModal({ machine: m }); setRaiseText(""); setRaiseDept(""); setRaiseErr(""); setRaisePart(emptyPendingJob()); }}>
-                                Report Issue
-                              </button>
-                            )}
-                            {m.trialCertificate && canFinish && onUpdateTrialCertificate && (
-                              <button type="button" className={`${btn} wu-soft`}
-                                      onClick={() => setTrialCertModal({ machine: m, editOnly: true })}>
-                                <LeadIcon e="✎" />Certificate
-                              </button>
-                            )}
+                          {/* 2026-11-06 MT UX pack — ONE next step (Fill checklist →
+                              Finish → next dept; Resume when held), every other
+                              action a smaller secondary below it. Same modals. */}
+                          <div className="mtx-actions" data-staff-actions={m.id}>
                             {next && canFinish && m.holdActive && heldNote(m, "finish it")}
-                            {next && canFinish && !m.holdActive && (
-                              <button data-needs-net type="button" data-staff-finish={m.id} className={`${btn} wu-ok wu-main`} onClick={() => openFinishModal(m)}>
-                                ✓ Finish → {next}
-                              </button>
+                            {m.holdActive && holdBtn(m)}
+                            {!m.holdActive && step && step.kind === "checklist" && (
+                              <NextStepButton step={step} data-staff-during={m.id} onClick={() => openDuringWorkModal(m)} />
                             )}
-                            {holdBtn(m)}
+                            {!m.holdActive && step && step.kind === "finish" && (
+                              <NextStepButton data-needs-net step={step} data-staff-finish={m.id} onClick={() => openFinishModal(m)} />
+                            )}
+                            <div className="mtx-sec-row">
+                              {next && canFinish && !m.holdActive && (!step || step.kind !== "finish") && (
+                                <button data-needs-net type="button" data-staff-finish={m.id} className="mtx-sec" onClick={() => openFinishModal(m)}>
+                                  Finish → {next}
+                                </button>
+                              )}
+                              {during && (!step || step.kind !== "checklist") && (
+                                <button type="button" data-staff-during={m.id} className="mtx-sec" onClick={() => openDuringWorkModal(m)}>
+                                  During-Work Checks
+                                </button>
+                              )}
+                              {canReport && (
+                                <button type="button" data-staff-issue={m.id} className="mtx-sec mtx-sec-bad"
+                                        onClick={() => { setRaiseModal({ machine: m }); setRaiseText(""); setRaiseDept(""); setRaiseErr(""); setRaisePart(emptyPendingJob()); }}>
+                                  Report Issue
+                                </button>
+                              )}
+                              {m.trialCertificate && canFinish && onUpdateTrialCertificate && (
+                                <button type="button" className="mtx-sec"
+                                        onClick={() => setTrialCertModal({ machine: m, editOnly: true })}>
+                                  Certificate
+                                </button>
+                              )}
+                              {!m.holdActive && holdBtn(m)}
+                            </div>
                           </div>
                         </Card>
                       );
@@ -2115,10 +2227,10 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
           </div>
         )}
 
-        {!staffMode && showScopeSwitch && (
+        {!staffMode && showScopeSwitch && !isDeptHead && (
           <div className="flex items-center gap-3 flex-wrap">
             <div className="flex rounded-xl p-1" style={{ background: "rgba(17,24,39,0.05)" }}>
-              <button type="button" onClick={() => setScope("mine")}
+              <button type="button" onClick={() => pickScope("mine")}
                       aria-pressed={scopeMine}
                       className="text-[12px] font-bold px-4 h-9 rounded-lg transition-all"
                       style={scopeMine
@@ -2126,7 +2238,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                         : { background: "transparent", color: "#6b7280" }}>
                 My work
               </button>
-              <button type="button" onClick={() => setScope("all")}
+              <button type="button" onClick={() => pickScope("all")}
                       aria-pressed={!scopeMine}
                       className="text-[12px] font-bold px-4 h-9 rounded-lg transition-all"
                       style={!scopeMine
@@ -4075,8 +4187,11 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
         const m = holdModal.machine;
         const submit = async () => {
           if (holdModal.busy) return;
-          const why = holdModal.reason.trim();
-          if (!holdModal.release && !why) { setHoldModal((prev) => prev ? { ...prev, error: "Write why the machine is being put on hold." } : prev); return; }
+          // 2026-11-06 — quick-pick reason chips: the chip and the note are
+          // saved together as text in the same hold reason field.
+          const why = holdModal.release ? holdModal.reason.trim() : composeHoldReason(holdModal.chip, holdModal.reason);
+          const whyErr = holdModal.release ? "" : holdReasonError(holdModal.chip, holdModal.reason);
+          if (whyErr) { setHoldModal((prev) => prev ? { ...prev, error: whyErr === "Write the reason." ? whyErr : "Write why the machine is being put on hold — or pick a reason." } : prev); try { document.querySelector("[data-hold-reason]")?.focus(); } catch { /* ignore */ } return; }
           setHoldModal((prev) => prev ? { ...prev, busy: true, error: "" } : prev);
           const r = await onSetMachineHold({ machineId: m.id, hold: !holdModal.release, reason: why });
           if (r && r.success === false) { setHoldModal((prev) => prev ? { ...prev, busy: false, error: r.error || "Could not save." } : prev); return; }
@@ -4095,10 +4210,21 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
               ) : (
                 <p className="text-[13px] text-slate-600 mb-3">Machine stops here until released.</p>
               )}
-              <label className="block text-[11px] font-bold text-slate-600 mb-1">{holdModal.release ? "Note (optional)" : <>Reason <span className="text-red-500">*</span></>}</label>
-              <textarea data-hold-reason rows={2} value={holdModal.reason} disabled={holdModal.busy} autoFocus
+              {!holdModal.release && (
+                <div className="mtx-chips" role="group" aria-label="Reason" data-hold-chips>
+                  {HOLD_REASON_CHIPS.map((c) => (
+                    <button key={c} type="button" data-hold-chip={c} aria-pressed={holdModal.chip === c} disabled={holdModal.busy}
+                            className="mtx-chip"
+                            onClick={() => setHoldModal((prev) => prev ? { ...prev, chip: prev.chip === c ? "" : c, error: "" } : prev)}>
+                      {c}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <label className="block text-[11px] font-bold text-slate-600 mb-1">{holdModal.release ? "Note (optional)" : holdModal.chip && holdModal.chip !== HOLD_OTHER ? "Note (optional)" : <>Reason <span className="text-red-500">*</span></>}</label>
+              <textarea data-hold-reason rows={2} value={holdModal.reason} disabled={holdModal.busy} autoFocus={!!holdModal.release}
                         onChange={(e) => setHoldModal((prev) => prev ? { ...prev, reason: e.target.value, error: "" } : prev)}
-                        placeholder={holdModal.release ? "e.g. motor arrived" : "e.g. waiting for motor; quality check"}
+                        placeholder={holdModal.release ? "e.g. motor arrived" : holdModal.chip && holdModal.chip !== HOLD_OTHER ? "Add detail, e.g. motor from vendor" : "e.g. waiting for motor; quality check"}
                         className="w-full rounded-lg px-3 py-2.5 text-[13px] text-slate-800 outline-none"
                         style={{ background: "var(--surface-elevated)", border: "1px solid rgba(17,24,39,0.12)" }} />
               {holdModal.error && <div className="mt-3 text-[11px] font-bold px-3 py-2 rounded-lg" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.4)", color: "#dc2626" }}>{holdModal.error}</div>}
