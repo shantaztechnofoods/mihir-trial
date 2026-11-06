@@ -150,3 +150,51 @@ export function sentTodayCount(handovers, depts, now = new Date()) {
   return (handovers || []).filter((h) => h && h.sentAt && mine.has(h.fromDepartment) && h.status !== "cancelled"
     && localIsoDate(new Date(h.sentAt)) === today).length;
 }
+
+// ── 5. "Today" line (worker-ease, 2026-11-06) ─────────────────────────────
+// "Today · 3 accepted · 2 sent forward · 1 late · 1 on hold" at the top of
+// Machine Tracker, from data the page already has. depts = the user's
+// departments (department users) or null for everything (admins).
+//   accepted      hand-overs accepted today INTO the scope
+//   sent forward  hand-overs sent today FROM the scope (not pulled back)
+//   late          machines in the scope that are late right now (isLate),
+//                 not counting ones on hold
+//   on hold       machines in the scope with a manual ON HOLD
+// A machine is in the scope by its current department, or by the pending
+// hand-over that is addressed to the scope.
+export function todayCounts({ handovers, machines, depts = null, now = new Date(), isLate = () => false } = {}) {
+  const today = localIsoDate(now);
+  const all = !Array.isArray(depts);
+  const mine = new Set(all ? [] : depts);
+  const inScope = (d) => all || mine.has(d);
+  const isToday = (iso) => !!iso && localIsoDate(new Date(iso)) === today;
+  const hs = (handovers || []).filter(Boolean);
+  const accepted = hs.filter((h) => h.status === "accepted" && isToday(h.acceptedAt) && inScope(h.toDepartment)).length;
+  const sent = hs.filter((h) => h.status !== "cancelled" && isToday(h.sentAt) && inScope(h.fromDepartment)).length;
+  const pendingTo = new Map();
+  hs.forEach((h) => { if (h.status === "pending" && h.machineId != null) pendingTo.set(String(h.machineId), h.toDepartment); });
+  let late = 0, held = 0;
+  for (const m of machines || []) {
+    if (!m || m.status === "completed" || m.stage === "BOM Issued") continue;
+    const to = pendingTo.get(String(m.id));
+    if (!(inScope(m.currentDepartment || m.stage) || (to && inScope(to)))) continue;
+    if (m.holdActive) held += 1;
+    else if (isLate(m)) late += 1;
+  }
+  return { accepted, sent, late, held };
+}
+
+// The parts in order. omit: keys already shown elsewhere in the same block
+// (the "My work today" summary shows late; its footer shows sent forward).
+export function todayParts(c, omit = []) {
+  const skip = new Set(omit || []);
+  return [
+    { key: "accepted", n: c.accepted || 0, word: "accepted", tone: "ok" },
+    { key: "sent", n: c.sent || 0, word: "sent forward", tone: "ok" },
+    { key: "late", n: c.late || 0, word: "late", tone: "bad" },
+    { key: "held", n: c.held || 0, word: "on hold", tone: "wait" },
+  ].filter((p) => !skip.has(p.key));
+}
+export function todayText(c, omit) {
+  return ["Today", ...todayParts(c, omit).map((p) => `${p.n} ${p.word}`)].join(" · ");
+}

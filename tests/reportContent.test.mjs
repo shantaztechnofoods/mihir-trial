@@ -139,8 +139,9 @@ test("customer review flags contradictions instead of printing them", () => {
 
 test("report components use the new sections and wording", () => {
   const rep = read("src/modules/reports/AtoZMachineReport.jsx");
-  assert.match(rep, /n="00" title="Exceptions and findings"/);
-  assert.ok(rep.indexOf("<Findings />") < rep.indexOf("<CriticalParts />"), "findings print first");
+  // 2026-11-06 (reports v4) — "What to look at" (the findings) is section 1 and prints first.
+  assert.match(rep, /n="1" title="What to look at"/);
+  assert.ok(rep.indexOf("<Findings />") < rep.indexOf("<Journey />") && rep.indexOf("<Findings />") < rep.indexOf("<CriticalParts />"), "findings print first");
   assert.match(rep, /data-report-timeline/);
   assert.match(rep, /data-report-comments-dept=\{g\.dept\}/);
   assert.match(rep, /data-report-holds/);

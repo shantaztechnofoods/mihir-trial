@@ -288,7 +288,10 @@ export function TcSeal() {
 // department and date — so the sheet drops its own title, identity block,
 // signature row and footer and keeps only the trial date and the results.
 // `company`: the stand-alone print gets the company letterhead on top.
-export function TrialCertificateSheet({ machine, cert, remarks = "", embedded = false, company = null }) {
+// 2026-11-06 (reports v4) — `signatures`: an embedded certificate that still
+// prints its three signature boxes (the owner's rule: the full certificate is
+// inside the machine reports, so no separate certificate document goes out).
+export function TrialCertificateSheet({ machine, cert, remarks = "", embedded = false, company = null, signatures = false }) {
   const c = cert || {};
   const kh = c.khakhraMode || {};
   const bh = c.bakhriMode || {};
@@ -430,7 +433,7 @@ export function TrialCertificateSheet({ machine, cert, remarks = "", embedded = 
         {!remarks && !c.note ? <span className="tc-muted">No remarks.</span> : null}
       </div>
 
-      {embedded ? (
+      {embedded && !signatures ? (
         <div className="tc-signed-note">
           Signed by {[c.trialByName ? `${c.trialByName} (machine set and trial)` : "", c.checkByName ? `${c.checkByName} (service engineer check)` : ""].filter(Boolean).join(" and ") || "—"}{tcSigSrc(c.trialBySignature) || tcSigSrc(c.checkBySignature) ? " — signatures in the signature register below." : " — no signature captured yet."}
         </div>
