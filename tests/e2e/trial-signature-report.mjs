@@ -72,11 +72,12 @@ ok("company report: Ready acceptance signature listed", rows.some((r) => /Accept
 ok("company report: signature count in the summary matches the register", (await p.locator("[data-report-sig-count]").innerText()).trim() === String(rows.length));
 await close();
 
-// 4. Customer report: the Trial sign-off carries the signature, name, department, date.
+// 4. Customer report: the full certificate (section 3) carries the Trial signature with name and date.
+// 2026-11-06 (reports v4) — owner rule: the trial signatures print once, on the certificate inside the report.
 await openFromMenu("customer", 6);
-rows = await sigRows();
-const ctrial = rows.find((r) => /Tina Trialhead/.test(r.text));
-ok("customer report: Trial signature shown with name, department and date", ctrial && ctrial.img && /Trial/.test(ctrial.text) && dateRe.test(ctrial.text), JSON.stringify(rows));
+const ccert = await p.evaluate(() => { const s = document.querySelector("[data-report-trial]"); const img = s && s.querySelector(".tc-sigimg img");
+  return { text: s ? s.innerText.replace(/\s+/g, " ") : "", img: !!(img && img.naturalWidth > 0) }; });
+ok("customer report: Trial signature shown on the certificate with name and date", ccert.img && /Tina Trialhead/.test(ccert.text) && /Machine Set and Trial By/i.test(ccert.text) && /\b\d{2} [A-Z][a-z]{2} \d{4}\b/.test(ccert.text), ccert.text.slice(-300));
 await close();
 ok("no page errors", errs.length === 0, errs.join(" | "));
 await done(b);
