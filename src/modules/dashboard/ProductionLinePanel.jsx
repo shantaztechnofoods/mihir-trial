@@ -20,25 +20,6 @@ class Line3DBoundary extends React.Component {
   render() { return this.state.failed ? null : this.props.children; }
 }
 
-// Small "today's output" ring for the header while 3D is on: ready today out of
-// ready today + in production, with late / on hold in words.
-function OutputRing({ line }) {
-  const late = line.attention.filter((a) => a.kind === "late").length;
-  const hold = line.attention.filter((a) => a.kind === "hold").length;
-  const total = line.readyToday + line.inProduction;
-  const R = 15, C = 2 * Math.PI * R, share = total > 0 ? line.readyToday / total : 0;
-  return (
-    <div className="f3-ring" data-output-ring role="group" aria-label={`Today's output: ${line.readyToday} ready today, ${line.inProduction} in production, ${late} late, ${hold} on hold`}>
-      <svg width="36" height="36" viewBox="0 0 40 40" aria-hidden="true">
-        <circle cx="20" cy="20" r={R} fill="none" className="f3-ring-track" strokeWidth="4" />
-        <circle cx="20" cy="20" r={R} fill="none" className="f3-ring-fill" strokeWidth="4" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={C * (1 - share)} transform="rotate(-90 20 20)" />
-        <text x="20" y="24" textAnchor="middle">{line.readyToday}</text>
-      </svg>
-      <span><b>Today's output</b><small>{line.readyToday} ready today · {line.inProduction} in production{late > 0 && <> · <em data-tone="late">{late} late</em></>}{hold > 0 && <> · <em data-tone="hold">{hold} on hold</em></>}</small></span>
-    </div>
-  );
-}
-
 const ICONS = { ok: Check, near: Timer, late: AlertTriangle, hold: PauseCircle, incoming: Inbox };
 
 function StatusLine({ line }) {
@@ -109,7 +90,6 @@ export function ProductionLinePanel({ machines = [], handovers = [], settings = 
       {isOpen && <div id="dash-line-body" className="dash-line-body" data-line-body>
       <div className="dash-line-meta dash-line-meta-row">
         <span>{lg.same ? `Target: ${lg.target} in each department` : "Target per department (Settings)"} · {show3d ? "tap a machine" : "tap a stage"}</span>
-        {show3d && <OutputRing line={line} />}
         {wide && (
           <span className="dash-line-views" role="group" aria-label="Production line view" data-line-views>
             <button type="button" aria-pressed={!show3d} data-view="line" onClick={() => setView("line")}>Line</button>

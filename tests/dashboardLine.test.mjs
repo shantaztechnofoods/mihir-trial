@@ -252,12 +252,36 @@ test("dashboard 3D: 25+ machines in one department → most urgent shown, rest '
   assert.equal(visibleOnLine([{ id: 1, stage: "Trial", kind: "ok" }], 3).shown.length, 1);
 });
 
-test("dashboard 3D: zone grid packs machines in two staggered rows and grows with the count", async () => {
+test("dashboard 3D (v6): one row of big machines up to 5, two neat rows from 6; width grows with the count", async () => {
   const { zoneGrid } = await import("../src/modules/dashboard/line3d.js");
   assert.equal(zoneGrid([]).cells.length, 0);
   assert.equal(zoneGrid(["a"]).rows, 1);
+  const five = zoneGrid(["a", "b", "c", "d", "e"]);
+  assert.equal(five.rows, 1); assert.equal(five.scale, 1);
+  assert.deepEqual(five.cells.map((c) => c.row), [0, 0, 0, 0, 0]);
   const g = zoneGrid(["a", "b", "c", "d", "e", "f"]);
-  assert.equal(g.rows, 2); assert.equal(g.cols, 3);
+  assert.equal(g.rows, 2); assert.equal(g.cols, 3); assert.ok(g.scale < 1);
   assert.deepEqual(g.cells.map((c) => c.row), [0, 0, 0, 1, 1, 1]);
-  assert.ok(zoneGrid(["a", "b", "c", "d"]).width < g.width && zoneGrid(["a"]).width > 0);
+  // the back row sits half a slot to the right of the front row (every machine visible)
+  assert.ok(Math.abs(g.cells[3].x - g.cells[0].x - g.pitch / 2) < 1e-9);
+  const w = (n) => zoneGrid(Array.from({ length: n }, (_, i) => String(i))).width;
+  assert.ok(w(1) > 0 && w(1) < w(2) && w(2) < w(3) && w(3) < w(4) && w(4) < w(5));
+  assert.ok(w(6) < w(7) && w(7) <= w(8) && w(8) < w(9)); // 7 and 8 both need 4 columns
+  // cells never overlap: centres at least one card apart in a row
+  for (const grid of [five, g]) for (const row of [0, 1]) {
+    const xs = grid.cells.filter((c) => c.row === row).map((c) => c.x).sort((a, b) => a - b);
+    for (let i = 1; i < xs.length; i++) assert.ok(xs[i] - xs[i - 1] >= 1.9 * grid.scale - 1e-9);
+  }
+  // a narrow photo takes a narrow slot, all inside the bay
+  const nar = zoneGrid(["a", "b"], 1.9, [1.0, 1.9]);
+  assert.ok(nar.width < zoneGrid(["a", "b"]).width);
+  for (const c of nar.cells) assert.ok(Math.abs(c.x) < nar.width / 2);
+});
+
+test("dashboard 3D (v6): photo trim finds the machine's box (margin cut away)", async () => {
+  const { alphaBounds } = await import("../src/modules/dashboard/photoCutout.js");
+  const w = 20, h = 10, px = new Uint8ClampedArray(w * h * 4);
+  for (let y = 3; y <= 6; y++) for (let x = 5; x <= 14; x++) px[(y * w + x) * 4 + 3] = 255;
+  assert.deepEqual(alphaBounds(px, w, h, 2), { x: 3, y: 1, w: 14, h: 8 });
+  assert.equal(alphaBounds(new Uint8ClampedArray(w * h * 4), w, h), null);
 });
