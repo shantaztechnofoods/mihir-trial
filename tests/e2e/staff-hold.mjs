@@ -49,5 +49,30 @@ ok("held with reason and who did it", m1.holdActive === true && m1.holdReason ==
 ok("Finish hidden again", await p.locator('[data-staff-finish="1"]').count() === 0);
 const audit = (await ls(p, "erp_audit")) || [];
 ok("audit: machine_hold_released then machine_hold_set", audit.some((a) => a.type === "machine_hold_released") && audit.some((a) => a.type === "machine_hold_set"));
+
+// ── 5. MT UX pack (2026-11-06): Resume is the one next step of a held machine ──
+const res = p.locator('[data-staff-release-hold="1"]');
+ok("held card: primary next step reads 'Resume' (no emoji)", (await res.getAttribute("data-next-step")) === "resume" && (await res.innerText()).trim() === "Resume");
+ok("Resume is >= 48px tall and full width on the phone", await res.evaluate((el) => el.getBoundingClientRect().height >= 48 && el.getBoundingClientRect().width >= 300));
+await res.click(); await p.waitForTimeout(300);
+ok("Resume opens the same Release ON HOLD modal", /Release ON HOLD/.test(await p.locator("[data-hold-modal]").innerText()) && await p.locator("[data-hold-chip]").count() === 0);
+await p.locator("[data-hold-confirm]").click(); await p.waitForTimeout(900);
+ok("resumed: not on hold", (await mach(1)).holdActive === false);
+const fin = p.locator('[data-staff-finish="1"]');
+ok("working card: the next step is 'Finish → Electrical'", (await fin.getAttribute("data-next-step")) === "finish" && (await fin.innerText()).trim() === "Finish → Electrical");
+ok("other actions are quieter secondaries below it", await p.locator('[data-staff-actions="1"] .mtx-sec-row [data-staff-issue="1"]').count() === 1 && await p.locator('[data-staff-actions="1"] .mtx-sec-row [data-staff-hold="1"]').count() === 1);
+// ── 6. Hold reason chips ──
+await p.locator('[data-staff-hold="1"]').click(); await p.waitForTimeout(300);
+const chips = await p.locator("[data-hold-chip]").evaluateAll((els) => els.map((e) => [e.textContent.trim(), Math.round(e.getBoundingClientRect().height)]));
+ok("six reason chips, each >= 44px", chips.map((c) => c[0]).join("|") === "Material not arrived|Part defective|No power|Worker absent|Waiting for QC|Other" && chips.every((c) => c[1] >= 44), JSON.stringify(chips));
+await p.locator('[data-hold-chip="Other"]').click(); await p.locator("[data-hold-confirm]").click(); await p.waitForTimeout(300);
+ok("'Other' with no text is refused", (await mach(1)).holdActive === false && /Write the reason/.test(await p.locator("[data-hold-modal]").innerText()));
+await p.locator('[data-hold-chip="Material not arrived"]').click();
+ok("picked chip is pressed, the note becomes optional", (await p.locator('[data-hold-chip="Material not arrived"]').getAttribute("aria-pressed")) === "true" && /Note \(optional\)/.test(await p.locator("[data-hold-modal]").innerText()));
+await p.locator("[data-hold-reason]").fill("motor from vendor");
+ok("390px: hold sheet has no sideways scroll", await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 2));
+if (process.env.SHOT_DIR) await p.screenshot({ path: process.env.SHOT_DIR + "/hold-chips-390.png" });
+await p.locator("[data-hold-confirm]").click(); await p.waitForTimeout(900);
+ok("chip + note saved as text in the same reason field", (await mach(1)).holdActive === true && (await mach(1)).holdReason === "Material not arrived — motor from vendor");
 ok("no page errors", errs.length === 0, errs.join(" | "));
 await done(b);
