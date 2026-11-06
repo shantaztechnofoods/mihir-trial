@@ -10,6 +10,7 @@ import { getCurrSymbol } from "../../shared/format.js";
 import { SETTINGS_DEFAULTS } from "../../shared/settingsDefaults.js";
 import { Btn } from "../../shared/ui/primitives.jsx";
 import { Topbar } from "../../shared/ui/Topbar.jsx";
+import Count from "../../shared/ui/Count.jsx";
 import { ProductionLinePanel } from "./ProductionLinePanel.jsx";
 
 // ─── REEL-INSPIRED ANIMATIONS: count-up + sparkline ──────────────────────────
@@ -40,10 +41,11 @@ export function useCountUp(target, duration = 900) {
   return val;
 }
 
+// motion-a (2026-11-06): the number no longer counts up from 0 on every page
+// open (that re-rendered React every frame for 900 ms). It shows at once and
+// rolls (shared <Count/>, CSS transform/opacity) only when the value changes.
 export function CountUpValue({ value, className, style }) {
-  const animated = useCountUp(value);
-  const display = typeof value === "number" ? animated.toLocaleString("en-IN") : value;
-  return <span className={className} style={style}>{display}</span>;
+  return <Count value={value} className={className} style={style} />;
 }
 
 // Deterministic smooth sparkline derived from a seed, so it's stable per-card.

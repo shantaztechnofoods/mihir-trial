@@ -6,6 +6,7 @@
 // own (persistPatch → handleSaveSettings → settings_updated audit event).
 import React, { useEffect, useState } from "react";
 import { HEAD_DEPARTMENTS, readDepartmentHeads, setDepartmentHead, cleanHeadName, userDisplayName } from "../../utils/departmentHeads.js";
+import SaveMorph from "../../shared/ui/SaveMorph.jsx";
 
 const TYPED = "__typed";
 const ctl = "w-full bg-white border border-slate-200 rounded-lg px-3 text-[14px] text-slate-900 outline-none disabled:opacity-60";
@@ -82,7 +83,7 @@ function HeadRow({ dept, head, users, canEdit, onSave }) {
             <button type="button" onClick={saveTyped} disabled={busy}
                     className="text-[14px] font-semibold px-4 rounded-lg text-white disabled:opacity-60 self-end"
                     style={{ minHeight: 44, background: "var(--action, #2E50D6)" }}>
-              Save name
+              <SaveMorph saved={msg && msg.tone === "ok" && msg.text === "Saved" ? msg : null}>Save name</SaveMorph>
             </button>
           </div>
         )}

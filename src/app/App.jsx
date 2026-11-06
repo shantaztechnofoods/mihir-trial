@@ -68,7 +68,7 @@ import { WhatsAppPage, waAlertTime, waDispatch, waReadSeen, waUnreadCount } from
 import { APP_BUILD } from "../shared/buildInfo.js";
 import { fmtDate, recomputeStatus, roundQty } from "../shared/format.js";
 import { SETTINGS_DEFAULTS } from "../shared/settingsDefaults.js";
-import { SkeletonLoader } from "../shared/ui/primitives.jsx";
+import { SkeletonLoader, PageSkeleton } from "../shared/ui/primitives.jsx";
 import { Topbar } from "../shared/ui/Topbar.jsx";
 import { LazyAppToaster } from "../shared/ui/lazyUi.js";
 
@@ -4400,7 +4400,7 @@ export default function App() {
         onNavigateHome={() => setActivePage("dashboard")}
       >
         {canOpenPage(activePage)
-          ? <React.Suspense fallback={<div className="flex-1 p-6" data-page-loading><SkeletonLoader /></div>}>{pages[activePage] || <DashboardPage />}</React.Suspense>
+          ? <React.Suspense fallback={<div className="flex-1 p-6" data-page-loading role="status" aria-label="Loading page"><PageSkeleton /></div>}>{pages[activePage] || <DashboardPage />}</React.Suspense>
           : <>
               <Topbar title="Access Denied" />
               <AccessDeniedPage onNavigateHome={() => {

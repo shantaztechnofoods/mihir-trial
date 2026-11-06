@@ -18,6 +18,7 @@ import { OrgGroup } from "../../shared/ui/OrgLayout.jsx";
 import { SignaturePad } from "../../shared/ui/SignaturePad.jsx";
 import { Topbar } from "../../shared/ui/Topbar.jsx";
 import { ThemeSwitch } from "../../shared/ui/ThemeSwitch.jsx";
+import SaveMorph from "../../shared/ui/SaveMorph.jsx";
 
 export function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, onSave, isSuperAdmin = false, canDo = () => true, onRegisterSignature, currentUser = null,
   // Phase B — checklist admin props (optional)
@@ -189,7 +190,7 @@ export function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, on
         <button onClick={() => handleSave()}
                 className="inline-flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-xl transition-all duration-200"
                 style={{ background: saved ? "var(--st-okBg, rgba(22,163,74,0.12))" : "var(--st-saveBg, #2640B0)", color: saved ? "var(--st-okTx, #15803d)" : "var(--st-saveTx, #fff)", border: saved ? "var(--st-okBorder, 1px solid rgba(22,163,74,0.35))" : "var(--st-saveBorder, 1px solid rgba(38, 64, 176,0.45))", boxShadow: saved ? "none" : "var(--st-saveShadow, 0 0 12px rgba(46, 80, 214,0.3))" }}>
-          <LeadLabel text={saved ? "✅ Saved!" : "💾 Save Changes"} />
+          <SaveMorph saved={saved} hold={2500}><LeadLabel text="💾 Save Changes" /></SaveMorph>
         </button>
       </Topbar>
 
