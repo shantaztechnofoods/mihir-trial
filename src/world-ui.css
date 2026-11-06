@@ -1586,3 +1586,43 @@
   .mtx-next:active:not(:disabled) { transform: none; }
 }
   @media screen { .mtx-actions > .wu-held { flex-basis: 100%; } }
+
+/* ═══ WORKER EASE (2026-11-06) — Today line · restored-draft note · tap-vibration switch
+   Petrol tokens only, both themes. Words never truncate: the line wraps BETWEEN
+   items (each item is nowrap). Motion: opacity/transform only, none with reduced motion. */
+@media screen {
+  .mtx-today { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin: 0; min-height: 24px;
+    font-size: 13.5px; line-height: 1.35; color: var(--p-tx2); font-variant-numeric: tabular-nums; letter-spacing: -0.003em; }
+  .mtx-today-lead { font-weight: 600; color: var(--p-tx1); }
+  .mtx-today-item { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+  .mtx-today-item b { font-weight: 700; color: var(--p-tx1); }
+  .mtx-today-item svg { flex: 0 0 auto; }
+  .mtx-today-item.is-ok svg { color: var(--p-okTx); }
+  .mtx-today-item.is-bad svg { color: var(--p-badTx); }
+  .mtx-today-item.is-wait svg { color: var(--p-warnTx); }
+  .mtx-today-item.is-zero, .mtx-today-item.is-zero b, .mtx-today-item.is-zero svg { color: var(--p-tx3); font-weight: 500; }
+  .mtx-today.is-merged { margin-top: 6px; font-size: 13px; }
+  .mtx-today:not(.is-merged) { animation: mtx-fade 200ms var(--ease-enter, ease-out) backwards; }
+
+  .mtx-restored { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 8px 12px; border-radius: var(--r-ctl, 12px);
+    background: var(--p-priWash); border: 1px solid var(--p-priLine); color: var(--p-tx1); font-size: 13.5px; font-weight: 600;
+    animation: mtx-fade 200ms var(--ease-enter, ease-out) backwards; }
+  .mtx-restored svg { flex: 0 0 auto; color: var(--p-priTx); }
+
+  .wk-switch { position: relative; flex: 0 0 auto; width: 52px; height: 44px; border: 0; background: transparent; padding: 0; cursor: pointer; }
+  .wk-switch::before { content: ""; position: absolute; left: 4px; right: 4px; top: 50%; height: 26px; margin-top: -13px; border-radius: 999px;
+    background: var(--p-muted2); box-shadow: inset 0 0 0 1px var(--p-line2); transition: background-color 160ms ease-out; }
+  .wk-switch[aria-checked="true"]::before { background: var(--p-pri); box-shadow: none; }
+  .wk-switch i { position: absolute; left: 7px; top: 50%; width: 20px; height: 20px; margin-top: -10px; border-radius: 50%; background: #fff;
+    box-shadow: 0 1px 2px rgba(11,18,32,.25); transition: transform 160ms var(--ease-enter, ease-out); }
+  .wk-switch[aria-checked="true"] i { transform: translateX(18px); }
+  .wk-switch:focus-visible { outline: 2px solid var(--p-ring); outline-offset: 2px; border-radius: 999px; }
+  @keyframes mtx-fade { from { opacity: 0; } to { opacity: 1; } }
+}
+@media screen and (max-width: 639px) {
+  .mtx-today-wide { display: none !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mtx-today, .mtx-restored { animation: none !important; }
+  .wk-switch::before, .wk-switch i { transition: none; }
+}
