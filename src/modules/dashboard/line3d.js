@@ -19,7 +19,7 @@ import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeom
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 
 const C = { late: "#dc2626", hold: "#7c3aed", near: "#d97706", ok: "#16a34a", idle: "#94a3b8", incoming: "#94a3b8" };
-const BOX_W = 1.9, BOX_H = 1.36, GAP_X = 0.12, PAD_X = 0.2, PAD_D = 3.0, MINZ = 2.2, END_W = 2.15;
+const BOX_W = 1.9, BOX_H = 1.36, GAP_X = 0.12, PAD_X = 0.48, PAD_D = 3.0, MINZ = 2.6, END_W = 2.3; // v9: a machine never touches its bay edge / andon post
 const TWO_ROWS_AT = 6, ROW2_SCALE = 0.8; // 6+ machines in a bay → two neat rows, a little smaller
 const LAMPS = ["late", "near", "ok", "hold"]; // andon stack, top → bottom: red, amber, green, purple
 const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
@@ -222,6 +222,7 @@ export function mountLine(host, { zones, machines, ready = [], rackCount = 0, da
     if (has) { const pc = photoCard(m.photo, w, h); g.add(pc.grp); g.userData.mats.push(pc.card.material); if (pc.refl) g.userData.mats.push(pc.refl.material); pc.refl.material.userData.base = pc.refl.material.opacity; }
     else { const s = silhouette(m.family, w); g.add(s.obj); g.userData.h = s.h; }
     g.add(shadow(w * 1.1, 0.8, 0.3, 0, 0.04));
+    g.add(shadow(w * 0.92, 0.26, 0.55, 0, 0.0)); // v9: tight contact shadow right under the base (grounded)
     // floor ring (ellipse under the machine) + a small andon behind its right edge
     const ringG = new THREE.Group(); ringG.rotation.x = -Math.PI / 2; ringG.position.y = 0.014; ringG.scale.set(w * 0.56 + 0.1, 0.58, 1);
     const track = mesh(trackGeo, trackMat); track.renderOrder = 3; ringG.add(track);
@@ -261,6 +262,8 @@ export function mountLine(host, { zones, machines, ready = [], rackCount = 0, da
       // lane line in front of the conveyor (white, dashed)
       g.strokeStyle = dark ? "rgba(220,240,240,.35)" : "rgba(148,163,184,.55)"; g.lineWidth = Math.max(1.5, 0.025 * u); g.setLineDash([0.22 * u, 0.14 * u]);
       const ly = (BELT_Z + 0.32 + PAD_D / 2) * u; g.beginPath(); g.moveTo(inset * 1.8, ly); g.lineTo(w - inset * 1.8, ly); g.stroke(); g.setLineDash([]);
+      // v9: an empty work bay says so, calmly, on its floor (the chip below says it too)
+      if (i > 0 && i < N - 1 && !(zn.count > 0)) { g.save(); g.fillStyle = dark ? "rgba(200,230,230,.34)" : "rgba(71,85,105,.42)"; g.font = `700 ${0.34 * u}px ${font}`; g.textAlign = "center"; g.textBaseline = "middle"; try { g.letterSpacing = `${0.08 * u}px`; } catch { /* older canvas */ } g.fillText("EMPTY", w / 2, h * 0.55); g.restore(); }
       // walkway hatch at the front edge
       g.save(); g.beginPath(); g.rect(inset * 1.6, h - inset - 0.2 * u, w - inset * 3.2, 0.14 * u); g.clip();
       g.strokeStyle = dark ? "rgba(214,178,58,.45)" : "rgba(234,179,8,.55)"; g.lineWidth = 0.04 * u;
@@ -346,7 +349,7 @@ export function mountLine(host, { zones, machines, ready = [], rackCount = 0, da
   const rack = new THREE.Group(); rack.position.set(ZC[0], padY, 0.05); sc.add(rack);
   const RW = 1.72, RH = 1.25, RD = 0.72;
   const up = RB(0.055, RH, 0.055, 0.015);
-  for (const x of [-RW / 2, RW / 2]) for (const z of [-RD / 2, RD / 2]) { const m = mesh(up, M.metal, x, RH / 2, z); m.castShadow = true; rack.add(m); }
+  for (const x of [-RW / 2, RW / 2]) for (const z of [-RD / 2, RD / 2]) { const m = mesh(up, M.sign, x, RH / 2, z); /* v9: solid navy uprights (was pale) */ m.castShadow = true; rack.add(m); }
   const shelf = RB(RW + 0.06, 0.035, RD + 0.04, 0.012);
   for (const y of [0.1, 0.6, 1.1]) { const m = mesh(shelf, M.metal, 0, y, 0); m.castShadow = true; m.receiveShadow = true; rack.add(m); }
   const crateLabel = tex(128, 64, (g, w, h) => { g.fillStyle = "#fff"; g.fillRect(0, 0, w, h); g.fillStyle = "#1e3a8a"; g.font = `700 26px ${font}`; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("PARTS", w / 2, h / 2); });
@@ -410,7 +413,7 @@ export function mountLine(host, { zones, machines, ready = [], rackCount = 0, da
     for (const c of [cam, baseCam]) { c.aspect = W / H; c.fov = THREE.MathUtils.clamp(2 * THREE.MathUtils.radToDeg(Math.atan(Math.tan(THREE.MathUtils.degToRad(12)) / c.aspect)), 3.5, 10); c.clearViewOffset(); c.updateProjectionMatrix(); }
     // distance: the smallest that keeps the line inside 96% of the width and ~62% of the height
     let lo = 1, hi = 600;
-    hi = 1600; for (let i = 0; i < 30; i++) { const mid = (lo + hi) / 2; place(baseCam, baseLook, mid); const ex = extent(baseCam); if (ex.x1 - ex.x0 <= 1.97 && ex.y1 - ex.y0 <= 1.36) hi = mid; else lo = mid; }
+    hi = 1600; for (let i = 0; i < 30; i++) { const mid = (lo + hi) / 2; place(baseCam, baseLook, mid); const ex = extent(baseCam); if (ex.x1 - ex.x0 <= 1.97 && ex.y1 - ex.y0 <= 1.6) hi = mid; /* v9: few machines → the line fills more of the card */ else lo = mid; }
     dBase = hi; place(baseCam, baseLook, dBase);
     const ex = extent(baseCam), cx = (ex.x0 + ex.x1) / 2;
     offY = Math.round((-0.95 - ex.y0) * H / 2); // sit the floor on the bottom edge; tags + header use the top band
