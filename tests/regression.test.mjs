@@ -250,6 +250,9 @@ const PAGE_COMPONENTS = [
   "OnHoldReport",
   "PendingJobsReport",
   "ReportSheet",
+  // 2026-11-06 — Dashboard "Production line today" + its optional 3D view (lazy chunk).
+  "ProductionLinePanel",
+  "Line3DView",
 ];
 
 for (const name of PAGE_COMPONENTS) {
@@ -341,6 +344,9 @@ for (const type of AUDIT_EVENT_TYPES) {
 // ─── User-visible strings (minification-safe markers for live-bundle checks) ─
 
 const USER_FACING_STRINGS = [
+  // 2026-11-06 — Dashboard 3D view toggle + the honest no-photo placeholder.
+  "3D view",
+  "add in BOM",
   // Rack / destination flow
   "Save To Rack",
   "Direct Production",

@@ -92,6 +92,8 @@ const awaitingRelease = (h) => !!(h && h.status === "pending" && h.releaseRequir
  *   head = department head's name from Settings (display only), "" when not set.
  *   attention: [{ machine, id, serial, name, department, kind: "late"|"hold",
  *                 minutesInDept, targetMinutes, overMinutes, reason, filter }],
+ *   onLine: [{ machine, id, serial, name, bomKey, stage, kind: "ok"|"near"|"late"|"hold"|"incoming", text }]
+ *     (machines standing in a work department — the Dashboard 3D view),
  *   readyToday, readyTotal, inProduction, targets, legend }
  */
 export function buildProductionLine({ machines = [], handovers = [], settings = null, now = Date.now() } = {}) {
@@ -102,6 +104,11 @@ export function buildProductionLine({ machines = [], handovers = [], settings = 
       worstLateMinutes: 0, nearLeftMinutes: null, holdReason: "" };
   }
   const attention = [];
+  // 3D view (2026-11-06): one entry per machine standing in a work department,
+  // with the same words the strip and Needs-attention list use. Display only.
+  const onLine = [];
+  const placed = (m, stage, kind, text) => onLine.push({ machine: m, id: m.id, serial: m.serialNo || "", name: m.bomLabel || m.label || m.bomKey || "Machine",
+    bomKey: m.bomKey || "", stage, kind, text });
   const todayKey = localDateKey(now);
   let readyToday = 0, readyTotal = 0, inProduction = 0;
 
@@ -142,6 +149,9 @@ export function buildProductionLine({ machines = [], handovers = [], settings = 
         const row = attnRow(m, h.toDepartment, "hold", waited, null, reason, "hold", overdue ? heldMinutes(h.sentAt, h.acceptTimeoutMinutes, now) : null);
         row.waitingAccept = true;
         attention.push(row);
+        if (to !== "Rack" && to !== "Ready") placed(m, to, "hold", `On hold${reason ? ` – ${reason}` : ""}`);
+      } else if (to !== "Rack" && to !== "Ready") {
+        placed(m, to, "incoming", `Waiting to accept · ${formatDuration(computeOverrun(h.sentAt, h.acceptTimeoutMinutes, now).actualMinutes)}`);
       }
       continue;
     }
@@ -155,18 +165,22 @@ export function buildProductionLine({ machines = [], handovers = [], settings = 
       st.hold += 1;
       if (!st.holdReason) st.holdReason = m.holdReason || "";
       attention.push(attnRow(m, here, "hold", t.actualMinutes, target, m.holdReason || "", "hold"));
+      placed(m, here, "hold", `On hold${m.holdReason ? ` – ${String(m.holdReason).trim()}` : ""}`);
       continue;
     }
     if (level === "late") {
       st.late += 1;
       st.worstLateMinutes = Math.max(st.worstLateMinutes, t.overrunMinutes);
       attention.push(attnRow(m, here, "late", t.actualMinutes, target, "", "active", t.overrunMinutes));
+      placed(m, here, "late", `Late ${formatDuration(t.overrunMinutes)}`);
     } else if (level === "near") {
       st.near += 1;
       const left = Math.max(0, target - t.actualMinutes);
       st.nearLeftMinutes = st.nearLeftMinutes == null ? left : Math.min(st.nearLeftMinutes, left);
+      placed(m, here, "near", `Near limit · ${formatDuration(left)} left`);
     } else {
       st.ok += 1;
+      placed(m, here, "ok", m.departmentEnteredAt ? `On time · ${formatDuration(t.actualMinutes)} in dept` : "On time");
     }
   }
 
@@ -178,7 +192,7 @@ export function buildProductionLine({ machines = [], handovers = [], settings = 
   attention.sort((a, b) => (a.kind === b.kind ? (b.overMinutes || 0) - (a.overMinutes || 0) : a.kind === "hold" ? -1 : 1));
   const targets = {};
   for (const d of WORK_DEPTS) targets[d] = targetMinutesFor(null, d, wf);
-  return { stages: list, attention, readyToday, readyTotal, inProduction, targets, legend: lineLegend(targets) };
+  return { stages: list, attention, onLine, readyToday, readyTotal, inProduction, targets, legend: lineLegend(targets) };
 }
 
 function attnRow(m, department, kind, minutesInDept, targetMinutes, reason, filter, overMinutes = null) {
