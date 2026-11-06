@@ -344,6 +344,8 @@ for (const type of AUDIT_EVENT_TYPES) {
 // ─── User-visible strings (minification-safe markers for live-bundle checks) ─
 
 const USER_FACING_STRINGS = [
+  // 2026-11-06 — app-root error boundary (reports to Sentry on Trial).
+  "Something went wrong. Tap to reload.",
   // 2026-11-06 — Dashboard 3D view toggle + the honest no-photo placeholder.
   "3D view",
   "add in BOM",

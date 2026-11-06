@@ -10,13 +10,15 @@ import { loadApp } from './app/loadApp.js'
 import { importWithReload } from './utils/lazyImport.js'
 import RootErrorBoundary from './shared/components/RootErrorBoundary.jsx'
 import OfflineBanner from './shared/components/OfflineBanner.jsx'
+import AppErrorBoundary from './shared/components/AppErrorBoundary.jsx'
+import { startSentry, setSentryUser } from './shared/sentry.js'
 
 // ── Boot build marker ──────────────────────────────────────────────────────────
 // Page-independent proof of which bundle is live. Shows a small green badge in the
 // bottom-left corner on EVERY screen (even the login page) + a console banner.
 // If you do NOT see "build 2026-05-29f" bottom-left in production, the served bundle
 // is stale or the URL you opened is not this deployment.
-export const APP_BUILD_TAG = "2026-11-06-dashboard-3d-review";
+export const APP_BUILD_TAG = "2026-11-06-sentry";
 if (typeof console !== "undefined") {
   console.warn(`%c[APP BUILD] ${APP_BUILD_TAG}`, "background:#16a34a;color:#fff;padding:2px 6px;border-radius:4px;font-weight:bold");
 }
@@ -29,6 +31,10 @@ try {
     document.body.appendChild(b);
   }
 } catch {}
+
+// Error reporting (MIHIR TRIAL production builds only; SDK loads after first
+// paint, early errors are queued) — see src/shared/sentry.js.
+startSentry(APP_BUILD_TAG);
 
 // RootErrorBoundary sits ABOVE everything so a render error in App's body,
 // AuthProvider, or any uncaught exception in a child surfaces a recoverable
@@ -69,6 +75,8 @@ const AppLoading = () => (
 function Root() {
   const { currentUser, isLoading, authLoadError, retryAuthLoad } = useAuth();
   const [appOn, setAppOn] = useState(false);
+  // Sentry: tag events with the opaque user id + role only (never name/email).
+  useEffect(() => { setSentryUser(currentUser ? { id: currentUser.id, role: currentUser.role } : null); }, [currentUser?.id, currentUser?.role]);
   // Signed out for sure: no user, and not restoring a stored session (a restore,
   // or a restore error while loading, is the app's own screen).
   const signedOut = !currentUser && !(isLoading && (authLoadError || hasStoredSession()));
@@ -98,10 +106,12 @@ const appCssReady = () => new Promise((resolve) => {
 appCssReady().then(() => ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <RootErrorBoundary>
-      <OfflineBanner />
-      <AuthProvider>
-        <Root />
-      </AuthProvider>
+      <AppErrorBoundary>
+        <OfflineBanner />
+        <AuthProvider>
+          <Root />
+        </AuthProvider>
+      </AppErrorBoundary>
     </RootErrorBoundary>
   </React.StrictMode>,
 ))
