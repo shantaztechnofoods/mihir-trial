@@ -46,6 +46,32 @@ const recorder = () => {
   watch();
 };
 
+// CPU calibration (Lighthouse-style). Shared CI machines differ in speed, so a
+// fixed 4x slowdown makes a slow runner much slower than a real phone and every
+// frame lands on 33 ms (seen 6 Nov on Item Master / Outward, all 3 tries).
+// Measure the machine once, then slow it to the SAME target speed every run:
+// rate = TARGET / measured, kept between 1x and 4x. A fast machine still gets 4x.
+const TARGET_BENCH = Number(process.env.FRAME_TARGET_BENCH_MS || 0); // ms of the benchmark at the target device speed
+let benchMs = 0;
+async function cpuBench(p) {
+  return p.evaluate(() => {
+    const t = [];
+    for (let k = 0; k < 5; k++) {
+      const s = performance.now(); let x = 0;
+      for (let i = 0; i < 3e6; i++) x += Math.sqrt(i) * Math.sin(i);
+      const a = []; for (let i = 0; i < 2e5; i++) a.push({ i, s: String(i) });
+      a.sort((u, v) => v.i - u.i); t.push(performance.now() - s + (x > 0 ? 0 : 0));
+    }
+    return t.sort((a, b2) => a - b2)[2];
+  });
+}
+async function throttleRate(p) {
+  if (!benchMs) benchMs = await cpuBench(p);
+  const rate = TARGET_BENCH ? Math.min(4, Math.max(1, TARGET_BENCH / benchMs)) : 4;
+  console.log(`cpu benchmark ${benchMs.toFixed(1)} ms unthrottled; throttle ${rate.toFixed(2)}x${TARGET_BENCH ? ` (target ${TARGET_BENCH} ms)` : ""}`);
+  return rate;
+}
+
 const { ok, done } = makeOk();
 const rows = [];
 const b = track(await pw.chromium.launch({ args: ["--no-sandbox", "--disable-dev-shm-usage"] }));
@@ -61,7 +87,7 @@ async function session(viewport, user, pass) {
   await p.getByRole("button", { name: "Sign In" }).click();
   await p.locator("#login-username").waitFor({ state: "detached", timeout: 20000 }); await settle(p, 2500, 400);
   const cdp = await ctx.newCDPSession(p);
-  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
+  await cdp.send("Emulation.setCPUThrottlingRate", { rate: await throttleRate(p) });
   return { ctx, p, errs };
 }
 
