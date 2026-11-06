@@ -7,7 +7,7 @@
 // scene shows the neutral "No photo · add in BOM" placeholder.
 
 const cache = new Map();
-const MAX_SIDE = 1024; // crisp at DPR 2 (review 2026-11-06; was 512)
+const MAX_SIDE = 2048; // v6: the photo's own full resolution (up to 2048 px) for the bigger machines (was 1024)
 
 // Pure: clears the background in an RGBA pixel array (Uint8ClampedArray) in place.
 // Returns the number of pixels made transparent.
@@ -43,6 +43,15 @@ export function cutWhiteBackground(px, w, h, { threshold = 232, spread = 26 } = 
   return cleared;
 }
 
+// Pure: the box around the visible (alpha > 24) pixels, with a 2-px margin; null when empty.
+export function alphaBounds(px, w, h, pad = 2) {
+  let x0 = w, y0 = h, x1 = -1, y1 = -1;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (px[(y * w + x) * 4 + 3] > 24) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  if (x1 < 0) return null;
+  x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad); x1 = Math.min(w - 1, x1 + pad); y1 = Math.min(h - 1, y1 + pad);
+  return { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
+}
+
 function loadImage(src, cors) {
   return new Promise((resolve, reject) => {
     const im = new Image();
@@ -72,7 +81,13 @@ async function build(src) {
   try { data = g.getImageData(0, 0, w, h); } catch { return { image: im, aspect: nw / nh, cut: false }; } // tainted canvas
   cutWhiteBackground(data.data, w, h);
   g.putImageData(data, 0, 0);
-  return { image: c, aspect: w / h, cut: true };
+  // v6: trim the now-empty margin so the machine fills its card (bigger on screen).
+  const b = alphaBounds(data.data, w, h);
+  if (!b || (b.w >= w - 2 && b.h >= h - 2)) return { image: c, aspect: w / h, cut: true };
+  const t = document.createElement("canvas"); t.width = b.w; t.height = b.h;
+  const tg = t.getContext("2d"); if (!tg) return { image: c, aspect: w / h, cut: true };
+  tg.drawImage(c, b.x, b.y, b.w, b.h, 0, 0, b.w, b.h);
+  return { image: t, aspect: b.w / b.h, cut: true };
 }
 
 // → Promise<{ image, aspect, cut } | null>
