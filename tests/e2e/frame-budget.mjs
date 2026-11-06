@@ -51,7 +51,7 @@ const recorder = () => {
 // frame lands on 33 ms (seen 6 Nov on Item Master / Outward, all 3 tries).
 // Measure the machine once, then slow it to the SAME target speed every run:
 // rate = TARGET / measured, kept between 1x and 4x. A fast machine still gets 4x.
-const TARGET_BENCH = Number(process.env.FRAME_TARGET_BENCH_MS || 0); // ms of the benchmark at the target device speed
+const TARGET_BENCH = Number(process.env.FRAME_TARGET_BENCH_MS || 510); // benchmark ms at the target speed: a typical runner (≈128 ms, measured 6 Nov) at 4x
 let benchMs = 0;
 async function cpuBench(p) {
   return p.evaluate(() => {
