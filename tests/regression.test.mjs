@@ -484,7 +484,8 @@ const USER_FACING_STRINGS = [
   "A-to-Z Machine Report",
   "One machine",
   // 2026-11-01 — formal, numbered report section titles
-  "Department journey",
+  // 2026-11-06 (reports v4) — renamed in the owner-approved layout.
+  "The machine's journey",
   "Stage History",
   // 2026-10-29 report rework. "BOM Components" and "Materials Issued" were
   // deliberately removed: the full BOM already lives on the BOM screen, and
@@ -501,7 +502,7 @@ const USER_FACING_STRINGS = [
   "onWheel",
   "did not leave stores",
   "Critical parts fitted",
-  "Serial numbers / verification",
+  "Serial number / verification",
   "Given later from Pending Stock",
   "Material arrived",
   "Machine Trial Certificate",
