@@ -1,7 +1,7 @@
 // src/modules/machine-tracker/MachinePage.jsx — moved verbatim from the former single-file src/App.jsx
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
 import React, { useState, useEffect, useRef, useMemo, useDeferredValue } from "react";
-import { Wrench, User, Boxes, AlertOctagon, Trash2, Bell } from "lucide-react";
+import { Wrench, User, Boxes, AlertOctagon, Trash2, Bell, History } from "lucide-react";
 import { celebrate } from "../../utils/worldMotion.js";
 import { LeadIcon, LeadLabel, Glyph } from "../../shared/components/LeadIcon.jsx";
 import SafeBoundary from "../../shared/components/SafeBoundary.jsx";
@@ -34,8 +34,10 @@ import Count from "../../shared/ui/Count.jsx";
 import { toast as sonnerToast } from "../../shared/ui/toast.js";
 import { useMtMotion, leftToDoText } from "./mtMotion.js";
 import "./mtMotion.css";
-import { nextStepFor, checklistLeftFor, HOLD_REASON_CHIPS, HOLD_OTHER, composeHoldReason, holdReasonError, nearLimitList, readDismissed, writeDismissed, headDepartmentsFor, sortByUrgency, myWorkSummary, sentTodayCount, shortLeft } from "./mtUx.js";
-import { NextStepButton, NearLimitStrip, MyWorkPanel } from "./MyWork.jsx";
+import { nextStepFor, checklistLeftFor, HOLD_REASON_CHIPS, HOLD_OTHER, composeHoldReason, holdReasonError, nearLimitList, readDismissed, writeDismissed, headDepartmentsFor, sortByUrgency, myWorkSummary, sentTodayCount, shortLeft, todayCounts } from "./mtUx.js";
+import { NextStepButton, NearLimitStrip, MyWorkPanel, TodayLine } from "./MyWork.jsx";
+import { tapHaptic } from "../../utils/haptics.js";
+import { pickDraft, draftHasInput, writeDraft, readDraft, clearDraft, applyDraft, DRAFT_RESTORED_TEXT } from "./mtDraft.js";
 import { readDepartmentHeads } from "../../utils/departmentHeads.js";
 
 // Staff view building blocks (phone first). Defined once at module level so a
@@ -292,6 +294,31 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
   // 2026-11-03 — offline: Confirm Acceptance is disabled (popup keeps the
   // signature / team / ticks) and a tap pulses the "No internet" banner.
   const online = useOnline();
+  // ── 2026-11-06 (worker-ease) — offline draft of the open Accept / Finish &
+  // Transfer popup. Written ONLY while offline; removed when the popup closes
+  // (successful save or explicit cancel). A reload / closed tab keeps it.
+  const draftStorage = () => { try { return window.localStorage; } catch { return null; } };
+  const draftFreshRef = useRef({ accept: null, finish: null });
+  // Leaving the page is not a cancel: the unmount flag (cleaned up first,
+  // as it is declared first) keeps the draft when the whole page goes away.
+  const draftUnmountRef = useRef(false);
+  useEffect(() => { draftUnmountRef.current = false; return () => { draftUnmountRef.current = true; }; }, []);
+  const acceptDraftId = acceptModal ? acceptModal.handover?.machineId : null;
+  const finishDraftId = finishModal ? finishModal.machine?.id : null;
+  useEffect(() => {
+    if (online || !acceptModal || !acceptModal.handover) return;
+    const d = pickDraft("accept", acceptModal, acceptModal.handover.id);
+    if (draftHasInput(d, draftFreshRef.current.accept)) writeDraft(draftStorage(), "accept", acceptModal.handover.machineId, d);
+  }, [online, acceptModal]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (online || !finishModal || !finishModal.machine) return;
+    const m = finishModal.machine;
+    const d = pickDraft("finish", finishModal, `${m.currentDepartment || m.stage}|${m.departmentEnteredAt || ""}`);
+    if (draftHasInput(d, draftFreshRef.current.finish)) writeDraft(draftStorage(), "finish", m.id, d);
+  }, [online, finishModal]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Popup closed in this session (saved or cancelled) → its draft goes.
+  useEffect(() => { if (acceptDraftId == null) return undefined; const id = acceptDraftId; return () => { if (!draftUnmountRef.current) clearDraft(draftStorage(), "accept", id); }; }, [acceptDraftId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (finishDraftId == null) return undefined; const id = finishDraftId; return () => { if (!draftUnmountRef.current) clearDraft(draftStorage(), "finish", id); }; }, [finishDraftId]); // eslint-disable-line react-hooks/exhaustive-deps
   const [transferBusy, setTransferBusy] = useState(false);
 
   // Pending handovers filtered to those awaiting acceptance.
@@ -386,10 +413,16 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
     // transfer is recorded under the logged-in user (sentBy) and their own
     // signature; the department that is handing over is the responsibility
     // record. (Accept keeps its employee logging exactly as before.)
-    setFinishModal({ machine, toDepartment, narration: "", template, answers,
+    const freshFinish = { machine, toDepartment, narration: "", template, answers,
                      workedBy: [], mainEmployeeId: currentUser?.id || null,
                      // Phase 1 — jobs this department still owes after handing over.
-                     owedItems: [] });
+                     owedItems: [] };
+    // 2026-11-06 (worker-ease) — an entry kept while offline comes back
+    // (display only; nothing is submitted until the worker presses the button).
+    const finishDraft = readDraft(draftStorage(), "finish", machine.id, `${fromDepartment}|${machine.departmentEnteredAt || ""}`);
+    const { state: finishState, restored: finishRestored } = applyDraft("finish", freshFinish, finishDraft);
+    draftFreshRef.current.finish = freshFinish;
+    setFinishModal({ ...finishState, draftRestored: finishRestored });
   };
 
   // Migration 028 — During-Work runtime. Opens the modal only when a template
@@ -410,6 +443,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
       flagChecklist("[data-during-checklist]");
       return;
     }
+    tapHaptic();   // worker-ease: Save tap registered
     setDuringWorkModal((prev) => prev ? { ...prev, busy: true, error: "" } : prev);
     const r = await onSubmitDuringWorkChecklist?.({ machine, template, answers });
     if (r && r.success === false) {
@@ -440,6 +474,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
       flagChecklist("[data-start-checklist]");
       return;
     }
+    tapHaptic();   // worker-ease: Save tap registered
     setStartChk((prev) => prev ? { ...prev, busy: true, error: "" } : prev);
     const machine = queue[idx];
     const r = await onSubmitDuringWorkChecklist({ machine, template, answers, stage: "before_receive", department: "Assembly" });
@@ -533,6 +568,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
     // collected at Transfer; the signed-in user is recorded as the transferer.
     if (!currentUser?.id) { showToast("Not signed in", "Sign in again to transfer.", "warning"); return; }
     const transferrerName = currentUser.fullName || currentUser.username || null;
+    tapHaptic();           // worker-ease: very light tap on a registered confirm (phone only)
     releaseSheetFocus();   // fast tap (focus only): see releaseSheetFocus
     setTransferBusy(true);
     try {
@@ -600,9 +636,14 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
     const hasDeptEmps = (settings?.employeeMembers || []).some((m) => m && m.active && Array.isArray(m.departments) && m.departments.includes(toDept));
     const acceptMain = hasDeptEmps ? acceptMe : "";
     const acceptTeamFinal = hasDeptEmps && acceptMe ? [acceptMe, ...acceptTeamMembers.filter((n) => n !== acceptMe)] : acceptTeamMembers;
-    setAcceptModal({ handover, password: "", sigSvg: null, busy: false, error: "", acceptMain,
+    const freshAccept = { handover, password: "", sigSvg: null, busy: false, error: "", acceptMain,
                      pendingItemsToRaise: [], newPendingText: "", holdReason: "",
-                     checklistTemplate, checklistAnswers, acceptTeamMembers: acceptTeamFinal });
+                     checklistTemplate, checklistAnswers, acceptTeamMembers: acceptTeamFinal };
+    // 2026-11-06 (worker-ease) — restore an entry kept while offline.
+    const acceptDraft = readDraft(draftStorage(), "accept", handover.machineId, handover.id);
+    const { state: acceptState, restored: acceptRestored } = applyDraft("accept", freshAccept, acceptDraft);
+    draftFreshRef.current.accept = freshAccept;
+    setAcceptModal({ ...acceptState, draftRestored: acceptRestored });
   };
 
   const submitAcceptHandover = async () => {
@@ -650,6 +691,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
       }
     }
     { const pp = pendingItemsProblem(acceptModal.pendingItemsToRaise); if (pp) { setAcceptModal((prev) => prev ? { ...prev, error: pp, errorField: pp } : prev); flagField("[data-accept-pending]"); return; } }
+    tapHaptic();           // worker-ease: very light tap on a registered confirm (phone only)
     releaseSheetFocus();   // fast tap (focus only): see releaseSheetFocus
     setAcceptModal((prev) => prev ? { ...prev, busy: true, error: "" } : prev);
     const pendingItemsToRaise = cleanPendingJobs(acceptModal.pendingItemsToRaise);
@@ -1015,6 +1057,21 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
   })();
   const ownSummary = myWorkSummary(ownRows);
   const sentToday = isDeptHead ? sentTodayCount(handovers, myDepartments, new Date(nowTick)) : 0;
+  // 2026-11-06 (worker-ease) — "Today · N accepted · N sent forward · N late ·
+  // N on hold". Department users: their departments; admins: everything.
+  // Late = acceptance window passed, or over the department target.
+  const todayScope = isAdminUser ? null : hasDepartments ? myDepartments : isFloorLogin ? [] : null;
+  const todayLate = (m) => {
+    const h = machineHandover(m);
+    if (h) return !isAwaitingRelease(h) && isHoldOverdue(h.sentAt, h.acceptTimeoutMinutes, nowTick);
+    const t = deptTimerOf(m).t;
+    return !!(t && t.isOverrun);
+  };
+  const todayStats = todayCounts({ handovers, machines: machineLog, depts: todayScope, now: new Date(nowTick), isLate: todayLate });
+  // Merged into "My work today" when that panel shows (never two lines):
+  // the panel's summary already says "late", a head's footer says "sent forward".
+  const todayOmit = isDeptHead ? ["late", "sent"] : ["late"];
+  const myWorkShown = isDeptHead || ownRows.length > 0;
   // Near-limit strip (heads only): no sound, no modal; dismissed once per
   // machine per stage, remembered per user in this browser.
   const [nearDismissed, setNearDismissed] = useState(() => { try { return readDismissed(window.localStorage, currentUser?.id); } catch { return new Set(); } });
@@ -1560,9 +1617,16 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
         {/* 2026-11-06 MT UX pack — heads: calm near-limit strip, then "My work
             today" (all widths). Everyone with a department: own machines first
             on a phone. Display + the same modals as the existing buttons. */}
+        {/* 2026-11-06 (worker-ease) — Today line. When "My work today" shows,
+            it sits inside that panel instead (for a non-head the panel is
+            phone-only, so the top line stays on wider screens). */}
+        {(!myWorkShown || !isDeptHead) && (
+          <TodayLine counts={todayStats} className={myWorkShown ? "mtx-today-wide" : ""} />
+        )}
         <NearLimitStrip rows={nearRows} onDismiss={dismissNear} onOpen={openOwnCard} />
         {(isDeptHead || ownRows.length > 0) && (
-          <MyWorkPanel rows={ownRows} isHead={isDeptHead} depts={myDepartments} summary={ownSummary} sentToday={sentToday}
+          <MyWorkPanel today={<TodayLine counts={todayStats} omit={todayOmit} merged />}
+                       rows={ownRows} isHead={isDeptHead} depts={myDepartments} summary={ownSummary} sentToday={sentToday}
                        phoneOnly={!isDeptHead} showToggle={isDeptHead && !staffMode && showScopeSwitch}
                        allDepts={isDeptHead && !staffMode && !scopeMine} onToggle={(all) => pickScope(all ? "all" : "mine")} />
         )}
@@ -5003,6 +5067,11 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                 })()}
               </div>
               <div className="p-5 space-y-4 flex-1 overflow-y-auto">
+                {finishModal.draftRestored && (
+                  <div className="mtx-restored" data-draft-restored role="status">
+                    <History size={15} strokeWidth={2.2} aria-hidden="true" /><span>{DRAFT_RESTORED_TEXT}</span>
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="rounded-lg px-3 py-2.5 bg-slate-50 border border-slate-200">
                     <div className="text-[11px] font-semibold text-slate-500">From</div>
@@ -5195,6 +5264,11 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                 })()}
               </div>
               <div className="p-5 space-y-4 flex-1 overflow-y-auto">
+                {acceptModal.draftRestored && (
+                  <div className="mtx-restored" data-draft-restored role="status">
+                    <History size={15} strokeWidth={2.2} aria-hidden="true" /><span>{DRAFT_RESTORED_TEXT}</span>
+                  </div>
+                )}
                 {handover.overrunNarration && (
                   <div className="rounded-lg px-3 py-2" style={{ background: "rgba(234,179,8,0.08)", border: "1px solid rgba(234,179,8,0.3)" }}>
                     <div className="text-[11px] font-bold text-amber-700 mb-0.5">Sender's delay note</div>

@@ -13,7 +13,7 @@
 .f3-empty { justify-content: flex-start; padding-top: 34px; }
 .f3-empty b { font-weight: 600; color: var(--ink, #0f172a); font-size: 14px; }
 .f3-tags { position: absolute; inset: 0; pointer-events: none; }
-.f3-tag { position: absolute; left: 0; top: 0; pointer-events: auto; display: flex; flex-direction: column; gap: 3px; max-width: 220px; padding: 4px 8px 4px; border: 0; border-radius: 999px;
+.f3-tag { position: absolute; left: 0; top: 0; pointer-events: auto; display: flex; flex-direction: column; gap: 3px; max-width: 340px; padding: 4px 8px 4px; border: 0; border-radius: 999px;
   background: color-mix(in srgb, var(--paper, #fff) 82%, transparent); -webkit-backdrop-filter: blur(10px) saturate(1.4); backdrop-filter: blur(10px) saturate(1.4);
   box-shadow: 0 0 0 1px var(--hair-2, rgba(15, 23, 42, .08)), 0 6px 14px -8px rgba(15, 23, 42, .28);
   font: 500 11px/1.2 var(--font-ui, Inter, sans-serif); color: var(--ink-2, #475569); text-align: left; cursor: pointer; transition: box-shadow .15s, opacity .2s, background .15s; white-space: nowrap; }
@@ -22,7 +22,7 @@
 .f3-tag b { font: 650 11px/1.2 var(--font-ui, Inter, sans-serif); color: var(--ink, #0f172a); font-variant-numeric: tabular-nums; }
 .f3-tb { color: var(--ink-3, #64748b); }
 .f3-ts { display: inline-flex; align-items: baseline; gap: 3px; min-width: 0; font-weight: 600; color: var(--ok, #15803d); font-variant-numeric: tabular-nums; }
-.f3-tt { overflow: hidden; text-overflow: ellipsis; min-width: 0; max-width: 120px; }
+.f3-tt { min-width: 0; } /* v7: the status words are never cut */
 .f3-ts[data-s="late"] { color: var(--bad, #dc2626); }
 .f3-ts[data-s="near"] { color: var(--wait, #b45309); }
 .f3-ts[data-s="hold"] { color: #6d28d9; }
@@ -36,7 +36,7 @@
 .f3-bar[data-s="hold"] i { background: #7c3aed; }
 .f3-bar[data-s="incoming"] i { background: var(--ink-3, #94a3b8); }
 .f3-tag[data-compact] .f3-tb, .f3-tag[data-compact] abbr, .f3-tag[data-compact] .f3-bar { display: none; }
-.f3-tag[data-compact] .f3-tt { max-width: 64px; }
+
 .f3-tag[data-s="late"] { box-shadow: 0 0 0 1px rgba(220, 38, 38, .45), 0 6px 14px -8px rgba(220, 38, 38, .45); }
 .f3-tag[data-s="hold"] { box-shadow: 0 0 0 1px rgba(124, 58, 237, .45), 0 6px 14px -8px rgba(124, 58, 237, .45); }
 .f3-tag:hover, .f3-tag.is-hot { box-shadow: 0 0 0 1.5px var(--action, #2563eb), 0 8px 18px -8px rgba(37, 99, 235, .5); z-index: 2; }

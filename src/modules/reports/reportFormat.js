@@ -453,7 +453,7 @@ export function rptFindings({ machine, handovers = [], checklistResponses = [], 
 
   // 3. Issues, comments and parts raised (checklist follow-ups are in 4).
   const followUp = (p) => /^Checklist not completed/.test(String(p.description || ""));
-  add("issues", "Open issues, comments and parts", "Jobs raised on this machine and not yet closed. Closed jobs, with their resolution, are in section 04.",
+  add("issues", "Open issues, comments and parts", "Jobs raised on this machine and not yet closed. Closed jobs, with their resolution, are traced in section 3.",
     jobs.filter((p) => !followUp(p) && p.status !== "resolved").map((p) => {
       const open = p.status !== "resolved"; const type = rptJobType(p);
       const by = user(p.raisedBy, p.raisedByName || "");

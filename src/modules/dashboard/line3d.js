@@ -88,8 +88,8 @@ export function mountLine(host, { zones, machines, ready = [], rackCount = 0, da
   const pmrem = new THREE.PMREMGenerator(r);
   const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture; pmrem.dispose();
   sc.environment = envTex;
-  const cam = new THREE.PerspectiveCamera(14, 6, 1, 400);
-  const baseCam = new THREE.PerspectiveCamera(14, 6, 1, 400); // never zooms: zone chips stay put
+  const cam = new THREE.PerspectiveCamera(8, 6, 1, 2000);
+  const baseCam = new THREE.PerspectiveCamera(8, 6, 1, 2000); // never zooms: zone chips stay put
   sc.add(new THREE.HemisphereLight(0xffffff, dark ? 0x0d2224 : 0xdfe5ee, dark ? 0.55 : 0.75));
   const key = new THREE.DirectionalLight(0xffffff, dark ? 1.5 : 1.9);
   key.castShadow = true; sc.add(key, key.target);
@@ -381,8 +381,10 @@ export function mountLine(host, { zones, machines, ready = [], rackCount = 0, da
   { const sc2 = key.shadow.camera; const hw = TOT / 2 + 1.2; sc2.left = -hw; sc2.right = hw; sc2.top = 3.4; sc2.bottom = -3.4; sc2.near = 1; sc2.far = 60; sc2.updateProjectionMatrix(); }
   key.shadow.bias = -0.0004; key.shadow.normalBias = 0.02; key.shadow.radius = 3;
 
-  // ---- camera: a gentle 3/4 view, fitted so the whole line fills the width ----
-  const PITCH = THREE.MathUtils.degToRad(26), YAW = THREE.MathUtils.degToRad(-6);
+  // ---- camera: straight at the line, slightly from above (no yaw → every bay edge,
+  // floor line and name plate is perfectly horizontal); a narrow lens pulled far
+  // back keeps perspective distortion minimal while the plinths still read as 3D ----
+  const PITCH = THREE.MathUtils.degToRad(24), YAW = 0;
   const DIR = new THREE.Vector3(Math.sin(YAW) * Math.cos(PITCH), Math.sin(PITCH), Math.cos(YAW) * Math.cos(PITCH));
   const baseLook = new THREE.Vector3(0, 0.45, 0.15);
   let dBase = 30, offY = 0, W = 1, H = 1;
@@ -397,15 +399,15 @@ export function mountLine(host, { zones, machines, ready = [], rackCount = 0, da
   const placeCam = () => {
     const e = ease(clamp01(zoom));
     curLook.copy(baseLook).lerp(zLook, e);
-    place(cam, curLook, dBase * (1 - 0.62 * e));
+    place(cam, curLook, dBase * (1 - 0.56 * e));
   };
   const resize = () => {
     W = Math.max(1, host.clientWidth); H = Math.max(1, host.clientHeight);
     r.setSize(W, H);
-    for (const c of [cam, baseCam]) { c.aspect = W / H; c.fov = THREE.MathUtils.clamp(2 * THREE.MathUtils.radToDeg(Math.atan(Math.tan(THREE.MathUtils.degToRad(24)) / c.aspect)), 6, 18); c.clearViewOffset(); c.updateProjectionMatrix(); }
+    for (const c of [cam, baseCam]) { c.aspect = W / H; c.fov = THREE.MathUtils.clamp(2 * THREE.MathUtils.radToDeg(Math.atan(Math.tan(THREE.MathUtils.degToRad(12)) / c.aspect)), 3.5, 10); c.clearViewOffset(); c.updateProjectionMatrix(); }
     // distance: the smallest that keeps the line inside 96% of the width and ~62% of the height
     let lo = 1, hi = 600;
-    for (let i = 0; i < 26; i++) { const mid = (lo + hi) / 2; place(baseCam, baseLook, mid); const ex = extent(baseCam); if (ex.x1 - ex.x0 <= 1.97 && ex.y1 - ex.y0 <= 1.36) hi = mid; else lo = mid; }
+    hi = 1600; for (let i = 0; i < 30; i++) { const mid = (lo + hi) / 2; place(baseCam, baseLook, mid); const ex = extent(baseCam); if (ex.x1 - ex.x0 <= 1.97 && ex.y1 - ex.y0 <= 1.36) hi = mid; else lo = mid; }
     dBase = hi; place(baseCam, baseLook, dBase);
     const ex = extent(baseCam), cx = (ex.x0 + ex.x1) / 2;
     offY = Math.round((-0.95 - ex.y0) * H / 2); // sit the floor on the bottom edge; tags + header use the top band

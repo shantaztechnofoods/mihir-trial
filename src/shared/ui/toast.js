@@ -13,12 +13,17 @@
 // Each call returns a Promise of sonner's toast id. A failed chunk load never
 // throws into the caller (console.warn only) — a toast is never worth a crash.
 
+import { tapHaptic } from "../../utils/haptics.js";
+
 export function haptic(ms = 10, nav = typeof navigator !== "undefined" ? navigator : undefined) {
   try { if (nav && typeof nav.vibrate === "function") nav.vibrate(ms); } catch {}
 }
 
 /** Build a toast API around a loader that resolves to the sonner module ({ toast }). */
-export function createToast(load, { onSuccess = () => haptic() } = {}) {
+// 2026-11-06 (worker-ease) — the success tick goes through the one shared
+// tap helper: phones only, skipped with reduced motion or when Settings →
+// Appearance → "Tap vibration" is off, never twice for one tap.
+export function createToast(load, { onSuccess = () => tapHaptic() } = {}) {
   let pending = null;
   const lib = () => (pending ||= Promise.resolve().then(load).catch((e) => { pending = null; throw e; }));
   const call = (fn) => lib().then((m) => fn(m.toast)).catch((e) => { try { console.warn("[toast] unavailable:", e?.message || e); } catch {} return undefined; });
