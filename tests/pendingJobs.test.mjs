@@ -205,7 +205,10 @@ test("reason history: three separate entries, earlier ones never replaced", asyn
 
 test("reason history is shown in Pending Jobs, machine card, Production report and A-to-Z report", () => {
   const uses = (app.match(/<JobHistory item=\{p\}/g) || []).length;
-  assert.ok(uses >= 5, `expected JobHistory in 5 places, found ${uses}`);
+  // 2026-11-06 (reports v4) — the Company report traces each job as a mini flow
+  // (Raised ▸ Part received ▸ Closed) read straight from pendingItemHistory(p).
+  assert.ok(uses >= 4, `expected JobHistory in 4 places, found ${uses}`);
+  assert.match(app, /const hist = pendingItemHistory\(p\);/);
   assert.match(app, /<PendingJobsHistory \/>/);
   assert.match(app, /ReportedReason: p\.reason/);
   assert.match(app, /ReceiveRemark: p\.receivedNotes/);

@@ -4,6 +4,16 @@ import React, { useState, useEffect, useRef } from "react";
 import { Glyph } from "../../shared/components/LeadIcon.jsx";
 import { EmptyState } from "../../shared/ui/primitives.jsx";
 
+// Voice search (2026-11-06): the mic code is loaded on the first tap only.
+let voiceModP = null;
+const loadSearchVoice = () => (voiceModP = voiceModP || import("./searchVoice.js").catch((e) => { voiceModP = null; throw e; }));
+
+const MicIcon = () => (
+  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0" /><path d="M12 18v3" />
+  </svg>
+);
+
 // ─── GLOBAL SEARCH ────────────────────────────────────────────────────────────
 
 export function GlobalSearch({ items, pos, vendorList, machineLog, onClose, onNavigate }) {
@@ -19,6 +29,37 @@ export function GlobalSearch({ items, pos, vendorList, machineLog, onClose, onNa
     return () => window.removeEventListener("keydown", handler);
   }, [onClose]);
   useEffect(() => { setActiveIdx(-1); }, [q]);
+
+  // ── Voice search ──
+  const [voice, setVoice] = useState({ phase: "idle", error: "" });
+  const voiceRef = useRef(null);   // controller from searchVoice.js
+  const voiceOwns = useRef(false); // true while the box shows spoken words (typing takes it back)
+  const voiceText = useRef("");    // last spoken words put in the box (normalised)
+  const voiceMod = useRef(null);   // the lazily loaded searchVoice.js module
+  useEffect(() => () => { voiceRef.current && voiceRef.current.cancel(); }, []);
+  const onVoiceText = (raw, final, replaces) => {
+    if (!voiceOwns.current) return;
+    const norm = voiceMod.current.normalizeVoiceQuery;
+    const t = norm(raw);
+    if (!t) return;
+    if (replaces !== undefined && norm(replaces) !== voiceText.current) return;
+    voiceText.current = t; setQ(t);
+    if (final) inputRef.current?.focus();
+  };
+  const toggleVoice = async () => {
+    const c = voiceRef.current;
+    if (c && c.phase === "listening") { c.stop(); return; }
+    if (voice.phase !== "idle") return;
+    setVoice({ phase: "starting", error: "" });
+    let mod;
+    try { mod = await loadSearchVoice(); } catch { setVoice({ phase: "idle", error: "Could not start the mic. Check the connection and try again." }); return; }
+    voiceMod.current = mod;
+    if (!voiceRef.current) voiceRef.current = mod.createSearchVoice({ onState: setVoice, onText: onVoiceText });
+    voiceOwns.current = true; voiceText.current = "";
+    voiceRef.current.start();
+  };
+  const onType = (e) => { voiceOwns.current = false; if (voiceRef.current && voiceRef.current.phase === "listening") voiceRef.current.stop(); setQ(e.target.value); };
+  const listening = voice.phase === "listening";
 
   const allItems = Object.entries(items).flatMap(([cat, list]) => list.map((i) => ({ ...i, category: cat })));
   const lq = q.trim().toLowerCase();
@@ -132,12 +173,29 @@ export function GlobalSearch({ items, pos, vendorList, machineLog, onClose, onNa
         {/* Input */}
         <div className="flex items-center gap-3 px-4 py-3.5" style={{ borderBottom: "1px solid var(--border-subtle)" }}>
           <span className="text-slate-500 text-base flex-shrink-0"><Glyph e="🔍" size={16} /></span>
-          <input ref={inputRef} value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={handleKeyDown}
-            placeholder="Search items, POs, vendors, machines, serial numbers…"
-            className="flex-1 bg-transparent text-sm placeholder-slate-400 outline-none" />
-          {q ? <button onClick={() => setQ("")} className="text-slate-600 hover:text-slate-400 text-xs transition-colors">✕</button> : null}
-          <kbd className="text-[10px] text-slate-600 flex-shrink-0" style={{ background: "rgba(17,24,39,0.04)", border: "1px solid rgba(17,24,39,0.10)", borderRadius: 5, padding: "2px 6px" }}>ESC</kbd>
+          <input ref={inputRef} value={q} onChange={onType} onKeyDown={handleKeyDown}
+            data-global-search-input
+            aria-label="Search"
+            placeholder={listening ? "Listening… say a code or name" : "Search items, POs, vendors, machines, serial numbers…"}
+            className="flex-1 min-w-0 bg-transparent text-sm placeholder-slate-400 outline-none" />
+          {q ? <button onClick={() => { voiceOwns.current = false; setQ(""); }} aria-label="Clear search" className="text-slate-600 hover:text-slate-400 text-xs transition-colors">✕</button> : null}
+          <button type="button" data-voice-search onClick={toggleVoice} onPointerEnter={() => { loadSearchVoice().catch(() => {}); }}
+                  aria-pressed={listening} aria-label={listening ? "Stop listening" : "Search by voice"} title={listening ? "Stop listening" : "Search by voice"}
+                  disabled={voice.phase === "starting" || voice.phase === "writing"}
+                  className={`gs-mic${listening ? " gs-mic-on" : ""}`}>
+            {voice.phase === "starting" || voice.phase === "writing" ? <span className="vn-spin" aria-hidden="true" /> : <MicIcon />}
+          </button>
+          <kbd className="gs-esc text-[10px] text-slate-600 flex-shrink-0" style={{ background: "rgba(17,24,39,0.04)", border: "1px solid rgba(17,24,39,0.10)", borderRadius: 5, padding: "2px 6px" }}>ESC</kbd>
         </div>
+
+        {(voice.phase !== "idle" && voice.phase !== "starting") || voice.error ? (
+          <div data-voice-search-status role="status" aria-live="polite"
+               className={`gs-voice-status${voice.error ? " gs-voice-err" : ""}`}>
+            {voice.error ? <span data-voice-search-error>{voice.error}</span>
+              : listening ? <><span className="gs-voice-dot" aria-hidden="true" /><span className="font-semibold">Listening…</span><span className="gs-voice-hint">Tap the mic to stop</span></>
+              : <span>Writing…</span>}
+          </div>
+        ) : null}
 
         {/* Results */}
         <div ref={listRef} className="overflow-y-auto" style={{ maxHeight: "58vh" }}>

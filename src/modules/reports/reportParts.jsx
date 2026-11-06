@@ -55,8 +55,25 @@ export function RptPageStyle({ page, head = "", refText = "", foot = "" }) {
 }
 
 // One register of every captured signature: image, name, department, date.
-export function RptSignatureRegister({ rows = [] }) {
+// 2026-11-06 (reports v4) — cards: the same register as signature cards (five
+// across on A4), each with its image, name, what was signed, department and date.
+export function RptSignatureRegister({ rows = [], cards = false }) {
   if (!rows.length) return null;
+  if (cards) return (
+    <div className="r4-sigs" data-report-signatures>
+      {rows.map((r) => {
+        const box = <div className={`rpt-sigbox${r.accept ? " mr-sig" : ""}`} data-report-sigbox><img src={r.src} alt={`Signature: ${r.name || r.role}`} /></div>;
+        return (
+          <div key={r.k} className="r4-sigc" data-report-sig-row={r.k}>
+            {r.accept ? <div data-report-accept-signature>{box}</div> : box}
+            <div className="r4-sigc-nm">{r.name || "Name not recorded"}</div>
+            <div className="r4-sigc-r">{r.role}</div>
+            <div className="r4-sigc-r">{r.dept || ""}{r.dept && r.when ? " · " : ""}{rptFmtDT(r.when) || ""}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
   return (
     <div className="mr-table rpt-sigtable mr-avoid" data-report-signatures>
       <div className="mr-tr mr-th" style={{ gridTemplateColumns: "1.7fr 1.3fr 1fr 1.25fr 128px" }}><div>Signed for</div><div>Name</div><div>Department</div><div>Date</div><div>Signature</div></div>
@@ -179,24 +196,26 @@ export function RptDeptRecord({ r, customer = false, comments = [], users = [], 
 
 // The common A4 frame: running header (repeats on every printed page),
 // letterhead, title block, and the closing footnote.
-export function ReportSheet({ kind, settings = {}, title, subtitle = "", refText = "", generatedBy = "", children }) {
+// 2026-11-06 (reports v4) — v4: the customer report draws its own header
+// (R4Header in reportFlow.jsx); the sheet keeps the page furniture and closing line.
+export function ReportSheet({ kind, settings = {}, title, subtitle = "", refText = "", generatedBy = "", children, v4 = false, foot = "" }) {
   const company = rptCompany(settings);
   const now = new Date();
   const issued = rptFmtDT(now);
   const page = `${kind}-report`;
   const internal = kind !== "customer";
   return (
-    <div className={`mr-doc rpt-doc rpt-${kind}`} data-report-kind={kind}>
-      <RptPageStyle page={page} head={`${company.name || RPT_LEGAL_NAME} · ${title}`} refText={refText} foot={internal ? "Computer-generated report · Confidential, internal use only" : "Computer-generated report"} />
+    <div className={`mr-doc rpt-doc rpt-${kind}${v4 ? " r4-doc" : ""}`} data-report-kind={kind}>
+      <RptPageStyle page={page} head={`${company.name || RPT_LEGAL_NAME} · ${title}`} refText={refText} foot={foot || (internal ? "Computer-generated report · Confidential, internal use only" : "Computer-generated report")} />
       <table className="mr-frame">
         <thead><tr><td><div className="mr-runhead"><span>{company.name || RPT_LEGAL_NAME} · {title}</span><span className="mr-mono">{refText}</span></div></td></tr></thead>
         <tbody><tr><td>
-          <div data-report-header className="rpt-header">
+          {!v4 && <div data-report-header className="rpt-header">
             <RptLetterhead company={company} />
             <RptTitleBlock title={title} sub={subtitle} refText={refText} dateText={rptFmtD(now)} />
-          </div>
+          </div>}
           {children}
-          <div className="mr-footnote" data-report-generated>Generated from ERP records on {issued}{generatedBy && internal ? ` by ${generatedBy}` : ""}.</div>
+          <div className="mr-footnote" data-report-generated>Generated from ERP records on {issued}{generatedBy && internal ? ` by ${generatedBy}` : ""}.{v4 && refText ? ` Ref ${refText}.` : ""}{v4 && !internal ? " Thank you for choosing Shantaz." : ""}</div>
         </td></tr></tbody>
       </table>
     </div>

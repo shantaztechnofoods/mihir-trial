@@ -75,7 +75,7 @@ test("handler refuses without a drawn signature and records name, department, ti
 
 test("the signature is visible in the machine report and the machine history", () => {
   // 2026-11-04 — printed once, in the report's signature register (name, department, date, image).
-  const rep = slice("  const sigRows = [", "// D7 — the release sign-off");
+  const rep = slice("  const sigRows = [", "// ── Header ──");
   assert.match(rep, /svgDataUri\(h\.acceptedSignatureSvg\)/);
   assert.match(rep, /h\.acceptedByName \|\| userName\(h\.acceptedBy\)/);
   assert.match(rep, /dept: h\.acceptedInDepartment \|\| h\.toDepartment, when: h\.acceptedAt/);

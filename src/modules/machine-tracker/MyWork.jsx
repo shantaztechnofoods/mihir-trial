@@ -10,9 +10,9 @@
 // SAME modal the existing buttons open — no handler, permission or data
 // change lives in this file. Styles: mtUx section of src/world-ui.css.
 import React, { useState } from "react";
-import { Check, ClipboardList, ArrowRight, Play, Timer, X, Wrench, ChevronDown } from "lucide-react";
+import { Check, ClipboardList, ArrowRight, Play, Timer, X, Wrench, ChevronDown, CircleCheck, Send, Clock, CirclePause } from "lucide-react";
 import { BomPhotoThumb } from "../bom/index.js";
-import { nearLimitText, summaryText } from "./mtUx.js";
+import { nearLimitText, summaryText, todayParts, todayText } from "./mtUx.js";
 
 const STEP_ICON = { accept: Check, checklist: ClipboardList, finish: ArrowRight, resume: Play };
 
@@ -64,7 +64,7 @@ export function NearLimitStrip({ rows, onDismiss, onOpen }) {
 const TONE_WORD = { bad: "is-bad", wait: "is-wait", hold: "is-bad", ok: "is-ok" };
 
 // rows: [{ key, m, title, sub, status, tone, step, run, photoUrl }]
-export function MyWorkPanel({ rows, isHead, depts, summary, sentToday, allDepts, onToggle, showToggle, phoneOnly, maxCards = 6 }) {
+export function MyWorkPanel({ rows, isHead, depts, summary, sentToday, allDepts, onToggle, showToggle, phoneOnly, maxCards = 6, today = null }) {
   const list = rows || [];
   if (!isHead && !list.length) return null;
   const shown = list.slice(0, maxCards);
@@ -78,6 +78,7 @@ export function MyWorkPanel({ rows, isHead, depts, summary, sentToday, allDepts,
           <p className="mtx-mywork-sum" data-mywork-summary>
             {(depts || []).join(", ")}{depts && depts.length ? " · " : ""}{summaryText(summary)}
           </p>
+          {today}
         </div>
         {showToggle && (
           <div className="mtx-seg" role="group" aria-label="Which departments">
@@ -116,5 +117,28 @@ export function MyWorkPanel({ rows, isHead, depts, summary, sentToday, allDepts,
         </>
       )}
     </section>
+  );
+}
+
+// 2026-11-06 (worker-ease) — "Today · 3 accepted · 2 sent forward · 1 late ·
+// 1 on hold". Calm, one line on desktop; on a phone it wraps between items,
+// never inside a word. Each count = icon + number + word (never colour alone).
+const TODAY_ICON = { accepted: CircleCheck, sent: Send, late: Clock, held: CirclePause };
+export function TodayLine({ counts, omit, merged = false, className = "" }) {
+  if (!counts) return null;
+  const parts = todayParts(counts, omit);
+  return (
+    <p className={`mtx-today${merged ? " is-merged" : ""} ${className}`} data-today-line={merged ? "merged" : "top"}
+       role="status" aria-label={todayText(counts, omit)}>
+      <span className="mtx-today-lead" aria-hidden="true">Today</span>
+      {parts.map((p) => {
+        const Icon = TODAY_ICON[p.key];
+        return (
+          <span key={p.key} className={`mtx-today-item is-${p.tone}${p.n ? "" : " is-zero"}`} data-today-part={p.key} data-n={p.n} aria-hidden="true">
+            <Icon size={14} strokeWidth={2.2} aria-hidden="true" /><b>{p.n}</b> {p.word}
+          </span>
+        );
+      })}
+    </p>
   );
 }

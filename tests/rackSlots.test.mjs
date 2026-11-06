@@ -772,24 +772,27 @@ test("App: machine report, reachable from the card, and popups that always close
   const css = fs.readFileSync(path.join(root, "src/index.css"), "utf8");
   // the report and the shared report pieces that used to sit between it and ReportCenterPage
   const rep = readSrcs("src/modules/reports/AtoZMachineReport.jsx", "src/shared/printFormat.js", "src/modules/reports/reportFormat.js",
-    "src/modules/reports/reportParts.jsx", "src/modules/reports/MachineReports.jsx");
+    "src/modules/reports/reportParts.jsx", "src/modules/reports/MachineReports.jsx", "src/modules/reports/reportFlow.jsx");
 
   // report: letterhead, facts, at-a-glance, numbered sections, red open issues, sign-off
   // D1: sentence case, no capitals (2026-11-04: through the shared title block)
-  assert.match(rep, /<RptTitleBlock title="Machine production report"/);
+  // 2026-11-06 (reports v4) — the owner-approved header: R4Header (letterhead with the real logo,
+  // BOM photo frame, title, verdict). The shared title block still serves the other report sheets.
+  assert.match(rep, /kindLine="Machine production report · Company full report"/);
   assert.match(rep, /<div className="mr-doctitle rpt-doctitle"/);
   assert.match(rep, /getActiveCompany\(settings\)/);
   assert.match(rep, /data-report-glance/);
-  // 2026-11-01 (D1–D10) — engineering-document layout; numbered sections
-  for (const [n, t] of [["01", "Critical parts fitted"], ["02", "Department journey"], ["03", "Trial certificate and results"],
-                        ["04", "Issues and pending jobs"], ["05", "Stage history"], ["06", "Attachments"], ["07", "Release sign-off"]])
+  // 2026-11-06 (reports v4) — the owner-approved numbered sections. Stage notes and every
+  // checklist answer (the old Stage history + Appendix A) now print inside "The machine's journey",
+  // at the step where they happened.
+  for (const [n, t] of [["1", "What to look at"], ["2", "The machine's journey"], ["3", "Pending jobs, traced"], ["4", "Critical parts fitted"],
+                        ["5", "Trial certificate and results"], ["6", "Attachments recorded"], ["7", "Signatures and release sign-off"]])
     assert.match(rep, new RegExp(`n="${n}" title="${t}"`), `${n} ${t}`);
-  assert.match(rep, /Appendix A · Checklist answers/);
-  assert.match(rep, /const jobs = \[\.\.\.openJobs\.slice\(\)\.sort\(byTime\), \.\.\.resolvedJobs\.slice\(\)\.sort\(byTime\)\];/);
+  assert.match(rep, /const jobs = \[\.\.\.openJobs, \.\.\.resolvedJobs\];/);
   assert.match(rep, /data-report-issue=\{open \? "open" : "resolved"\} className=\{`mr-issue \$\{open \? "is-open" : "is-done"\}`\}/);
-  assert.match(rep, /<JobHistory item=\{p\} users=\{allUsers\} compact reportDates \/>/, "how and when each issue was resolved");
-  // every evidence section is still composed, plus the checklist appendix
-  for (const s of ["<Hdr />", "<CriticalParts />", "<Journey />", "<TrialCertificate />", "<PendingJobsHistory />", "<StageHistory />", "<AttachmentsList />", "<SignOff />", "<ChecklistAppendix />"])
+  assert.match(rep, /const hist = pendingItemHistory\(p\);/, "how and when each part job was received and closed");
+  // every evidence section is still composed
+  for (const s of ["<Hdr />", "<DeptTimes />", "<Findings />", "<Journey />", "<PendingJobsHistory />", "<CriticalParts />", "<TrialCertificate />", "<AttachmentsList />", "<SignOff />"])
     assert.ok(rep.includes(s), s);
 
   // reachable from the tracker: Ready card + History panel, full-screen viewer with Back / Print / Close
@@ -824,7 +827,7 @@ test("Machine report: every recorded field is still printed, and the A4 rules ho
   const css = fs.readFileSync(path.join(root, "src/index.css"), "utf8");
   // the report and the shared report pieces that used to sit between it and ReportCenterPage
   const rep = readSrcs("src/modules/reports/AtoZMachineReport.jsx", "src/shared/printFormat.js", "src/modules/reports/reportFormat.js",
-    "src/modules/reports/reportParts.jsx", "src/modules/reports/MachineReports.jsx");
+    "src/modules/reports/reportParts.jsx", "src/modules/reports/MachineReports.jsx", "src/modules/reports/reportFlow.jsx");
 
   const mustRead = [
     // header + references
@@ -834,16 +837,16 @@ test("Machine report: every recorded field is still printed, and the A4 rules ho
     "ci.notIssued", "ci.remark", "ci.serials", "ci.confirmed", "r.via", "r.when", "otherLines",
     // hand-overs
     "h.sentAt", "h.acceptedAt", "h.acceptTimeoutMinutes", "h.expectedDurationMinutes", "h.actualDurationMinutes",
-    "h.overrunMinutes", "h.overrunNarration", "workerIdsOf(h)", "h.mainEmployeeId", "h.mainEmployeeSignatureSvg",
+    "h.overrunMinutes", "h.overrunNarration", "workerIdsOf(outHop)", "h.mainEmployeeId", "h.mainEmployeeSignatureSvg",
     "h.workedBySnapshot", "rating.rating", "h.sentBy", "h.acceptedBy",
     // checklists (all stages, every answer, remarks)
     "a.label", "a.checked", "a.required", "a.remark", "cr.templateName", "cr.templateVersion", "cr.submittedAt", "cr.submittedBy",
     "during_work",
     // issues
     "p.description", "p.itemCode", "p.itemName", "p.qty", "p.partSerialNo", "p.critical", "p.raisedInDepartment",
-    "p.raisedAt", "p.assignedDepartment", "p.raisedInHandoverId", "<JobHistory item={p}",
+    "p.raisedAt", "p.assignedDepartment", "pendingItemHistory(p)", "p.resolutionNotes", "p.resolvedInDepartment",
     // trial certificate, stage history, attachments
-    "<TrialCertificateSheet machine={machine} cert={machine.trialCertificate} embedded />", "h.stage", "h.note", "h.date",
+    "<TrialCertificateSheet machine={machine} cert={cert} embedded signatures company={company} />", "h.stage", "h.note", "h.date",
     // 2026-11-04 — every captured signature, the Trial Certificate's included
     "h.acceptedSignatureSvg", "trialCertSignatureRows(machine", "c.trialBySignature", "c.checkBySignature", "c.trialByName", "c.checkByName",
     "a.name", "a.department", "a.createdAt",
@@ -856,8 +859,8 @@ test("Machine report: every recorded field is still printed, and the A4 rules ho
   // 2026-11-04 — one shared style for every report: "04 Nov 2026, 09:32" (24 h).
   assert.match(rep, /const fmtDT = rptFmtDT;/);
   assert.match(rep, /const rptFmtDT = .*\$\{rpt2\(d\.getHours\(\)\)\}:\$\{rpt2\(d\.getMinutes\(\)\)\}/);
-  assert.match(rep, /\$\{dur\(h\.actualDurationMinutes\)\} of \$\{dur\(h\.expectedDurationMinutes\)\}/);
-  assert.match(rep, /const rate = \(r\) =>/);
+  assert.match(rep, /\{rptDur\(r\.actual\)\}\{r\.target \? ` of \$\{rptDur\(r\.target\)\}` : ""\}/);
+  assert.match(rep, /Rating \{Number\(r\.rating\.rating\)\.toFixed\(1\)\} \/ 5/);
   assert.doesNotMatch(rep, /formatRatingBadge\(/, "no star badges");
   // D7: every captured signature at one size
   // 2026-11-02 — the signature is an <img> data URI (no markup injection); same box.

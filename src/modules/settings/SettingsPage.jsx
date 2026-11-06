@@ -19,6 +19,7 @@ import { SignaturePad } from "../../shared/ui/SignaturePad.jsx";
 import { Topbar } from "../../shared/ui/Topbar.jsx";
 import { ThemeSwitch } from "../../shared/ui/ThemeSwitch.jsx";
 import SaveMorph from "../../shared/ui/SaveMorph.jsx";
+import { readHapticPref, writeHapticPref, tapHaptic } from "../../utils/haptics.js";
 
 export function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, onSave, isSuperAdmin = false, canDo = () => true, onRegisterSignature, currentUser = null,
   // Phase B — checklist admin props (optional)
@@ -37,6 +38,7 @@ export function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, on
   const lastSavedSnapshotRef = useRef(JSON.stringify(initialSettings));
   const [saveError, setSaveError] = useState("");   // surfaces Supabase upsert failures
   const [settings, setSettings] = useState(() => ({ ...SETTINGS_DEFAULTS, ...initialSettings }));
+  const [hapticOn, setHapticOn] = useState(() => readHapticPref());
   // 2026-11-04 (fix/live-sync) — settings saved on another screen arrive here
   // live. The form adopts them only while it is untouched since the last value
   // it took; an edit in progress is never overwritten.
@@ -211,11 +213,20 @@ export function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, on
       <div className="px-6 pt-4 max-w-5xl">
         <div data-settings-appearance className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl px-4 py-3"
              style={{ background: "var(--p-s1)", border: "1px solid var(--p-line)" }}>
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1 basis-[220px]">
             <div className="text-[13px] font-semibold" style={{ color: "var(--p-tx1)" }}>Appearance</div>
             <div className="text-[12px] mt-0.5" style={{ color: "var(--p-tx3)" }}>Light or dark screen. Auto follows this device. Saved in this browser only.</div>
           </div>
           <ThemeSwitch withLabels />
+          {/* 2026-11-06 (worker-ease) — very light vibration on confirm / save taps (phones only). */}
+          <div data-settings-haptic className="w-full flex items-center gap-4 pt-3 mt-1" style={{ borderTop: "1px solid var(--p-line)" }}>
+            <div className="min-w-0 flex-1">
+              <div id="tap-vibration-label" className="text-[13px] font-semibold" style={{ color: "var(--p-tx1)" }}>Tap vibration</div>
+              <div className="text-[12px] mt-0.5" style={{ color: "var(--p-tx3)" }}>A very light buzz when Accept, Finish &amp; Transfer or Save is pressed. Phones only. Saved on this device.</div>
+            </div>
+            <button type="button" role="switch" aria-checked={hapticOn} aria-labelledby="tap-vibration-label" data-haptic-toggle
+                    className="wk-switch" onClick={() => { const v = writeHapticPref(!hapticOn); setHapticOn(v); if (v) tapHaptic(); }}><i aria-hidden="true" /></button>
+          </div>
         </div>
       </div>
 
