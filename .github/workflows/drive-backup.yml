@@ -1,0 +1,60 @@
+# Google Drive backup — every day 1:00 PM and 9:00 PM IST, plus "Back up now"
+# (Settings → Data & Backup starts this workflow through the drive-backup
+# edge function with run_id). READ-ONLY on ERP data; see scripts/drive-backup/.
+#
+# One-time setup (repo → Settings → Secrets and variables → Actions):
+#   secret   SUPABASE_SERVICE_ROLE_KEY   service-role (secret) key of this ERP's Supabase project
+#   variable SUPABASE_URL                optional; defaults to MIHIR TRIAL
+#   variable BACKUP_ROOT_NAME            optional; Drive folder name (default "SHANTAZ ERP Backup (Trial)")
+name: drive-backup
+
+on:
+  schedule:
+    - cron: "30 7 * * *"    # 1:00 PM IST
+    - cron: "30 15 * * *"   # 9:00 PM IST
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "backup_runs id (set by Back up now)"
+        required: false
+        default: ""
+
+concurrency:
+  group: drive-backup
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts/drive-backup
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: scripts/drive-backup/package-lock.json
+
+      - name: Install
+        run: npm ci --prefix scripts/drive-backup --no-audit --no-fund
+
+      - name: Back up to Google Drive
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL || 'https://kneklzurkwayfpawtdvf.supabase.co' }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          BACKUP_ROOT_NAME: ${{ vars.BACKUP_ROOT_NAME }}
+          RUN_ID: ${{ github.event.inputs.run_id }}
+        run: |
+          if [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "::notice::Drive backup is not set up yet (secret SUPABASE_SERVICE_ROLE_KEY missing) — skipped."
+            exit 0
+          fi
+          node scripts/drive-backup/backup.mjs

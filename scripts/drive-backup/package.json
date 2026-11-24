@@ -1,0 +1,11 @@
+{
+  "name": "shantaz-erp-drive-backup",
+  "private": true,
+  "type": "module",
+  "description": "Google Drive backup job for SHANTAZ ERP (runs in GitHub Actions, see .github/workflows/drive-backup.yml)",
+  "scripts": { "backup": "node backup.mjs" },
+  "dependencies": {
+    "exceljs": "4.4.0",
+    "fflate": "0.8.2"
+  }
+}
