@@ -114,3 +114,5 @@ export const adminCreateUser     = (p) => callFn("admin-create-user",     p);
 export const adminDeactivateUser = (p) => callFn("admin-deactivate-user", p);
 export const adminDeleteUser     = (p) => callFn("admin-delete-user",     p);
 export const adminResetPassword  = (p) => callFn("admin-reset-password",  p);
+// Google Drive backup (Settings → Data & Backup). action: status | connect | run | download
+export const driveBackup         = (action) => callFn("drive-backup", { action });

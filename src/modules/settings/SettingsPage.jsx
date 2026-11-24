@@ -11,6 +11,7 @@ import { ChecklistAdminPanel } from "./ChecklistAdminPanel.jsx";
 import { DeptEmployeesRow, EmployeeMembersPanel } from "./EmployeeMembersPanel.jsx";
 import { DepartmentHeadsPanel } from "./DepartmentHeadsPanel.jsx";
 import { ModulesPanel } from "./ModulesPanel.jsx";
+import { DriveBackupPanel } from "./DriveBackupPanel.jsx";
 import { SLabel, Section, Toggle } from "./settingsUi.jsx";
 import { APP_BUILD } from "../../shared/buildInfo.js";
 import { SETTINGS_DEFAULTS } from "../../shared/settingsDefaults.js";
@@ -783,6 +784,7 @@ export function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, on
         {tab === "data" && (
           <Section icon="💾" title="Data & Backup">
             <div className="space-y-3">
+              {isSuperAdmin && <DriveBackupPanel />}
               <div className="flex items-center justify-between p-4 rounded-xl border border-slate-200"
                    style={{ background: "rgba(17,24,39,0.03)" }}>
                 <div>
