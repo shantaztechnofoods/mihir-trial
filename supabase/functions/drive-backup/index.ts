@@ -145,8 +145,9 @@ serve(async (req: Request) => {
   // The backup job: proves it holds a service-role key by reading backup_secrets with it.
   if (body.action === "token") {
     const key = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
+    if (!key) return json(403, { error: "Service key required" });
     const probe = await createClient(SUPABASE_URL, key).from("backup_secrets").select("key").limit(1);
-    if (!key || probe.error) return json(403, { error: "Service key required" });
+    if (probe.error) return json(403, { error: "Service key required" });
     const refresh = await getSecret("google_refresh_token");
     if (!refresh) return json(409, { error: "Google Drive is not connected yet (Settings → Data & Backup → Connect Google Drive)" });
     try {
