@@ -22,7 +22,7 @@ import { DelayReasonsCard, rackFillShortWhy } from "./DelayReasonsCard.jsx";
 import { AttachmentLink, ModalX, SenderUndoButton } from "./parts.jsx";
 import { StaffMyDashboard } from "./StaffMyDashboard.jsx";
 import { CRITICAL_MODES, JobHistory, PendingJobRows, cleanPendingJobs, emptyPendingJob, flagField, pendingItemsProblem } from "../pending-jobs/index.js";
-import { AtoZMachineReport, CustomerMachineReport, OnHoldReport, PendingJobsReport, RPT_PERIODS, machineReportRef, printWithTitle, rptCompany } from "../reports/index.js";
+import { AtoZMachineReport, CustomerMachineReport, OnHoldReport, PendingJobsReport, RPT_PERIODS, canOpenReport, machineReportRef, printWithTitle, resolveReportMaster, rptCompany } from "../reports/index.js";
 import { TrialCertificateModal, TrialCertificatePrintModal } from "../trial-certificate/index.js";
 import { waAlertTime, waDispatch } from "../whatsapp/index.js";
 import { fmtDate, svgDataUri } from "../../shared/format.js";
@@ -188,6 +188,8 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
   // row). It stays for admins to correct mistakes and is hidden from operators,
   // who use Finish & Transfer. Role keys mirror authStore.DEFAULT_ROLES.
   const isAdminUser = currentUser?.role === "super_admin" || currentUser?.role === "Admin";
+  // 2026-11-24 — Report Master (Settings → Report Master) decides who may open each report.
+  const canOpenRep = (kind) => canOpenReport(resolveReportMaster(settings?.report || {}), kind, currentUser?.role);
   // Phase 1 — raise-issue modal: { machine } while open.
   const [raiseModal, setRaiseModal] = useState(null);
   // 2026-11-01 — machine whose full report is open (id), or null.
@@ -3607,7 +3609,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                           <LeadIcon e="📋" />Certificate
                         </button>
                       )}
-                      {isComplete && isAdminUser && (
+                      {isComplete && canOpenRep("company") && (
                         <button type="button" data-card-report={machine.id} onClick={() => setReportMachineId(machine.id)}
                                 className="text-[11px] font-black px-3 py-1.5 rounded-lg border transition-all"
                                 style={{ background: "rgba(21,128,61,0.08)", border: "1px solid rgba(21,128,61,0.35)", color: "#15803d" }}
@@ -3615,7 +3617,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                           Company report
                         </button>
                       )}
-                      {isAdminUser && (
+                      {canOpenRep("customer") && (
                         <button type="button" data-card-customer-report={machine.id} onClick={() => openReport("customer", machine.id)}
                                 className="text-[11px] font-black px-3 py-1.5 rounded-lg border transition-all"
                                 style={{ background: "var(--surface-card)", border: "1px solid var(--border-rim)", color: "var(--text-strong)" }}
@@ -3651,7 +3653,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                       <div className="md:col-span-2">
                         <div className="flex items-baseline gap-3 flex-wrap mb-3">
                           <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Production report</div>
-                          {isAdminUser && <button type="button" data-history-report={machine.id} onClick={() => setReportMachineId(machine.id)}
+                          {canOpenRep("company") && <button type="button" data-history-report={machine.id} onClick={() => setReportMachineId(machine.id)}
                                   className="text-[11px] font-bold px-2.5 py-1 rounded-lg border ml-auto"
                                   style={{ borderColor: "var(--border-rim)", color: "var(--text-strong)", background: "var(--surface-card)" }}>
                             Company full report
@@ -4108,7 +4110,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
           { kind: "company",  title: "Company full report", sub: "Internal: route with times vs target, who transferred and accepted, every checklist, holds, pending jobs, signatures.", machine: true, admin: true },
           { kind: "hold",     title: "On hold report", sub: "Machines that went on hold in a period, how long, why and who — totals by department and reason." },
           { kind: "pending",  title: "Pending jobs report", sub: "Open parts and work per machine and department: quantity, critical flag, status and age." },
-        ].filter((x) => !x.admin || isAdminUser);
+        ].filter((x) => canOpenRep(x.kind));
         return (
           <div data-reports-chooser className="modal-backdrop fixed inset-0 z-[90] flex items-center justify-center p-4"
                style={{ background: "rgba(17,24,39,0.45)", backdropFilter: "blur(6px)" }}

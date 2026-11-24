@@ -140,7 +140,9 @@ test("customer review flags contradictions instead of printing them", () => {
 test("report components use the new sections and wording", () => {
   const rep = read("src/modules/reports/AtoZMachineReport.jsx");
   // 2026-11-06 (reports v4) — "What to look at" (the findings) is section 1 and prints first.
-  assert.match(rep, /n="1" title="What to look at"/);
+  // 2026-11-24 — numbered by the Report Master; findings stay first in the order (section 1 when on).
+  assert.match(rep, /n=\{secNo\("findings"\)\} title="What to look at"/);
+  assert.ok(rep.includes('const secOrder = ["findings", '), "findings first in the section order");
   assert.ok(rep.indexOf("<Findings />") < rep.indexOf("<Journey />") && rep.indexOf("<Findings />") < rep.indexOf("<CriticalParts />"), "findings print first");
   assert.match(rep, /data-report-timeline/);
   assert.match(rep, /data-report-comments-dept=\{g\.dept\}/);
