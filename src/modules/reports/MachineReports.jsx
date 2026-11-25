@@ -9,6 +9,7 @@ import { R4Glance, R4Header, R4Icon, R4Pill, R4Ribbon, R4Sec, r4Day, r4Range } f
 import { TC_SHEET_CSS, TrialCertificateSheet } from "../trial-certificate/index.js";
 import { svgDataUri } from "../../shared/format.js";
 import { RPT_LEGAL_NAME, rptFmtD, rptFmtDT } from "../../shared/printFormat.js";
+import { reportShows, resolveReportMaster } from "./reportMaster.js";
 
 // ── 1. Customer report — only what a customer should see ────────────────
 // No employee names, delays, holds, ratings, internal remarks or pending
@@ -19,6 +20,12 @@ export function CustomerMachineReport({ machineId, machineLog = [], bomDefs = {}
   pendingHandoverItems = [], outwardLog = [], auditLog = [], items = {}, allUsers = [] }) {
   const machine = (machineLog || []).find((m) => String(m.id) === String(machineId)) || null;
   if (!machine) return <p className="mr-empty">Pick a machine to see its customer report.</p>;
+  // 2026-11-24 — Report Master: which sections print (internal facts are locked off here).
+  const master = resolveReportMaster((settings && settings.report) || {});
+  const on = (key) => reportShows(master, "customer", key);
+  const secOrder = ["journey", "critical", "trial", "attachments", "warranty", "signatures"].filter(on);
+  const secNo = (k) => String(secOrder.indexOf(k) + 1);
+  const certNo = on("trial") ? secNo("trial") : "";
   const bom = bomDefs[machine.bomKey] || {};
   const isReady = machine.status === "completed";
   const cur = isReady ? "Ready" : (machine.currentDepartment || machine.stage);
@@ -29,8 +36,8 @@ export function CustomerMachineReport({ machineId, machineLog = [], bomDefs = {}
   const records = rptDeptRecords(machine, handovers, checklistResponses);
   const machinePending = (pendingHandoverItems || []).filter((p) => String(p.machineId) === String(machine.id));
   const commentGroups = rptCommentGroups(machinePending, { completedOnly: true, by: "done" });
-  const commentsOf = (d) => ((commentGroups.find((g) => g.dept === d) || {}).rows || []);
-  const otherComments = commentGroups.filter((g) => !RPT_STAGE_DEPTS.includes(g.dept)).flatMap((g) => g.rows);
+  const commentsOf = (d) => (!on("finishing") ? [] : ((commentGroups.find((g) => g.dept === d) || {}).rows || []));
+  const otherComments = !on("finishing") ? [] : commentGroups.filter((g) => !RPT_STAGE_DEPTS.includes(g.dept)).flatMap((g) => g.rows);
   const critical = rptCriticalItems({ machine, outwardLog, auditLog, items, pendingItems: machinePending, allUsers });
   const critSummary = rptCriticalSummary(critical);
   const docs = (attachments || []).filter((a) => String(a.machineId) === String(machine.id) && a.isCustomerVisible && a.kind !== "audio");
@@ -65,10 +72,10 @@ export function CustomerMachineReport({ machineId, machineLog = [], bomDefs = {}
     isReady
       ? `${[rptFmtD(machine.createdDate) && `Work started on ${rptFmtD(machine.createdDate)}`, rptFmtD(machine.completedDate) && `the machine was completed on ${rptFmtD(machine.completedDate)}`].filter(Boolean).join(" and ").replace(/^t/, "T") || "The machine is completed"}${buildDays ? `, a build time of ${rptCount(buildDays, "day")}` : ""}. It passed through all five stages — ${rptList(doneStages)}.`
       : `Work started on ${rptFmtD(machine.createdDate) || "the date of the BOM issue"}. The machine is in production at the ${cur === "Ready" ? "final inspection" : cur} stage${doneStages.length ? `; completed so far: ${rptList(doneStages)}` : ""}.`,
-    points ? (openPoints === 0 ? `Every stage was inspected against its checklist, and all ${points} quality check points were completed.` : `${passed} of ${points} quality check points have been completed; ${rptCount(openPoints, "point is", "points are")} still open${isReady ? " and will be closed before dispatch" : ""}.`) : "",
-    critical.length ? (critOk === critical.length ? `${rptCount(critical.length, "critical component")} ${critical.length === 1 ? "was" : "were"} fitted and ${critical.length === 1 ? "its serial number or verification is" : "their serial numbers or verification are"} recorded below.` : critOk === 0 ? `Serial numbers for its ${rptCount(critical.length, "critical component")} are recorded as ${critical.length === 1 ? "it is" : "they are"} fitted.` : `${critOk} of ${critical.length} critical components have their serial numbers or verification recorded; the rest are recorded as they are fitted.`) : "",
-    cert ? `The machine was run on trial${certDate ? ` on ${certDate}` : ""}; the full trial certificate is section 3 of this report.` : "The machine will be run under load on trial before release, and its trial certificate added to this report.",
-    finishing ? `${rptCount(finishing, "finishing job")} found during the build ${finishing === 1 ? "was" : "were"} completed and ${finishing === 1 ? "is" : "are"} listed under the stage that did ${finishing === 1 ? "it" : "them"}.` : "",
+    points && on("checklists") ? (openPoints === 0 ? `Every stage was inspected against its checklist, and all ${points} quality check points were completed.` : `${passed} of ${points} quality check points have been completed; ${rptCount(openPoints, "point is", "points are")} still open${isReady ? " and will be closed before dispatch" : ""}.`) : "",
+    critical.length && on("critical") ? (critOk === critical.length ? `${rptCount(critical.length, "critical component")} ${critical.length === 1 ? "was" : "were"} fitted and ${critical.length === 1 ? "its serial number or verification is" : "their serial numbers or verification are"} recorded below.` : critOk === 0 ? `Serial numbers for its ${rptCount(critical.length, "critical component")} are recorded as ${critical.length === 1 ? "it is" : "they are"} fitted.` : `${critOk} of ${critical.length} critical components have their serial numbers or verification recorded; the rest are recorded as they are fitted.`) : "",
+    !on("trial") ? "" : cert ? `The machine was run on trial${certDate ? ` on ${certDate}` : ""}; the full trial certificate is section ${certNo} of this report.` : "The machine will be run under load on trial before release, and its trial certificate added to this report.",
+    finishing && on("finishing") ? `${rptCount(finishing, "finishing job")} found during the build ${finishing === 1 ? "was" : "were"} completed and ${finishing === 1 ? "is" : "are"} listed under the stage that did ${finishing === 1 ? "it" : "them"}.` : "",
   ].filter(Boolean);
   return (
     <>
@@ -94,6 +101,7 @@ export function CustomerMachineReport({ machineId, machineLog = [], bomDefs = {}
             sub: isReady && openPoints === 0 ? `Built, inspected${cert ? " and trial-tested" : ""}` : isReady ? "Being closed before dispatch" : "This is a progress report" }}
           verdictAttr={{ "data-report-status": "" }} />
       </div>
+      {on("summary") && <>
       <div data-report-customer-summary>
         <h3 className="r4-sub-h">How this machine was built</h3>
         <p className="r4-lead rpt-summary-text">{summary.join(" ")}</p>
@@ -105,12 +113,13 @@ export function CustomerMachineReport({ machineId, machineLog = [], bomDefs = {}
         { k: "Quality check points", v: points ? passed : "—", small: points ? `of ${points}` : "", tone: points && openPoints === 0 ? "ok" : "warn", icon: points && openPoints === 0 ? "check" : "clock", s: points ? (openPoints === 0 ? "Passed" : `${openPoints} still open`) : "None recorded" },
         { k: "Critical components recorded", v: critical.length ? critOk : "—", small: critical.length ? `of ${critical.length}` : "", tone: critOk === critical.length ? "ok" : "warn", icon: critOk === critical.length ? "check" : "clock", s: critical.length ? (critOk === critical.length ? "Serials on file" : "Being recorded") : "None listed" },
         { k: "Finishing jobs completed", v: finishing, tone: "ok", icon: "check", s: finishing ? "Listed under their stage" : "None needed" },
-      ]} />
-      <R4Sec n="1" title="Your machine's journey" count={`${records.length} stages`} attr={{ "data-report-journey": "" }}>
+      ].filter((t, i) => [true, on("checklists"), on("critical"), on("finishing")][i])} />
+      </>}
+      {on("journey") && <R4Sec n={secNo("journey")} title="Your machine's journey" count={`${records.length} stages`} attr={{ "data-report-journey": "" }}>
         {records.map((r, i) => (
           <div key={r.dept} className={`r4-cust-row${i === records.length - 1 ? " is-last" : ""}`}>
             <div className="r4-rail"><div className={`r4-node is-${r.state === "done" ? "done" : r.state}`}>{r.dept === "Ready" ? <R4Icon name="flag" /> : i + 1}</div></div>
-            <RptDeptRecord r={r} customer comments={commentsOf(r.dept)} users={allUsers} certNo="3" jobs={machinePending} ready={isReady} hasCert={!!cert} />
+            <RptDeptRecord r={r} customer comments={commentsOf(r.dept)} users={allUsers} certNo={certNo} jobs={machinePending} ready={isReady} hasCert={!!cert} people={on("people")} checks={on("checklists")} />
           </div>
         ))}
         {otherComments.length > 0 && (
@@ -121,8 +130,8 @@ export function CustomerMachineReport({ machineId, machineLog = [], bomDefs = {}
             ))}
           </div>
         )}
-      </R4Sec>
-      <R4Sec n="2" title="Critical components" attr={{ "data-report-critical": "" }}
+      </R4Sec>}
+      {on("critical") && <R4Sec n={secNo("critical")} title="Critical components" attr={{ "data-report-critical": "" }}
              intro={critical.length ? "The controlled parts fitted to your machine. Quote these serial numbers when you contact service." : null}
              extra={critical.length ? <span className={`r4-pill ${/not yet/.test(critSummary) ? "r4-p-warn" : "r4-p-ok"}`} data-report-critical-summary><R4Icon name={/not yet/.test(critSummary) ? "clock" : "check"} />{critSummary}</span> : null}>
         {critical.length === 0 ? <p className="mr-empty">No critical components are listed for this machine.</p> : (
@@ -140,15 +149,15 @@ export function CustomerMachineReport({ machineId, machineLog = [], bomDefs = {}
             </tbody>
           </table>
         )}
-      </R4Sec>
-      <R4Sec n="3" title="Trial certificate" cls={cert ? "mr-cert-sec" : ""} attr={{ "data-report-trial": "" }}
+      </R4Sec>}
+      {on("trial") && <R4Sec n={secNo("trial")} title="Trial certificate" cls={cert ? "mr-cert-sec" : ""} attr={{ "data-report-trial": "" }}
              extra={cert ? <R4Pill tone="blue" icon="check">Certificate issued{certDate ? ` · ${certDate}` : ""}</R4Pill> : null}
              intro={cert ? "Your machine's complete trial certificate. It is part of this report; no separate certificate is sent." : null}>
         {cert ? <div className="mr-cert"><style>{TC_SHEET_CSS}</style><TrialCertificateSheet machine={machine} cert={cert} embedded signatures company={company} /></div>
               : <p className="mr-empty">The machine is run under load at Trial; its certificate is added here when the trial is complete.</p>}
-      </R4Sec>
-      <R4Sec n="4" title="Documents supplied with this machine" count={rptCount(docs.length, "item")} attr={{ "data-report-docs": "" }}
-             intro={`Handed over with the machine. No files are attached to this report.${cert ? " The trial certificate is not a separate document; it is section 3 of this report." : ""}`}>
+      </R4Sec>}
+      {on("attachments") && <R4Sec n={secNo("attachments")} title="Documents supplied with this machine" count={rptCount(docs.length, "item")} attr={{ "data-report-docs": "" }}
+             intro={`Handed over with the machine. No files are attached to this report.${cert && certNo ? ` The trial certificate is not a separate document; it is section ${certNo} of this report.` : ""}`}>
         {docs.length === 0 ? <p className="mr-empty">No documents have been shared for this machine yet. They are added here when they are ready.</p> : (
           <table className="r4-t">
             <thead><tr><th>Document</th><th>What it is</th><th>Date</th></tr></thead>
@@ -163,8 +172,8 @@ export function CustomerMachineReport({ machineId, machineLog = [], bomDefs = {}
             </tbody>
           </table>
         )}
-      </R4Sec>
-      <R4Sec n="5" title="Warranty and support" attr={{ "data-report-warranty": "" }}>
+      </R4Sec>}
+      {on("warranty") && <R4Sec n={secNo("warranty")} title="Warranty and support" attr={{ "data-report-warranty": "" }}>
         <div className="r4-two">
           <div className="r4-box"><h4>Warranty</h4><div className="r4-kv"><span>Warranty</span><span>— (terms to be added)</span><span>Period</span><span>—</span><span>Starts from</span><span>—</span></div></div>
           <div className="r4-box"><h4>Service and support</h4>
@@ -172,19 +181,19 @@ export function CustomerMachineReport({ machineId, machineLog = [], bomDefs = {}
             <div className="r4-kv"><span>Phone</span><span>{company.phone || "—"}</span><span>Email</span><span>{company.email || "—"}</span><span>Hours</span><span>—</span></div>
           </div>
         </div>
-      </R4Sec>
-      <R4Sec n="6" title="Final sign-off" cls="rpt-signoff-sec" attr={{ "data-report-customer-signoff": "" }}>
+      </R4Sec>}
+      {on("signatures") && <R4Sec n={secNo("signatures")} title="Final sign-off" cls="rpt-signoff-sec" attr={{ "data-report-customer-signoff": "" }}>
         {isReady
           ? <p className="mr-small" style={{ marginBottom: 10 }} data-report-certify>We certify that the machine described above, serial no. <b className="mr-mono">{machine.serialNo || ""}</b>, was built to its approved bill of materials{cert ? " and run on trial before release" : ""}, and was inspected and tested as recorded in this report.{openPoints > 0 ? ` ${rptCount(openPoints, "check point is", "check points are")} still open and will be closed before dispatch.` : ""}</p>
           : <p className="mr-small" style={{ marginBottom: 10 }} data-report-certify>This is a progress report, not a release certificate. The machine described above, serial no. <b className="mr-mono">{machine.serialNo || ""}</b>, is still in production; it is signed off for dispatch after final inspection and trial.</p>}
-        {cert && certSigs.length ? <p className="mr-label" style={{ marginBottom: 6 }}>Trial signatures are on the certificate in section 3.</p> : null}
+        {cert && certSigs.length && certNo ? <p className="mr-label" style={{ marginBottom: 6 }}>Trial signatures are on the certificate in section {certNo}.</p> : null}
         <RptSignatureRegister rows={releaseSigs} cards />
         <div className="r4-release" style={{ gridTemplateColumns: certSigs.length ? "repeat(2, minmax(0, 1fr))" : undefined }}>
           {[...(certSigs.length ? [] : [["Quality & trial", "name, signature, date"]]), ["Authorised signatory", `for ${companyName}`], ["Received by customer", "name, signature, date"]].map(([r, d]) => (
             <div key={r}><div className="r4-line" /><b>{r}</b>{d}</div>
           ))}
         </div>
-      </R4Sec>
+      </R4Sec>}
     </ReportSheet>
     </>
   );

@@ -5,13 +5,14 @@ import { LeadIcon, LeadLabel } from "../../shared/components/LeadIcon.jsx";
 import { SETTINGS_TAB_MODULE } from "../../utils/modules.js";
 import { readDeptWorkflowSettings, writeDeptWorkflowSettings, formatDuration, canConfigureDept } from "../../utils/handoverLogic.js";
 import { POSettings } from "../purchase/index.js";
-import { REPORT_LANGS } from "../reports/index.js";
+import { REPORT_LANGS, canEditReportMaster } from "../reports/index.js";
 import { AdminCleanupPanel } from "./AdminCleanupPanel.jsx";
 import { ChecklistAdminPanel } from "./ChecklistAdminPanel.jsx";
 import { DeptEmployeesRow, EmployeeMembersPanel } from "./EmployeeMembersPanel.jsx";
 import { DepartmentHeadsPanel } from "./DepartmentHeadsPanel.jsx";
 import { ModulesPanel } from "./ModulesPanel.jsx";
 import { DriveBackupPanel } from "./DriveBackupPanel.jsx";
+import { ReportMasterPanel } from "./ReportMasterPanel.jsx";
 import { SLabel, Section, Toggle } from "./settingsUi.jsx";
 import { APP_BUILD } from "../../shared/buildInfo.js";
 import { SETTINGS_DEFAULTS } from "../../shared/settingsDefaults.js";
@@ -172,6 +173,7 @@ export function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, on
     { id: "checklists",    label: "📋 Department Checklists", desc: "Department checklists — what each department must check" },
     { id: "employees",     label: "👥 Employees",            desc: "Manage display names for factory workers" },
     { id: "reports",       label: "📄 Report Settings",      desc: "Logo, company line, PDF language" },
+    { id: "reportMaster",  label: "📑 Report Master",        desc: "What each report shows · who can open it" },
     { id: "notifications", label: "🔔 Notifications",  desc: "WhatsApp / email alerts" },
     { id: "data",          label: "💾 Data & Backup",  desc: "Export + backup" },
     ...(isSuperAdmin && onSaveModules ? [{ id: "modules", label: "🧩 Modules", desc: "Turn whole modules on / off (super admin)" }] : []),
@@ -349,12 +351,11 @@ export function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, on
                   </div>
                 </div>
                 <div>
-                  <SLabel text="Displayed fields" hint="Sections included in the machine journey and production reports." />
-                  <div className="flex items-center gap-4 flex-wrap text-[12px] text-slate-700">
-                    {[["showEmployees", "Employees / team"], ["showChecklists", "Checklists"], ["showRatings", "Ratings"], ["showPendingJobs", "Pending jobs"]].map(([k, l]) => (
-                      <label key={k} className="flex items-center gap-2"><input type="checkbox" checked={rc[k] !== false} disabled={!canEdit} onChange={(e) => setRc({ [k]: e.target.checked })} className="accent-red-600 w-4 h-4" />{l}</label>
-                    ))}
-                  </div>
+                  <SLabel text="Displayed fields" hint="What each report shows, and who can open it, is set in one place now." />
+                  <button type="button" data-open-report-master onClick={() => setTab("reportMaster")}
+                          className="text-[11px] font-bold px-3 py-1.5 rounded-lg border" style={{ borderColor: "rgba(17,24,39,0.15)", color: "#2640B0" }}>
+                    Open Report Master
+                  </button>
                 </div>
                 <div>
                   <SLabel text="Test / pilot records" hint="Machines whose serial or BOM starts with TEST or PILOT are kept out of reports unless this is on." />
@@ -372,6 +373,20 @@ export function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, on
             </Section>
           );
         })()}
+
+        {/* ── Report Master tab (2026-11-24) ─────────────────────────────────── */}
+        {tab === "reportMaster" && (
+          <Section icon="📑" title="Report Master">
+            <ReportMasterPanel report={{ ...SETTINGS_DEFAULTS.report, ...(settings.report || {}) }}
+                               onChange={(next) => upd("report", next)}
+                               canEdit={canEditReportMaster(currentUser?.role)} />
+            {canEditReportMaster(currentUser?.role) && isDirty && !saved && (
+              <div className="mt-4 px-3 py-2 rounded-lg text-[11px] font-semibold" style={{ background: "rgba(217, 119, 6,0.10)", color: "#B45309", border: "1px solid rgba(217, 119, 6,0.4)" }}>
+                ● Unsaved changes — click <strong><LeadIcon e="💾" />Save Changes</strong> at the top to apply.
+              </div>
+            )}
+          </Section>
+        )}
 
         {/* ── Inventory tab ─────────────────────────────────────────────────── */}
         {tab === "inventory" && (

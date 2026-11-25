@@ -6,3 +6,4 @@ export { REPORT_LANGS } from "./i18n.js";
 export { CustomerMachineReport, OnHoldReport, PendingJobsReport } from "./MachineReports.jsx";
 export { ReportCenterPage } from "./ReportCenterPage.jsx";
 export { machineReportRef, printWithTitle, RPT_PERIODS, rptCompany } from "./reportFormat.js";
+export { REPORT_KINDS, REPORT_SECTIONS, SECTION_REPORTS, canEditReportMaster, canOpenReport, reportShows, resolveReportMaster, serializeReportMaster } from "./reportMaster.js";

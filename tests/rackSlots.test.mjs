@@ -449,7 +449,7 @@ test("App: Report Center navigation, seven reports, filters, exports and setting
   assert.match(app, /@page \{ size: \$\{rc\.pageSize \|\| "A4"\} \$\{rc\.orientation \|\| "portrait"\}; margin: 12mm; \}/);
   // 2026-11-01 — the issues section always prints ("none recorded" when empty)
   // so a reader can tell "no issues" from "section switched off".
-  assert.match(app, /if \(show\.showPendingJobs === false\) return null;/);
+  assert.match(app, /if \(!on\("pending"\)\) return null;/); // 2026-11-24: switched off in the Report Master
   // customer PDF is printed / saved, never linked
   assert.doesNotMatch(app, /share(able)? link/i);
 });
@@ -785,9 +785,11 @@ test("App: machine report, reachable from the card, and popups that always close
   // 2026-11-06 (reports v4) — the owner-approved numbered sections. Stage notes and every
   // checklist answer (the old Stage history + Appendix A) now print inside "The machine's journey",
   // at the step where they happened.
-  for (const [n, t] of [["1", "What to look at"], ["2", "The machine's journey"], ["3", "Pending jobs, traced"], ["4", "Critical parts fitted"],
-                        ["5", "Trial certificate and results"], ["6", "Attachments recorded"], ["7", "Signatures and release sign-off"]])
-    assert.match(rep, new RegExp(`n="${n}" title="${t}"`), `${n} ${t}`);
+  // 2026-11-24 — numbered from the sections the Report Master switches on (1–7 when all are on, no gaps).
+  assert.ok(rep.includes('const secOrder = ["findings", "journey", "pending", "critical", "trial", "attachments", "signatures"].filter(on);'), "section order");
+  for (const [k, t] of [["findings", "What to look at"], ["journey", "The machine's journey"], ["pending", "Pending jobs, traced"], ["critical", "Critical parts fitted"],
+                        ["trial", "Trial certificate and results"], ["attachments", "Attachments recorded"], ["signatures", "Signatures and release sign-off"]])
+    assert.ok(rep.includes(`n={secNo("${k}")} title="${t}"`), `${k} ${t}`);
   assert.match(rep, /const jobs = \[\.\.\.openJobs, \.\.\.resolvedJobs\];/);
   assert.match(rep, /data-report-issue=\{open \? "open" : "resolved"\} className=\{`mr-issue \$\{open \? "is-open" : "is-done"\}`\}/);
   assert.match(rep, /const hist = pendingItemHistory\(p\);/, "how and when each part job was received and closed");
@@ -852,8 +854,10 @@ test("Machine report: every recorded field is still printed, and the A4 rules ho
     "a.name", "a.department", "a.createdAt",
   ];
   for (const f of mustRead) assert.ok(rep.includes(f), `report still reads ${f}`);
-  // the Settings → Report Settings toggles still apply
-  for (const t of ["show.showEmployees", "show.showChecklists", "show.showRatings", "show.showPendingJobs"]) assert.ok(rep.includes(t), t);
+  // the Settings → Report Settings toggles still apply — since 2026-11-24 through the
+  // Report Master (they are its defaults), so every gated section reads it.
+  assert.ok(rep.includes("const master = resolveReportMaster(show);"), "Report Master read from the report settings");
+  for (const t of ['on("people")', 'on("checklists")', 'on("ratings")', 'on("pending")', 'on("times")', 'on("holds")', 'on("signatures")']) assert.ok(rep.includes(t), t);
 
   // D10: one date style, durations in words, ratings as numbers
   // 2026-11-04 — one shared style for every report: "04 Nov 2026, 09:32" (24 h).

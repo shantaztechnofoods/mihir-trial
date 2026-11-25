@@ -22,6 +22,7 @@ import { svgDataUri } from "../../shared/format.js";
 import { displayStageOf } from "../../shared/machineStages.js";
 import { RPT_LEGAL_NAME, rptFmtD, rptFmtDT } from "../../shared/printFormat.js";
 import { SETTINGS_DEFAULTS } from "../../shared/settingsDefaults.js";
+import { reportShows, resolveReportMaster } from "./reportMaster.js";
 
 const STAGE_LABEL = { before_dispatch: "Before transfer", before_receive: "Before receive", during_work: "During work" };
 const STAGE_ORDER = { before_receive: 0, during_work: 1, before_dispatch: 2 };
@@ -38,6 +39,11 @@ export function AtoZMachineReport({
 }) {
   // 2026-10-31 — displayed-field toggles from Settings → Report Settings.
   const show = { ...SETTINGS_DEFAULTS.report, ...((settings && settings.report) || {}) };
+  // 2026-11-24 — Report Master (Settings → Report Master) decides which
+  // sections print. The old toggles (show.showEmployees, show.showChecklists,
+  // show.showRatings, show.showPendingJobs) are its defaults until it is saved.
+  const master = resolveReportMaster(show);
+  const on = (key) => reportShows(master, "company", key);
   const machine = (machineLog || []).find((m) => String(m.id) === String(machineId)) || null;
   if (!machine) {
     return (
@@ -113,6 +119,10 @@ export function AtoZMachineReport({
     ...trialCertSignatureRows(machine, machineHandovers),
   ].filter(Boolean).sort((a, b) => (rptMs(a.when) || 0) - (rptMs(b.when) || 0));
 
+  // Section numbers follow what is switched on (no gaps when one is hidden).
+  const secOrder = ["findings", "journey", "pending", "critical", "trial", "attachments", "signatures"].filter(on);
+  const secNo = (k) => String(secOrder.indexOf(k) + 1);
+
   // ── Header ─────────────────────────────────────────────────────────────
   const high = findings.counts.High;
   const verdict = !isReady
@@ -128,7 +138,7 @@ export function AtoZMachineReport({
           machine.issueId ? <>BOM issue <b className="r4-mono">{String(machine.issueId)}</b></> : null,
           <>{machine.rackSlot ? `Rack ${slotLabel(machine.rackSlot)}` : rackCapacityFor(machine.bomKey, bom) > 0 ? "Left the rack" : "Direct production"}</>]}
         verdict={verdict} verdictAttr={{ "data-report-status": "" }}
-        verdictExtra={isReady && high > 0 ? <div className="r4-v-sub r4-t-bad" data-report-stamp-note>{rptCount(high, "high finding")} open — see section 1</div> : null} />
+        verdictExtra={isReady && high > 0 ? <div className="r4-v-sub r4-t-bad" data-report-stamp-note>{rptCount(high, "high finding")} open{on("findings") ? ` — see section ${secNo("findings")}` : ""}</div> : null} />
     </div>
   );
 
@@ -136,23 +146,23 @@ export function AtoZMachineReport({
     const s = [];
     if (isReady) s.push(<>Built in <b>{buildMin != null ? rptDur(buildMin) : "—"}</b>, from {fmtD(startAt) || "the BOM issue"} to {fmtD(machine.completedDate)}.</>);
     else s.push(<>In production since <b>{fmtD(startAt) || "the BOM issue"}</b>; it is now in <b>{curDept}</b>.</>);
-    if (workT) s.push(<> Working time was <b>{rptDur(workA)} against {rptDur(workT)} target</b>{workA > workT ? `, ${rptDur(workA - workT)} over${overDepts.length ? `, in ${rptList(overDepts.map((r) => r.dept))}` : ""}` : ", within target"}.</>);
-    if (manualHolds.length || lateAccepts.length) s.push(<> {[manualHolds.length ? `${rptCount(manualHolds.length, "hold")} (${rptList(manualHolds.map((h) => `${h.from || "a department"}, ${h.minutes != null ? rptDur(h.minutes) : "time not recorded"}`))})` : "", lateAccepts.length ? `${rptCount(lateAccepts.length, "late acceptance")}` : ""].filter(Boolean).join(" and ").replace(/^./, (c) => c.toUpperCase())}.</>);
-    if (machinePending.length) s.push(<> {openJobs.length ? <><b>{openJobs.length} of {machinePending.length} pending jobs are still open</b></> : <>All <b>{machinePending.length} pending {machinePending.length === 1 ? "job is" : "jobs are"} closed</b></>}.</>);
-    if (criticalRows.length) s.push(<> Critical parts: {critSummary}.</>);
+    if (workT && on("times")) s.push(<> Working time was <b>{rptDur(workA)} against {rptDur(workT)} target</b>{workA > workT ? `, ${rptDur(workA - workT)} over${overDepts.length ? `, in ${rptList(overDepts.map((r) => r.dept))}` : ""}` : ", within target"}.</>);
+    if (on("holds") && (manualHolds.length || lateAccepts.length)) s.push(<> {[manualHolds.length ? `${rptCount(manualHolds.length, "hold")} (${rptList(manualHolds.map((h) => `${h.from || "a department"}, ${h.minutes != null ? rptDur(h.minutes) : "time not recorded"}`))})` : "", lateAccepts.length ? `${rptCount(lateAccepts.length, "late acceptance")}` : ""].filter(Boolean).join(" and ").replace(/^./, (c) => c.toUpperCase())}.</>);
+    if (on("pending") && machinePending.length) s.push(<> {openJobs.length ? <><b>{openJobs.length} of {machinePending.length} pending jobs are still open</b></> : <>All <b>{machinePending.length} pending {machinePending.length === 1 ? "job is" : "jobs are"} closed</b></>}.</>);
+    if (on("critical") && criticalRows.length) s.push(<> Critical parts: {critSummary}.</>);
     return s;
   })();
 
   const tiles = [
     { k: "Build time, start to release", v: buildMin != null ? rptDur(buildMin) : "—", tone: "mute", icon: "clock", s: `${r4Day(startAt) || "—"} → ${isReady ? r4Day(machine.completedDate) : "now"}` },
-    { k: "Working time", v: workT || workA ? rptDur(workA) : "Not recorded", small: workT ? `· target ${rptDur(workT)}` : "", tone: workA > workT && workT ? "warn" : workT ? "ok" : "mute", icon: workA > workT && workT ? "warn" : "check", s: workT ? (workA > workT ? `${rptDur(workA - workT)} over target` : "Within target") : "No target set" },
-    { k: "Delays against target", v: overDepts.length, tone: overDepts.length ? "warn" : "ok", icon: overDepts.length ? "warn" : "check", s: overDepts.length ? overDepts.map((r) => `${r.dept}, ${rptDur(r.over)}`).join(" · ") : "None" },
-    { k: "Holds", v: manualHolds.length, small: lateAccepts.length ? `· ${lateAccepts.length} late accept${lateAccepts.length === 1 ? "" : "s"}` : "", tone: manualHolds.some((h) => h.open) ? "bad" : manualHolds.length ? "ok" : "ok", icon: manualHolds.some((h) => h.open) ? "hold" : "check", s: manualHolds.some((h) => h.open) ? "Still on hold" : manualHolds.length ? `Released, ${rptDur(manualHolds.reduce((x, h) => x + (h.minutes || 0), 0))}` : "None" },
-    { k: "Pending jobs", v: resolvedJobs.length, small: `of ${machinePending.length} closed`, tone: openJobs.length ? "bad" : "ok", icon: openJobs.length ? "clock" : "check", s: openJobs.length ? `${openJobs.length} open` : "None open" },
-    { k: "Checklist points ticked", v: pointsDone, small: `of ${allPoints.length}`, tone: allPoints.length - pointsDone ? "warn" : "ok", icon: allPoints.length - pointsDone ? "warn" : "check", s: allPoints.length ? (allPoints.length - pointsDone ? `${allPoints.length - pointsDone} not ticked` : "All ticked") : "None recorded" },
-    { k: "Critical parts recorded", v: critOk, small: `of ${criticalRows.length}`, tone: critOk < criticalRows.length ? "warn" : "ok", icon: critOk < criticalRows.length ? "warn" : "check", s: criticalRows.length ? (critOk < criticalRows.length ? "Serials missing" : "Serials on file") : "None listed" },
-    { k: "Signatures", v: sigRows.length, attr: { "data-report-sig-count": "" }, tone: "mute", icon: "pen", s: "Register in section 7" },
-  ];
+    { sec: "times", k: "Working time", v: workT || workA ? rptDur(workA) : "Not recorded", small: workT ? `· target ${rptDur(workT)}` : "", tone: workA > workT && workT ? "warn" : workT ? "ok" : "mute", icon: workA > workT && workT ? "warn" : "check", s: workT ? (workA > workT ? `${rptDur(workA - workT)} over target` : "Within target") : "No target set" },
+    { sec: "times", k: "Delays against target", v: overDepts.length, tone: overDepts.length ? "warn" : "ok", icon: overDepts.length ? "warn" : "check", s: overDepts.length ? overDepts.map((r) => `${r.dept}, ${rptDur(r.over)}`).join(" · ") : "None" },
+    { sec: "holds", k: "Holds", v: manualHolds.length, small: lateAccepts.length ? `· ${lateAccepts.length} late accept${lateAccepts.length === 1 ? "" : "s"}` : "", tone: manualHolds.some((h) => h.open) ? "bad" : manualHolds.length ? "ok" : "ok", icon: manualHolds.some((h) => h.open) ? "hold" : "check", s: manualHolds.some((h) => h.open) ? "Still on hold" : manualHolds.length ? `Released, ${rptDur(manualHolds.reduce((x, h) => x + (h.minutes || 0), 0))}` : "None" },
+    { sec: "pending", k: "Pending jobs", v: resolvedJobs.length, small: `of ${machinePending.length} closed`, tone: openJobs.length ? "bad" : "ok", icon: openJobs.length ? "clock" : "check", s: openJobs.length ? `${openJobs.length} open` : "None open" },
+    { sec: "checklists", k: "Checklist points ticked", v: pointsDone, small: `of ${allPoints.length}`, tone: allPoints.length - pointsDone ? "warn" : "ok", icon: allPoints.length - pointsDone ? "warn" : "check", s: allPoints.length ? (allPoints.length - pointsDone ? `${allPoints.length - pointsDone} not ticked` : "All ticked") : "None recorded" },
+    { sec: "critical", k: "Critical parts recorded", v: critOk, small: `of ${criticalRows.length}`, tone: critOk < criticalRows.length ? "warn" : "ok", icon: critOk < criticalRows.length ? "warn" : "check", s: criticalRows.length ? (critOk < criticalRows.length ? "Serials missing" : "Serials on file") : "None listed" },
+    { sec: "signatures", k: "Signatures", v: sigRows.length, attr: { "data-report-sig-count": "" }, tone: "mute", icon: "pen", s: `Register in section ${secNo("signatures")}` },
+  ].filter((t) => !t.sec || on(t.sec));
 
   const ribbon = [
     { key: "Rack", mark: "R", label: "Rack", dates: r4Day(startAt), state: "done" },
@@ -200,10 +210,10 @@ export function AtoZMachineReport({
   };
   const Findings = () => {
     const c = findings.counts;
-    const timeGroups = findings.groups.filter((g) => g.key === "delays" || g.key === "holds");
+    const timeGroups = findings.groups.filter((g) => (g.key === "delays" && on("times")) || (g.key === "holds" && on("holds")));
     const otherGroups = findings.groups.filter((g) => g.key !== "delays" && g.key !== "holds");
     return (
-      <R4Sec n="1" title="What to look at" count={c.total ? `${c.total} finding${c.total === 1 ? "" : "s"}` : null}
+      <R4Sec n={secNo("findings")} title="What to look at" count={c.total ? `${c.total} finding${c.total === 1 ? "" : "s"}` : null}
              extra={c.High ? <R4Pill tone="bad" icon="warn">{c.High} high</R4Pill> : c.total ? <R4Pill tone="ok" icon="check">none high</R4Pill> : <R4Pill tone="ok" icon="check">nothing to look at</R4Pill>}>
         <div data-report-findings>
           <p className={`rpt-findings-lead ${c.High ? "is-high" : ""}`} data-report-findings-headline>{rptFindingsHeadline(findings)}</p>
@@ -238,7 +248,7 @@ export function AtoZMachineReport({
     const part = pendingItemIsPart(p); const type = rptJobType(p);
     return { at: p.raisedAt, el: (
       <R4Ev tone={part ? "warn" : type === "Checklist follow-up" ? "bad" : "warn"} icon={part ? "part" : "comment"} word={part ? "Part needed" : type === "Checklist follow-up" ? "Follow-up raised" : "Job raised"}
-        sub={`${J(p)} · ${p.raisedInDepartment || "—"} → ${p.assignedDepartment || "unassigned"} · traced in section 3${p.critical ? " · critical" : ""}`}>
+        sub={`${J(p)} · ${p.raisedInDepartment || "—"} → ${p.assignedDepartment || "unassigned"} · ${on("pending") ? `traced in section ${secNo("pending")}` : ""}${p.critical ? " · critical" : ""}`}>
         <strong>{p.description || [p.itemName || p.itemCode, p.qty != null ? `× ${p.qty}` : ""].filter(Boolean).join(" ")}</strong>
       </R4Ev>), tone: "warn", kind: "job" };
   };
@@ -259,36 +269,36 @@ export function AtoZMachineReport({
             {wait != null ? <span className={late ? "r4-t-warn" : "r4-t-ok"}>waited {rptDur(wait)}{win ? ` · window ${rptDur(win)}` : ""}</span> : null}
           </div>
           {late && lateReason ? <div className="r4-quote">Reason for the late accept: “{lateReason}”</div> : null}
-          {show.showEmployees !== false && (inHop.acceptedByName || userName(inHop.acceptedBy)) ? <div className="r4-ev-sub"><span data-report-accepted-by>Accepted by <b>{inHop.acceptedByName || userName(inHop.acceptedBy)}</b>{inHop.acceptedInDepartment && inHop.acceptedInDepartment !== inHop.toDepartment ? ` into ${inHop.acceptedInDepartment}` : ""}</span>
+          {on("people") && (inHop.acceptedByName || userName(inHop.acceptedBy)) ? <div className="r4-ev-sub"><span data-report-accepted-by>Accepted by <b>{inHop.acceptedByName || userName(inHop.acceptedBy)}</b>{inHop.acceptedInDepartment && inHop.acceptedInDepartment !== inHop.toDepartment ? ` into ${inHop.acceptedInDepartment}` : ""}</span>
             {Array.isArray(inHop.acceptedByTeamSnapshot) && inHop.acceptedByTeamSnapshot.length > 0 ? <span data-report-accept-team> · Team: {team.join(", ") || "no one else named"}</span> : null}</div> : null}
-          <R4SigChip src={inHop.acceptedSignatureSvg ? svgDataUri(inHop.acceptedSignatureSvg) : ""} name={inHop.acceptedByName || userName(inHop.acceptedBy)} line={`Accepted · ${fmtDT(inHop.acceptedAt)}`} />
-          {inHop.status === "accepted" && !inHop.acceptedSignatureSvg ? <div className="r4-ev-sub">{inHop.acceptedBySignatureId ? "Signature on file (earlier record)" : "No acceptance signature on file"}</div> : null}
+          {on("signatures") && <R4SigChip src={inHop.acceptedSignatureSvg ? svgDataUri(inHop.acceptedSignatureSvg) : ""} name={inHop.acceptedByName || userName(inHop.acceptedBy)} line={`Accepted · ${fmtDT(inHop.acceptedAt)}`} />}
+          {on("signatures") && inHop.status === "accepted" && !inHop.acceptedSignatureSvg ? <div className="r4-ev-sub">{inHop.acceptedBySignatureId ? "Signature on file (earlier record)" : "No acceptance signature on file"}</div> : null}
         </div>) });
     }
-    if (show.showChecklists !== false) r.checks.forEach((cr) => ev.push({ at: cr.submittedAt || (cr.stage === "before_receive" ? r.inAt : cr.stage === "before_dispatch" ? r.outAt : ""), order: 1 + (STAGE_ORDER[cr.stage] ?? 1), tone: (cr.answers || []).every((a) => a.checked) ? "ok" : "bad", el: checklistCard(cr) }));
-    if (show.showPendingJobs !== false) {
+    if (on("checklists")) r.checks.forEach((cr) => ev.push({ at: cr.submittedAt || (cr.stage === "before_receive" ? r.inAt : cr.stage === "before_dispatch" ? r.outAt : ""), order: 1 + (STAGE_ORDER[cr.stage] ?? 1), tone: (cr.answers || []).every((a) => a.checked) ? "ok" : "bad", el: checklistCard(cr) }));
+    if (on("pending")) {
       machinePending.filter((p) => p.raisedInDepartment === d).forEach((p) => ev.push({ ...jobEvent(p), order: 2 }));
       machinePending.forEach((p) => pendingItemHistory(p).filter((h) => h.kind === "received" && (h.department || p.assignedDepartment) === d).forEach((h, i) => ev.push({ at: h.at, order: 3, tone: "blue", el: (
         <R4Ev tone="blue" icon="part" word="Part received" sub={[h.byName || userName(h.by), h.text].filter(Boolean).join(" · ")}><strong>{p.itemName || p.itemCode || p.description}</strong><span className="r4-mute">{h.label.replace(/^Part received/, "").trim()} · {J(p)}</span></R4Ev>) , key: `rcv-${p.id}-${i}` })));
       machinePending.filter((p) => p.status === "resolved" && (p.resolvedInDepartment || p.assignedDepartment) === d).forEach((p) => ev.push({ at: p.resolvedAt, order: 4, tone: "ok", el: (
         <R4Ev tone="ok" icon="check" word="Job closed" sub={p.resolutionNotes ? `“${p.resolutionNotes}”` : ""}><strong>{p.description || p.itemName}</strong><span className="r4-mute">{J(p)}{userName(p.resolvedBy) ? ` · ${userName(p.resolvedBy)}` : ""}</span></R4Ev>) }));
     }
-    manualHolds.filter((h) => (h.from || "") === d).forEach((h) => ev.push({ at: h.startAt, order: 2, tone: h.open ? "bad" : "warn", el: (
+    if (on("holds")) manualHolds.filter((h) => (h.from || "") === d).forEach((h) => ev.push({ at: h.startAt, order: 2, tone: h.open ? "bad" : "warn", el: (
       <div className="r4-ev">
         <div className="r4-ev-t"><R4Pill tone={h.open ? "bad" : "warn"} icon="hold">On hold</R4Pill><strong>{h.minutes != null ? rptDur(h.minutes) : ""}</strong><span className="r4-mute">{r4Time(h.startAt)}{h.endAt ? ` to ${r4Time(h.endAt)}` : " · still on hold"}</span></div>
         <div className="r4-quote">Reason{h.by ? `, by ${h.by}` : ""}: “{h.reason || "no reason given"}”</div>
         {h.endAt ? <div className="r4-ev-sub">Released {fmtDT(h.endAt)}{h.releasedBy ? ` by ${h.releasedBy}` : ""}.</div> : null}
       </div>) }));
-    (machine.history || []).filter((h) => h.stage === d && h.note).forEach((h, i) => ev.push({ at: h.date, order: 5, tone: "blue", el: <R4Ev tone="mute" icon="comment" word="Stage note"><span>{h.note}</span></R4Ev>, key: `note-${i}` }));
+    if (on("notes")) (machine.history || []).filter((h) => h.stage === d && h.note).forEach((h, i) => ev.push({ at: h.date, order: 5, tone: "blue", el: <R4Ev tone="mute" icon="comment" word="Stage note"><span>{h.note}</span></R4Ev>, key: `note-${i}` }));
     if (r.outHop) {
       const h = r.outHop; const leadName = nameFromSnap(h.mainEmployeeId, h.workedBySnapshot) || h.mainEmployeeName || userName(h.sentBy);
       ev.push({ at: h.sentAt, order: 9, tone: h.status === "accepted" ? "ok" : "warn", el: (
         <div className="r4-ev">
           <div className="r4-ev-t"><R4Pill tone="ok" icon="arrow">Handed over</R4Pill><R4FromTo from={h.fromDepartment} to={h.toDepartment} />{userName(h.sentBy) ? <span className="r4-mute">by {userName(h.sentBy)}</span> : null}</div>
-          {h.overrunNarration ? <div className="r4-quote">Delay note at transfer: “{h.overrunNarration}”</div> : null}
-          {(Number(h.overrunMinutes) || 0) > 0 && !h.overrunNarration ? <div className="r4-ev-sub r4-t-warn">Over by {rptDur(h.overrunMinutes)}; no reason was recorded.</div> : null}
-          {show.showRatings !== false && r.rating ? <div className="r4-ev-sub">Rating {Number(r.rating.rating).toFixed(1)} / 5 from {h.toDepartment}</div> : null}
-          <R4SigChip src={h.mainEmployeeSignatureSvg ? svgDataUri(h.mainEmployeeSignatureSvg) : ""} name={leadName} line={`${h.fromDepartment} lead · ${fmtDT(h.sentAt)}`} />
+          {on("times") && h.overrunNarration ? <div className="r4-quote">Delay note at transfer: “{h.overrunNarration}”</div> : null}
+          {on("times") && (Number(h.overrunMinutes) || 0) > 0 && !h.overrunNarration ? <div className="r4-ev-sub r4-t-warn">Over by {rptDur(h.overrunMinutes)}; no reason was recorded.</div> : null}
+          {on("ratings") && r.rating ? <div className="r4-ev-sub">Rating {Number(r.rating.rating).toFixed(1)} / 5 from {h.toDepartment}</div> : null}
+          {on("signatures") && <R4SigChip src={h.mainEmployeeSignatureSvg ? svgDataUri(h.mainEmployeeSignatureSvg) : ""} name={leadName} line={`${h.fromDepartment} lead · ${fmtDT(h.sentAt)}`} />}
         </div>) });
     }
     if (d === "Ready" && isReady) ev.push({ at: machine.completedDate, order: 10, tone: "ok", el: <R4Ev tone="ok" icon="flag" word="Released for dispatch"><span className="r4-mute">{fmtDT(machine.completedDate)}</span></R4Ev> });
@@ -300,13 +310,13 @@ export function AtoZMachineReport({
   };
   const rackEvents = (() => {
     const ev = [];
-    if (show.showPendingJobs !== false) machinePending.filter((p) => !RPT_STAGE_DEPTS.includes(p.raisedInDepartment)).forEach((p) => ev.push(jobEvent(p)));
-    (machine.history || []).filter((h) => h.note && !RPT_STAGE_DEPTS.includes(h.stage)).forEach((h, i) => ev.push({ at: h.date, tone: "blue", key: `rn-${i}`, el: <R4Ev tone="mute" icon="comment" word={h.stage || "Note"}><span>{h.note}</span></R4Ev> }));
+    if (on("pending")) machinePending.filter((p) => !RPT_STAGE_DEPTS.includes(p.raisedInDepartment)).forEach((p) => ev.push(jobEvent(p)));
+    if (on("notes")) (machine.history || []).filter((h) => h.note && !RPT_STAGE_DEPTS.includes(h.stage)).forEach((h, i) => ev.push({ at: h.date, tone: "blue", key: `rn-${i}`, el: <R4Ev tone="mute" icon="comment" word={h.stage || "Note"}><span>{h.note}</span></R4Ev> }));
     return ev.sort((a, b) => (rptMs(a.at) || 0) - (rptMs(b.at) || 0));
   })();
 
   const Journey = () => (
-    <R4Sec n="2" title="The machine's journey" extra={<span className="r4-mute">Rack → Assembly → Mechanical → Electrical → Trial → Ready</span>} attr={{ "data-report-journey": "" }}>
+    <R4Sec n={secNo("journey")} title="The machine's journey" extra={<span className="r4-mute">Rack → Assembly → Mechanical → Electrical → Trial → Ready</span>} attr={{ "data-report-journey": "" }}>
       <div className="r4-journey">
         <R4Step first head date={r4Day(startAt)} time={r4Time(startAt)} node={{ kind: "dept", mark: "R" }}>
           <div className="r4-dept"><span className="r4-dept-name">Rack · BOM issued</span><R4Pill tone="ok" icon="check">Done</R4Pill>{issueAudit && issueAudit.user ? <span className="r4-who">Issued by <b>{issueAudit.user}</b>, Store</span> : null}</div>
@@ -325,11 +335,11 @@ export function AtoZMachineReport({
                 <div className="r4-dept">
                   <span className="r4-dept-name">{r.dept === "Ready" ? "Final inspection · Ready" : r.dept}</span>
                   <R4Pill tone={r.state === "done" ? "ok" : r.state === "current" ? "warn" : "mute"} icon={r.state === "done" ? "check" : "clock"}>{r.state === "done" ? "Completed" : r.state === "current" ? "In progress" : "Not started"}</R4Pill>
-                  {r.target ? (r.over > 0 ? <R4Pill tone="warn" icon="warn">Over target</R4Pill> : r.actual ? <R4Pill tone="ok" icon="check">On time</R4Pill> : null) : null}
-                  {holdsHere ? <R4Pill tone="warn" icon="hold">{rptCount(holdsHere, "hold")}</R4Pill> : null}
-                  {show.showEmployees !== false && r.handedOver && r.handedOver.name ? <span className="r4-who">Lead <b>{r.handedOver.name}</b>{r.handedOver.team.filter((n) => n !== r.handedOver.name).length ? ` · with ${r.handedOver.team.filter((n) => n !== r.handedOver.name).join(", ")}` : ""}</span> : null}
+                  {on("times") && r.target ? (r.over > 0 ? <R4Pill tone="warn" icon="warn">Over target</R4Pill> : r.actual ? <R4Pill tone="ok" icon="check">On time</R4Pill> : null) : null}
+                  {on("holds") && holdsHere ? <R4Pill tone="warn" icon="hold">{rptCount(holdsHere, "hold")}</R4Pill> : null}
+                  {on("people") && r.handedOver && r.handedOver.name ? <span className="r4-who">Lead <b>{r.handedOver.name}</b>{r.handedOver.team.filter((n) => n !== r.handedOver.name).length ? ` · with ${r.handedOver.team.filter((n) => n !== r.handedOver.name).join(", ")}` : ""}</span> : null}
                 </div>
-                {r.dept !== "Ready" && (r.actual || r.target) ? (
+                {on("times") && r.dept !== "Ready" && (r.actual || r.target) ? (
                   <div className="r4-tvt">
                     <R4Bar actual={r.actual} target={r.target} />
                     <span className={`r4-tvt-txt ${r.over > 0 ? "r4-t-warn" : "r4-t-ok"}`}><R4Icon name={r.over > 0 ? "warn" : "check"} />{rptDur(r.actual)}{r.target ? ` of ${rptDur(r.target)}` : ""} · {r.over > 0 ? `${rptDur(r.over)} over` : r.target ? "within target" : "no target set"}</span>
@@ -348,7 +358,7 @@ export function AtoZMachineReport({
 
   // ── 3 Pending jobs, traced ──
   const PendingJobsHistory = () => {
-    if (show.showPendingJobs === false) return null;
+    if (!on("pending")) return null;
     const jobs = [...openJobs, ...resolvedJobs];
     const parts = jobs.filter((p) => pendingItemIsPart(p));
     const commentDepts = rptCommentTable(jobs.filter((p) => !pendingItemIsPart(p)), allUsers);
@@ -366,7 +376,7 @@ export function AtoZMachineReport({
       ];
     };
     return (
-      <R4Sec n="3" title="Pending jobs, traced" count={`${jobs.length} raised · ${resolvedJobs.length} closed · ${openJobs.length} open`}
+      <R4Sec n={secNo("pending")} title="Pending jobs, traced" count={`${jobs.length} raised · ${resolvedJobs.length} closed · ${openJobs.length} open`}
              extra={openJobs.length ? <R4Pill tone="bad" icon="clock">{openJobs.length} open</R4Pill> : <R4Pill tone="ok" icon="check">{jobs.length ? "all closed" : "none recorded"}</R4Pill>}>
         <div data-report-issues>
           {parts.length > 0 && (
@@ -416,7 +426,7 @@ export function AtoZMachineReport({
   // ── 4 Critical parts fitted ──
   const otherLines = Math.max(0, (bom.items || []).length - new Set(criticalRows.map((r) => r.code)).size);
   const CriticalParts = () => (
-    <R4Sec n="4" title="Critical parts fitted"
+    <R4Sec n={secNo("critical")} title="Critical parts fitted"
            extra={<>{criticalRows.length > 0 && <span className={`r4-pill ${/not yet|missing/.test(critSummary) ? "r4-p-warn" : "r4-p-ok"}`} data-report-critical-summary><R4Icon name={/not yet|missing/.test(critSummary) ? "warn" : "check"} />{critSummary}</span>}{otherLines > 0 ? <span className="r4-mute">plus {otherLines} other part{otherLines === 1 ? "" : "s"} as per BOM {machine.bomKey}</span> : null}</>}>
       <div data-report-critical>
         {criticalRows.length === 0 ? <p className="mr-empty">No critical parts recorded for this machine.</p> : (
@@ -448,7 +458,7 @@ export function AtoZMachineReport({
   // ── 5 Trial certificate (the module's own sheet, embedded) ──
   const cert = machine.trialCertificate || null;
   const TrialCertificate = () => (
-    <R4Sec n="5" title="Trial certificate and results" cls={cert ? "mr-cert-sec" : ""} attr={{ "data-report-trial": "" }}
+    <R4Sec n={secNo("trial")} title="Trial certificate and results" cls={cert ? "mr-cert-sec" : ""} attr={{ "data-report-trial": "" }}
            extra={cert ? <R4Pill tone="blue" icon="check">Certificate issued · {fmtD(cert.trialDate || cert.updatedAt)}</R4Pill> : null}
            intro={cert ? "The complete trial certificate. It is part of this report; no separate certificate is issued." : null}>
       {cert
@@ -462,7 +472,7 @@ export function AtoZMachineReport({
   const kindWord = (a) => (isVoice(a) ? "Voice note" : a.kind === "image" ? "Photo" : a.kind === "video" ? "Video" : a.kind === "pdf" ? "PDF document" : "File");
   const custCount = machineAttach.filter((a) => a.isCustomerVisible && !isVoice(a)).length;
   const AttachmentsList = () => (
-    <R4Sec n="6" title="Attachments recorded" count={machineAttach.length ? `${rptCount(machineAttach.length, "item")} · ${custCount} also in the customer report` : null}
+    <R4Sec n={secNo("attachments")} title="Attachments recorded" count={machineAttach.length ? `${rptCount(machineAttach.length, "item")} · ${custCount} also in the customer report` : null}
            intro={machineAttach.length ? "A plain record of what was attached in the ERP. No files are attached to this report; they open from the machine card in Machine Tracker." : null}>
       {machineAttach.length === 0 ? <p className="mr-empty">No attachments on this machine.</p> : (
         <div {...(machineAttach.some(isVoice) ? { "data-report-voice": "" } : {})}>
@@ -487,7 +497,7 @@ export function AtoZMachineReport({
 
   // ── 7 Signatures and release sign-off ──
   const SignOff = () => (
-    <R4Sec n="7" title="Signatures and release sign-off" count={sigRows.length ? `${rptCount(sigRows.length, "signature")}, in the order given` : null}>
+    <R4Sec n={secNo("signatures")} title="Signatures and release sign-off" count={sigRows.length ? `${rptCount(sigRows.length, "signature")}, in the order given` : null}>
       {sigRows.length === 0 && <p className="mr-empty">No signatures captured yet.</p>}
       <RptSignatureRegister rows={sigRows} cards />
       <div data-report-signoff className="r4-release">
@@ -505,18 +515,20 @@ export function AtoZMachineReport({
         <thead><tr><td><div className="mr-runhead"><span>{company.name || RPT_LEGAL_NAME} · Machine production report</span><span className="mr-mono">{reportRef}</span></div></td></tr></thead>
         <tbody><tr><td>
           <Hdr />
-          <p className="r4-lead" data-report-lead>{lead}</p>
-          <R4Glance tiles={tiles} attr={{ "data-report-glance": "" }} />
-          <R4Ribbon steps={ribbon} />
-          <DeptTimes />
-          <Findings />
-          <Journey />
+          {on("summary") && <>
+            <p className="r4-lead" data-report-lead>{lead}</p>
+            <R4Glance tiles={tiles} attr={{ "data-report-glance": "" }} />
+            <R4Ribbon steps={ribbon} />
+          </>}
+          {on("times") && <DeptTimes />}
+          {on("findings") && <Findings />}
+          {on("journey") && <Journey />}
           <PendingJobsHistory />
-          <CriticalParts />
-          <TrialCertificate />
-          <AttachmentsList />
-          <SignOff />
-          <div className="mr-footnote" data-report-generated>Generated from ERP records on {fmtDT(new Date())}{generatedBy ? ` by ${generatedBy}` : ""}. Nothing in this report was typed in by hand. Ref {reportRef}.{sum.average !== null && show.showRatings !== false ? ` Average department rating ${Number(sum.average).toFixed(1)} / 5.` : ""}</div>
+          {on("critical") && <CriticalParts />}
+          {on("trial") && <TrialCertificate />}
+          {on("attachments") && <AttachmentsList />}
+          {on("signatures") && <SignOff />}
+          <div className="mr-footnote" data-report-generated>Generated from ERP records on {fmtDT(new Date())}{generatedBy ? ` by ${generatedBy}` : ""}. Nothing in this report was typed in by hand. Ref {reportRef}.{sum.average !== null && on("ratings") ? ` Average department rating ${Number(sum.average).toFixed(1)} / 5.` : ""}</div>
         </td></tr></tbody>
       </table>
     </div>

@@ -59,9 +59,14 @@ test("staff actions reuse the existing modals and are permission-gated; buttons 
   }
 });
 
-test("machine history and the full report are admin-only", () => {
-  assert.match(mp, /\{isComplete && isAdminUser && \(\s*<button type="button" data-card-report=\{machine\.id\} onClick=\{\(\) => setReportMachineId\(machine\.id\)\}/);
-  assert.match(mp, /\{isAdminUser && <button type="button" data-history-report=\{machine\.id\} onClick=\{\(\) => setReportMachineId\(machine\.id\)\}/);
+test("machine history and the full report are admin-only (by default — Report Master decides since 2026-11-24)", async () => {
+  assert.match(mp, /\{isComplete && canOpenRep\("company"\) && \(\s*<button type="button" data-card-report=\{machine\.id\} onClick=\{\(\) => setReportMachineId\(machine\.id\)\}/);
+  assert.match(mp, /\{canOpenRep\("company"\) && <button type="button" data-history-report=\{machine\.id\} onClick=\{\(\) => setReportMachineId\(machine\.id\)\}/);
+  const { canOpenReport, resolveReportMaster } = await import("../src/modules/reports/reportMaster.js");
+  const m = resolveReportMaster({});
+  assert.equal(canOpenReport(m, "company", "super_admin"), true);
+  assert.equal(canOpenReport(m, "company", "Admin"), true);
+  for (const r of ["dept_staff", "Production", "Store Manager", "no_access", undefined]) assert.equal(canOpenReport(m, "company", r), false, String(r));
 });
 
 test("Report Center: Machine journey tab is admin-gated", () => {

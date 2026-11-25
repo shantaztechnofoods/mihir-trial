@@ -108,7 +108,8 @@ export function trialCertSignatureRows(machine, handovers = []) {
   ].filter(Boolean);
 }
 
-export function RptDeptRecord({ r, customer = false, comments = [], users = [], certNo = "", jobs = [], ready = false, hasCert = false }) {
+// people / checks (2026-11-24, Report Master): hide names + signatures / the checklist block.
+export function RptDeptRecord({ r, customer = false, comments = [], users = [], certNo = "", jobs = [], ready = false, hasCert = false, people = true, checks = true }) {
   const stateText = r.state === "done" ? "Completed" : r.state === "current" ? "In progress" : "Not started";
   const timeText = r.actual || r.target ? `${rptDur(r.actual)}${r.target ? ` · target ${rptDur(r.target)}` : ""}` : "";
   // 2026-11-04 (content v4) — no empty cells: a fact without a value is left
@@ -121,7 +122,7 @@ export function RptDeptRecord({ r, customer = false, comments = [], users = [], 
   ].filter(([, v]) => !customer || v);
   const scope = r.state !== "done" ? (RPT_DEPT_SCOPE_TODO[r.dept] || RPT_DEPT_SCOPE[r.dept])
     : customer && r.dept === "Trial" && !hasCert ? "Machine run under load." : RPT_DEPT_SCOPE[r.dept];
-  const showAccepted = !customer || !!r.accepted;
+  const showAccepted = people && (!customer || !!r.accepted);
   const sig = r.accepted && r.accepted.sig ? svgDataUri(r.accepted.sig) : "";
   return (
     <div className={`rpt-dept is-${r.state}`} data-report-dept={r.dept}>
@@ -130,7 +131,7 @@ export function RptDeptRecord({ r, customer = false, comments = [], users = [], 
         <span className={`rpt-dept-state rpt-badge rpt-status ${r.state === "done" ? "mr-green" : r.state === "current" ? "mr-amber" : "mr-muted"}`}>{stateText}</span>
       </div>
       <div className="rpt-dept-scope">{scope}{r.dept === "Trial" && certNo && (!customer || hasCert) ? " See the trial certificate below." : ""}</div>
-      {customer && r.dept === "Assembly" && !r.accepted && r.state !== "pending" && <div className="mr-label rpt-dept-line">Work started from the bill-of-materials issue.</div>}
+      {customer && people && r.dept === "Assembly" && !r.accepted && r.state !== "pending" && <div className="mr-label rpt-dept-line">Work started from the bill-of-materials issue.</div>}
       {customer && r.state === "done" && facts.length === 0 && !r.accepted && r.dept !== "Assembly" && <div className="mr-label rpt-dept-line">Completed. The hand-over dates for this stage were not recorded.</div>}
       {customer && r.state === "pending" && <div className="mr-label rpt-dept-line">This stage has not started yet.</div>}
       {(facts.length > 0 || showAccepted) && <div className={`rpt-dept-grid${customer ? " is-3" : ""}`}>
@@ -147,11 +148,11 @@ export function RptDeptRecord({ r, customer = false, comments = [], users = [], 
           ) : <div className="rpt-dept-v mr-muted">{r.dept === "Assembly" ? "Started from BOM issue" : ""}</div>}
         </div>}
       </div>}
-      {!customer && r.handedOver && (
+      {!customer && people && r.handedOver && (
         <div className="mr-label rpt-dept-line">Handed over by <b>{r.handedOver.name || ""}</b>{r.handedOver.team.length ? ` · team ${r.handedOver.team.join(", ")}` : ""}{r.rating ? ` · rating ${Number(r.rating.rating).toFixed(1)} / 5` : ""}</div>
       )}
       {r.notes.length > 0 && <div className="mr-label rpt-dept-line">{r.notes.map((h) => h.note).join(" · ")}</div>}
-      <div className="rpt-dept-checks" data-report-quality>
+      {checks && <div className="rpt-dept-checks" data-report-quality>
         {r.checks.length === 0 ? (r.state === "pending" && customer ? null : <div className="mr-label">{r.state === "pending" ? "Checklists are recorded when this stage is worked." : r.state === "current" ? "No checklist has been recorded for this stage yet." : "No checklist was recorded for this stage."}</div>) : r.checks.map((cr) => {
           const ans = cr.answers || [];
           const fixed = (a) => customer && !a.checked && rptPointFixed(a.label, jobs);
@@ -177,7 +178,7 @@ export function RptDeptRecord({ r, customer = false, comments = [], users = [], 
             </div>
           );
         })}
-      </div>
+      </div>}
       {comments.length > 0 && (
         <div className="rpt-dept-comments" data-report-dept-comments={r.dept}>
           <div className="mr-label font-semibold">{customer ? "Finishing work completed" : "Comments"}</div>
