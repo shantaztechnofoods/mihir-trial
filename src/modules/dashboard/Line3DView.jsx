@@ -12,6 +12,11 @@
 // machine (the same time share as the tag bar), a header strip with big
 // odometer numbers (In production · Late · On hold · Ready today, same counts as
 // the header ring) and a dolly-in on click; the summary card sits beside it.
+// Phone (2026-11-27, panel under 600 px): the same line on a wider stage that the
+// finger swipes natively, snapping one department at a time, with a "‹ Assembly
+// 2 / 6 ›" pager under it. The scene is drawn once (light budget, see line3d.js)
+// and the browser scrolls the finished picture, so a swipe costs no WebGL frames.
+// Tags, chips and numbers are 12 px or more; a tap opens the same summary card.
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { LINE_STAGES, stageStatusLines, visibleOnLine, tagStatus } from "./productionLine.js";
 import { formatDuration } from "../../utils/handoverLogic.js";
@@ -34,6 +39,8 @@ function chipOf(lines) {
 }
 const zoneTone = (lines) => { const t = chipOf(lines).t; return t === "near" ? "near" : t; };
 
+const PHONE_MAX = 600; // panel narrower than this → phone layout
+const PHONE_PPU = 74;  // phone stage: CSS px per metre of line (tags need ~120 px per machine)
 const reduceMotion = () => { try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { return false; } };
 const isDark = () => document.documentElement.getAttribute("data-theme") === "dark"
   || (document.documentElement.getAttribute("data-theme") !== "light" && !!window.matchMedia?.("(prefers-color-scheme: dark)").matches);
@@ -129,6 +136,9 @@ function Odo({ n }) {
 
 export default function Line3DView({ line, bomDefs = {}, onOpenMachine, onFail }) {
   const glRef = useRef(null), tagsRef = useRef(null), chipsRef = useRef(null), stageRef = useRef(null), popRef = useRef(null);
+  const wrapRef = useRef(null), scrollRef = useRef(null), trackRef = useRef(null), snapsRef = useRef(null);
+  const [phone, setPhone] = useState(() => typeof window !== "undefined" && window.innerWidth < PHONE_MAX);
+  const [dept, setDept] = useState(0);
   const apiRef = useRef(null);
   const [cap, setCap] = useState(6);
   const all = line.onLine || [];
@@ -154,9 +164,10 @@ export default function Line3DView({ line, bomDefs = {}, onOpenMachine, onFail }
   const selRef = useRef(null); selRef.current = sel;
 
   // Fewer machines per department when the panel is narrow (tags must fit).
+  // Measured on the outer card (on a phone the stage itself is wider than the screen).
   useEffect(() => {
-    const el = stageRef.current; if (!el || typeof ResizeObserver === "undefined") return undefined;
-    const ro = new ResizeObserver(() => { setCap(el.clientWidth < 700 ? 3 : el.clientWidth < 1000 ? 4 : 6); setWb(Math.round(el.clientWidth / 160)); });
+    const el = wrapRef.current; if (!el || typeof ResizeObserver === "undefined") return undefined;
+    const ro = new ResizeObserver(() => { const w = el.clientWidth; setPhone(w < PHONE_MAX); setCap(w < 700 ? 3 : w < 1000 ? 4 : 6); setWb(Math.round(w / 160)); });
     ro.observe(el); return () => ro.disconnect();
   }, []);
   // Follow the light / petrol-dark switch while the 3D view is open.
@@ -184,7 +195,8 @@ export default function Line3DView({ line, bomDefs = {}, onOpenMachine, onFail }
     try {
       api = mountLine(glRef.current, {
         zones: cur.zones, machines: cur.machines.map(ph), ready: cur.ready.map(ph), rackCount: cur.rackCount,
-        dark: isDark(), reduce: reduceMotion(),
+        dark: isDark(), reduce: reduceMotion(), lite: phone,
+        onSpan: phone ? (tot) => { if (trackRef.current) trackRef.current.style.width = Math.max(wrapRef.current?.clientWidth || 0, Math.round(tot * PHONE_PPU)) + "px"; } : undefined,
         onHover: (sn) => setHot(sn),
         onPick: (sn) => setSel(sn),
       });
@@ -212,11 +224,13 @@ export default function Line3DView({ line, bomDefs = {}, onOpenMachine, onFail }
         for (let i = 0; i < n; i++) { kids[i].style.width = ws[i] + "px"; kids[i].style.left = Math.round(ls[i]) + "px"; }
         // v9: the department head's name (11 px) on its own line; left out when the chip is too narrow for it
         for (let i = 0; i < n; i++) { const hd = kids[i].querySelector("[data-chip-head]"); if (hd) hd.hidden = ws[i] - 14 < Math.ceil(hd.textContent.length * 6.6); }
+        // phone: one snap area per department (the swipe stops on each one)
+        if (snapsRef.current) [...snapsRef.current.children].forEach((sn, i) => { const z = zs[i]; if (z) { sn.style.left = Math.round(z.x - z.w / 2) + "px"; sn.style.width = Math.round(z.w) + "px"; } });
         stageRef.current?.querySelectorAll("[data-more]").forEach((b) => { const z = zs[Number(b.dataset.more)]; if (z) { b.style.left = z.x + "px"; b.style.top = Math.round(z.y + 4) + "px"; } });
       }
       const ms = api.machineScreen(), mk = ms.map((s) => s.x.toFixed(0) + "," + s.y.toFixed(0)).join("|") + "|" + (stageRef.current?.clientWidth || 0);
       const only = api.isZoomed() ? selRef.current : null;
-      const top = (kpisRef.current?.offsetHeight || 46) + 4;
+      const top = phone ? 8 : (kpisRef.current?.offsetHeight || 46) + 4; // phone: the numbers sit above the stage
       if (mk + only + top !== tagKey) { tagKey = mk + only + top; layoutTags(tagsRef.current, ms, stageRef.current?.clientWidth || 1000, only, top); }
     };
     api.kick();
@@ -227,8 +241,21 @@ export default function Line3DView({ line, bomDefs = {}, onOpenMachine, onFail }
     if (typeof ResizeObserver !== "undefined" && tagsRef.current) { tro = new ResizeObserver(relayout); tagsRef.current.querySelectorAll(".f3-tag").forEach((t) => tro.observe(t)); }
     try { document.fonts?.ready?.then(() => { if (apiRef.current === api) relayout(); }); } catch { /* no font API */ }
     if (typeof window !== "undefined") window.__dash3d = api; // e2e hook (renderer.info)
-    return () => { if (tro) tro.disconnect(); api.stop(); if (apiRef.current === api) apiRef.current = null; if (window.__dash3d === api) window.__dash3d = null; };
-  }, [photos, mountN, wb]);
+    return () => { if (tro) tro.disconnect(); api.stop(); if (apiRef.current === api) apiRef.current = null; if (window.__dash3d === api) window.__dash3d = null; if (trackRef.current) trackRef.current.style.width = ""; };
+  }, [photos, mountN, wb, phone]);
+
+  // Phone pager: which department is in the middle of the screen (no scroll handler).
+  useEffect(() => {
+    if (!phone || !scrollRef.current || !snapsRef.current || typeof IntersectionObserver === "undefined") return undefined;
+    const io = new IntersectionObserver((es) => { for (const e of es) if (e.isIntersecting) setDept(Number(e.target.dataset.snap)); },
+      { root: scrollRef.current, rootMargin: "0px -50% 0px -50%", threshold: 0 });
+    [...snapsRef.current.children].forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  }, [phone, photos]);
+  const goDept = (i) => {
+    const sc = scrollRef.current, el = snapsRef.current?.children[i]; if (!sc || !el) return;
+    sc.scrollTo({ left: el.offsetLeft + el.offsetWidth / 2 - sc.clientWidth / 2, behavior: reduceMotion() ? "auto" : "smooth" });
+  };
 
   // 3. Live data: a dept change glides; anything structural remounts.
   const live = machines.map((m) => `${m.id}:${m.z}:${m.state}:${m.share == null ? "-" : Math.round(m.share * 72)}`).join("|");
@@ -255,7 +282,7 @@ export default function Line3DView({ line, bomDefs = {}, onOpenMachine, onFail }
   const headOf = (it) => (line.stages.find((s) => s.key === it.stage) || {}).head || "";
   const selIt = sel ? items.find((x) => String(x.id) === sel) : null;
   const selPos = (() => {
-    if (!selIt || !apiRef.current) return null;
+    if (!selIt || !apiRef.current || phone) return null; // phone: the card spans the screen (CSS)
     // The camera dollies the machine to just left of centre; the card sits to its right.
     const W = stageRef.current?.clientWidth || 1000;
     return { left: Math.round(Math.max(8, Math.min(W / 2 + 36, W - 272))) };
@@ -271,74 +298,112 @@ export default function Line3DView({ line, bomDefs = {}, onOpenMachine, onFail }
   ];
   const summary = `3D production line. ${line.stages.map((st) => `${st.label}${st.head ? ` (head ${st.head})` : ""}: ${st.count}, ${stageStatusLines(st).map((l) => l.text).join(", ")}`).join(". ")}.`;
 
-  return (
-    <div className="f3-wrap" data-floor-3d>
-      <div className={`f3-stage${hot || sel ? " is-focus" : ""}${sel ? " is-zoom" : ""}`} ref={stageRef}>
-        <div className="f3-gl" ref={glRef} role="img" aria-label={summary} />
-        <div className="f3-kpis" ref={kpisRef} data-3d-kpis role="group" aria-label={kpis.map((x) => `${x.n} ${x.label.toLowerCase()}`).join(", ")}>
-          {kpis.map((x) => (
-            <div key={x.k} className="f3-kpi" data-k={x.k} data-zero={x.n === 0 ? "" : undefined}>
-              <Odo n={x.n} /><span className="f3-kl">{x.label}</span>
-            </div>
-          ))}
-          <div className="f3-legend" aria-hidden="true">
-            <span data-t="ok">On time</span><span data-t="near">Near limit</span><span data-t="late">Late</span><span data-t="hold">On hold</span>
-          </div>
-          <span className="f3-hidden-note" data-hidden-note hidden />
+  const kpisEl = (
+    <div className="f3-kpis" ref={kpisRef} data-3d-kpis role="group" aria-label={kpis.map((x) => `${x.n} ${x.label.toLowerCase()}`).join(", ")}>
+      {kpis.map((x) => (
+        <div key={x.k} className="f3-kpi" data-k={x.k} data-zero={x.n === 0 ? "" : undefined}>
+          <Odo n={x.n} /><span className="f3-kl">{x.label}</span>
         </div>
-        <div className="f3-tags" ref={tagsRef}>
-          {items.map((it) => {
-            const head = headOf(it), st = tagStatus(it), id = String(it.id);
-            return (
-              <button key={it.id} type="button" className={`f3-tag${hot === id || sel === id ? " is-hot" : ""}`} data-sn={id} data-s={it.kind}
-                      title={`${it.serial || it.name} · ${it.name} — ${it.text}${head ? ` · head ${head}` : ""}`}
-                      aria-label={`${it.serial || it.name}, ${it.name}, ${it.stage}: ${it.text}${it.minutesInDept != null ? `, ${formatDuration(it.minutesInDept)} in department` : ""}${head ? `, head ${head}` : ""}. Show details`}
-                      aria-expanded={sel === id}
-                      onClick={() => { if (apiRef.current) apiRef.current.pick(id); else setSel(id); }}
-                      onMouseEnter={() => apiRef.current?.setHover(id)} onMouseLeave={() => apiRef.current?.setHover(null)}>
-                <span className="f3-tl">
-                  <b>{it.serial || "—"}</b><span className="f3-tb">{it.bomKey || it.name}</span>
-                  <span className="f3-ts" data-s={it.kind}><span aria-hidden="true">{ICON[it.kind]}</span><span className="f3-tt">{st.words}</span></span>
-                  {head && <abbr title={head}>{initials(head)}</abbr>}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-        {Object.entries(more).map(([stage, n]) => (
-          <button key={stage} type="button" className="f3-more" data-more={STAGE_INDEX[stage]} onClick={() => onOpenMachine?.("active")}
-                  aria-label={`${n} more machines in ${stage}. Open Machine Tracker`}>+{n} more</button>
-        ))}
-        {photos && all.length === 0 && (
-          <div className="f3-empty" role="status" data-3d-empty><b>No machines in the departments right now</b><span>Issue a BOM in Machine Tracker to start one.</span></div>
-        )}
-        {selIt && (
-          <div className="f3-pop" ref={popRef} role="dialog" aria-label={`${selIt.serial || selIt.name} details`} style={selPos || undefined} data-3d-popover>
-            <button type="button" className="f3-pop-x" onClick={close} aria-label="Close details">×</button>
-            <div className="f3-pop-h"><b>{selIt.serial || "—"}</b><span>{selIt.name}</span></div>
-            <dl>
-              <dt>Department</dt><dd>{selIt.stage}{selIt.minutesInDept != null && <> · {formatDuration(selIt.minutesInDept)}{selIt.targetMinutes ? ` of ${formatDuration(selIt.targetMinutes)}` : ""}</>}</dd>
-              <dt>Status</dt><dd className="f3-ts" data-s={selIt.kind}><span aria-hidden="true">{ICON[selIt.kind]}</span> {selIt.text}</dd>
-              {headOf(selIt) && <><dt>Head</dt><dd>{headOf(selIt)}</dd></>}
-              {lastWorker(selIt.machine) && <><dt>Last signed</dt><dd>{lastWorker(selIt.machine)}</dd></>}
-            </dl>
-            <button type="button" className="f3-pop-go" data-open-mt onClick={() => { const k = selIt.kind; close(); onOpenMachine?.(k === "hold" ? "hold" : "active"); }}>Open in Machine Tracker</button>
-          </div>
-        )}
-        {!photos && <div className="f3-loading" role="status">Loading 3D view…</div>}
+      ))}
+      <div className="f3-legend" aria-hidden="true">
+        <span data-t="ok">On time</span><span data-t="near">Near limit</span><span data-t="late">Late</span><span data-t="hold">On hold</span>
       </div>
-      <div className="f3-chips" ref={chipsRef}>
-        {line.stages.map((st) => {
-          const c = chipOf(stageStatusLines(st));
+      <span className="f3-hidden-note" data-hidden-note hidden />
+    </div>
+  );
+  const emptyEl = photos && all.length === 0 && (
+    <div className="f3-empty" role="status" data-3d-empty><b>No machines in the departments right now</b><span>Issue a BOM in Machine Tracker to start one.</span></div>
+  );
+  const popEl = selIt && (
+    <div className="f3-pop" ref={popRef} role="dialog" aria-label={`${selIt.serial || selIt.name} details`} style={selPos || undefined} data-3d-popover>
+      <button type="button" className="f3-pop-x" onClick={close} aria-label="Close details">×</button>
+      <div className="f3-pop-h"><b>{selIt.serial || "—"}</b><span>{selIt.name}</span></div>
+      <dl>
+        <dt>Department</dt><dd>{selIt.stage}{selIt.minutesInDept != null && <> · {formatDuration(selIt.minutesInDept)}{selIt.targetMinutes ? ` of ${formatDuration(selIt.targetMinutes)}` : ""}</>}</dd>
+        <dt>Status</dt><dd className="f3-ts" data-s={selIt.kind}><span aria-hidden="true">{ICON[selIt.kind]}</span> {selIt.text}</dd>
+        {headOf(selIt) && <><dt>Head</dt><dd>{headOf(selIt)}</dd></>}
+        {lastWorker(selIt.machine) && <><dt>Last signed</dt><dd>{lastWorker(selIt.machine)}</dd></>}
+      </dl>
+      <button type="button" className="f3-pop-go" data-open-mt onClick={() => { const k = selIt.kind; close(); onOpenMachine?.(k === "hold" ? "hold" : "active"); }}>Open in Machine Tracker</button>
+    </div>
+  );
+  const stageEl = (
+    <div className={`f3-stage${hot || sel ? " is-focus" : ""}${sel ? " is-zoom" : ""}`} ref={stageRef}>
+      <div className="f3-gl" ref={glRef} role="img" aria-label={summary} />
+      {!phone && kpisEl}
+      <div className="f3-tags" ref={tagsRef}>
+        {items.map((it) => {
+          const head = headOf(it), st = tagStatus(it), id = String(it.id);
           return (
-            <div key={st.key} className="f3-chip" data-t={c.t} data-chip={st.key} title={`${st.label}: ${st.count} · ${c.s}`} aria-label={`${st.label}: ${st.count}, ${c.s}`}>
-              <em>{st.count}</em>
-              {st.head && <span className="f3-ch" data-chip-head>{st.head}</span>}
-              <span className="f3-cs">{ICON[c.t] && <u aria-hidden="true">{ICON[c.t]}</u>}{String(c.s).split(" – ")[0]}</span>
-            </div>
+            <button key={it.id} type="button" className={`f3-tag${hot === id || sel === id ? " is-hot" : ""}`} data-sn={id} data-s={it.kind}
+                    title={`${it.serial || it.name} · ${it.name} — ${it.text}${head ? ` · head ${head}` : ""}`}
+                    aria-label={`${it.serial || it.name}, ${it.name}, ${it.stage}: ${it.text}${it.minutesInDept != null ? `, ${formatDuration(it.minutesInDept)} in department` : ""}${head ? `, head ${head}` : ""}. Show details`}
+                    aria-expanded={sel === id}
+                    onClick={() => { if (apiRef.current) apiRef.current.pick(id); else setSel(id); }}
+                    onMouseEnter={() => apiRef.current?.setHover(id)} onMouseLeave={() => apiRef.current?.setHover(null)}>
+              <span className="f3-tl">
+                <b>{it.serial || "—"}</b><span className="f3-tb">{it.bomKey || it.name}</span>
+                <span className="f3-ts" data-s={it.kind}><span aria-hidden="true">{ICON[it.kind]}</span><span className="f3-tt">{st.words}</span></span>
+                {head && <abbr title={head}>{initials(head)}</abbr>}
+              </span>
+            </button>
           );
         })}
       </div>
+      {Object.entries(more).map(([stage, n]) => (
+        <button key={stage} type="button" className="f3-more" data-more={STAGE_INDEX[stage]} onClick={() => onOpenMachine?.("active")}
+                aria-label={`${n} more machines in ${stage}. Open Machine Tracker`}>+{n} more</button>
+      ))}
+      {!phone && emptyEl}
+      {!phone && popEl}
+      {!photos && <div className="f3-loading" role="status">Loading 3D view…</div>}
+    </div>
+  );
+  const chipsEl = (
+    <div className="f3-chips" ref={chipsRef}>
+      {line.stages.map((st) => {
+        const c = chipOf(stageStatusLines(st));
+        return (
+          <div key={st.key} className="f3-chip" data-t={c.t} data-chip={st.key} title={`${st.label}: ${st.count} · ${c.s}`} aria-label={`${st.label}: ${st.count}, ${c.s}`}>
+            <em>{st.count}</em>
+            {st.head && <span className="f3-ch" data-chip-head>{st.head}</span>}
+            <span className="f3-cs">{ICON[c.t] && <u aria-hidden="true">{ICON[c.t]}</u>}{String(c.s).split(" – ")[0]}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  if (!phone) {
+    return (
+      <div className="f3-wrap" data-floor-3d ref={wrapRef}>
+        {stageEl}
+        {chipsEl}
+      </div>
+    );
+  }
+  // Phone: numbers on top, the swipeable line, then the department pager.
+  const st = line.stages[dept] || line.stages[0];
+  return (
+    <div className="f3-wrap" data-floor-3d data-phone ref={wrapRef}>
+      {kpisEl}
+      {emptyEl}
+      <div className="f3-scroll" ref={scrollRef} data-3d-scroll tabIndex={0} aria-label="Production line, swipe for the next department">
+        <div className="f3-track" ref={trackRef}>
+          {stageEl}
+          {chipsEl}
+          <div className="f3-snaps" ref={snapsRef} aria-hidden="true">
+            {line.stages.map((s2, i) => <span key={s2.key} data-snap={i} />)}
+          </div>
+        </div>
+      </div>
+      <div className="f3-pager" data-3d-pager>
+        <button type="button" onClick={() => goDept(Math.max(0, dept - 1))} disabled={dept === 0} aria-label="Previous department">‹</button>
+        <span className="f3-pager-l" aria-live="polite"><b>{st.label}</b> · {dept + 1} / {line.stages.length}</span>
+        <span className="f3-dots" aria-hidden="true">{line.stages.map((s2, i) => <i key={s2.key} data-on={i === dept ? "" : undefined} />)}</span>
+        <button type="button" onClick={() => goDept(Math.min(line.stages.length - 1, dept + 1))} disabled={dept === line.stages.length - 1} aria-label="Next department">›</button>
+      </div>
+      {popEl}
     </div>
   );
 }
