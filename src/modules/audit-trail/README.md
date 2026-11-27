@@ -12,6 +12,7 @@ Read-only view of the append-only audit log (who did what, when).
 | file | lines |
 |---|---|
 | `AuditHistoryPage.jsx` | 437 |
+| `auditFetch.js` | 48 — `fetchAuditFromSupabase` (reads `audit_log`), moved verbatim from `src/auth/auditStore.js` (modules/fold-audit-trail, 2026-11-27); only this page reads it. The write path (`appendAudit*`, `getAuditLog`, `subscribeAudit`) stays in `src/auth/auditStore.js` — every module writes audit entries. No re-export at the old path: nothing else imported it, and core may not import a module folder (tests/moduleManifest). |
 | `index.js` | 6 |
 
 `index.js` is the public surface — the app shell and other modules import only from it:
@@ -31,7 +32,7 @@ Used by: `app/App.jsx (shell)`
 ## Data: stores, tables, functions
 Store functions called (by this module directly, or by the handlers above):
 - `src/auth/AuthContext.jsx` → `useAuth`
-- `src/auth/auditStore.js` → `fetchAuditFromSupabase`
+- `./auditFetch.js` → `fetchAuditFromSupabase` (was `src/auth/auditStore.js`)
 - `src/auth/auditStore.js` → `getAuditLog`
 - `src/auth/auditStore.js` → `subscribeAudit`
 

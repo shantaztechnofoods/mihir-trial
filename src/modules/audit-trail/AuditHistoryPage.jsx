@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from "react";
 import { PageHeader } from "../../shared/components/PageHeader.jsx";
 import { useAuth } from "../../auth/AuthContext.jsx";
-import { getAuditLog, subscribeAudit, fetchAuditFromSupabase } from "../../auth/auditStore.js";
+import { getAuditLog, subscribeAudit } from "../../auth/auditStore.js";
+import { fetchAuditFromSupabase } from "./auditFetch.js";
 import { isSupabaseEnabled } from "../../config/env.js";
 
 const MODULE_LABELS = {

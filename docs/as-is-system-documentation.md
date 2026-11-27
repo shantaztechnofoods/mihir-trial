@@ -974,7 +974,7 @@ Every mutation button is wrapped in `canDo(module, action)`. Every page is wrapp
 | `src/devtools/testDataset.js` | seed data for localStorage mode |
 | `src/auth/AuthContext.jsx` | React context: `useAuth()` surface |
 | `src/auth/authStore.js` | `DEFAULT_ROLES`, `resolveCanDo`, `resolveCanView`, Supabase user fetch |
-| `src/auth/auditStore.js` | localStorage + Supabase audit log mirror; `subscribeAudit`, `fetchAuditFromSupabase` |
+| `src/auth/auditStore.js` | localStorage + Supabase audit log mirror; `subscribeAudit` (`fetchAuditFromSupabase` now in `src/modules/audit-trail/auditFetch.js`) |
 | `src/pages/LoginPage.jsx` | 139 lines; auth form with network/credentials/project-outage distinction |
 | `src/pages/AuditHistoryPage.jsx` | Audit Trail live-updating page |
 | `src/pages/UserManagementPage.jsx` | User list + create/edit/deactivate/delete/password-reset via Edge Functions |
