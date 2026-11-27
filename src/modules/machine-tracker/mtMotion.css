@@ -9,9 +9,11 @@
 @media screen {
   :root { --dur-out: 180ms; --dur-move: 240ms; --ring-ok: rgba(21, 128, 61, .55); }
 
-  /* ── Press: 0.98 in 100 ms (calm, never a bounce) ─────────────────────── */
-  .mt-premium button:not(:disabled) { transition-property: transform, background-color, color, opacity; }
-  .mt-premium button:not(:disabled):active { transform: scale(.98); transition-duration: 100ms; }
+  /* ── Press: 0.98 in 80 ms, release 160 ms ease-out (Motion v2 --m-press /
+     --m-release; was 100 ms in, release inherited) ─────────────────────── */
+  .mt-premium button:not(:disabled) { transition-property: transform, background-color, color, opacity;
+    transition-duration: var(--m-release, 160ms); transition-timing-function: var(--m-ease-out, cubic-bezier(.23, 1, .32, 1)); }
+  .mt-premium button:not(:disabled):active { transform: scale(.98); transition-duration: var(--m-press, 80ms); }
   .mt-premium .wu-step:not(:disabled):active { transform: scale(.98); }
 
   /* ── Card entrance: 260 ms, first 4 cards stagger, the rest come at once ─
@@ -67,7 +69,7 @@
     box-shadow: 0 0 0 3px rgba(21, 128, 61, .45); opacity: 0; animation: mt-ready 700ms var(--ease-enter) 1;
   }
   @keyframes mt-ready { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(1.08); } }
-  .modal-backdrop button[data-accept-confirm], .modal-backdrop button[data-finish-confirm] { transition: background-color 200ms var(--ease-enter), color 200ms var(--ease-enter), transform 100ms var(--ease-enter); }
+  .modal-backdrop button[data-accept-confirm], .modal-backdrop button[data-finish-confirm] { transition: background-color 200ms var(--ease-enter), color 200ms var(--ease-enter), transform var(--m-press, 80ms) var(--ease-enter); }
 
   /* "1 check left · then sign" under a grey Confirm (display only) */
   .mt-left { display: flex; align-items: center; gap: 6px; padding: 8px 20px 0; font-size: 13px; font-weight: 500; line-height: 1.35; color: var(--ink-3, #5b6474);
@@ -77,12 +79,12 @@
 
   /* ── Checklist ✗: the reason row fades + settles in (opacity/transform only;
      mt-smooth: was a grid-template-rows height animation = layout every frame) */
-  .ck-reason { animation: mt-reveal 180ms var(--ease-enter) backwards; }
-  .ck-no { transition: background-color 150ms, color 150ms, border-color 150ms, transform 100ms var(--ease-enter); }
-  .ck-no[aria-pressed="true"] { animation: mt-ck-x 200ms var(--ease-pop); }
+  .ck-reason { animation: mt-reveal var(--m-small, 200ms) var(--m-ease-out, cubic-bezier(.23, 1, .32, 1)) backwards; }
+  .ck-no { transition: background-color 150ms, color 150ms, border-color 150ms, transform var(--m-press, 80ms) var(--ease-enter); }
+  .ck-no[aria-pressed="true"] { animation: mt-ck-x var(--m-small, 200ms) var(--m-ease-out, cubic-bezier(.23, 1, .32, 1)); }
   @keyframes mt-ck-x { from { transform: scale(.88); } to { transform: none; } }
   /* 🎤 pops in just after the box opens */
-  .ck-reason .vn-mic:not(.vn-mic-busy) { animation: mt-mic-in 180ms var(--ease-pop) 60ms backwards; }
+  .ck-reason .vn-mic:not(.vn-mic-busy) { animation: mt-mic-in var(--m-small, 200ms) var(--m-ease-out, cubic-bezier(.23, 1, .32, 1)) 40ms backwards; }
   @keyframes mt-mic-in { from { opacity: 0; transform: translateY(-50%) scale(.6); } to { opacity: 1; transform: translateY(-50%); } }
   /* listening = red ring around the box (a live state, so it may breathe) */
   .modal-backdrop .vn-bar { box-shadow: 0 0 0 3px rgba(220, 38, 38, .16); }
@@ -111,7 +113,7 @@
   .ck-prog-n { font-size: 13px; font-weight: 600; color: var(--ink-3, #5b6474); font-variant-numeric: tabular-nums; white-space: nowrap; }
   .ck-prog[data-ck-progress="full"] .ck-prog-n { color: var(--ok, #15803d); }
   .ck-prog-tick { display: inline-block; font-weight: 700; }
-  .ck-prog-pop { animation: ck-pop 300ms var(--ease-pop) 120ms backwards; }
+  .ck-prog-pop { animation: ck-pop var(--m-small, 200ms) var(--m-ease-out, cubic-bezier(.23, 1, .32, 1)) 40ms backwards; }
   @keyframes ck-pop { from { opacity: 0; transform: scale(.3); } to { opacity: 1; transform: none; } }
 
   /* Late machine: a calm red dot that breathes (1.6 s; transform/opacity of a
@@ -159,4 +161,40 @@ html.wu-lite .wu-confetti { display: none !important; }
   .ck-prog-pop { animation: wu-fade 120ms ease backwards; }
   .ck-prog-glow { animation: ck-glow 400ms ease 1; }
   .wu-timer.is-bad::after { animation: none; }
+}
+
+/* ═══ motion-mt (2026-11-27): Accept / Finish & Transfer / Hold popups,
+   checklist sheets and Rack View on the Motion v2 timing system (world-ui.css
+   --m-*). Enter 200-240 ms ease-out, exit 140-160 ms ease-in (exits are the
+   ghost in mtMotion.js), press 80 ms, transform + opacity only. Every
+   animation uses fill "backwards" or runs on a pointer-events:none ghost, so
+   a tap during it lands on the real button. VISUAL ONLY. */
+@media screen {
+  /* Dialogs (laptop): dim 140 ms, panel 200 ms scale .97 → 1 (was 200 / 220 ms scale .96) */
+  .mt-premium .modal-backdrop { animation: wu-fade var(--m-micro, 140ms) var(--m-ease-out, cubic-bezier(.23, 1, .32, 1)) backwards; }
+  .mt-premium .modal-backdrop > div { animation: mt-pop var(--m-small, 200ms) var(--m-ease-out, cubic-bezier(.23, 1, .32, 1)) backwards; }
+  @keyframes mt-pop { from { opacity: 0; transform: scale(.97); } to { opacity: 1; transform: none; } }
+
+  /* Rack View + Pending-jobs drawer: was instant; dim 140 ms, panel slides in from the right 220 ms */
+  .mt-premium .rack-panel-backdrop { animation: wu-fade var(--m-micro, 140ms) var(--m-ease-out, cubic-bezier(.23, 1, .32, 1)) backwards; }
+  .mt-premium .rack-panel-backdrop > .rack-panel { animation: mt-drawer-in 220ms var(--m-ease-out, cubic-bezier(.23, 1, .32, 1)) backwards; }
+  @keyframes mt-drawer-in { from { opacity: 0; transform: translateX(32px); } to { opacity: 1; transform: none; } }
+
+  /* Rack crate: lift is transform only (shadow no longer animates), press 80 ms */
+  .mt-premium .rack-crate { transition: transform var(--m-micro, 140ms) var(--m-ease-out, cubic-bezier(.23, 1, .32, 1)); }
+  .mt-premium .rack-crate:active { transform: scale(.98); transition-duration: var(--m-press, 80ms); }
+
+  /* Checklist bar fill: 320 → 240 ms */
+  .mt-premium .ck-prog-track i, .modal-backdrop .ck-prog-track i { transition-duration: 240ms; }
+}
+@media screen and (max-width: 767.98px) {
+  /* Phone bottom sheets (popups, checklists, rack drawer): 300 → 240 ms, drawer curve */
+  .mt-premium .modal-backdrop > div, .mt-premium .rack-panel-backdrop > .rack-panel {
+    animation: wu-sheet 240ms var(--m-ease-drawer, cubic-bezier(.32, .72, 0, 1)) backwards !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mt-premium .modal-backdrop, .mt-premium .modal-backdrop > div,
+  .mt-premium .rack-panel-backdrop, .mt-premium .rack-panel-backdrop > .rack-panel { animation: wu-fade var(--m-micro-out, 100ms) linear backwards !important; }
+  .mt-premium .rack-crate, .mt-premium .rack-crate:hover, .mt-premium .rack-crate:active { transition: none; transform: none; }
+  .mt-premium .ck-prog-track i, .modal-backdrop .ck-prog-track i { transition: none; }
 }
