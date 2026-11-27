@@ -4,7 +4,7 @@
 // handlers into the pages exactly as before.
 import { isSupabaseEnabled } from "../../config/env.js";
 import { roundQty, recomputeStatus, fmtDate } from "../../shared/format.js";
-import { createItem as itemCreate, updateItem as itemUpdate, deleteItem as itemDelete, restoreItem as itemRestore } from "../../stores/itemsStore.js";
+import { createItem as itemCreate, updateItem as itemUpdate, deleteItem as itemDelete, restoreItem as itemRestore, updateStockAndHistory } from "../../stores/itemsStore.js";
 import { updatePending as pendingUpdate, deletePending as pendingDelete, clearAllPending, bulkCreatePending } from "../../stores/pendingStore.js";
 import { createOutward, deleteOutwardByIssueId } from "../../stores/outwardStore.js";
 import { createPendingItem } from "../../stores/pendingItemsStore.js";
@@ -934,5 +934,38 @@ export function createInventoryHandlers(shell) {
     return { success: true, restored: issuedLines.length };
   };
 
-  return { handleInwardComplete, handleCreateItemRow, handleUpdateItemRow, handleDeleteItemRow, handleRestoreItemRow, handleSetItemDefaultRate, handleBulkAddItems, handleClearPending, handleFulfillPending, handleFulfillGroup, handleAddOutward, raiseNotIssuedJobs, handleCreateMachine, handleAbortMachineCreate, handleRemoveRackMachine };
+  const handleInventoryCorrection = async (category, code, newStock, reason = "") => {
+    if (currentUser?.role !== "super_admin") return { success: false, error: "Only Super Admin can perform inventory corrections" };
+    const item = items[category]?.find((i) => i.code === code);
+    if (!item) return { success: false, error: "Item not found" };
+    const oldStock = item.stock;
+    const delta    = newStock - oldStock;
+    const dateStr  = fmtDate(new Date());
+    if (isSupabaseEnabled()) {
+      const res = await updateStockAndHistory(category, code, delta, `Correction: ${reason || "Super Admin adjustment"}`);
+      if (!res.success) { console.warn("[App] handleInventoryCorrection: Supabase failed —", res.error); return { success: false, error: res.error }; }
+    }
+    setItems((prev) => ({
+      ...prev,
+      [category]: prev[category].map((it) => it.code !== code ? it : {
+        ...it,
+        stock:  Math.max(0, newStock),
+        status: recomputeStatus(Math.max(0, newStock), it.min),
+        trend:  [...it.trend.slice(1), Math.max(0, newStock)],
+        history: [{ date: dateStr, event: `Correction: ${reason || "Super Admin adjustment"}`, change: delta, qty: Math.max(0, newStock) }, ...(it.history || [])],
+      }),
+    }));
+    logAudit({
+      type: "inventory_correction", module: "Inventory",
+      action: `Stock Correction: ${item.name} ${oldStock} → ${newStock}${reason ? ` (${reason})` : ""}`,
+      ref: code, itemCode: code, itemName: item.name,
+      qty: delta,
+      oldValue: { stock: oldStock },
+      newValue: { stock: newStock },
+      details: { reason, category, delta },
+    });
+    return { success: true };
+  };
+
+  return { handleInwardComplete, handleCreateItemRow, handleUpdateItemRow, handleDeleteItemRow, handleRestoreItemRow, handleSetItemDefaultRate, handleBulkAddItems, handleClearPending, handleFulfillPending, handleFulfillGroup, handleAddOutward, raiseNotIssuedJobs, handleCreateMachine, handleAbortMachineCreate, handleRemoveRackMachine, handleInventoryCorrection };
 }

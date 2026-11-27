@@ -21,7 +21,7 @@ Stock: Item Master (items, quick stock change, item detail with history, add/edi
 | `ItemImportModal.jsx` | 208 |
 | `OutwardPage.jsx` | 1135 |
 | `PendingPage.jsx` | 686 |
-| `handlers.js` | 938 |
+| `handlers.js` | 971 |
 | `index.js` | 7 |
 
 `index.js` is the public surface — the app shell and other modules import only from it:
@@ -63,7 +63,9 @@ incl. `guarded.fulfillPending` / `deleteItemRow` / `restoreItemRow` and the Orde
 yes for Trial, 27 Nov 2026) — still owner-locked: change them only with the owner's yes
 (skill `shantaz-erp-frozen-modules`). `handleRemoveRackMachine` is also registered as
 `shell.call("inventory.removeRackMachine")` for bom's `handleDeleteBOM`. The BOM handlers live in
-`modules/bom/handlers.js`. `handleUpdateStock` and `saveFailed` are shell API. Needs `SHELL_API` ≥ 6
+`modules/bom/handlers.js`. `handleInventoryCorrection` (Super Admin stock correction; defined but not
+wired to any page today) moved here as well (modules/c-inventory-correction) — removing it is a
+separate decision for the owner, never part of a move. `handleUpdateStock` and `saveFailed` are shell API. Needs `SHELL_API` ≥ 6
 (`requiresShell` in MODULE.json).
 
 Depends on other modules (imported through their `index.js`): `modules/bom`
