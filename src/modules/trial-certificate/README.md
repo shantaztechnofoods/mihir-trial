@@ -14,6 +14,7 @@ The Trial department's certificate: the fill-in modal (steps, speeds, timings, c
 |---|---|
 | `TrialCertificateModal.jsx` | 418 |
 | `TrialCertificateSheet.jsx` | 487 |
+| `handlers.js` | 34 |
 | `index.js` | 5 |
 
 `index.js` is the public surface — the app shell and other modules import only from it:
@@ -24,6 +25,12 @@ The screens here are presentational: state and every write (handler) still live 
 `src/app/App.jsx` and come in as props. Handlers wired into this module's components:
 
 _No App.jsx handlers are passed in (read-only screens, or the module calls its stores / Edge Function directly)._
+
+**Phase C (docs/SHELL-CONTEXT.md):** the certificate write `handleUpdateTrialCertificate`
+(complete / correct a saved Trial Certificate from Machine Tracker) lives in this folder's
+`handlers.js` (moved verbatim, `createTrialCertificateHandlers(shell)`, `requiresShell` 6;
+owner/handler yes for Trial, 27 Nov 2026). App.jsx passes it to the Machine Tracker page as
+`onUpdateTrialCertificate`, exactly as before.
 
 Depends on other modules (imported through their `index.js`): _none_
 Shared code used: `src/shared/components/LeadIcon.jsx`, `src/shared/printFormat.js`, `src/shared/ui/SignaturePad.jsx`
@@ -60,6 +67,6 @@ Automated: `npm test && npm run build`, then `E2E_ONLY=<suite> scripts/ship.sh c
 See `docs/MODULE-PROMOTION.md`. In short:
 1. Copy this whole folder from the Trial ERP over `src/modules/trial-certificate/` in Live (replace, do not merge by hand).
 2. Diff `index.js`: every name other modules import must still be exported (`npm run build` fails if not).
-3. If the Trial change also touched the handlers listed above, copy those handler changes in `src/app/App.jsx` too (handlers are not inside the folder yet).
+3. The handler in `handlers.js` travels with the folder. Run `node scripts/module-check.mjs trial-certificate --against <live>`: section 5b lists shell keys and the `createTrialCertificateHandlers(shell)` line Live's App.jsx still needs (one-time App.jsx step). It serves Machine Tracker, which is LOCKED in ERP LIVE: promotion needs the owner's "haan".
 4. Apply any NEW migration the change needs (additive, in number order, BEFORE merging) and redeploy any Edge Function listed above that changed.
 5. `npm test`, `npm run build`, the browser suites listed above, then merge; Vercel deploys `main`.
