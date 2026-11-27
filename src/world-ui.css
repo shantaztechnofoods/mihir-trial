@@ -1794,7 +1794,10 @@
   .dash-line-3d-loading { animation: wu-fade var(--m-micro) 300ms var(--m-ease-out) backwards; }
 
   .wu-notif-in { transform-origin: top right; animation: wu-menu var(--m-small) var(--m-ease-out) backwards; }
-  .wu-search-in { transform-origin: top center; animation: wu-menu var(--m-small) var(--m-ease-out) backwards; }
+  /* No scale on the search panel: the mic inside must measure its full 44px
+     tap target from the first frame (tests/e2e/voice-search.mjs). */
+  .wu-search-in { animation: wu-search-drop var(--m-small) var(--m-ease-out) backwards; }
+  @keyframes wu-search-drop { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 }
 @media screen and (max-width: 767.98px) {
   .wu-notif-in { animation: wu-notif-drop var(--m-medium) var(--m-ease-drawer) backwards; }
