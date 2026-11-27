@@ -261,7 +261,7 @@ export default function Line3DView({ line, bomDefs = {}, onOpenMachine, onFail }
     api.kick();
     // Re-run the tag layout when a tag's width changes after it was placed (the web
     // font arriving late, new words), so tags never end up overlapping.
-    const relayout = () => { tagKey = ""; api.kick(); };
+    const relayout = () => { tagKey = ""; if (api.lite) api.layout(); else api.kick(); }; // phone: tags only, no WebGL frame
     let tro = null;
     if (typeof ResizeObserver !== "undefined" && tagsRef.current) { tro = new ResizeObserver(relayout); tagsRef.current.querySelectorAll(".f3-tag").forEach((t) => tro.observe(t)); }
     try { document.fonts?.ready?.then(() => { if (apiRef.current === api) relayout(); }); } catch { /* no font API */ }
@@ -279,7 +279,8 @@ export default function Line3DView({ line, bomDefs = {}, onOpenMachine, onFail }
     else api.kick();
   }, [live]);
   // Tag text changes (time in dept) move nothing in 3D but re-measure the tags.
-  useEffect(() => { apiRef.current?.kick(); });
+  // Phone: a parent re-render (clock tick, other app state) re-places the tags without a WebGL frame (idle = 0 fps).
+  useEffect(() => { const api = apiRef.current; if (!api) return; if (api.lite) api.layout(); else api.kick(); });
 
   // In-place summary: Esc / outside tap closes it.
   const close = () => { setSel(null); apiRef.current?.pick(null); };
