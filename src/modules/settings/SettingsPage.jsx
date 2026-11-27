@@ -218,7 +218,7 @@ export function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, on
              style={{ background: "var(--p-s1)", border: "1px solid var(--p-line)" }}>
           <div className="min-w-0 flex-1 basis-[220px]">
             <div className="text-[13px] font-semibold" style={{ color: "var(--p-tx1)" }}>Appearance</div>
-            <div className="text-[12px] mt-0.5" style={{ color: "var(--p-tx3)" }}>Light or dark screen. Auto follows this device. Saved in this browser only.</div>
+            <div className="text-[12px] mt-0.5" style={{ color: "var(--p-tx3)" }}>Light or dark screen. Saved in this browser only.</div>
           </div>
           <ThemeSwitch withLabels />
           {/* 2026-11-06 (worker-ease) — very light vibration on confirm / save taps (phones only). */}
