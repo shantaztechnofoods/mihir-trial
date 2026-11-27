@@ -699,6 +699,9 @@ export default function App() {
         if (showShortcuts) { setShowShortcuts(false); return; }
         if (showSearch)    { setShowSearch(false);    return; }
         if (showNotifs)    { setShowNotifs(false);    return; }
+        // The phone "All pages" drawer: Esc closed nothing, so a keyboard / tablet
+        // user was left behind a backdrop that hides the bottom bar.
+        if (mobileNavOpen) { setMobileNavOpen(false); return; }
         // modals/drawers have their own Esc handlers; don't preventDefault
       }
       // Alt + nav — only fires outside text fields so it doesn't compete
@@ -723,7 +726,7 @@ export default function App() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [showShortcuts, showSearch, showNotifs, canView, canOpenPage]);
+  }, [showShortcuts, showSearch, showNotifs, mobileNavOpen, canView, canOpenPage]);
 
   // ── 2026-11-03 — Admin "Ready machines" popup (owner-approved) ──
   // Read-only: derived from machineLog (status + the accept-into-Ready history
