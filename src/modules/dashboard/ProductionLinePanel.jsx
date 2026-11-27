@@ -3,7 +3,7 @@
 // live in productionLine.js (pure, unit-tested). Every coloured state also
 // carries an icon + words, so colour never has to be remembered.
 import React, { Suspense, lazy, useEffect, useMemo, useState } from "react";
-import { Check, Timer, AlertTriangle, PauseCircle, Inbox, ChevronRight } from "lucide-react";
+import { Check, Timer, AlertTriangle, PauseCircle, Inbox, ChevronRight, Cog } from "lucide-react";
 import { buildProductionLine, stageStatusLines, lineSummary } from "./productionLine.js";
 import { formatDuration } from "../../utils/handoverLogic.js";
 
@@ -32,6 +32,18 @@ function StatusLine({ line }) {
   );
 }
 
+// Machine photo tile (spatial glass, 2026-11-27): the BOM photo already saved on
+// the machine's BOM (bomDefs[bomKey].photoUrl), or a quiet placeholder. Picture
+// only — decorative, the stage's words carry the meaning (aria-hidden).
+const photoOf = (bomDefs, bomKey) => { const u = bomDefs && bomKey && bomDefs[bomKey] && bomDefs[bomKey].photoUrl; return typeof u === "string" && u.trim() ? u.trim() : ""; };
+function MachinePhoto({ url, className }) {
+  return (
+    <span className={className} aria-hidden="true" data-photo={url ? "bom" : "none"}>
+      {url ? <img src={url} alt="" loading="lazy" decoding="async" draggable="false" /> : <Cog size={22} strokeWidth={1.6} />}
+    </span>
+  );
+}
+
 // The number rolls in (200 ms, --dur-ui) whenever it changes; key= remounts the span.
 function RollNumber({ value }) {
   return <span className="dash-line-num" key={value} data-count={value}>{value}</span>;
@@ -48,6 +60,12 @@ export function ProductionLinePanel({ machines = [], handovers = [], settings = 
   const open = (filter) => onOpenMachines?.(filter);
   const top = line.attention.slice(0, 5);
   const lg = line.legend;
+  // One photo per stage: the first machine in it whose BOM has a photo.
+  const stagePhoto = (key) => {
+    const list = key === "Ready" ? (line.readyList || []) : (line.onLine || []).filter((o) => o.stage === key);
+    for (const o of list) { const u = photoOf(bomDefs, o.bomKey); if (u) return u; }
+    return "";
+  };
   // Fold / unfold, same as Machine Tracker's "Issue a BOM" section: open by
   // default on a wide screen, folded on a phone; an explicit choice is
   // remembered per browser.
@@ -103,8 +121,11 @@ export function ProductionLinePanel({ machines = [], handovers = [], settings = 
           return (
             <button key={st.key} type="button" className="dash-line-stage" data-stage={st.key} data-tone={st.tone} data-zero={st.count === 0 ? "" : undefined}
                     onClick={() => open(st.filter)} aria-label={label}>
-              <span className="dash-line-label">{st.label}{st.head && <span className="dash-line-head-name" data-dept-head={st.head}><span className="dash-line-head-sep"> · </span>{st.head}</span>}</span>
-              <RollNumber value={st.count} />
+              <MachinePhoto url={stagePhoto(st.key)} className="dash-line-photo" />
+              <span className="dash-line-top">
+                <span className="dash-line-label">{st.label}{st.head && <span className="dash-line-head-name" data-dept-head={st.head}><span className="dash-line-head-sep"> · </span>{st.head}</span>}</span>
+                <RollNumber value={st.count} />
+              </span>
               {st.key === "Ready" && <span className="dash-line-sub">{st.readyTotal} ready in total</span>}
               <span className="dash-line-flags">{lines.map((l, i) => <StatusLine key={i} line={l} />)}</span>
             </button>
@@ -136,6 +157,7 @@ export function ProductionLinePanel({ machines = [], handovers = [], settings = 
               return (
                 <li key={`${a.kind}-${a.id}`}>
                   <button type="button" className="dash-line-row" data-attn-kind={a.kind} onClick={() => open(a.filter)}>
+                    <MachinePhoto url={photoOf(bomDefs, a.machine && a.machine.bomKey)} className="dash-line-thumb" />
                     <span className="dash-line-row-m">
                       <b>{a.serial || a.name}</b>
                       <span>{a.serial ? a.name : ""}</span>

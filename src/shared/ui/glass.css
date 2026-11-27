@@ -215,28 +215,46 @@
   html[data-theme="dark"] body .app-shell .dash-line-views > button[aria-pressed="true"] { color: var(--p-tx1) !important; }
   html body .app-shell .f3-ring { background: var(--g-well) !important; border-color: transparent !important; }
 
-  /* Each stage becomes a raised pod. The pod is painted on ::before, inset
-     4px from the stage's own box, so nothing moves; the chevron (::after)
-     now sits in the gap between two pods, like a connector. */
-  html body .app-shell .dash-line-stage { isolation: isolate; background: none !important; border-radius: 22px; }
-  html body .app-shell .dash-line-strip > .dash-line-stage::before {
-    content: ""; position: absolute; inset: 0 4px; z-index: -1; border: 0; border-radius: 20px; pointer-events: none;
-    background: var(--g-glass-strong), var(--g-tint);
-    box-shadow: var(--g-inner), 0 1px 2px rgba(40, 60, 70, .06), 0 14px 30px -18px rgba(40, 60, 75, .30), 0 0 0 1px var(--g-edge);
+  /* Each stage is a soft glass pod: machine photo tile on top, the stage
+     name with its big number on the right, then the status words, each led
+     by a tinted ring icon. Late / on hold is said by the ring and the word,
+     never by a red frame round the whole pod. */
+  html body .app-shell .dash-line-strip { gap: 12px; margin: 0; }
+  html body .app-shell .dash-line-stage {
+    padding: 8px 8px 14px; border-radius: 26px; isolation: isolate;
+    background: var(--g-glass-strong), var(--g-tint) !important;
+    box-shadow: var(--g-inner), 0 1px 2px rgba(40, 60, 70, .06), 0 14px 30px -18px rgba(40, 60, 75, .32), 0 0 0 1px var(--g-edge);
     transition: box-shadow .3s var(--g-ease), transform .35s var(--g-ease);
   }
-  html[data-theme="dark"] body .app-shell .dash-line-strip > .dash-line-stage::before { box-shadow: var(--g-inner), 0 14px 30px -16px rgba(0, 0, 0, .6), 0 0 0 1px var(--g-edge); }
-  html body .app-shell .dash-line-stage + .dash-line-stage::after { z-index: 1; background: var(--g-env-solid); border-color: var(--g-hair); }
-  html body .app-shell .dash-line-stage:has(.dash-line-flag[data-tone="late"])::before { box-shadow: var(--g-inner), 0 14px 30px -18px rgba(40, 60, 75, .30), 0 0 0 1.5px color-mix(in srgb, var(--bad) 55%, transparent); }
-  html body .app-shell .dash-line-stage:has(.dash-line-flag[data-tone="near"])::before { box-shadow: var(--g-inner), 0 14px 30px -18px rgba(40, 60, 75, .30), 0 0 0 1.5px color-mix(in srgb, var(--wait) 55%, transparent); }
+  html[data-theme="dark"] body .app-shell .dash-line-stage { box-shadow: var(--g-inner), 0 14px 30px -16px rgba(0, 0, 0, .6), 0 0 0 1px var(--g-edge); }
+  html body .app-shell .dash-line-stage + .dash-line-stage::before,
+  html body .app-shell .dash-line-stage + .dash-line-stage::after { display: none; }
   @media (hover: hover) and (pointer: fine) {
-    html body .app-shell .dash-line-stage:hover { background: none !important; }
-    html body .app-shell .dash-line-strip > .dash-line-stage:hover::before { box-shadow: var(--g-inner), 0 2px 4px rgba(40, 60, 70, .08), 0 22px 40px -18px rgba(40, 60, 75, .38), 0 0 0 1px var(--g-edge); }
+    html body .app-shell .dash-line-stage:hover { box-shadow: var(--g-inner), 0 2px 4px rgba(40, 60, 70, .08), 0 22px 40px -18px rgba(40, 60, 75, .4), 0 0 0 1px var(--g-edge); }
   }
-  @media (prefers-reduced-motion: no-preference) {
-    html body .app-shell .dash-line-strip > .dash-line-stage:hover::before { transform: translateY(-2px); }
-    html body .app-shell .dash-line-stage:active::before { transform: scale(.98); transition-duration: .12s; }
+  @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+    html body .app-shell .dash-line-stage:hover { transform: translateY(-2px); }
+    html body .app-shell .dash-line-stage:active { transform: scale(.98); transition-duration: .12s; }
   }
+  html body .app-shell :is(.dash-line-photo, .dash-line-thumb) {
+    position: relative; display: grid; place-items: center; overflow: hidden; flex: none; color: #93a2aa;
+    background: radial-gradient(120% 90% at 50% 18%, #ffffff 0%, #f6f8f9 60%, #e3e9ec 100%);
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .06), inset 0 -10px 24px -12px rgba(0, 0, 0, .16);
+  }
+  html body .app-shell .dash-line-photo { width: 100%; aspect-ratio: 1.45; border-radius: 19px; margin-bottom: 10px; }
+  html body .app-shell :is(.dash-line-photo, .dash-line-thumb) img { position: absolute; inset: 8% 6% 4%; width: 88%; height: 88%; object-fit: contain; mix-blend-mode: multiply; }
+  html body .app-shell :is(.dash-line-photo, .dash-line-thumb)::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: linear-gradient(170deg, rgba(255, 255, 255, .45) 0%, transparent 28%); }
+  html body .app-shell .dash-line-top { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; width: 100%; padding: 0 6px; min-width: 0; }
+  html body .app-shell .dash-line-top .dash-line-label { min-width: 0; font-size: 14px; font-weight: 600; color: var(--ink-2); }
+  html body .app-shell .dash-line-top .dash-line-num { margin: 0; font-size: 34px; font-weight: 700; letter-spacing: -0.04em; line-height: 1; flex: none; }
+  html body .app-shell .dash-line-stage > :is(.dash-line-sub, .dash-line-flags) { padding: 0 6px; }
+  html body .app-shell .dash-line-stage .dash-line-flags { margin-top: 8px; gap: 6px; }
+  html body .app-shell .dash-line-flag { align-items: center; gap: 8px; font-size: 13.5px; }
+  html body .app-shell .dash-line-flag > svg {
+    box-sizing: content-box; width: 13px; height: 13px; padding: 5px; margin: 0; border-radius: 50%;
+    background: color-mix(in srgb, currentColor 16%, transparent); box-shadow: 0 0 0 1.5px currentColor;
+  }
+  html body .app-shell .dash-line-flag[data-tone="idle"] > svg { box-shadow: 0 0 0 1.5px color-mix(in srgb, currentColor 60%, transparent); }
   html body .app-shell .dash-line-legend { border-top-color: var(--g-hair) !important; }
 
   html body .app-shell .dash-line-rows { background: var(--g-well); border-color: transparent !important; border-radius: 18px !important; }
@@ -264,7 +282,8 @@
   html body .app-shell :is(.section-card, .kpi-tile, .hero-tile, .premium-card, .dash-tile) {
     background: var(--g-solid) !important; box-shadow: inset 0 1px 0 var(--g-rim), 0 1px 2px rgba(40, 60, 70, .06), 0 10px 24px -16px rgba(40, 60, 75, .28), 0 0 0 1px var(--g-edge) !important;
   }
-  html body .app-shell .dash-line-strip > .dash-line-stage::before { inset: 0 2px; border-radius: 18px; background: var(--g-solid); }
+  html body .app-shell .dash-line-stage { background: var(--g-solid) !important; }
+  html body .app-shell .dash-line-strip { gap: 8px; }
 }
 @media screen and (max-width: 639px) {
   html body .app-shell .section-card.dash-line { border-radius: 26px !important; }
@@ -277,11 +296,11 @@
     -webkit-backdrop-filter: none !important; backdrop-filter: none !important; background: var(--g-solid) !important;
   }
   html body .app-shell :is(.section-card, .kpi-tile, .hero-tile, .premium-card, .dash-tile), html body .theme-switch { background: var(--g-solid) !important; }
-  html body .app-shell .dash-line-strip > .dash-line-stage::before { background: var(--g-solid); }
+  html body .app-shell .dash-line-stage { background: var(--g-solid) !important; }
   html body .app-shell { background: var(--g-env-solid) !important; }
 }
 @media screen and (prefers-reduced-motion: reduce) {
-  html body .app-shell button.dash-tile, html body .app-shell .dash-line-strip > .dash-line-stage::before { transition: none !important; transform: none !important; }
+  html body .app-shell button.dash-tile, html body .app-shell .dash-line-stage { transition: none !important; transform: none !important; }
 }
 
 /* Bell / nav count badge: white on #ef4444 measured 3.8:1 → #d92d20 is 5.0:1 */
@@ -327,4 +346,103 @@
   .mr-doc, .rpt-lh, .rpt-titleblock, .report-area { --rpt-faint: #646a74; }
   /* build badge: white on 92 % green 3.0:1 → solid green-700 5.0:1 */
   #erp-build-badge { background: #15803d !important; }
+}
+
+/* ── Preview round 2 (coordinator, 2026-11-27): the 7 Dashboard gaps ─────── */
+@media screen {
+  /* 1 · Floating glass sidebar panel (radius 24, 8px margin). The rail box is
+     unchanged; the panel is painted inside it, and each nav item swaps 4px of
+     its side padding for a transparent border so text never moves while the
+     pill sits clear of the panel edge. */
+  html body .app-shell .app-sidebar.sidebar-slate { background: transparent !important; box-shadow: none !important; border-right-color: transparent !important; }
+  html body .app-shell .app-sidebar.sidebar-slate::before {
+    content: ""; position: absolute; inset: 8px; z-index: -1; border-radius: 24px; pointer-events: none;
+    background: var(--g-glass), var(--g-tint);
+    box-shadow: var(--g-inner), var(--g-drop), 0 0 0 1px var(--g-edge);
+  }
+  html body .app-shell .app-sidebar.sidebar-slate { isolation: isolate; }
+  html body .app-shell .app-sidebar :is(.sb-divider, .sb-divider-top) { border-color: transparent !important; }
+  html body .app-shell .app-sidebar .sb-item { padding-left: 6px !important; padding-right: 6px !important; border-left: 4px solid transparent !important; border-right: 4px solid transparent !important; background-clip: padding-box !important; }
+  html body .app-shell .app-sidebar .sb-item.is-active { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), inset 0 0 0 1px var(--g-edge) !important; }
+
+  /* 3 · Needs-attention rows: machine thumbnail first */
+  html body .app-shell .dash-line-row { grid-template-columns: 52px minmax(0, 1.1fr) minmax(0, 1.4fr) minmax(0, 1.4fr) 16px; padding: 8px 12px 8px 8px; }
+  html body .app-shell .dash-line-thumb { width: 52px; height: 52px; border-radius: 14px; }
+  html body .app-shell .dash-line-thumb svg { width: 18px; height: 18px; }
+  @container (max-width: 560px) {
+    html body .app-shell .dash-line-row { grid-template-columns: 44px minmax(0, 1fr) 16px; grid-template-areas: "t m go" "t d go" "t w go"; padding: 10px; }
+    html body .app-shell .dash-line-thumb { grid-area: t; width: 44px; height: 44px; border-radius: 12px; align-self: start; }
+  }
+
+  /* 4 · KPI cards: reference spacing and heavier numbers */
+  html body .app-shell .dash-tile { padding: 16px; }
+  html body .app-shell .dash-tile--lg { padding: 18px 18px 17px; }
+  html body .app-shell .dash-tile-value { font-size: 32px; font-weight: 700; letter-spacing: -0.04em; line-height: 1.05; }
+  html body .app-shell .dash-tile--lg .dash-tile-value { font-size: 40px; }
+  html body .app-shell .dash-tile-head { margin-bottom: 12px; }
+  html body .app-shell .dash-tile-label { margin-top: 6px; font-size: 14.5px; font-weight: 600; color: var(--ink); letter-spacing: -0.015em; }
+  html body .app-shell .dash-tile-icon { color: var(--ink-2); }
+
+  /* 5 · Larger greeting */
+  @media (min-width: 1024px) {
+    html body .app-shell .page-header h1 { font-size: 34px !important; font-weight: 650 !important; letter-spacing: -0.03em !important; line-height: 1.05 !important; }
+    html body .app-shell .page-header h1 + p { font-size: 15px !important; color: var(--ink-2) !important; margin-top: 6px !important; }
+  }
+  @media (min-width: 768px) and (max-width: 1023.98px) {
+    html body .app-shell .page-header h1 { font-size: 26px !important; font-weight: 650 !important; letter-spacing: -0.025em !important; }
+  }
+
+  /* 6 · Theme switch: Light / Dark as text segments (phone keeps one icon button) */
+  html body .theme-switch:not(.theme-switch-full) { padding: 4px; }
+  html body .theme-switch:not(.theme-switch-full) button { height: 36px; padding: 0 14px; gap: 7px; font: 560 14px/1 var(--font-ui); }
+  html body .theme-switch-word { display: inline; }
+  @media (max-width: 639.98px) {
+    html body .theme-switch-word { display: none; }
+    html body .page-header .theme-switch:not(.theme-switch-full) { padding: 0; }
+    html body .page-header .theme-switch:not(.theme-switch-full) button { padding: 0; height: 40px; }
+  }
+
+  /* 7 · Build badge: off the header — bottom right, above the phone tab bar */
+  html body #erp-build-badge, html body:has(.mt-premium) #erp-build-badge { top: auto !important; left: auto !important; right: 10px !important; bottom: 8px !important; opacity: .85; }
+  @media (max-width: 767.98px) { html body #erp-build-badge, html body:has(.mt-premium) #erp-build-badge { bottom: calc(64px + env(safe-area-inset-bottom)) !important; } }
+}
+@media screen and (max-width: 767.98px), screen and (hover: none), screen and (pointer: coarse) {
+  html body .app-shell .app-sidebar.sidebar-slate::before { background: var(--g-solid); }
+}
+@media screen and (prefers-reduced-transparency: reduce) {
+  html body .app-shell .app-sidebar.sidebar-slate::before { background: var(--g-solid); }
+}
+@media screen {
+  /* narrow line card (phone / small tablet): number under the name, never a split word */
+  @container (max-width: 760px) {
+    html body .app-shell .dash-line-top { flex-direction: column; align-items: flex-start; gap: 2px; }
+    html body .app-shell .dash-line-top .dash-line-label { overflow-wrap: normal; word-break: normal; hyphens: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+    html body .app-shell .dash-line-top .dash-line-num { font-size: 30px; }
+    html body .app-shell .dash-line-flag { font-size: 13px; gap: 6px; }
+  }
+  /* no photo yet: a quiet tile that sits in the theme instead of a white block */
+  html[data-theme="dark"] body .app-shell :is(.dash-line-photo, .dash-line-thumb)[data-photo="none"] { background: radial-gradient(120% 90% at 50% 18%, #2c3c45 0%, #22313a 60%, #1b2830 100%); color: #8fa3ac; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .06); }
+}
+
+/* ── Liquid Glass layering (coordinator / ui-ux-pro-max "liquid-glass") ────
+   Glass is for navigation and controls only: the floating sidebar, the
+   header, segmented switches, the phone tab bar. Content — section cards,
+   KPI cards, stage pods, attention rows — is a separate, near-solid, calm
+   layer: white 94 % with a hairline and one soft shadow. */
+@media screen {
+  :root { --g-card: rgba(255, 255, 255, .94); --g-card-2: rgba(255, 255, 255, .97);
+    --g-card-shadow: 0 1px 2px rgba(40, 60, 70, .06), 0 10px 28px -14px rgba(40, 60, 75, .22), 0 0 0 1px rgba(20, 40, 50, .07); }
+  :root[data-theme="dark"] { --g-card: rgba(24, 36, 43, .94); --g-card-2: rgba(32, 46, 54, .96);
+    --g-card-shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 12px 30px -14px rgba(0, 0, 0, .6), 0 0 0 1px rgba(255, 255, 255, .07); }
+  html body .app-shell :is(.section-card, .kpi-tile, .hero-tile, .premium-card, .dash-tile) { background: var(--g-card) !important; box-shadow: var(--g-card-shadow) !important; }
+  html body .app-shell .dash-line-stage { background: var(--g-card-2) !important; box-shadow: var(--g-card-shadow); }
+  @media (hover: hover) and (pointer: fine) {
+    html body .app-shell button.dash-tile:hover, html body .app-shell .dash-line-stage:hover { box-shadow: 0 2px 4px rgba(40, 60, 70, .08), 0 18px 36px -14px rgba(40, 60, 75, .3), 0 0 0 1px rgba(20, 40, 50, .08) !important; }
+    html[data-theme="dark"] body .app-shell :is(button.dash-tile, .dash-line-stage):hover { box-shadow: 0 2px 4px rgba(0, 0, 0, .3), 0 18px 36px -14px rgba(0, 0, 0, .7), 0 0 0 1px rgba(255, 255, 255, .1) !important; }
+  }
+  html body .app-shell .dash-line-stage .dash-line-photo { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .06); }
+}
+@media screen and (prefers-reduced-transparency: reduce) {
+  :root { --g-card: #ffffff; --g-card-2: #ffffff; }
+  :root[data-theme="dark"] { --g-card: #18242b; --g-card-2: #202e36; }
 }
