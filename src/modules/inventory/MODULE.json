@@ -52,6 +52,7 @@
     "shared/components/useProgressiveCount.js",
     "shared/format.js",
     "shared/machineStages.js",
+    "shared/ui/SuccessTick.jsx",
     "shared/ui/Topbar.jsx",
     "shared/ui/primitives.jsx"
   ],

@@ -32,8 +32,12 @@
     "shared/components/useProgressiveCount.js",
     "shared/format.js",
     "shared/loadXlsx.js",
+    "shared/motion/useRowMotion.js",
+    "shared/ui/EmptyArt.jsx",
+    "shared/ui/SuccessTick.jsx",
     "shared/ui/Topbar.jsx",
-    "shared/ui/primitives.jsx"
+    "shared/ui/primitives.jsx",
+    "shared/ui/useDialogFocus.js"
   ],
   "core": {
     "config": [

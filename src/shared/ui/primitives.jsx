@@ -3,6 +3,8 @@
 import React from "react";
 import { Glyph } from "../components/LeadIcon.jsx";
 import Count from "./Count.jsx";
+import { useSwap } from "./useSwap.js";
+import "../motion/motion3-big.css";
 
 export const statusConfig = {
   critical: { label: "CRITICAL",  bg: "", text: "", border: "", dot: "#dc2626",   style: { background: "rgba(220,38,38,0.08)",   color: "#dc2626", border: "1px solid rgba(220,38,38,0.22)" } },
@@ -27,8 +29,9 @@ export const statusConfig = {
 
 export const StatusBadge = ({ status }) => {
   const cfg = statusConfig[status] || statusConfig.safe;
+  const swap = useSwap(status);   // motion3: cross-fades when the status changes
   return (
-    <span className="wu-status inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold" data-status={status}
+    <span key={status} className={`wu-status ${swap} inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold`} data-status={status}
           style={{ letterSpacing: "0.05em", ...cfg.style }}>
       {cfg.dot && <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: cfg.dot }} />}
       {cfg.label}
@@ -209,7 +212,7 @@ export function ListSkeleton({ rows = 5 }) {
 export function EmptyState({ icon = "📭", title = "Nothing here yet", desc = "", action = null }) {
   return (
     <div className="wu-empty-in flex flex-col items-center justify-center py-16 px-6 text-center select-none">
-      <div className="text-5xl mb-4" style={{ opacity: 0.45 }}><Glyph e={icon} size={34} /></div>
+      <div className="wu-empty-icon text-5xl mb-4" style={{ opacity: 0.45 }}><Glyph e={icon} size={34} /></div>
       <div className="text-sm font-semibold mb-1.5" style={{ color: "var(--text-strong)" }}>{title}</div>
       {desc && <div className="text-xs max-w-xs leading-relaxed" style={{ color: "var(--text-dim)" }}>{desc}</div>}
       {action && <div className="mt-5">{action}</div>}

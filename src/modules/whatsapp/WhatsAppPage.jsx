@@ -853,10 +853,10 @@ export function WhatsAppPage({ settings = {}, onSave, canDo = () => false }) {
                   </div>
                 </div>
                 <button onClick={() => { setComposeOpen(true); setComposeTo(""); }}
-                        className="wa-icon-btn" title="New chat">
+                        aria-label="New chat" className="wa-icon-btn" title="New chat">
                   <MessageSquarePlus size={18} />
                 </button>
-                <button onClick={() => loadChats()} disabled={chatsLoading} title="Refresh" className="wa-icon-btn">
+                <button onClick={() => loadChats()} disabled={chatsLoading} title="Refresh" aria-label="Refresh" className="wa-icon-btn">
                   <RefreshCw size={17} className={chatsLoading ? "animate-spin" : ""} />
                 </button>
               </div>
@@ -878,7 +878,7 @@ export function WhatsAppPage({ settings = {}, onSave, canDo = () => false }) {
                      style={{ background: "var(--wa-field)", borderBottom: "1px solid var(--wa-line)" }}>
                   <div className="flex items-center justify-between mb-2">
                     <div className="text-[12.5px] font-semibold" style={{ color: "var(--wa-ink)" }}>New chat</div>
-                    <button onClick={() => setComposeOpen(false)} className="wa-icon-btn" style={{ width: 26, height: 26 }}>
+                    <button onClick={() => setComposeOpen(false)} aria-label="Close new chat" className="wa-icon-btn" style={{ width: 26, height: 26 }}>
                       <X size={14} />
                     </button>
                   </div>
@@ -1016,7 +1016,7 @@ export function WhatsAppPage({ settings = {}, onSave, canDo = () => false }) {
                 <div className="px-4 py-2.5 flex items-center gap-3 flex-shrink-0"
                      style={{ background: "var(--wa-field)", borderBottom: "1px solid var(--wa-line)" }}>
                   <button onClick={() => { setActiveChat(null); setMessages([]); setMsgsErr(""); }}
-                          className="wa-icon-btn" title="Back">
+                          aria-label="Back" className="wa-icon-btn" title="Back">
                     <ArrowLeft size={18} />
                   </button>
                   {(() => {
@@ -1037,7 +1037,7 @@ export function WhatsAppPage({ settings = {}, onSave, canDo = () => false }) {
                   })()}
                   {!activeChat.isNew && (
                     <>
-                      <button onClick={() => openChat(activeChat)} disabled={msgsLoading} className="wa-icon-btn" title="Refresh">
+                      <button onClick={() => openChat(activeChat)} disabled={msgsLoading} aria-label="Refresh" className="wa-icon-btn" title="Refresh">
                         <RefreshCw size={17} className={msgsLoading ? "animate-spin" : ""} />
                       </button>
                     </>
@@ -1203,7 +1203,7 @@ export function WhatsAppPage({ settings = {}, onSave, canDo = () => false }) {
                   </button>
                 )}
                 <button onClick={loadTemplates} disabled={tplLoading} title="Refresh"
-                        className="wa-icon-btn ml-auto" style={{ border: "1px solid var(--wa-line)", background: "var(--wa-surface)" }}>
+                        aria-label="Refresh" className="wa-icon-btn ml-auto" style={{ border: "1px solid var(--wa-line)", background: "var(--wa-surface)" }}>
                   <RefreshCw size={16} className={tplLoading ? "animate-spin" : ""} />
                 </button>
               </div>
@@ -1433,7 +1433,7 @@ export function WhatsAppPage({ settings = {}, onSave, canDo = () => false }) {
                           </span>
                         ) : (
                           <button onClick={() => setTplConfirm(t.name)} disabled={!!tplBusy}
-                                  className="wa-icon-btn" title="Delete">
+                                  aria-label="Delete" className="wa-icon-btn" title="Delete">
                             <Trash2 size={15} />
                           </button>
                         )}
@@ -1605,10 +1605,10 @@ export function WhatsAppPage({ settings = {}, onSave, canDo = () => false }) {
                       ) : (
                         <>
                           <div className="flex-1 min-w-0 text-[13px]" style={{ color: "var(--wa-ink)", lineHeight: 1.5 }}>{r}</div>
-                          <button onClick={() => setRuleEdit({ i, text: r })} className="wa-icon-btn" title="Edit">
+                          <button onClick={() => setRuleEdit({ i, text: r })} aria-label="Edit" className="wa-icon-btn" title="Edit">
                             <FileText size={15} />
                           </button>
-                          <button onClick={() => writeRules(rules.filter((_, j) => j !== i))} className="wa-icon-btn" title="Remove">
+                          <button onClick={() => writeRules(rules.filter((_, j) => j !== i))} aria-label="Remove" className="wa-icon-btn" title="Remove">
                             <Trash2 size={15} />
                           </button>
                         </>
@@ -1743,7 +1743,7 @@ export function WhatsAppPage({ settings = {}, onSave, canDo = () => false }) {
                           <input value={p.dept || ""} placeholder="Department"
                                  onChange={(e) => setDirRow(i, { dept: e.target.value })}
                                  className="wa-field-input" style={{ flex: "1 1 28%" }} />
-                          <button onClick={() => removeDirRow(i)} disabled={!canEdit} className="wa-icon-btn" title="Remove">
+                          <button onClick={() => removeDirRow(i)} disabled={!canEdit} aria-label="Remove" className="wa-icon-btn" title="Remove">
                             <Trash2 size={15} />
                           </button>
                         </div>

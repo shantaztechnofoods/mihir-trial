@@ -1,6 +1,7 @@
 // src/modules/inventory/InventoryPage.jsx — moved verbatim from the former single-file src/App.jsx
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
 import React, { useState, useEffect, useRef, useMemo, useDeferredValue, startTransition } from "react";
+import { useRowMotion } from "../../shared/motion/useRowMotion.js";
 import { LeadIcon, Glyph } from "../../shared/components/LeadIcon.jsx";
 import { useProgressiveCount } from "../../shared/components/useProgressiveCount.js";
 import MoreRowsNote from "../../shared/components/MoreRowsNote.jsx";
@@ -14,6 +15,8 @@ import { Topbar } from "../../shared/ui/Topbar.jsx";
 import ArchivedSection from "../../shared/components/ArchivedSection.jsx";
 import { ERP_INSTANCE } from "../../config/env.js";
 import { archiveConfirmTitle } from "../../utils/archive.js";
+import SuccessTick from "../../shared/ui/SuccessTick.jsx";
+import EmptyArt from "../../shared/ui/EmptyArt.jsx";
 
 // ─── QUICK STOCK MODAL ───────────────────────────────────────────────────────
 
@@ -369,19 +372,19 @@ const ItemMasterRow = React.memo(function ItemMasterRow({ item, isNew, canAdjust
         <div className="flex gap-1 items-center">
           {canAdjust && (
             <button onClick={() => setQuickAdjust({ item: { ...item }, category: item.category, mode: "add" })}
-                    title="Add Stock"
+                    title="Add Stock" aria-label={`Add Stock: ${item.name}`}
                     className="wu-rowbtn w-6 h-6 rounded flex items-center justify-center text-xs font-black text-green-700 hover:text-green-900 transition-colors"
                     style={{ background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.22)" }}>＋</button>
           )}
           {canAdjust && (
             <button onClick={() => setQuickAdjust({ item: { ...item }, category: item.category, mode: "remove" })}
-                    title="Remove Stock"
+                    title="Remove Stock" aria-label={`Remove Stock: ${item.name}`}
                     className="wu-rowbtn w-6 h-6 rounded flex items-center justify-center text-xs font-black text-amber-700 hover:text-amber-900 transition-colors"
                     style={{ background: "rgba(217, 119, 6,0.1)", border: "1px solid rgba(217, 119, 6,0.22)" }}>－</button>
           )}
           {canEdit && (
             <button onClick={() => setEditingItem({ item: { ...item }, category: item.category })}
-                    title="Edit"
+                    title="Edit" aria-label={`Edit item: ${item.name}`}
                     className="wu-rowbtn w-6 h-6 rounded flex items-center justify-center text-[11px] text-slate-500 hover:text-slate-900 transition-colors"
                     style={{ background: "rgba(17,24,39,0.04)", border: "1px solid rgba(17,24,39,0.10)" }}><Glyph e="✏" size={13} /></button>
           )}
@@ -523,6 +526,10 @@ export function InventoryPage({ items, setItems, handleUpdateStock, pos = [], in
   const listCat    = useDeferredValue(catFilter);
   const listSortCol = useDeferredValue(sortCol);
   const listSortDir = useDeferredValue(sortDir);
+  // motion3: rows fade in / out when the (deferred) search or a filter changes
+  // — keyed on the values the rows are rendered from, so it lands with them.
+  const rowsRef = useRef(null);
+  useRowMotion(rowsRef, `${deferredSearch}|${listStatus}|${listCat}`);
   const filtered = useMemo(() => {
     const q = deferredSearch.trim().toLowerCase();
     return allItems.filter((i) => {
@@ -701,7 +708,7 @@ export function InventoryPage({ items, setItems, handleUpdateStock, pos = [], in
             <LeadIcon e="🧹" />Clear Demo Data
           </button>
         )}
-        {canDo("inventory","add") && <Btn variant="primary" size="sm" onClick={() => startTransition(() => setShowModal(true))}>+ Add Item</Btn>}
+        {canDo("inventory","add") && <Btn variant="primary" size="sm" onClick={() => startTransition(() => setShowModal(true))}>+ Add Item<SuccessTick on={toast} /></Btn>}
       </Topbar>
 
       <div className="p-6 space-y-4">
@@ -842,10 +849,11 @@ export function InventoryPage({ items, setItems, handleUpdateStock, pos = [], in
                   ))}
                 </tr>
               </thead>
-              <tbody>
+              <tbody ref={rowsRef}>
                 {sorted.length === 0 ? (
                   <tr>
                     <td colSpan={11} className="px-4 py-12 text-center text-xs text-slate-600">
+                      <EmptyArt />
                       No items match your filters.
                       {filtersActive && <button onClick={clearFilters} className="text-blue-600 font-bold ml-1 hover:underline">Clear filters</button>}
                     </td>

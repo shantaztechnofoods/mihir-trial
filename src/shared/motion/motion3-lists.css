@@ -1,0 +1,36 @@
+/* ═══ MOTION 3 (2026-11-27) — list rows on search / filter ═══════════════════
+   shared/motion/useRowMotion.js. Motion v2 tokens: in 200 ms ease-out, out
+   140 ms ease-in (exits faster), transform / opacity only. Removed-row copies
+   float over the list and never take a click. Reduced motion: nothing.      */
+.wu-rows-host { position: relative; }
+@media screen {
+  .wu-row-in { animation: wu-row-in var(--m-small) var(--m-ease-out) backwards; }
+  .wu-row-ghost {
+    position: absolute !important; margin: 0 !important; z-index: 1; pointer-events: none; box-sizing: border-box;
+    background: var(--surface-card, #fff);
+    animation: wu-row-out var(--m-small-out) var(--m-ease-in) forwards;
+  }
+  tr.wu-row-ghost { display: flex; }
+  tr.wu-row-ghost > * { flex: none; box-sizing: border-box; overflow: hidden; }
+  @keyframes wu-row-in  { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  @keyframes wu-row-out { from { opacity: 1; } to { opacity: 0; transform: translateY(-2px); } }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wu-row-in { animation: none; }
+  .wu-row-ghost { display: none !important; }
+}
+
+/* ── Sliding tab indicator (shared/motion/useTabIndicator.js) ── */
+.wu-tabs { position: relative; isolation: isolate; }
+.wu-tab-ind {
+  position: absolute; left: 0; top: 0; z-index: -1; pointer-events: none;
+  transition: transform var(--m-small) var(--m-ease-out);
+}
+.wu-tab-ind.is-still { transition: none; }
+.wu-tab-ind--line { width: 100px; height: 2px; transform-origin: 0 0; background: var(--st-tabLine, #2E50D6); z-index: 1; }
+.wu-tab-ind--pill { border-radius: 8px; background: var(--paper, var(--surface-card, #fff)); box-shadow: var(--e1, 0 1px 2px rgba(17,24,39,.12)); }
+/* the chosen tab's own underline / pill is drawn by the indicator instead */
+.wu-tabs--line > button { border-bottom-color: transparent !important; }
+.wu-tabs--pill > button[aria-pressed="true"], .wu-tabs--pill > button[aria-selected="true"] { background: transparent !important; box-shadow: none !important; }
+.dash-line-views.wu-tabs > button::before { display: none; }
+@media (prefers-reduced-motion: reduce) { .wu-tab-ind { transition: none; } }

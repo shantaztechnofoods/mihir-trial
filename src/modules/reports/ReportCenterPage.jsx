@@ -1,6 +1,7 @@
 // src/modules/reports/ReportCenterPage.jsx — moved verbatim from the former single-file src/App.jsx
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
+import { useTabIndicator } from "../../shared/motion/useTabIndicator.js";
 import { DEPARTMENT_SEQUENCE, readDeptWorkflowSettings, isHoldOverdue, formatDuration } from "../../utils/handoverLogic.js";
 import { summarizeMachineRatings, buildDepartmentScoreboard } from "../../utils/ratingLogic.js";
 import { rackKeyNorm } from "../../utils/rackSlots.js";
@@ -70,6 +71,8 @@ export function ReportCenterPage({
   // 2026-10-30 — report settings (language, header, footer, pilot records).
   const rc = { ...SETTINGS_DEFAULTS.report, ...((settings && settings.report) || {}) };
   const [reportLang, setReportLang] = useState(rc.language || "en");
+  const langBarRef = useRef(null);
+  useTabIndicator(langBarRef, reportLang, { variant: "pill" });   // motion3: pill slides
   const T = (k) => rt(reportLang, k);
   // Pilot / test machines stay out of every report unless the admin turned
   // them on in Report Settings; the "One machine" picker may still show them.
@@ -470,7 +473,7 @@ export function ReportCenterPage({
             </button>
           ))}
           <div className="flex-1" />
-          <div className="flex items-center gap-1 rounded-lg p-0.5" style={{ background: "rgba(17,24,39,0.05)" }} role="group" aria-label="PDF language">
+          <div ref={langBarRef} className="flex items-center gap-1 rounded-lg p-0.5" style={{ background: "rgba(17,24,39,0.05)" }} role="group" aria-label="PDF language">
             {REPORT_LANGS.map(([code, label]) => (
               <button key={code} type="button" onClick={() => setReportLang(code)} aria-pressed={reportLang === code}
                       className="text-[10.5px] font-bold px-2.5 py-1 rounded-md transition-all"

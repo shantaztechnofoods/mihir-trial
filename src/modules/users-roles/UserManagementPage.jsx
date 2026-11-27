@@ -391,7 +391,7 @@ export default function UserManagementPage({ canDo }) {
                     </td>
                     <td data-label="Mobile" className="px-4 py-3 text-slate-600">{user.mobile || "—"}</td>
                     <td data-label="Role" className="px-4 py-3">
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold" style={{ background: rColor + "22", color: rColor }}>{rLabel}</span>
+                      <span className="um-role-chip px-2 py-0.5 rounded-full text-[10px] font-semibold" style={{ background: rColor + "22", color: rColor, "--chip": rColor }}>{rLabel}</span>
                     </td>
                     <td data-label="Status" className="px-4 py-3">
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${user.status === "active" ? "text-emerald-400" : "text-slate-500"}`}

@@ -1039,7 +1039,7 @@ export function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, 
               <div className="rounded-xl p-4" style={CARD_STYLE}>
                 <div className="text-xs font-bold text-slate-900 mb-3">Monthly Purchase Value (₹)</div>
                 {monthlyPurchase.length === 0 ? <div className="text-center text-slate-600 py-8 text-xs">No data</div> : (
-                  <ChartSlot height={180}>{({ ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip }) => (
+                  <ChartSlot height={180} drawIn="history">{({ ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip }) => (
                   <ResponsiveContainer width="100%" height={180}>
                     <AreaChart data={monthlyPurchase} margin={{top:4,right:4,left:0,bottom:4}}>
                       <defs><linearGradient id="hrPG" x1="0" y1="0" x2="0" y2="1"><stop offset="10%" stopColor="#2E50D6" stopOpacity={0.25}/><stop offset="95%" stopColor="#2E50D6" stopOpacity={0}/></linearGradient></defs>
@@ -1058,7 +1058,7 @@ export function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, 
               <div className="rounded-xl p-4" style={CARD_STYLE}>
                 <div className="text-xs font-bold text-slate-900 mb-3">Vendor-wise Purchase Value (₹)</div>
                 {vendorPurchase.length === 0 ? <div className="text-center text-slate-600 py-8 text-xs">No data</div> : (
-                  <ChartSlot height={180}>{({ ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip }) => (
+                  <ChartSlot height={180} drawIn="history">{({ ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip }) => (
                   <ResponsiveContainer width="100%" height={180}>
                     <BarChart data={vendorPurchase} margin={{top:4,right:4,left:0,bottom:4}}>
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(17,24,39,0.04)" />
@@ -1133,7 +1133,7 @@ export function HistoryPage({ auditLog, pos, inwardLog, outwardLog, pendingLog, 
               <div className="rounded-xl p-4" style={CARD_STYLE}>
                 <div className="text-xs font-bold text-slate-900 mb-3">Inward Report — Monthly Volume</div>
                 {inwardByMonth.length === 0 ? <div className="text-center text-slate-600 py-8 text-xs">No inward data</div> : (
-                  <ChartSlot height={160}>{({ ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip }) => (
+                  <ChartSlot height={160} drawIn="history-inward">{({ ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip }) => (
                   <ResponsiveContainer width="100%" height={160}>
                     <BarChart data={inwardByMonth} margin={{top:4,right:4,left:0,bottom:4}}>
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(17,24,39,0.04)" />

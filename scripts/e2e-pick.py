@@ -22,7 +22,11 @@ import sys
 
 ROOT = os.environ.get("E2E_PICK_ROOT") or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 E2E = os.path.join(ROOT, "tests", "e2e")
-SMOKE = ["go-live-workflows", "mobile-sweep", "overlap-guard"]   # whole-app walk-through, phone + desktop; no overlaps at 4 widths
+SMOKE = ["go-live-workflows", "mobile-sweep", "overlap-guard", "visible-ui-guard"]   # whole-app walk-through, phone + desktop; no overlaps at 4 widths; everything visible / named / on screen
+# Any UI change (screen code, CSS, the HTML shell) also runs the visible-UI guard: glass, premium,
+# motion and folder moves have all turned buttons invisible without touching their module (2026-11-27).
+UI_FILE = re.compile(r"^(src/.*\.(jsx|css)$|src/shared/|index\.html$|tailwind\.config|postcss\.config)")
+UI_GUARD = "visible-ui-guard"
 MT = ["go-live-workflows", "pending-part-or-comment", "sender-undo", "staff-hold", "mt-polish", "back-closes-popup", "frame-budget"]
 
 # (regex on the App.jsx component name OR on a file path, suites). First match wins.
@@ -177,6 +181,9 @@ def changed(base):
                 break
         else:
             add(SMOKE, f"{f} (no specific suite)")
+    ui = sorted(f for f in files if UI_FILE.match(f))
+    if ui and UI_GUARD not in picked:
+        add([UI_GUARD], f"UI change ({ui[0]}{' …' if len(ui) > 1 else ''})")
     return picked, why
 
 
