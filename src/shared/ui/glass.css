@@ -446,3 +446,89 @@
   :root { --g-card: #ffffff; --g-card-2: #ffffff; }
   :root[data-theme="dark"] { --g-card: #18242b; --g-card-2: #202e36; }
 }
+
+/* ── Preview round 2 (coordinator critique, 2026-11-27) ─────────────────── */
+@media screen {
+  /* 7 · soft light pools so the glass reads as glass */
+  :root:not([data-theme="dark"]) {
+    --g-env:
+      radial-gradient(42% 36% at 22% 8%, rgba(255, 255, 255, .95) 0%, rgba(255, 255, 255, 0) 70%),
+      radial-gradient(38% 34% at 84% 6%, rgba(10, 132, 255, .06) 0%, rgba(10, 132, 255, 0) 70%),
+      radial-gradient(46% 40% at 64% 78%, rgba(10, 132, 255, .05) 0%, rgba(10, 132, 255, 0) 70%),
+      radial-gradient(40% 36% at 10% 92%, rgba(255, 255, 255, .8) 0%, rgba(255, 255, 255, 0) 70%),
+      linear-gradient(180deg, #f8fafb 0%, #eff3f6 60%, #e9eef2 100%);
+  }
+  :root[data-theme="dark"] {
+    --g-env:
+      radial-gradient(44% 34% at 24% 6%, rgba(64, 200, 200, .08) 0%, rgba(64, 200, 200, 0) 70%),
+      radial-gradient(40% 32% at 86% 12%, rgba(169, 212, 255, .07) 0%, rgba(169, 212, 255, 0) 70%),
+      radial-gradient(50% 40% at 60% 82%, rgba(64, 200, 200, .06) 0%, rgba(64, 200, 200, 0) 70%),
+      radial-gradient(80% 50% at 50% 0%, #13222b 0%, rgba(19, 34, 43, 0) 70%),
+      linear-gradient(180deg, #0d1820 0%, #09121a 58%, #070d12 100%);
+  }
+
+  /* 1 · drawn art in place of an empty tile */
+  html body .app-shell .dash-line-art { width: 74%; height: 74%; color: #6f8189; }
+  html body .app-shell .dash-line-thumb .dash-line-art { width: 86%; height: 86%; }
+
+  /* 2 · one rhythm per pod: photo · name+number · primary status (max 2 lines)
+     · secondary info as a one-line chip pinned to the pod's bottom edge */
+  html body .app-shell .dash-line-stage .dash-line-flags { flex: 1 1 auto; width: 100%; }
+  html body .app-shell .dash-line-stage .dash-line-flag + .dash-line-flag,
+  html body .app-shell .dash-line-stage > .dash-line-sub {
+    margin-top: auto; align-self: flex-start; max-width: 100%; height: 26px; padding: 0 8px; border-radius: 13px;
+    display: inline-flex; align-items: center; gap: 5px; background: var(--g-chip);
+    font-size: 12px; letter-spacing: -0.01em; font-weight: 560; color: var(--ink-2); white-space: nowrap; overflow: hidden;
+  }
+  html body .app-shell .dash-line-stage .dash-line-flag + .dash-line-flag > span { display: block; -webkit-line-clamp: unset; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  html body .app-shell .dash-line-stage .dash-line-flag + .dash-line-flag > svg { padding: 0; box-shadow: none; background: none; width: 13px; height: 13px; }
+  html body .app-shell .dash-line-stage > .dash-line-sub { order: 5; margin: 8px 6px 0; text-overflow: ellipsis; }
+  html body .app-shell .dash-line-stage .dash-line-flags { order: 4; }
+  html body .app-shell .dash-line-stage .dash-line-flags:has(+ .dash-line-sub), html body .app-shell .dash-line-stage .dash-line-sub + .dash-line-flags { flex: 1 1 auto; }
+  html body .app-shell .dash-line-stage .dash-line-flag:first-child > span { min-height: 0; }
+
+  /* 3 · dark: photo tiles sit in the glass — soft neutral tile, photo multiplied */
+  html[data-theme="dark"] body .app-shell :is(.dash-line-photo, .dash-line-thumb) {
+    background: radial-gradient(120% 90% at 50% 18%, #b4c1c7 0%, #93a3aa 62%, #75868e 100%);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08), inset 0 -10px 24px -12px rgba(0, 0, 0, .35);
+  }
+  html[data-theme="dark"] body .app-shell :is(.dash-line-photo, .dash-line-thumb) img { mix-blend-mode: multiply; filter: contrast(1.05); }
+  html[data-theme="dark"] body .app-shell :is(.dash-line-photo, .dash-line-thumb)::after { background: linear-gradient(170deg, rgba(255, 255, 255, .14) 0%, transparent 30%); }
+  html[data-theme="dark"] body .app-shell :is(.dash-line-photo, .dash-line-thumb)[data-photo="none"] { background: radial-gradient(120% 90% at 50% 18%, #2e3e47 0%, #24333b 60%, #1c2a31 100%); }
+  html[data-theme="dark"] body .app-shell .dash-line-art { color: #9fb1b8; }
+
+  /* 4 · dark: a soft light plate for the logo (padding by spread, so nothing moves) */
+  html[data-theme="dark"] body .app-sidebar .sb-brand { background: linear-gradient(160deg, rgba(232, 238, 241, .92), rgba(206, 216, 221, .86)); border-radius: 16px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .7), 0 6px 18px -10px rgba(0, 0, 0, .6); }
+
+  /* 5 · build badge: small and muted, in the sidebar footer margin */
+  html body #erp-build-badge, html body:has(.mt-premium) #erp-build-badge {
+    top: auto !important; right: auto !important; left: 22px !important; bottom: 1px !important;
+    background: transparent !important; box-shadow: none !important; color: var(--g-side-tx2) !important;
+    font-size: 8px !important; line-height: 10px !important; padding: 0 !important; opacity: 1 !important;
+  }
+  @media (max-width: 767.98px) {
+    html body #erp-build-badge, html body:has(.mt-premium) #erp-build-badge { left: 50% !important; transform: translateX(-50%); bottom: 1px !important; }
+  }
+
+  /* 6 · glass toolbar band behind greeting and controls (top aligned with the sidebar panel) */
+  html body .app-shell .page-header { background: transparent !important; border-bottom-color: transparent !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; isolation: isolate; }
+  html body .app-shell .page-header::before {
+    content: ""; position: absolute; inset: 8px 8px 0 4px; z-index: -1; border-radius: 24px; pointer-events: none;
+    background: linear-gradient(180deg, rgba(255, 255, 255, .66), rgba(255, 255, 255, .46));
+    -webkit-backdrop-filter: var(--g-blur); backdrop-filter: var(--g-blur);
+    box-shadow: inset 0 1px 0 var(--g-rim), 0 0 0 1px var(--g-edge), 0 10px 28px -18px rgba(40, 60, 75, .35);
+  }
+  html[data-theme="dark"] body .app-shell .page-header::before { background: linear-gradient(180deg, rgba(30, 44, 52, .72), rgba(24, 36, 43, .58)); }
+  html body .app-shell .page-header.is-compact { box-shadow: none; }
+
+  /* 8 · KPI: tighter number → label */
+  html body .app-shell .dash-tile-label { margin-top: 4px; }
+  html body .app-shell .dash-tile-head { margin-bottom: 10px; }
+}
+@media screen and (max-width: 767.98px), screen and (hover: none), screen and (pointer: coarse) {
+  html body .app-shell .page-header::before { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--g-solid); inset: 6px 8px 0; }
+}
+@media screen and (prefers-reduced-transparency: reduce) {
+  html body .app-shell .page-header::before { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--g-solid); }
+}
+@media screen { html body .app-shell .dash-line-stage > .dash-line-sub { display: block; line-height: 26px; text-overflow: ellipsis; box-sizing: border-box; max-width: calc(100% - 12px); } }

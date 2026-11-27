@@ -3,7 +3,7 @@
 // live in productionLine.js (pure, unit-tested). Every coloured state also
 // carries an icon + words, so colour never has to be remembered.
 import React, { Suspense, lazy, useEffect, useMemo, useState } from "react";
-import { Check, Timer, AlertTriangle, PauseCircle, Inbox, ChevronRight, Cog } from "lucide-react";
+import { Check, Timer, AlertTriangle, PauseCircle, Inbox, ChevronRight } from "lucide-react";
 import { buildProductionLine, stageStatusLines, lineSummary } from "./productionLine.js";
 import { formatDuration } from "../../utils/handoverLogic.js";
 
@@ -36,10 +36,38 @@ function StatusLine({ line }) {
 // the machine's BOM (bomDefs[bomKey].photoUrl), or a quiet placeholder. Picture
 // only — decorative, the stage's words carry the meaning (aria-hidden).
 const photoOf = (bomDefs, bomKey) => { const u = bomDefs && bomKey && bomDefs[bomKey] && bomDefs[bomKey].photoUrl; return typeof u === "string" && u.trim() ? u.trim() : ""; };
-function MachinePhoto({ url, className }) {
+// No photo yet: a drawn rack (shelf with crates) for the Rack stage, a drawn
+// machine for every other stage — never an empty tile.
+const RackArt = () => (
+  <svg className="dash-line-art" viewBox="0 0 120 80" fill="none" aria-hidden="true">
+    <rect x="14" y="8" width="4" height="66" rx="2" fill="currentColor" opacity=".55" />
+    <rect x="102" y="8" width="4" height="66" rx="2" fill="currentColor" opacity=".55" />
+    <rect x="14" y="30" width="92" height="3" rx="1.5" fill="currentColor" opacity=".45" />
+    <rect x="14" y="56" width="92" height="3" rx="1.5" fill="currentColor" opacity=".45" />
+    <rect x="24" y="14" width="22" height="16" rx="3" fill="currentColor" opacity=".28" />
+    <rect x="50" y="18" width="18" height="12" rx="3" fill="currentColor" opacity=".2" />
+    <rect x="24" y="40" width="18" height="16" rx="3" fill="currentColor" opacity=".2" />
+    <rect x="46" y="38" width="26" height="18" rx="3" fill="currentColor" opacity=".3" />
+    <rect x="76" y="42" width="20" height="14" rx="3" fill="currentColor" opacity=".22" />
+    <ellipse cx="60" cy="76" rx="44" ry="3" fill="currentColor" opacity=".12" />
+  </svg>
+);
+const MachineArt = () => (
+  <svg className="dash-line-art" viewBox="0 0 120 80" fill="none" aria-hidden="true">
+    <rect x="26" y="20" width="68" height="44" rx="5" fill="currentColor" opacity=".26" />
+    <rect x="34" y="12" width="40" height="10" rx="3" fill="currentColor" opacity=".2" />
+    <rect x="34" y="30" width="30" height="16" rx="2" fill="currentColor" opacity=".22" />
+    <circle cx="80" cy="34" r="5" fill="currentColor" opacity=".35" />
+    <rect x="70" y="46" width="16" height="4" rx="2" fill="currentColor" opacity=".3" />
+    <rect x="30" y="64" width="6" height="8" rx="1" fill="currentColor" opacity=".35" />
+    <rect x="84" y="64" width="6" height="8" rx="1" fill="currentColor" opacity=".35" />
+    <ellipse cx="60" cy="75" rx="40" ry="3" fill="currentColor" opacity=".12" />
+  </svg>
+);
+function MachinePhoto({ url, className, rack = false }) {
   return (
     <span className={className} aria-hidden="true" data-photo={url ? "bom" : "none"}>
-      {url ? <img src={url} alt="" loading="lazy" decoding="async" draggable="false" /> : <Cog size={22} strokeWidth={1.6} />}
+      {url ? <img src={url} alt="" loading="lazy" decoding="async" draggable="false" /> : rack ? <RackArt /> : <MachineArt />}
     </span>
   );
 }
@@ -121,7 +149,7 @@ export function ProductionLinePanel({ machines = [], handovers = [], settings = 
           return (
             <button key={st.key} type="button" className="dash-line-stage" data-stage={st.key} data-tone={st.tone} data-zero={st.count === 0 ? "" : undefined}
                     onClick={() => open(st.filter)} aria-label={label}>
-              <MachinePhoto url={stagePhoto(st.key)} className="dash-line-photo" />
+              <MachinePhoto url={stagePhoto(st.key)} rack={st.key === "Rack"} className="dash-line-photo" />
               <span className="dash-line-top">
                 <span className="dash-line-label">{st.label}{st.head && <span className="dash-line-head-name" data-dept-head={st.head}><span className="dash-line-head-sep"> · </span>{st.head}</span>}</span>
                 <RollNumber value={st.count} />
