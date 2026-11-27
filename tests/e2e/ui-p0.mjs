@@ -1,4 +1,5 @@
 // UI P0 foundation (2026-11-05): sonner / motion / number-flow / TanStack are never
+// speedtest: exercises the affected-e2e CI path (throwaway branch, never merged)
 // fetched by the login screen; the one shared <Toaster/> mounts after login.
 // LOCAL TEST DATA ONLY.
 import { launch, loginAdmin, makeOk, settle } from "./lib/helpers.mjs";
