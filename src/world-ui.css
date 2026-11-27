@@ -1626,3 +1626,71 @@
   .mtx-today, .mtx-restored { animation: none !important; }
   .wk-switch::before, .wk-switch i { transition: none; }
 }
+
+/* ═══ MOTION v2 (2026-11-27) — one timing system ══════════════════════════════
+   Linear / Apple feel: everything answers at once, nothing makes you wait.
+     press    80 ms in · 160 ms release (ease-out, no overshoot)
+     micro   140 ms in · 100 ms out  — dropdowns, menus, tab pill, chevrons
+     small   200 ms in · 140 ms out  — dialogs, toasts, page enter
+     medium  260 ms in · 180 ms out  — phone sheets, nav drawer
+   Enter = ease-out, exit = ease-in, exits faster than enters. transform /
+   opacity only. Nothing over 300 ms in the work path (login reveal excepted).
+   Machine Tracker is FROZEN: every rule below skips .mt-premium (its own
+   mtMotion.css stays exactly as approved). Visual only — no logic.          */
+:root {
+  --m-press: 80ms; --m-release: 160ms;
+  --m-micro: 140ms; --m-micro-out: 100ms;
+  --m-small: 200ms; --m-small-out: 140ms;
+  --m-medium: 260ms; --m-medium-out: 180ms;
+  --m-ease-out: cubic-bezier(.23, 1, .32, 1);
+  --m-ease-in: cubic-bezier(.5, 0, .75, 0);
+  --m-ease-drawer: cubic-bezier(.32, .72, 0, 1);
+}
+@media screen {
+  /* Press: in 80 ms, release 160 ms ease-out (was a 260 ms overshoot spring) */
+  .app-shell button:not(:disabled):not(.mt-premium *), .lg-root button:not(:disabled) {
+    transition-duration: var(--m-release), var(--m-small), var(--m-small), var(--m-small), var(--m-small);
+    transition-timing-function: var(--m-ease-out);
+  }
+  .app-shell button:not(:disabled):not(.mt-premium *):active, .lg-root button:not(:disabled):active {
+    transition-duration: var(--m-press), var(--m-small), var(--m-small), var(--m-small), var(--m-small);
+  }
+
+  /* Dialogs (desktop): dim 140 ms, panel 200 ms scale .97 → 1 */
+  .modal-backdrop:not(.mt-premium *) { animation: wu-fade var(--m-micro) var(--m-ease-out) backwards; }
+  .modal-backdrop:not(.mt-premium *) > div { animation: wu-pop2 var(--m-small) var(--m-ease-out) backwards; }
+  @keyframes wu-pop2 { from { opacity: 0; transform: scale(.97); } to { opacity: 1; transform: none; } }
+
+  /* Inline-styled legacy popups & toasts ("slideUp 0.2–0.45s ease") → 200 ms ease-out */
+  .app-shell [style*="slideUp"]:not(.mt-premium *), .app-shell [style*="fadeIn 0.4s"]:not(.mt-premium *) {
+    animation-duration: var(--m-small) !important; animation-timing-function: var(--m-ease-out) !important;
+  }
+
+  /* Toasts — sonner: 200 ms in, 140 ms ease-in out, no height animation (layout) */
+  [data-sonner-toast] {
+    transition-property: transform, opacity, box-shadow !important;
+    transition-duration: var(--m-small) !important; transition-timing-function: var(--m-ease-out) !important;
+  }
+  [data-sonner-toast][data-removed="true"] { transition-duration: var(--m-small-out) !important; transition-timing-function: var(--m-ease-in) !important; }
+  /* legacy .toast: 320 ms → 200 ms in, 220 ms → 140 ms ease-in out */
+  .toast { animation-duration: var(--m-small) !important; }
+  .toast.toast-exit { animation: toastSlideOut var(--m-small-out) var(--m-ease-in) both !important; }
+
+  /* Arrival banner: 420 ms → 260 ms */
+  .arrival-banner { animation-duration: var(--m-medium) !important; animation-timing-function: var(--m-ease-out) !important; }
+}
+@media screen and (max-width: 767.98px) {
+  /* Phone bottom sheets: 300 ms → 260 ms, iOS drawer curve */
+  .modal-backdrop:not(.mt-premium *) > div { animation: wu-sheet var(--m-medium) var(--m-ease-drawer) backwards !important; }
+  /* Nav drawer: opens 260 → 240 ms ease-out, closes 180 ms ease-in (exit faster) */
+  .app-sidebar { transition: transform var(--m-medium-out) var(--m-ease-in) !important; }
+  .app-sidebar.is-open { transition: transform 240ms var(--m-ease-out) !important; }
+  .nav-backdrop { animation-duration: var(--m-small) !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .modal-backdrop:not(.mt-premium *), .modal-backdrop:not(.mt-premium *) > div { animation: wu-fade var(--m-micro-out) linear backwards !important; }
+  .app-shell button:not(:disabled):not(.mt-premium *):active, .lg-root button:not(:disabled):active { transform: none; }
+  .app-sidebar, .app-sidebar.is-open { transition: none !important; }
+  [data-sonner-toast] { transition-property: opacity !important; }
+  .arrival-banner, .toast, .app-shell [style*="slideUp"]:not(.mt-premium *) { animation-name: wu-fade !important; }
+}

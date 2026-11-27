@@ -17,8 +17,10 @@ import { importWithReload } from "../../utils/lazyImport.js";
 const loadFeatures = () => importWithReload(() => import("./motionFeatures.js")).then((r) => r.default);
 
 export const MOTION = Object.freeze({
-  fast: 0.1, quick: 0.15, base: 0.2, sheet: 0.3,          // seconds (100 / 150 / 200 / 300 ms)
-  easeOut: [0.16, 1, 0.3, 1], easeIn: [0.7, 0, 0.84, 1],   // enter = ease-out, exit = ease-in
+  // motion v2 (2026-11-27): same tokens as world-ui.css --m-* (micro / small / medium; exits faster)
+  fast: 0.1, quick: 0.14, base: 0.2, sheet: 0.26,           // seconds (100 / 140 / 200 / 260 ms)
+  quickOut: 0.1, baseOut: 0.14, sheetOut: 0.18,             // exits
+  easeOut: [0.23, 1, 0.32, 1], easeIn: [0.5, 0, 0.75, 0],   // enter = ease-out, exit = ease-in
 });
 
 export default function MotionProvider({ children }) {
