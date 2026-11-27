@@ -2752,7 +2752,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                       const crateSt = null; // M and R units are independent (2026-10-31)
                       const niN = notIssuedOpenFor(m).length;
                       return (
-                        <button key={sl.id} type="button" data-slot={sl.id} data-serial={m ? (m.serialNo || "") : ""}
+                        <button key={sl.id} type="button" data-slot={sl.id} data-serial={m ? (m.serialNo || "") : ""} data-slot-state={sl.status}
                                 aria-label={`${slotLabel(sl.id)}: ${st.label}${m ? ` · BOM Ready · ${niN} Pending · ${m.serialNo || m.bomKey}` : ""}`}
                                 onClick={() => setRackPanel(sl.id)}
                                 className="rack-crate text-left rounded-xl p-2 pt-3.5 relative focus-visible:ring-2"

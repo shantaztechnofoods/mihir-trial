@@ -50,3 +50,25 @@
   .wu-empty-art .lens { animation: none !important; }
   .wu-empty-icon svg *, .wu-empty-art .d { animation: none !important; stroke-dashoffset: 0; }
 }
+
+/* B2 (redesigned rack moment). A slot that just got its parts fills up from
+   the bottom in its rack colour (--crate) in 360 ms with a "✓ Filled" badge,
+   holds, then the wash fades (200 ms) — the crate's own state shows after.
+   The first time Rack View shows in a page load, each EMPTY slot pulses once. */
+.wu-slot-filling { isolation: isolate; }
+.wu-slot-fill { position: absolute; inset: 0; z-index: 1; mix-blend-mode: multiply; border-radius: inherit; pointer-events: none; transform-origin: 50% 100%;
+  background: linear-gradient(to top, color-mix(in srgb, var(--crate, #2E50D6) 34%, transparent), color-mix(in srgb, var(--crate, #2E50D6) 12%, transparent));
+  animation: wu-slot-up 360ms var(--m-ease-out) backwards, wu-slot-fade var(--m-small) 1200ms var(--m-ease-in) forwards; }
+.wu-slot-badge { position: absolute; z-index: 2; right: 6px; top: 6px; padding: 2px 7px; border-radius: 999px; pointer-events: none;
+  font: 800 10.5px/15px var(--font-ui, system-ui); color: #fff; background: var(--crate, #2E50D6); box-shadow: 0 2px 6px rgba(17,24,39,.18);
+  animation: wu-slot-badge var(--m-small) 160ms var(--m-ease-out) backwards, wu-slot-fade var(--m-small) 1200ms var(--m-ease-in) forwards; }
+.wu-slot-pulse { isolation: isolate; }
+.wu-slot-pulse::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 3;
+  box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--crate, #2E50D6) 55%, transparent); animation: wu-slot-pulse 380ms var(--m-ease-out) both; }
+@keyframes wu-slot-up { from { transform: scaleY(0); } to { transform: none; } }
+@keyframes wu-slot-fade { to { opacity: 0; } }
+@keyframes wu-slot-badge { from { opacity: 0; transform: scale(.7); } to { opacity: 1; transform: none; } }
+@keyframes wu-slot-pulse { from { opacity: 0; } 35% { opacity: 1; } to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .wu-slot-fill, .wu-slot-badge, .wu-slot-pulse::after { display: none; }
+}

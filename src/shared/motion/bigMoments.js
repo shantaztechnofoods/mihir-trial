@@ -9,10 +9,16 @@
 //       to the new one (360 ms) and the new step pops (200 ms).
 //   data-ready-count="<n>"     (Machine Tracker "Ready" tile) — when it goes up,
 //       a short sparkle around the tile (< 800 ms) and the number pops.
+//   data-slot-state="empty|…"  (Production Rack View crate) — when a slot goes
+//       from empty to filled, it fills up from the bottom in its rack colour
+//       (360 ms) with a "✓ Filled" badge, then the wash fades (B2, 2026-11-27).
+// Also, the first time Rack View shows in a page load, every EMPTY slot gives
+// one soft pulse ("these still need parts").
 // A change in the first 3 s after the screen mounts (installBigMoments() is
 // called on every mount) is ignored: that is data arriving, not a hand-over.
 // Reduced motion: nothing. Phones get the same (it is one small element).
 import { prefersReducedMotion } from "./viewTransition.js";
+import { claimFirstShow } from "./firstShow.js";
 import "./motion3-big.css";
 
 const SETTLE_MS = 3000;
@@ -61,15 +67,39 @@ function sparkle(tile) {
   setTimeout(() => tile.classList.remove("wu-spark-host"), 1000);
 }
 
+function slotFill(crate) {
+  crate.classList.remove("wu-slot-filling"); void crate.offsetWidth;
+  crate.classList.add("wu-slot-filling");
+  const fill = document.createElement("i"); fill.className = "wu-slot-fill"; fill.setAttribute("aria-hidden", "true");
+  const badge = document.createElement("span"); badge.className = "wu-slot-badge"; badge.setAttribute("aria-hidden", "true"); badge.textContent = "✓ Filled";
+  crate.append(fill, badge);
+  setTimeout(() => { fill.remove(); badge.remove(); crate.classList.remove("wu-slot-filling"); }, 1500);
+}
+
+function pulseEmptySlots() {
+  if (prefersReducedMotion() || !claimFirstShow("rack-empty-pulse")) return;
+  setTimeout(() => {
+    document.querySelectorAll('.rack-crate[data-slot-state="empty"]').forEach((c) => {
+      c.classList.add("wu-slot-pulse");
+      setTimeout(() => c.classList.remove("wu-slot-pulse"), 500);
+    });
+  }, 400);
+}
+
 export function installBigMoments() {
   if (typeof document === "undefined" || typeof MutationObserver !== "function") return;
   mountedAt = performance.now();
+  try { pulseEmptySlots(); } catch { /* decoration only */ }
   if (window.__wuBigMoments) return;
   window.__wuBigMoments = true;
   new MutationObserver((list) => {
     if (performance.now() - mountedAt < SETTLE_MS || prefersReducedMotion()) return;
     for (const m of list) {
       const el = m.target;
+      if (m.attributeName === "data-slot-state") {
+        if (m.oldValue === "empty" && el.getAttribute("data-slot-state") !== "empty") { try { slotFill(el); } catch { /* decoration only */ } }
+        continue;
+      }
       const old = Number(m.oldValue), now = Number(el.getAttribute(m.attributeName));
       if (m.oldValue == null || !Number.isFinite(old) || !Number.isFinite(now) || now <= old) continue;
       try {
@@ -77,5 +107,5 @@ export function installBigMoments() {
         if (m.attributeName === "data-ready-count") sparkle(el);
       } catch { /* decoration must never break anything */ }
     }
-  }).observe(document.body, { subtree: true, attributes: true, attributeOldValue: true, attributeFilter: ["data-step-glide", "data-ready-count"] });
+  }).observe(document.body, { subtree: true, attributes: true, attributeOldValue: true, attributeFilter: ["data-step-glide", "data-ready-count", "data-slot-state"] });
 }
