@@ -48,3 +48,4 @@ overlap-guard 140
 dashboard-3d-phone 200
 dashboard-3d-phone-dark 200
 dashboard-3d-phone-4x 60
+inp-guard 90

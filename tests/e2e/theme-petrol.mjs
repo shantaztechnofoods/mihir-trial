@@ -36,17 +36,23 @@ const bodyBg = (p) => p.evaluate(() => getComputedStyle(document.body).backgroun
   await p.waitForFunction(() => getComputedStyle(document.body).backgroundColor !== "rgb(244, 246, 250)", null, { timeout: 2000 }).catch(() => {});
   ok("Dark → data-theme dark", await theme(p) === "dark");
   ok("Dark: page is the petrol/navy glass background (spatial glass, 2026-11-27)", await bodyBg(p) === "rgb(11, 20, 27)", await bodyBg(p));
+  ok("dark: the dark-only inline-colour sheet is on", await p.evaluate(() => document.querySelector("style[data-theme-inline-dark]")?.media) === "screen");
 
   const rects = () => p.evaluate(() => [...document.querySelectorAll(".page-header, aside, main, .page-header h1, .page-header-actions")].map((e) => { const r = e.getBoundingClientRect(); return [r.x, r.y, r.width, r.height].map(Math.round).join(","); }).join("|"));
   const before = await rects();
   await p.evaluate(() => { window.__xf = false; new MutationObserver(() => { if (document.documentElement.classList.contains("theme-xf")) window.__xf = true; }).observe(document.documentElement, { attributes: true, attributeFilter: ["class"] }); });
   await sw.locator("[data-theme-option='light']").click();
-  ok("cross-fade class is on while switching", await p.evaluate(() => window.__xf));
-  await p.waitForTimeout(400);
+  ok("swap class (transitions off) is on while switching", await p.evaluate(() => window.__xf));
+  ok("new colours are on at once (no fade wait)", await bodyBg(p) === "rgb(244, 246, 250)", await bodyBg(p));
+  await p.waitForFunction(() => !document.documentElement.classList.contains("theme-xf"), null, { timeout: 2000 }).catch(() => {});
   ok("Light → data-theme light", await theme(p) === "light");
   await p.waitForTimeout(300);
   ok("Light → old light background (pre-Petrol)", await bodyBg(p) === "rgb(244, 246, 250)", await bodyBg(p));
-  ok("cross-fade class is removed after the fade", !(await p.evaluate(() => document.documentElement.classList.contains("theme-xf"))));
+  ok("swap class is removed after the swap", !(await p.evaluate(() => document.documentElement.classList.contains("theme-xf"))));
+  // (kept on while the pointer is on the switch, ready for the next tap; off once it leaves)
+  await p.mouse.move(700, 650);
+  await p.waitForFunction(() => document.querySelector("style[data-theme-inline-dark]")?.media === "not all", null, { timeout: 2000 }).catch(() => {});
+  ok("light: the dark-only inline-colour sheet is off once the pointer leaves the switch", await p.evaluate(() => document.querySelector("style[data-theme-inline-dark]")?.media) === "not all");
   ok("switching moved nothing (same boxes)", await rects() === before);
   ok("choice saved in this browser", await p.evaluate(() => localStorage.getItem("erp_theme_mode")) === "light");
   // Spatial glass (2026-11-27, handler's chosen look): the primary action is a cobalt glass pill

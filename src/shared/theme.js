@@ -8,9 +8,18 @@
 // The resolved mode lives on <html data-theme="light|dark">; the CSS in
 // world-ui.css reads it (plus a prefers-color-scheme fallback for the moment
 // before this script runs — index.html sets the attribute before first paint).
-// Switching adds html.theme-xf for 260 ms: a 200 ms colour-only cross-fade, no
-// layout change (see world-ui.css). Visual only — no data, logic or permissions.
+// Switching (perf/inp-theme-toggle, 2026-11-27 — was a 200 ms cross-fade that
+// put a transition on EVERY element, ~550 ms to the next paint at 4x CPU):
+//   * the swap is instant and only flips the --p-* tokens (data-theme on <html>);
+//   * html.theme-xf turns transitions OFF for the one frame of the swap, so no
+//     element animates its colour (no flash, no per-frame restyle); it is
+//     removed once the new colours are painted and the page is idle;
+//   * the dark-only inline-colour remaps (style="…" substring selectors) live in
+//     theme-inline-dark.css and are switched on only while the page is dark, so
+//     light mode never tests elements against them.
+// No layout change. Visual only — no data, logic or permissions.
 import { useSyncExternalStore } from "react";
+import inlineDarkCss from "./theme-inline-dark.css?inline";
 
 export const THEME_KEY = "erp_theme_mode";
 export const THEME_MODES = ["light", "dark"];
@@ -26,21 +35,87 @@ export function resolveTheme(mode) {
 
 let mode = typeof window !== "undefined" ? readThemeMode() : "light";
 const subs = new Set();
-let xfTimer = 0;
+let inlineDark = null;
+
+// The dark-only sheet: one <style> element, active (media="screen") only in dark.
+// Created at boot (installTheme → apply) in both modes, so it always sits at the
+// same place in the cascade: after the main CSS, before any lazily loaded page CSS
+// (where these rules were when they lived in world-ui.css).
+function setInlineDark(on) {
+  try {
+    if (!inlineDark) {
+      inlineDark = document.createElement("style");
+      inlineDark.setAttribute("data-theme-inline-dark", "");
+      inlineDark.media = on ? "screen" : "not all";
+      inlineDark.textContent = inlineDarkCss;
+      document.head.appendChild(inlineDark);
+      return;
+    }
+    const media = on ? "screen" : "not all";
+    if (inlineDark.media !== media) inlineDark.media = media;
+  } catch { /* cosmetic only */ }
+}
+
+function write(root, resolved, keepSheet = false) {
+  root.setAttribute("data-theme", resolved);
+  root.setAttribute("data-theme-mode", mode);
+  root.style.colorScheme = resolved;
+  // Light → dark: the remaps must be on in the same frame. Dark → light: they
+  // match nothing in light, so a switch defers turning them off to idle time
+  // (a stylesheet change empties the browser's style cache: one less full restyle
+  // in the frame the person is waiting for).
+  if (resolved === "dark" || !keepSheet) setInlineDark(resolved === "dark");
+  try { const meta = document.querySelector('meta[name="theme-color"]'); if (meta) meta.setAttribute("content", META_COLOR[resolved]); } catch { /* cosmetic */ }
+}
 
 function apply(fade) {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
   const resolved = resolveTheme(mode);
-  if (fade && root.getAttribute("data-theme") !== resolved) {
-    root.classList.add("theme-xf");
-    clearTimeout(xfTimer);
-    xfTimer = setTimeout(() => root.classList.remove("theme-xf"), 260);
-  }
-  root.setAttribute("data-theme", resolved);
-  root.setAttribute("data-theme-mode", mode);
-  root.style.colorScheme = resolved;
-  try { const meta = document.querySelector('meta[name="theme-color"]'); if (meta) meta.setAttribute("content", META_COLOR[resolved]); } catch { /* cosmetic */ }
+  if (!fade || root.getAttribute("data-theme") === resolved) return write(root, resolved);
+  // Instant swap with transitions off for this frame (one style recalc, then paint).
+  // Clean-up (transitions back on, dark-only sheet off in light) is one more full
+  // restyle, so it waits until the new colours are on screen and the page is idle.
+  cancelIdle();
+  root.classList.add("theme-xf");
+  write(root, resolved, true);
+  idleId = onIdle(() => {
+    idleId = null;
+    root.classList.remove("theme-xf");
+    setInlineDark(warm || root.getAttribute("data-theme") === "dark");
+  });
+}
+
+let idleId = null;
+// After the next paint (two frames), then when the main thread is free (at most ~0.3 s later).
+function onIdle(fn) {
+  const h = { dead: false, ric: 0, t: 0 };
+  const ric = typeof window !== "undefined" && typeof window.requestIdleCallback === "function";
+  const raf = typeof requestAnimationFrame === "function" ? requestAnimationFrame : (f) => setTimeout(f, 16);
+  const run = () => { if (!h.dead) fn(); };
+  raf(() => raf(() => { if (h.dead) return; if (ric) h.ric = window.requestIdleCallback(run, { timeout: 300 }); else h.t = setTimeout(run, 120); }));
+  h.cancel = () => { h.dead = true; if (h.ric) window.cancelIdleCallback(h.ric); if (h.t) clearTimeout(h.t); };
+  return h;
+}
+function cancelIdle() { if (idleId) { idleId.cancel(); idleId = null; } }
+
+// Pointer / focus on the switch (ThemeSwitch): in light mode, switch the dark-only
+// sheet on ahead of the tap (its rules match nothing in light, so nothing changes
+// on screen) — the light → dark tap then only flips the tokens. When the pointer /
+// focus leaves without a switch, it goes off again at idle time.
+let coolId = null;
+let warm = false;
+export function warmThemeSwitch() {
+  if (typeof document === "undefined") return;
+  warm = true;
+  if (coolId) { coolId.cancel(); coolId = null; }
+  setInlineDark(true);
+}
+export function coolThemeSwitch() {
+  if (typeof document === "undefined") return;
+  warm = false;
+  if (coolId) coolId.cancel();
+  coolId = onIdle(() => { coolId = null; if (!idleId && !warm) setInlineDark(document.documentElement.getAttribute("data-theme") === "dark"); });
 }
 
 export function getThemeMode() { return mode; }

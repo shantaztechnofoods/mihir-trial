@@ -174,3 +174,24 @@ test("world-ui.css: P0 platform utilities ship with a reduced-motion path", () =
   for (const s of ["--motion-200", "::view-transition-new(root)", "container-type: inline-size", "content-visibility: auto", "@supports (animation-timeline: scroll())", "@supports (anchor-name: --a)"]) assert.ok(p0.includes(s), s);
   assert.match(p0, /prefers-reduced-motion: reduce\)\s*\{\s*::view-transition-group\(\*\), ::view-transition-old\(\*\), ::view-transition-new\(\*\) \{ animation: none !important; \}/);
 });
+
+// perf/inp-theme-toggle (2026-11-27): the Light ↔ Dark switch flips tokens only.
+// No transition on every element while switching, and no style="…" substring
+// selectors in the always-on CSS (they made every restyle test every element);
+// the dark-only inline-colour remaps live in their own sheet that theme.js
+// switches on only while the page is dark.
+test("theme switch: token flip only, no per-element cross-fade, no [style] selectors in always-on CSS", () => {
+  const css = readFileSync(new URL("../src/world-ui.css", import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+  const themeStyleSel = css.split("}").map((r) => r.split("{")[0]).filter((sel) => /data-theme/.test(sel) && /\[style[\^*$|~]?=/.test(sel));
+  assert.deepEqual(themeStyleSel, [], "world-ui.css theme rules must not match inline style attributes by substring");
+  assert.doesNotMatch(css, /html\.theme-xf \*[^{]*\{[^}]*transition:(?!\s*none)/, "theme-xf must turn transitions OFF, not on");
+  assert.match(css, /html\.theme-xf \*, html\.theme-xf \*::before, html\.theme-xf \*::after \{ transition: none !important; \}/);
+  const dark = readFileSync(new URL("../src/shared/theme-inline-dark.css", import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+  for (const sel of dark.split("}").map((r) => r.split("{")[0].trim()).filter((s) => s && !s.startsWith("@"))) {
+    assert.match(sel, /data-theme="dark"/, `dark-only sheet rule must be scoped to dark: ${sel.slice(0, 80)}`);
+  }
+  const js = readFileSync(new URL("../src/shared/theme.js", import.meta.url), "utf8");
+  assert.match(js, /theme-inline-dark\.css\?inline/);
+  assert.match(js, /"not all"/);
+  assert.doesNotMatch(js, /startViewTransition/, "theme swap must stay a single restyle (a view transition added a second full restyle)");
+});
