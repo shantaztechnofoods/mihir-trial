@@ -44,3 +44,6 @@ no-delete 30
 theme-petrol 25
 light-restore 30
 overlap-guard 140
+dashboard-3d-phone 200
+dashboard-3d-phone-dark 200
+dashboard-3d-phone-4x 60
