@@ -117,3 +117,36 @@
 .f3-chip { flex-wrap: wrap; row-gap: 1px; }
 .f3-ch { order: 3; flex-basis: 100%; font: 500 11px/1.2 var(--font-ui, Inter, sans-serif); color: var(--ink-3, #64748b); white-space: nowrap; }
 .f3-ch[hidden] { display: none; }
+
+/* Phone (2026-11-27): the line on a wide stage the finger swipes natively, one
+   department per snap. No backdrop blur while scrolling (solid tags), every
+   word 12 px or more, 44 px pager buttons. */
+.f3-wrap[data-phone] { position: relative; }
+.f3-wrap[data-phone] .f3-kpis { position: static; height: auto; padding: 4px 2px 8px; gap: 6px 14px; flex-wrap: wrap; align-items: baseline; background: none; }
+.f3-wrap[data-phone] .f3-kpi + .f3-kpi { padding-left: 12px; }
+.f3-wrap[data-phone] .f3-odo { font-size: 22px; }
+.f3-wrap[data-phone] .f3-kl, .f3-wrap[data-phone] .f3-legend, .f3-wrap[data-phone] .f3-hidden-note { font-size: 12px; }
+.f3-wrap[data-phone] .f3-legend { order: 9; margin-left: 0; gap: 10px; flex-wrap: wrap; }
+.f3-wrap[data-phone] .f3-hidden-note { order: 10; }
+.f3-scroll { overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; scrollbar-width: none; border-radius: 16px; touch-action: pan-x pan-y; }
+.f3-scroll::-webkit-scrollbar { display: none; }
+.f3-scroll:focus-visible { outline: 2px solid var(--action, #2563eb); outline-offset: 2px; }
+.f3-track { position: relative; width: 100%; }
+.f3-wrap[data-phone] .f3-stage { height: 300px; border-radius: 16px; }
+.f3-wrap[data-phone] .f3-gl { -webkit-mask-image: none; mask-image: none; }
+.f3-wrap[data-phone] .f3-tag { font-size: 12px; min-height: 30px; justify-content: center; padding: 5px 10px; background: var(--paper, #fff); -webkit-backdrop-filter: none; backdrop-filter: none; }
+.f3-wrap[data-phone] .f3-tag b, .f3-wrap[data-phone] .f3-tag abbr { font-size: 12px; }
+.f3-wrap[data-phone] .f3-more, .f3-wrap[data-phone] .f3-chip, .f3-wrap[data-phone] .f3-ch { font-size: 12px; }
+.f3-wrap[data-phone] .f3-chips { height: 50px; }
+.f3-snaps { position: absolute; left: 0; top: 0; height: 1px; width: 100%; pointer-events: none; }
+.f3-snaps > span { position: absolute; top: 0; height: 1px; scroll-snap-align: center; }
+.f3-pager { display: flex; align-items: center; gap: 8px; margin-top: 4px; font: 500 13px/1.2 var(--font-ui, Inter, sans-serif); color: var(--ink-3, #64748b); }
+.f3-pager > button { flex: none; width: 44px; height: 44px; border: 1px solid var(--line, #e2e8f0); border-radius: 12px; background: var(--paper, #fff); color: var(--ink, #0f172a); font: 600 22px/1 var(--font-ui, Inter, sans-serif); cursor: pointer; }
+.f3-pager > button:disabled { opacity: .35; cursor: default; }
+.f3-pager > button:focus-visible { outline: 2px solid var(--action, #2563eb); outline-offset: 2px; }
+.f3-pager-l { flex: 1; min-width: 0; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.f3-pager-l b { color: var(--ink, #0f172a); font-weight: 650; }
+.f3-wrap[data-phone] .f3-pop { position: absolute; left: 8px; right: 8px; top: 8px; width: auto; z-index: 5; background: var(--paper, #fff); -webkit-backdrop-filter: none; backdrop-filter: none; font-size: 13px; }
+.f3-wrap[data-phone] .f3-pop-go { min-height: 44px; font-size: 14px; }
+.f3-wrap[data-phone] .f3-pop-x { width: 44px; height: 44px; top: 0; right: 0; }
+.f3-wrap[data-phone] .f3-empty { position: static; padding: 8px 0; }

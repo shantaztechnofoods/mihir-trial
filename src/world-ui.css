@@ -812,6 +812,7 @@
   .dash-line-views > button { min-height: 32px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: var(--ink-3); font: 600 13px/1 var(--font-ui); cursor: pointer; }
   .dash-line-views > button[aria-pressed="true"] { background: var(--paper); color: var(--ink); box-shadow: var(--e1); }
   .dash-line-views > button:focus-visible { outline: 2px solid var(--action); outline-offset: 1px; }
+  @media (max-width: 599px) { .dash-line-views > button { min-height: 44px; padding: 0 14px; } } /* phone: 3D toggle shown too (2026-11-27) */
   .dash-line-note, .dash-line-3d-loading { margin: 0 0 8px; font-size: 13px; font-weight: 500; color: var(--ink-3); }
   .dash-line-3d-loading { display: flex; align-items: center; justify-content: center; height: 190px; border-radius: 16px; background: var(--sunk); }
   .f3-ring { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; padding: 2px 12px 2px 2px; border-radius: 999px; background: var(--sunk); border: 1px solid var(--line); }

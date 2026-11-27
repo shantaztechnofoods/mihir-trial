@@ -11,7 +11,7 @@ import { formatDuration } from "../../utils/handoverLogic.js";
 // (own chunk via dynamic import). The panel always opens on "Line"; the choice
 // is never remembered.
 const Line3DView = lazy(() => import("./Line3DView.jsx"));
-const MIN_3D_WIDTH = 420; // phones below this stay on Line (no 3D button)
+// Phones get 3D too (2026-11-27): a swipeable line, light renderer budget (Line3DView / line3d.js).
 
 class Line3DBoundary extends React.Component {
   constructor(props) { super(props); this.state = { failed: false }; }
@@ -58,15 +58,7 @@ export function ProductionLinePanel({ machines = [], handovers = [], settings = 
   // Line is the default for everyone on every page open; 3D only after a tap.
   const [view, setView] = useState("line");
   const [note3d, setNote3d] = useState("");
-  const [wide, setWide] = useState(() => typeof window === "undefined" || window.innerWidth >= MIN_3D_WIDTH);
-  useEffect(() => {
-    if (typeof window === "undefined" || !window.matchMedia) return undefined;
-    const mq = window.matchMedia(`(min-width: ${MIN_3D_WIDTH}px)`);
-    const on = () => { setWide(mq.matches); if (!mq.matches) setView("line"); };
-    on(); mq.addEventListener?.("change", on);
-    return () => mq.removeEventListener?.("change", on);
-  }, []);
-  const show3d = view === "3d" && wide && isOpen;
+  const show3d = view === "3d" && isOpen;
   const fail3d = (msg) => { setView("line"); setNote3d(msg); };
   const toggle = () => setIsOpen((v) => { try { localStorage.setItem("erp_dash_line_open", v ? "0" : "1"); } catch {} return !v; });
 
@@ -90,12 +82,10 @@ export function ProductionLinePanel({ machines = [], handovers = [], settings = 
       {isOpen && <div id="dash-line-body" className="dash-line-body" data-line-body>
       <div className="dash-line-meta dash-line-meta-row">
         <span>{lg.same ? `Target: ${lg.target} in each department` : "Target per department (Settings)"} · {show3d ? "tap a machine" : "tap a stage"}</span>
-        {wide && (
-          <span className="dash-line-views" role="group" aria-label="Production line view" data-line-views>
-            <button type="button" aria-pressed={!show3d} data-view="line" onClick={() => setView("line")}>Line</button>
-            <button type="button" aria-pressed={show3d} data-view="3d" onClick={() => { setNote3d(""); setView("3d"); }}>3D view</button>
-          </span>
-        )}
+        <span className="dash-line-views" role="group" aria-label="Production line view" data-line-views>
+          <button type="button" aria-pressed={!show3d} data-view="line" onClick={() => setView("line")}>Line</button>
+          <button type="button" aria-pressed={show3d} data-view="3d" onClick={() => { setNote3d(""); setView("3d"); }}>3D view</button>
+        </span>
       </div>
       {note3d && <div className="dash-line-note" role="status" data-line-3d-note>{note3d}</div>}
 
