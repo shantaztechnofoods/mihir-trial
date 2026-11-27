@@ -63,6 +63,7 @@ import { createPurchaseHandlers } from "../modules/purchase/handlers.js";
 import { createInventoryHandlers } from "../modules/inventory/handlers.js";
 import { createBomHandlers } from "../modules/bom/handlers.js";
 import { createPendingJobsHandlers } from "../modules/pending-jobs/handlers.js";
+import { createTrialCertificateHandlers } from "../modules/trial-certificate/handlers.js";
 import { makeShellCall } from "./shellCall.js";
 import { APP_BUILD } from "../shared/buildInfo.js";
 import { fmtDate, recomputeStatus, roundQty } from "../shared/format.js";
@@ -2168,28 +2169,6 @@ export default function App() {
     }
   };
 
-  // 2026-10-31 — complete / correct a saved Trial Certificate from the
-  // Machine Tracker. Finish & Transfer permission; the machine's record is
-  // updated and the change audited; no stage change.
-  const handleUpdateTrialCertificate = async (machineId, cert) => {
-    if (!currentUser?.id) return { success: false, error: "Not authenticated" };
-    if (!canFinishTransfer(authCanDo)) return { success: false, error: "You do not have permission to edit the certificate (Machines → Finish & Transfer)." };
-    const machine = machineLog.find((m) => String(m.id) === String(machineId));
-    if (!machine) return { success: false, error: "Machine not found" };
-    if (!cert || typeof cert !== "object") return { success: false, error: "No certificate data" };
-    const next = { ...cert, updatedAt: new Date().toISOString(), updatedBy: currentUser.id };
-    setMachineLog((prev) => prev.map((m) => (String(m.id) === String(machineId) ? { ...m, trialCertificate: next } : m)));
-    const r = await machineUpdate(machineId, { trialCertificate: next });
-    if (!r.success) return r;
-    logAudit({
-      type: "trial_certificate_updated", module: "Machine",
-      action: `Trial Certificate updated: ${machine.bomKey}${machine.serialNo ? ` [${machine.serialNo}]` : ""}`,
-      ref: machine.bomKey, serialNo: machine.serialNo || "",
-      details: { machineId, trialBy: next.trialByName || "", signed: !!next.trialBySignature },
-    });
-    return { success: true };
-  };
-
   // ── Phase B — Attachments ─────────────────────────────────────────────────
   const handleUploadAttachment = async ({ machineId, department, stage, file, caption, isCustomerVisible }) => {
     if (!currentUser?.id) return { success: false, error: "Not authenticated" };
@@ -2275,6 +2254,7 @@ export default function App() {
   const { handleInwardComplete, handleCreateItemRow, handleUpdateItemRow, handleDeleteItemRow, handleRestoreItemRow, handleSetItemDefaultRate, handleBulkAddItems, handleClearPending, handleFulfillPending, handleFulfillGroup, handleAddOutward, raiseNotIssuedJobs, handleCreateMachine, handleAbortMachineCreate, handleRemoveRackMachine } = createInventoryHandlers(shell);
   const { handleUpdateBOM, handleCreateBOM, handleDuplicateBOM, computeBOMDeletionInfo, handleDeleteBOM, handleRestoreBOM, handleRenameBOM, handleSaveBomChecklist } = createBomHandlers(shell);
   const { handleRaisePendingItem, handleResolvePendingItem, handleReceivePendingItem, handleIssuePendingPart } = createPendingJobsHandlers(shell);
+  const { handleUpdateTrialCertificate } = createTrialCertificateHandlers(shell);
   Object.assign(shellRegistry, { "inventory.removeRackMachine": handleRemoveRackMachine, "inventory.addOutward": handleAddOutward });
 
   // One set of props for BOM Outward, used by the Outward page and by the BOM
