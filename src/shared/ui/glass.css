@@ -637,3 +637,12 @@
   html body .app-shell :is(button.dash-tile, .dash-line-stage):active { transform: scale(.98) !important; transition-duration: 100ms !important; }
   html body .app-shell :is(.dash-line-row, .sb-item, .dash-line-views > button, .theme-switch button):active { transform: scale(.98); }
 }
+/* Stat (KPI) cards: exactly two soft, low-opacity drop layers; the hairline is an inset, not a third layer */
+@media screen {
+  html body .app-shell .dash-tile { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 1), inset 0 0 0 1px rgba(20, 40, 50, .06), 0 1px 2px rgba(40, 60, 70, .05), 0 12px 28px -14px rgba(40, 60, 75, .18) !important; }
+  html[data-theme="dark"] body .app-shell .dash-tile { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14), inset 0 0 0 1px rgba(255, 255, 255, .06), 0 1px 2px rgba(0, 0, 0, .25), 0 12px 28px -14px rgba(0, 0, 0, .55) !important; }
+  @media (hover: hover) and (pointer: fine) {
+    html body .app-shell button.dash-tile:hover { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 1), inset 0 0 0 1px rgba(20, 40, 50, .07), 0 2px 4px rgba(40, 60, 70, .06), 0 18px 36px -14px rgba(40, 60, 75, .24) !important; }
+    html[data-theme="dark"] body .app-shell button.dash-tile:hover { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .16), inset 0 0 0 1px rgba(255, 255, 255, .08), 0 2px 4px rgba(0, 0, 0, .3), 0 18px 36px -14px rgba(0, 0, 0, .65) !important; }
+  }
+}
