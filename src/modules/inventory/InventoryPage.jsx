@@ -369,19 +369,19 @@ const ItemMasterRow = React.memo(function ItemMasterRow({ item, isNew, canAdjust
         <div className="flex gap-1 items-center">
           {canAdjust && (
             <button onClick={() => setQuickAdjust({ item: { ...item }, category: item.category, mode: "add" })}
-                    title="Add Stock"
+                    title="Add Stock" aria-label={`Add Stock: ${item.name}`}
                     className="wu-rowbtn w-6 h-6 rounded flex items-center justify-center text-xs font-black text-green-700 hover:text-green-900 transition-colors"
                     style={{ background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.22)" }}>＋</button>
           )}
           {canAdjust && (
             <button onClick={() => setQuickAdjust({ item: { ...item }, category: item.category, mode: "remove" })}
-                    title="Remove Stock"
+                    title="Remove Stock" aria-label={`Remove Stock: ${item.name}`}
                     className="wu-rowbtn w-6 h-6 rounded flex items-center justify-center text-xs font-black text-amber-700 hover:text-amber-900 transition-colors"
                     style={{ background: "rgba(217, 119, 6,0.1)", border: "1px solid rgba(217, 119, 6,0.22)" }}>－</button>
           )}
           {canEdit && (
             <button onClick={() => setEditingItem({ item: { ...item }, category: item.category })}
-                    title="Edit"
+                    title="Edit" aria-label={`Edit item: ${item.name}`}
                     className="wu-rowbtn w-6 h-6 rounded flex items-center justify-center text-[11px] text-slate-500 hover:text-slate-900 transition-colors"
                     style={{ background: "rgba(17,24,39,0.04)", border: "1px solid rgba(17,24,39,0.10)" }}><Glyph e="✏" size={13} /></button>
           )}
