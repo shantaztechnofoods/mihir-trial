@@ -1,7 +1,7 @@
 // src/modules/inventory/PendingPage.jsx — moved verbatim from the former single-file src/App.jsx
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
 import React, { useState, useRef, useMemo } from "react";
-import { LeadIcon } from "../../shared/components/LeadIcon.jsx";
+import { LeadIcon, Glyph } from "../../shared/components/LeadIcon.jsx";
 import { roundQty } from "../../shared/format.js";
 import { STAGE_COLORS } from "../../shared/machineStages.js";
 import { Topbar } from "../../shared/ui/Topbar.jsx";
@@ -497,17 +497,17 @@ export function PendingPage({ pendingLog, onClearPending, onFulfillPending, onFu
 
         {/* Summary */}
         <div className="grid grid-cols-3 gap-4">
-          <div className="p-5 rounded-xl" style={{ background: "rgba(217, 119, 6,0.06)", border: "1px solid rgba(217, 119, 6,0.2)" }}>
+          <div className="pending-kpi p-5 rounded-xl" style={{ background: "rgba(217, 119, 6,0.06)", border: "1px solid rgba(217, 119, 6,0.2)" }}>
             <div className="text-[9px] font-bold text-amber-600 uppercase tracking-[0.08em] mb-1">Pending Machines</div>
             <div className="text-4xl font-black text-amber-700 mb-1">{groups.length}</div>
             <div className="text-[10px] text-slate-500">builds with shortfalls</div>
           </div>
-          <div className="p-5 rounded-xl" style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.2)" }}>
+          <div className="pending-kpi p-5 rounded-xl" style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.2)" }}>
             <div className="text-[9px] font-bold text-red-500 uppercase tracking-[0.08em] mb-1">Missing Items</div>
             <div className="text-4xl font-black text-red-400 mb-1">{enriched.length}</div>
             <div className="text-[10px] text-slate-500">{totalPending} total units pending</div>
           </div>
-          <div className="p-5 rounded-xl" style={{ background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.2)" }}>
+          <div className="pending-kpi p-5 rounded-xl" style={{ background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.2)" }}>
             <div className="text-[9px] font-bold text-green-500 uppercase tracking-[0.08em] mb-1">Can Issue Now</div>
             <div className="text-4xl font-black text-green-400 mb-1">{availN}</div>
             <div className="text-[10px] text-slate-500">items with stock available</div>
@@ -516,7 +516,7 @@ export function PendingPage({ pendingLog, onClearPending, onFulfillPending, onFu
 
         {groups.length === 0 ? (
           <div className="bg-white border border-slate-200 rounded-xl py-20 text-center" style={{ animation: "fadeIn 0.4s ease both" }}>
-            <div className="text-5xl mb-4">✅</div>
+            <div className="empty-glyph text-5xl mb-4" data-tone="ok"><Glyph e="✅" size={30} /></div>
             <div className="text-sm font-bold text-slate-900 mb-2">No Pending Materials</div>
             <div className="text-[11px] text-slate-500">All BOM issues are fully fulfilled. Issue a BOM from Outward to track shortfalls here.</div>
           </div>

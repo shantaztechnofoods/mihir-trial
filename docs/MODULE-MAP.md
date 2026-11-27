@@ -26,6 +26,7 @@ whether replacing the folder alone is enough **today**.
 | bom | 10 | 3045 | (via inventory/MT) ~13 | NO | FROZEN |
 | dashboard | 9 | 2237 | 1 (`goToPage`) + props | PARTLY | |
 | inventory | 9 | 4860 | 30 | NO | BOM-issue part FROZEN |
+| item-master | 8 | ~3170 | 0 (own `handlers.js`) | YES* (folder carries its writes; App.jsx needs the `createItemMasterHandlers(shell)` line once) | |
 | machine-tracker | 14 | 7217 | 42 | NO | FROZEN; **LOCKED in ERP LIVE** |
 | pending-jobs | 5 | 493 | 0 (library) | YES (library) | FROZEN |
 | purchase | 12 | 3815 | 15 | NO | |
@@ -176,6 +177,10 @@ These are not owned by any one module and would be versioned together as
 * Stores / utils those handlers call: `auth/authStore.js` (fetchDeptRoster); `shared/components/LazyCharts.jsx` (loadCharts); `utils/handoverLogic.js` (readDeptWorkflowSettings, setWorkCalendar)
 * Migrations (from its README): `012_stock_movements (recent movements)`
 * Edge Functions / serverless: none
+
+> **Update 27 Nov 2026 (modules/item-master):** Item Master (InventoryPage, AddItemModal,
+> ItemDetailModal, ItemImportModal, `itemImport.js`, the item writes) moved to
+> `src/modules/item-master/` — see its README. The inventory row/section below is the earlier snapshot.
 
 ### inventory
 

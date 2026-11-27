@@ -1128,7 +1128,7 @@ export function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, on
               <button onClick={handleManualSubmit} disabled={manualBusy}
                       className="inline-flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-bold text-white border transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                       style={{ background: "#B45309", borderColor: "rgba(217, 119, 6,0.5)", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
-                {manualBusy ? "⏳ Issuing…" : "📤 Issue Stock"}
+                {manualBusy ? <><LeadIcon e="⏳" />Issuing…</> : <><LeadIcon e="📤" />Issue Stock</>}
               </button>
             )}
           </div>
