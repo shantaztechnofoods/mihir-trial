@@ -21,7 +21,8 @@ import { appendAuditWithUser, getAuditLog, subscribeAudit } from "../auth/auditS
 import { isSupabaseEnabled, ALLOW_DEMO, ENABLED_MODULES_ENV, ERP_INSTANCE } from "../config/env.js";
 import { MODULES, effectiveEnabledModules, isModuleOn, normaliseModuleSelection } from "../utils/modules.js";
 import { getSupabase } from "../supabase/client.js";
-import { loadSettings, saveSettings } from "../stores/settingsStore.js";
+import { loadSettings, saveSettings, saveSettingsKeys } from "../stores/settingsStore.js";
+import { adminSettingsPatch } from "../utils/adminSettingsKeys.js";
 import { listVendors, createVendor, updateVendor, archiveVendor, restoreVendor } from "../stores/vendorsStore.js";
 import { fetchItems, createItem as itemCreate, updateItem as itemUpdate, deleteItem as itemDelete, fetchArchivedItems, restoreItem as itemRestore, updateStockAndHistory } from "../stores/itemsStore.js";
 import { fetchBOMs, createBOM as bomCreate, updateBOM as bomUpdate, renameBOM as bomRename, deleteBOM as bomDelete, restoreBOM as bomRestore } from "../stores/bomsStore.js";
@@ -55,16 +56,10 @@ import { GlobalSearch } from "./layout/GlobalSearch.jsx";
 import { navItems } from "./layout/navItems.js";
 import { NotificationPanel } from "./layout/NotificationPanel.jsx";
 import { Sidebar } from "./layout/Sidebar.jsx";
-import { AIPage } from "../modules/ai-assistant/index.js";
-import { AnalyticsPage } from "../modules/analytics/index.js";
-import { DashboardPage } from "../modules/dashboard/index.js";
-import { InventoryPage, InwardPage, OutwardPage, PendingPage } from "../modules/inventory/index.js";
-import { MachinePage, ReadyMachinesPopup } from "../modules/machine-tracker/index.js";
+// perf/lazy-pages (2026-11-27) — every page screen is its own on-demand chunk (src/app/lazyPages.js).
+import { AIPage, AnalyticsPage, DashboardPage, InventoryPage, InwardPage, OutwardPage, PendingPage, MachinePage, OrderPipelinePage, VendorsPage, HistoryPage, ReportCenterPage, SettingsPage, WhatsAppPage, ReadyMachinesPopup, prefetchPage, prefetchPagesWhenIdle } from "./lazyPages.js";
 import { cleanPendingJobs } from "../modules/pending-jobs/index.js";
-import { OrderPipelinePage, VendorsPage } from "../modules/purchase/index.js";
-import { HistoryPage, ReportCenterPage } from "../modules/reports/index.js";
-import { SettingsPage } from "../modules/settings/index.js";
-import { WhatsAppPage, waAlertTime, waDispatch, waReadSeen, waUnreadCount } from "../modules/whatsapp/index.js";
+import { waAlertTime, waDispatch, waReadSeen, waUnreadCount } from "../modules/whatsapp/index.js";
 import { APP_BUILD } from "../shared/buildInfo.js";
 import { fmtDate, recomputeStatus, roundQty } from "../shared/format.js";
 import { SETTINGS_DEFAULTS } from "../shared/settingsDefaults.js";
@@ -265,6 +260,23 @@ export default function App() {
   // Jumps from inside pages / search / notifications: a switched-OFF module is
   // a no-op (with every module ON this is exactly setActivePage).
   const goToPage    = useCallback((id) => { if (moduleOn(id)) setActivePage(id); }, [moduleOn]);
+  // perf/lazy-pages — signed in: warm the other pages' code in the background
+  // (idle time, one at a time), and start a page's download as soon as the
+  // pointer / keyboard focus reaches its sidebar button. Loading only.
+  useEffect(() => {
+    if (!currentUser) return undefined;
+    prefetchPagesWhenIdle(["machines", "dashboard", "reports", "inventory", "inward", "outward", "pending", "pipeline", "settings", "history", "vendors", "analytics", "whatsapp", "ai"]);
+    const warm = (e) => {
+      const btn = e.target && e.target.closest && e.target.closest(".app-sidebar button");
+      if (!btn) return;
+      const label = (btn.innerText || "").trim();
+      const hit = navItems.find((n) => label.startsWith(n.label));
+      if (hit) prefetchPage(hit.id);
+    };
+    document.addEventListener("pointerover", warm, { passive: true });
+    document.addEventListener("focusin", warm);
+    return () => { document.removeEventListener("pointerover", warm); document.removeEventListener("focusin", warm); };
+  }, [currentUser]);
   useEffect(() => {
     if (authLoading || !currentUser || typeof canView !== "function") return;
     if (canOpenPage(activePage)) return;
@@ -351,7 +363,11 @@ export default function App() {
     if (Object.prototype.hasOwnProperty.call(before, "enabledModules")) newSettings.enabledModules = before.enabledModules;
     else delete newSettings.enabledModules;
     setSettings(newSettings);                            // optimistic UI
-    const res = await saveSettings(newSettings);
+    // Migration 072 — Admin may save only Report Master + Department heads, one
+    // key at a time through save_org_setting(); the settings table itself stays
+    // Super Admin only. Any other change keeps the whole-row save.
+    const adminWrites = currentUser?.role === "Admin" ? adminSettingsPatch(before, newSettings, SETTINGS_DEFAULTS.report) : null;
+    const res = adminWrites ? await saveSettingsKeys(newSettings, adminWrites) : await saveSettings(newSettings);
     if (!res.success) {
       console.warn("[App] handleSaveSettings: Supabase save failed —", res.error);
       return res;
@@ -371,6 +387,7 @@ export default function App() {
         changedFields: changedKeys.filter((k) => k !== "logo"),  // omit logo blob key
         companyName: newSettings.companyName || "",
         gstPresent: !!newSettings.gst,
+        ...(adminWrites ? { via: "save_org_setting", keys: adminWrites.map((w) => w.key) } : {}),
       },
     });
     return res;
@@ -699,6 +716,9 @@ export default function App() {
         if (showShortcuts) { setShowShortcuts(false); return; }
         if (showSearch)    { setShowSearch(false);    return; }
         if (showNotifs)    { setShowNotifs(false);    return; }
+        // The phone "All pages" drawer: Esc closed nothing, so a keyboard / tablet
+        // user was left behind a backdrop that hides the bottom bar.
+        if (mobileNavOpen) { setMobileNavOpen(false); return; }
         // modals/drawers have their own Esc handlers; don't preventDefault
       }
       // Alt + nav — only fires outside text fields so it doesn't compete
@@ -723,7 +743,7 @@ export default function App() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [showShortcuts, showSearch, showNotifs, canView, canOpenPage]);
+  }, [showShortcuts, showSearch, showNotifs, mobileNavOpen, canView, canOpenPage]);
 
   // ── 2026-11-03 — Admin "Ready machines" popup (owner-approved) ──
   // Read-only: derived from machineLog (status + the accept-into-Ready history
@@ -4439,6 +4459,7 @@ export default function App() {
       {/* ── 2026-11-03 — Admin Ready popup (Dashboard / Machine Tracker) ── */}
       {readyAdmin && readyPopupItems.length > 0 && (activePage === "dashboard" || activePage === "machines") && (
         <SafeBoundary name="ready-popup" label="ready machines popup" overlay onClose={markReadySeen}>
+        <React.Suspense fallback={null}>
         <ReadyMachinesPopup
           items={readyPopupItems}
           bomDefs={bomDefs}
@@ -4449,6 +4470,7 @@ export default function App() {
             setMtFilterReq({ filter: "completed", n: Date.now() });
           }}
         />
+        </React.Suspense>
         </SafeBoundary>
       )}
 

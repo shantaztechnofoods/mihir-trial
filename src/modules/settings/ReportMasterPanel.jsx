@@ -66,7 +66,7 @@ export function ReportMasterPanel({ report = {}, onChange, canEdit = false }) {
                         <td key={kind} className={td}>
                           {kind === "customer" && s.customerLock ? <LockPill />
                             : !s.in.includes(kind) ? <Na />
-                            : <label className="inline-flex items-center gap-1.5">
+                            : <label className="rm-tick inline-flex items-center gap-1.5">
                                 <input type="checkbox" className="w-4 h-4 accent-blue-700" disabled={!canEdit}
                                        aria-label={`${s.label} — ${kind} report`} data-report-master-cell={`${kind}:${s.key}`}
                                        checked={master.sections[kind][s.key] !== false} onChange={(e) => setSection(kind, s.key, e.target.checked)} />
@@ -97,9 +97,11 @@ export function ReportMasterPanel({ report = {}, onChange, canEdit = false }) {
                     <td key={kind} className={td}>
                       {r.key === "super_admin"
                         ? <span className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full" style={{ color: "#15803d", background: "rgba(22,163,74,0.10)" }}>Always</span>
-                        : <input type="checkbox" className="w-4 h-4 accent-blue-700" disabled={!canEdit}
-                                 aria-label={`${r.label} may open the ${kind} report`} data-report-master-access-cell={`${kind}:${r.key}`}
-                                 checked={roleOn(kind, r.key)} onChange={(e) => setAccess(kind, r.key, e.target.checked)} />}
+                        : <label className="rm-tick inline-flex items-center justify-center">
+                            <input type="checkbox" className="w-4 h-4 accent-blue-700" disabled={!canEdit}
+                                   aria-label={`${r.label} may open the ${kind} report`} data-report-master-access-cell={`${kind}:${r.key}`}
+                                   checked={roleOn(kind, r.key)} onChange={(e) => setAccess(kind, r.key, e.target.checked)} />
+                          </label>}
                     </td>
                   ))}
                 </tr>

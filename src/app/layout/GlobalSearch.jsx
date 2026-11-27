@@ -166,7 +166,7 @@ export function GlobalSearch({ items, pos, vendorList, machineLog, onClose, onNa
     <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[8vh]"
          style={{ background: "rgba(17,24,39,0.45)", backdropFilter: "blur(6px)" }}
          onClick={onClose}>
-      <div className="w-full max-w-xl mx-4 overflow-hidden"
+      <div className="wu-search-in w-full max-w-xl mx-4 overflow-hidden"
            style={{ background: "var(--surface-elevated)", border: "1px solid var(--border-rim)", borderRadius: 16, boxShadow: "0 32px 80px rgba(17,24,39,0.22)" }}
            onClick={(e) => e.stopPropagation()}>
 
