@@ -44,8 +44,9 @@ export function useCountUp(target, duration = 900) {
 // motion-a (2026-11-06): the number no longer counts up from 0 on every page
 // open (that re-rendered React every frame for 900 ms). It shows at once and
 // rolls (shared <Count/>, CSS transform/opacity) only when the value changes.
-export function CountUpValue({ value, className, style }) {
-  return <Count value={value} className={className} style={style} />;
+// motion3 (2026-11-27): intro="dash" counts the tiles up once per page load.
+export function CountUpValue({ value, className, style, intro = null }) {
+  return <Count value={value} className={className} style={style} intro={intro} />;
 }
 
 // Deterministic smooth sparkline derived from a seed, so it's stable per-card.
@@ -200,7 +201,7 @@ export function DashboardPage({ items = {}, pos = [], vendorList = [], machineLo
                   <span className={`dash-tile-status${kpi.alert ? " is-bad" : ""}`}>{kpi.alert ? "Action" : "On track"}</span>
                 )}
               </div>
-              <CountUpValue value={kpi.value} className="dash-tile-value" />
+              <CountUpValue value={kpi.value} className="dash-tile-value" intro="dash" />
               <div className="dash-tile-label">{kpi.label}</div>
               <div className="dash-tile-sub">{kpi.sub}</div>
             </button>
@@ -241,7 +242,7 @@ export function DashboardPage({ items = {}, pos = [], vendorList = [], machineLo
                     <a.Icon size={16} strokeWidth={2} aria-hidden="true" className="dash-tile-icon" />
                     {a.n > 0 && <span className={`dash-tile-dot is-${a.tone}`} aria-hidden="true" />}
                   </div>
-                  <CountUpValue value={a.n} className="dash-tile-value" />
+                  <CountUpValue value={a.n} className="dash-tile-value" intro="dash" />
                   <div className="dash-tile-label">{a.label}</div>
                   <div className="dash-tile-sub">{a.hint}</div>
                 </button>
@@ -256,7 +257,7 @@ export function DashboardPage({ items = {}, pos = [], vendorList = [], machineLo
                 <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
                   {Object.entries(production.byStage).map(([st, n]) => (
                     <div key={st} className="dash-stage" data-zero={n > 0 ? undefined : ""}>
-                      <CountUpValue value={n} className="dash-stage-value" />
+                      <CountUpValue value={n} className="dash-stage-value" intro="dash" />
                       <div className="dash-stage-label">{st === "BOM Issued" ? "Issued" : st}</div>
                     </div>
                   ))}
