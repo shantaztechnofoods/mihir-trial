@@ -11,6 +11,7 @@
   "handlers": [],
   "stores": [],
   "shared": [
+    "shared/components/LeadIcon.jsx",
     "shared/components/PageHeader.jsx"
   ],
   "core": {

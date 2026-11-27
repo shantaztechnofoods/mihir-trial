@@ -172,7 +172,7 @@ export function AnalyticsPage({ items, pos, vendorList, settings = SETTINGS_DEFA
               </>
             ) : (
               <div className="h-[200px] flex flex-col items-center justify-center gap-1 text-center">
-                <div className="text-2xl" style={{ opacity: 0.45 }}>🥧</div>
+                <div className="empty-glyph-sm" data-tone="muted"><Glyph e="🥧" size={20} /></div>
                 <div className="text-xs font-semibold" style={{ color: "var(--text-muted)" }}>No PO line item data yet</div>
               </div>
             )}
