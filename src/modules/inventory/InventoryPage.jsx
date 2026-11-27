@@ -320,6 +320,81 @@ export function ClearDemoDataModal({ items = {}, bomDefs = {}, onDeleteItem, onD
   );
 }
 
+// perf (2026-11-27): one Item Master row, memoised. A row re-renders only when its own
+// item / flags change, so adding the next slice of rows, typing in the search box or any
+// other page state change no longer re-renders every row already on screen.
+const catColors = { Electrical: "#D97706", Mechanical: "#2E50D6", "R&D": "#a78bfa", Other: "#6b7280" };
+const ItemMasterRow = React.memo(function ItemMasterRow({ item, isNew, canAdjust, canEdit, setSelectedItem, setQuickAdjust, setEditingItem }) {
+  const cfg      = statusConfig[item.status];
+  const stockPct = item.min > 0 ? Math.min((item.stock / item.min) * 100, 100) : 0;
+  const barColor = item.status === "critical" ? "#ef4444" : item.status === "warning" ? "#D97706" : "#22c55e";
+  const catColor = catColors[item.category] || "#6b7280";
+  const isCrit   = item.status === "critical";
+  return (
+    <tr onClick={() => setSelectedItem({ item: { ...item }, category: item.category })}
+        className={`wu-imrow border-b border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors ${isCrit ? "bg-red-500/[0.025]" : ""} ${isNew ? "bg-blue-500/[0.08]" : ""}`}>
+      <td className="px-4 py-4 text-xs font-mono font-bold text-blue-600 whitespace-nowrap">{item.code}</td>
+      <td className="px-4 py-4 text-xs font-semibold max-w-[160px]" style={{ color: "var(--text-strong)" }}>
+        <div className="truncate">{item.name}</div>
+      </td>
+      <td className="px-4 py-4">
+        <span className="wu-cat text-[10px] font-bold px-2 py-0.5 rounded-md whitespace-nowrap"
+              style={{ background: `${catColor}14`, color: catColor, border: `1px solid ${catColor}28` }}>
+          {item.category}
+        </span>
+      </td>
+      <td className="px-4 py-4 text-xs" style={{ color: "var(--text-dim)" }}>{item.unit}</td>
+      <td className="px-4 py-4">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-bold font-mono tabular-nums" style={{ color: cfg.dot || cfg.style?.color || "var(--text)" }}>{item.stock}</span>
+          <div className="w-14 h-1 bg-slate-50 rounded-full overflow-hidden flex-shrink-0">
+            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${stockPct}%`, background: barColor }} />
+          </div>
+        </div>
+      </td>
+      <td className="px-4 py-4 text-xs font-mono tabular-nums" style={{ color: "var(--text-muted)" }}>{item.min}</td>
+      <td className="px-4 py-4 text-xs font-mono tabular-nums" style={{ color: "var(--text-muted)" }}>
+        {item.lastPurchaseRate ? `₹${Number(item.lastPurchaseRate).toLocaleString("en-IN")}` : <span style={{ color: "var(--text-faint)" }}>—</span>}
+      </td>
+      <td className="px-4 py-4">
+        <StatusBadge status={item.status} />
+      </td>
+      <td className="px-4 py-4 text-[10px] max-w-[120px]" style={{ color: "var(--text-muted)" }}>
+        <div className="truncate">{item.vendor || <span style={{ color: "var(--text-faint)" }}>—</span>}</div>
+      </td>
+      <td className="px-4 py-4 text-[10px] max-w-[100px]" style={{ color: "var(--text-muted)" }}>
+        <div className="truncate">{item.location || <span style={{ color: "var(--text-faint)" }}>—</span>}</div>
+      </td>
+      <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
+        <div className="flex gap-1 items-center">
+          {canAdjust && (
+            <button onClick={() => setQuickAdjust({ item: { ...item }, category: item.category, mode: "add" })}
+                    title="Add Stock"
+                    className="wu-rowbtn w-6 h-6 rounded flex items-center justify-center text-xs font-black text-green-700 hover:text-green-900 transition-all"
+                    style={{ background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.22)" }}>＋</button>
+          )}
+          {canAdjust && (
+            <button onClick={() => setQuickAdjust({ item: { ...item }, category: item.category, mode: "remove" })}
+                    title="Remove Stock"
+                    className="wu-rowbtn w-6 h-6 rounded flex items-center justify-center text-xs font-black text-amber-700 hover:text-amber-900 transition-all"
+                    style={{ background: "rgba(217, 119, 6,0.1)", border: "1px solid rgba(217, 119, 6,0.22)" }}>－</button>
+          )}
+          {canEdit && (
+            <button onClick={() => setEditingItem({ item: { ...item }, category: item.category })}
+                    title="Edit"
+                    className="wu-rowbtn w-6 h-6 rounded flex items-center justify-center text-[11px] text-slate-500 hover:text-slate-900 transition-all"
+                    style={{ background: "rgba(17,24,39,0.04)", border: "1px solid rgba(17,24,39,0.10)" }}><Glyph e="✏" size={13} /></button>
+          )}
+          {item.status !== "safe" && (
+            <span className="wu-rowflag text-[9px] font-black text-red-700 px-1.5 py-0.5 rounded whitespace-nowrap"
+                  style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)" }}><Glyph e="🚨" size={13} /></span>
+          )}
+        </div>
+      </td>
+    </tr>
+  );
+});
+
 export function InventoryPage({ items, setItems, handleUpdateStock, pos = [], inwardLog = [], outwardLog = [], pendingLog = [], bomDefs = {}, machineLog = [], onLogAudit = () => {}, canDo = () => true, vendorList = [], onCreateItem, onUpdateItem, onDeleteItem, onDeleteBOM, onBulkAddItems, archivedItems = [], onRestoreItem = null }) {
   const [search,        setSearch]        = useState("");
   // Search input ref so we can auto-focus on page mount (Tally-style: land
@@ -474,12 +549,13 @@ export function InventoryPage({ items, setItems, handleUpdateStock, pos = [], in
 
   const alerts      = useMemo(() => allItems.filter((i) => i.status !== "safe"), [allItems]);
   // 2026-11-04 (fix/perf-1) — draw the table in slices (150 rows, more on scroll).
-  const masterRows = useProgressiveCount(sorted.length, `${deferredSearch}|${statusFilter}|${catFilter}|${sortCol}|${sortDir}`);
+  const canAdjust = canDo("inventory","adjust");
+  const canEdit = canDo("inventory","edit");
+  const masterRows = useProgressiveCount(sorted.length, `${deferredSearch}|${statusFilter}|${catFilter}|${sortCol}|${sortDir}`, { step: 100 });
   const filteredVal = useMemo(() => sorted.reduce((s, i) => s + (i.stock * (i.lastPurchaseRate || 0)), 0), [sorted]);
   const filtersActive = search || statusFilter !== "all" || catFilter !== "all";
   const clearFilters  = () => { setSearch(""); setStatusFilter("all"); setCatFilter("all"); };
 
-  const catColors = { Electrical: "#D97706", Mechanical: "#2E50D6", "R&D": "#a78bfa", Other: "#6b7280" };
 
   const SortIcon = ({ col }) =>
     sortCol !== col
@@ -885,77 +961,11 @@ export function InventoryPage({ items, setItems, handleUpdateStock, pos = [], in
                       {filtersActive && <button onClick={clearFilters} className="text-blue-600 font-bold ml-1 hover:underline">Clear filters</button>}
                     </td>
                   </tr>
-                ) : sorted.slice(0, masterRows.shown).map((item) => {
-                  const cfg      = statusConfig[item.status];
-                  const stockPct = item.min > 0 ? Math.min((item.stock / item.min) * 100, 100) : 0;
-                  const barColor = item.status === "critical" ? "#ef4444" : item.status === "warning" ? "#D97706" : "#22c55e";
-                  const catColor = catColors[item.category] || "#6b7280";
-                  const isCrit   = item.status === "critical";
-                  return (
-                    <tr key={`${item.category}-${item.code}`}
-                        onClick={() => setSelectedItem({ item: { ...item }, category: item.category })}
-                        className={`wu-imrow border-b border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors ${isCrit ? "bg-red-500/[0.025]" : ""} ${lastAddedCode === item.code ? "bg-blue-500/[0.08]" : ""}`}>
-                      <td className="px-4 py-4 text-xs font-mono font-bold text-blue-600 whitespace-nowrap">{item.code}</td>
-                      <td className="px-4 py-4 text-xs font-semibold max-w-[160px]" style={{ color: "var(--text-strong)" }}>
-                        <div className="truncate">{item.name}</div>
-                      </td>
-                      <td className="px-4 py-4">
-                        <span className="wu-cat text-[10px] font-bold px-2 py-0.5 rounded-md whitespace-nowrap"
-                              style={{ background: `${catColor}14`, color: catColor, border: `1px solid ${catColor}28` }}>
-                          {item.category}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4 text-xs" style={{ color: "var(--text-dim)" }}>{item.unit}</td>
-                      <td className="px-4 py-4">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold font-mono tabular-nums" style={{ color: cfg.dot || cfg.style?.color || "var(--text)" }}>{item.stock}</span>
-                          <div className="w-14 h-1 bg-slate-50 rounded-full overflow-hidden flex-shrink-0">
-                            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${stockPct}%`, background: barColor }} />
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4 text-xs font-mono tabular-nums" style={{ color: "var(--text-muted)" }}>{item.min}</td>
-                      <td className="px-4 py-4 text-xs font-mono tabular-nums" style={{ color: "var(--text-muted)" }}>
-                        {item.lastPurchaseRate ? `₹${Number(item.lastPurchaseRate).toLocaleString("en-IN")}` : <span style={{ color: "var(--text-faint)" }}>—</span>}
-                      </td>
-                      <td className="px-4 py-4">
-                        <StatusBadge status={item.status} />
-                      </td>
-                      <td className="px-4 py-4 text-[10px] max-w-[120px]" style={{ color: "var(--text-muted)" }}>
-                        <div className="truncate">{item.vendor || <span style={{ color: "var(--text-faint)" }}>—</span>}</div>
-                      </td>
-                      <td className="px-4 py-4 text-[10px] max-w-[100px]" style={{ color: "var(--text-muted)" }}>
-                        <div className="truncate">{item.location || <span style={{ color: "var(--text-faint)" }}>—</span>}</div>
-                      </td>
-                      <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex gap-1 items-center">
-                          {canDo("inventory","adjust") && (
-                            <button onClick={() => setQuickAdjust({ item: { ...item }, category: item.category, mode: "add" })}
-                                    title="Add Stock"
-                                    className="wu-rowbtn w-6 h-6 rounded flex items-center justify-center text-xs font-black text-green-700 hover:text-green-900 transition-all"
-                                    style={{ background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.22)" }}>＋</button>
-                          )}
-                          {canDo("inventory","adjust") && (
-                            <button onClick={() => setQuickAdjust({ item: { ...item }, category: item.category, mode: "remove" })}
-                                    title="Remove Stock"
-                                    className="wu-rowbtn w-6 h-6 rounded flex items-center justify-center text-xs font-black text-amber-700 hover:text-amber-900 transition-all"
-                                    style={{ background: "rgba(217, 119, 6,0.1)", border: "1px solid rgba(217, 119, 6,0.22)" }}>－</button>
-                          )}
-                          {canDo("inventory","edit") && (
-                            <button onClick={() => setEditingItem({ item: { ...item }, category: item.category })}
-                                    title="Edit"
-                                    className="wu-rowbtn w-6 h-6 rounded flex items-center justify-center text-[11px] text-slate-500 hover:text-slate-900 transition-all"
-                                    style={{ background: "rgba(17,24,39,0.04)", border: "1px solid rgba(17,24,39,0.10)" }}><Glyph e="✏" size={13} /></button>
-                          )}
-                          {item.status !== "safe" && (
-                            <span className="wu-rowflag text-[9px] font-black text-red-700 px-1.5 py-0.5 rounded whitespace-nowrap"
-                                  style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)" }}><Glyph e="🚨" size={13} /></span>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+                ) : sorted.slice(0, masterRows.shown).map((item) => (
+                  <ItemMasterRow key={`${item.category}-${item.code}`} item={item}
+                    isNew={lastAddedCode === item.code} canAdjust={canAdjust} canEdit={canEdit}
+                    setSelectedItem={setSelectedItem} setQuickAdjust={setQuickAdjust} setEditingItem={setEditingItem} />
+                ))}
                 {masterRows.more > 0 && (
                   <tr ref={masterRows.sentinelRef} data-more-rows={masterRows.more}>
                     <td colSpan={11} className="px-4 py-3 text-center text-[11px]" style={{ color: "var(--text-muted)" }}>
