@@ -682,7 +682,7 @@ export function InventoryPage({ items, setItems, handleUpdateStock, pos = [], in
   ];
 
   return (
-    <div className="flex-1 overflow-y-auto">
+    <div className="flex-1 overflow-y-auto" data-page="item-master">
 
       <Topbar title="Item Master" subtitle="Unified inventory across all categories">
         <Btn variant="ghost" size="sm" onClick={async () => {
