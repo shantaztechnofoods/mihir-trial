@@ -1,0 +1,63 @@
+/* PREVIEW ONLY (motion3 big moments, 2026-11-27) — needs the owner's "haan"
+   before any of this goes into src/. Injected on the local build by
+   record.mjs. Same Motion v2 tokens where they exist (--m-*). */
+
+/* A. Finish & Transfer: the department token glides to the next step */
+.m3p-token { position: absolute; z-index: 5; width: 26px; height: 26px; border-radius: 50%;
+  background: #b45309; box-shadow: 0 0 0 4px rgba(180,83,9,.18), 0 4px 10px rgba(17,24,39,.18);
+  color: #fff; font: 800 12px/26px system-ui; text-align: center; pointer-events: none;
+  transition: transform 450ms cubic-bezier(.65,0,.35,1); }
+.m3p-step-pop { animation: m3p-step-pop 260ms var(--m-ease-out) both; }
+@keyframes m3p-step-pop { from { transform: scale(.7); } 60% { transform: scale(1.12); } to { transform: none; } }
+.m3p-card-lift { animation: m3p-lift 700ms var(--m-ease-out) both; }
+@keyframes m3p-lift { 0% { transform: none; } 30% { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(17,24,39,.12); } 100% { transform: none; } }
+
+/* B. Rack slots fill one by one */
+.m3p-crate-hide { opacity: 0 !important; animation: none !important; }
+.m3p-crate-in { animation: m3p-crate 240ms var(--m-ease-out) both !important; }
+@keyframes m3p-crate { from { opacity: 0; transform: translateY(8px) scale(.96); } to { opacity: 1; transform: none; } }
+
+/* C. Trial Certificate: the seal stamps on */
+.m3p-stamp { position: absolute; right: 18px; top: 12px; z-index: 6; width: 92px; height: 92px; border-radius: 50%;
+  border: 3px solid #15803d; color: #15803d; display: grid; place-items: center; text-align: center;
+  font: 800 10px/1.15 system-ui; letter-spacing: .06em; background: rgba(240,253,244,.92); pointer-events: none;
+  box-shadow: inset 0 0 0 4px #fff, inset 0 0 0 5px rgba(21,128,61,.5);
+  animation: m3p-stamp 380ms cubic-bezier(.3,1.25,.5,1) both; }
+.m3p-stamp b { display: block; font-size: 20px; line-height: 1; margin: 2px 0; }
+.m3p-stamp::after { content: ""; position: absolute; inset: -3px; border-radius: 50%; border: 3px solid #15803d;
+  animation: m3p-ink 420ms 200ms var(--m-ease-out) both; }
+@keyframes m3p-stamp { from { opacity: 0; transform: scale(1.7) rotate(-18deg); } to { opacity: 1; transform: rotate(-8deg); } }
+@keyframes m3p-ink { from { opacity: .5; transform: scale(1); } to { opacity: 0; transform: scale(1.45); } }
+
+/* D. Machine reaches Ready: sparkle under 1 s */
+.m3p-spark-host { position: relative; overflow: visible !important; }
+.m3p-spark { position: absolute; left: 50%; top: 45%; width: 13px; height: 13px; margin: -6.5px; pointer-events: none; z-index: 30;
+  background: var(--c, #f59e0b);
+  clip-path: polygon(50% 0, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0 50%, 39% 39%);
+  animation: m3p-spark 760ms var(--m-ease-out) both; }
+.m3p-spark-host::after { content: ""; position: absolute; inset: -2px; border-radius: inherit; pointer-events: none;
+  box-shadow: 0 0 0 3px rgba(34,197,94,.55), 0 0 22px rgba(34,197,94,.35); animation: m3p-glow 800ms var(--m-ease-out) both; }
+@keyframes m3p-glow { from { opacity: 0; } 25% { opacity: 1; } to { opacity: 0; } }
+@keyframes m3p-spark { 0% { opacity: 0; transform: translate(0,0) scale(.4) rotate(0); } 20% { opacity: 1; }
+  60% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(1) rotate(90deg); } }
+.m3p-ready-pop { animation: m3p-ready 300ms var(--m-ease-out) both; }
+@keyframes m3p-ready { from { transform: scale(1); } 40% { transform: scale(1.12); } to { transform: none; } }
+
+/* E. Moving between modules: header first, body 40 ms later, 8 px rise, 240 ms */
+.m3p-pages .app-shell > .flex-1, .m3p-pages .app-shell > main > .flex-1, .m3p-pages .app-shell > main > div.flex-1, .m3p-pages .app-shell > div.flex-1 { animation: m3p-page 240ms var(--m-ease-out) backwards !important; }
+.m3p-pages .app-shell .flex-1 > :nth-child(2) { animation: m3p-page 240ms 40ms var(--m-ease-out) backwards; }
+@keyframes m3p-page { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* F. Empty states: a small line drawing draws itself, the lens sweeps once */
+.m3p-empty { display: block; margin: 0 auto 10px; width: 96px; height: 72px; color: #94a3b8; }
+.m3p-empty .d { stroke-dasharray: 1; stroke-dashoffset: 1; animation: m3p-draw 700ms var(--m-ease-out) forwards; }
+.m3p-empty .d2 { animation-delay: 150ms; }
+.m3p-empty .lens { transform-box: fill-box; transform-origin: 30% 30%; animation: m3p-lens 900ms 500ms cubic-bezier(.65,0,.35,1) both; }
+@keyframes m3p-draw { to { stroke-dashoffset: 0; } }
+@keyframes m3p-lens { 0% { opacity: 0; transform: translate(-6px,4px) rotate(-12deg); } 30% { opacity: 1; } 70% { transform: translate(4px,-2px) rotate(8deg); } 100% { opacity: 1; transform: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .m3p-token, .m3p-step-pop, .m3p-card-lift, .m3p-crate-in, .m3p-stamp, .m3p-stamp::after, .m3p-ready-pop, .m3p-empty .lens { animation: none !important; transition: none !important; }
+  .m3p-spark { display: none; }
+  .m3p-empty .d { animation: none; stroke-dashoffset: 0; }
+}
