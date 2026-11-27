@@ -4445,7 +4445,7 @@ export default function App() {
         <GlobalSearch
           items={items} pos={pos} vendorList={vendorList} machineLog={machineLog}
           onClose={() => setShowSearch(false)}
-          onNavigate={goToPage}
+          onNavigate={(page) => { goToPage(page); setMobileNavOpen(false); }}
         />
         </SafeBoundary>
       )}
@@ -4455,7 +4455,7 @@ export default function App() {
           notifications={notifications}
           dismissed={dismissedIds}
           onClose={() => setShowNotifs(false)}
-          onNavigate={(page) => { goToPage(page); setShowNotifs(false); }}
+          onNavigate={(page) => { goToPage(page); setShowNotifs(false); setMobileNavOpen(false); }}
           onDismiss={dismissNotif}
           onDismissAll={dismissAllNotifs}
         />
