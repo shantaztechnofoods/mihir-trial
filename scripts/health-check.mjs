@@ -10,7 +10,7 @@
 //   imports  every import resolves (file / package), no cycles (files or module
 //            folders), layer rules (shared ↛ app/modules, modules ↛ app, lower
 //            layers ↛ screen code), other folders import a module only through
-//            its index.js (Phase C: App.jsx may import <m>/handlers.js), every module folder has index.js + README.md
+//            its index.js (Phase C: App.jsx may import <m>/handlers.js and <m>/hooks.js), every module folder has index.js + README.md
 //   wiring   every named import is really exported by its target (incl. the
 //            `const { x } = await import(…)` form), every handleXxx a screen file
 //            uses is declared/imported there (esbuild does NOT catch a missing
@@ -208,7 +208,7 @@ if (ONLY.includes("imports")) {
     if (b.layer === "module" && a.module !== b.module && e.kind !== "dynamic") {
       const isIndex = rel(e.to) === `src/modules/${b.module}/index.js`;
       // Phase C (docs/SHELL-CONTEXT.md): App.jsx imports a module's handlers.js directly.
-      const isShellHandlers = rel(e.from) === "src/app/App.jsx" && rel(e.to) === `src/modules/${b.module}/handlers.js`;
+      const isShellHandlers = rel(e.from) === "src/app/App.jsx" && (rel(e.to) === `src/modules/${b.module}/handlers.js` || rel(e.to) === `src/modules/${b.module}/hooks.js`);
       if (!isIndex && !isShellHandlers) throughIndex.push(where);
     }
   }
@@ -267,7 +267,9 @@ if (ONLY.includes("wiring")) {
     const L = layerOf(f).layer;
     if (L === "lower") continue;      // screen code only (stores/utils have no handlers)
     const src = code.get(f);
-    const used = new Set(src.match(/\bhandle[A-Z][\w$]*/g) || []);
+    // a name inside a "…" string is data, not a reference (e.g. SHELL_CALLS in src/app/shellVersion.js
+    // names the handler a shell.call entry maps to) — only code can throw a ReferenceError
+    const used = new Set(src.replace(/"(?:[^"\\\n]|\\.)*"/g, '""').match(/\bhandle[A-Z][\w$]*/g) || []);
     for (const h of used) {
       const declared = new RegExp(`(?:const|let|var|function)\\s+${h}\\b|(?<![=\\w$])\\{\\s*${h}\\s*(?:[,}=]|:\\s*[\\w$])|,\\s*${h}\\s*(?:[,}=]|:\\s*[\\w$])|\\(\\s*${h}\\s*[,)=]|\\bimport\\b[^;]*\\b${h}\\b`).test(src);
       if (!declared) undeclared.push(`${rel(f)}: ${h}`);

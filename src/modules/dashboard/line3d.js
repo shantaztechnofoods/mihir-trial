@@ -22,6 +22,10 @@
 // material is merged into ONE draw call (static scene; the original machine
 // meshes stay, hidden, for tap picking). Glow halos are left out (the lit lamp
 // is enough at phone size). Any data change remounts instead of animating.
+// First frame (2026-11-27): shaders are compiled with compileAsync before the
+// first draw (parallel compile where the GPU allows it; the panel shows a CSS
+// poster meanwhile), onFirst fires after the first real frame, and setPhoto()
+// swaps a small photo cut-out for the full one without a remount.
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
@@ -95,16 +99,20 @@ export function mountLine(host, { zones, machines, ready = [], rackCount = 0, da
   host.appendChild(r.domElement);
   const maxAniso = r.capabilities.getMaxAnisotropy ? r.capabilities.getMaxAnisotropy() : 4;
   const sc = new THREE.Scene();
-  const pmrem = new THREE.PMREMGenerator(r);
-  const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture; pmrem.dispose();
-  sc.environment = envTex;
+  // Phone: no image-based light (the PMREM pass + its shaders cost most of a second on a
+  // mid phone); the hemisphere + key + a soft front fill light the scene instead.
+  let envTex = null;
+  if (!lite) { const pmrem = new THREE.PMREMGenerator(r); envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture; pmrem.dispose(); sc.environment = envTex; }
+  const mark = (n) => { try { performance.mark(n); } catch { /* old browser */ } };
+  mark("dash3d-env");
   const cam = new THREE.PerspectiveCamera(8, 6, 1, 2000);
   const baseCam = new THREE.PerspectiveCamera(8, 6, 1, 2000); // never zooms: zone chips stay put
-  sc.add(new THREE.HemisphereLight(0xffffff, dark ? 0x0d2224 : 0xdfe5ee, dark ? 0.55 : 0.75));
+  sc.add(new THREE.HemisphereLight(0xffffff, dark ? 0x0d2224 : 0xdfe5ee, lite ? (dark ? 1.1 : 1.5) : dark ? 0.55 : 0.75));
+  if (lite) { const fill = new THREE.DirectionalLight(0xffffff, dark ? 0.5 : 0.7); fill.position.set(0, 4, 12); sc.add(fill); }
   const key = new THREE.DirectionalLight(0xffffff, dark ? 1.5 : 1.9);
   key.castShadow = !lite; sc.add(key, key.target);
 
-  const textures = [envTex];
+  const textures = envTex ? [envTex] : [];
   const tex = (w, h, draw, srgb = true) => {
     const c = document.createElement("canvas"); c.width = w; c.height = h; draw(c.getContext("2d"), w, h);
     const t = new THREE.CanvasTexture(c); if (srgb) t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = maxAniso; textures.push(t); return t;
@@ -125,6 +133,12 @@ export function mountLine(host, { zones, machines, ready = [], rackCount = 0, da
     led: new THREE.MeshBasicMaterial({ color: dark ? 0xbff6ee : 0xffffff, toneMapped: false }),
     sign: new THREE.MeshStandardMaterial({ color: dark ? 0x0c2b30 : 0x0f2a5c, roughness: 0.35, metalness: 0.3 }),
   };
+  if (lite) {
+    // No environment to reflect on a phone: metals would turn black, so they go satin; glass is a plain
+    // see-through standard material (one shader less to compile than the physical one).
+    for (const m of Object.values(M)) if (m.isMeshStandardMaterial && m.metalness > 0.2) { m.metalness = Math.min(m.metalness, 0.2); m.roughness = Math.max(m.roughness, 0.4); }
+    const g = M.glass; M.glass = new THREE.MeshStandardMaterial({ color: g.color, roughness: 0.2, metalness: 0, transparent: true, opacity: g.opacity, depthWrite: false, side: THREE.DoubleSide }); g.dispose();
+  }
   const shadowTex = radial("rgba(0,0,0,1)", "rgba(0,0,0,0)", "rgba(0,0,0,.55)");
   const shadowMats = new Map(); // phone: one material per opacity, so the merge pass can join them
   const shadowMat = (o) => { const mk = () => new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, opacity: dark ? o * 1.6 : o, depthWrite: false }); if (!lite) return mk(); if (!shadowMats.has(o)) shadowMats.set(o, mk()); return shadowMats.get(o); };
@@ -211,9 +225,14 @@ export function mountLine(host, { zones, machines, ready = [], rackCount = 0, da
   // Reflection fade: opaque at the floor line, gone by a third of the card.
   const fadeTex = tex(4, 128, (g, w, h) => { const lg = g.createLinearGradient(0, h, 0, 0); lg.addColorStop(0, "rgba(255,255,255,1)"); lg.addColorStop(0.38, "rgba(255,255,255,0)"); lg.addColorStop(1, "rgba(255,255,255,0)"); g.fillStyle = lg; g.fillRect(0, 0, w, h); }, false);
   const TILT = -0.1;
-  const photoCard = (photo, w, h, withReflection = true) => {
-    const map = new THREE.Texture(photo.image); map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = maxAniso;
+  const photoMats = new Map(); // photo object → the materials that show it (setPhoto swaps their map)
+  const photoTexOf = (image) => {
+    const map = new THREE.Texture(image); map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = maxAniso;
     map.generateMipmaps = true; map.minFilter = THREE.LinearMipmapLinearFilter; map.magFilter = THREE.LinearFilter; map.needsUpdate = true; textures.push(map);
+    return map;
+  };
+  const photoCard = (photo, w, h, withReflection = true) => {
+    const map = photoTexOf(photo.image);
     const grp = new THREE.Group();
     const card = mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map, transparent: true, alphaTest: 0.06, toneMapped: false }), 0, 0.03 + h / 2, 0);
     card.rotation.x = TILT; card.castShadow = true; card.renderOrder = 5; grp.add(card);
@@ -224,6 +243,8 @@ export function mountLine(host, { zones, machines, ready = [], rackCount = 0, da
       // the floor would hide it: drawn on top of the floor, under everything else
       refl.material.depthTest = false;
     }
+    if (!photoMats.has(photo)) photoMats.set(photo, []);
+    photoMats.get(photo).push(card.material, ...(refl ? [refl.material] : []));
     return { grp, card, refl };
   };
 
@@ -270,7 +291,7 @@ export function mountLine(host, { zones, machines, ready = [], rackCount = 0, da
     const pad = mesh(RB(W, padH, PAD_D, 0.04), M.sign, x0, padH / 2, 0); pad.receiveShadow = true; pad.castShadow = true; sc.add(pad);
     sc.add(shadow(W + 0.7, PAD_D + 0.8, 0.12, x0, 0));
     // epoxy floor: soft pool of light, painted safety line, walkway hatch at the front
-    const ppu = Math.min(150, 2048 / W), cw = Math.round(W * ppu), ch = Math.round(PAD_D * ppu);
+    const ppu = Math.min(lite ? 96 : 150, 2048 / W) /* phone: ~74 css px per metre × DPR 1.5 → 96 texels is enough */, cw = Math.round(W * ppu), ch = Math.round(PAD_D * ppu);
     const floor = tex(cw, ch, (g, w, h) => {
       g.fillStyle = dark ? "#132b2d" : "#eef2f6"; g.fillRect(0, 0, w, h);
       const rg = g.createRadialGradient(w / 2, h * 0.5, 0, w / 2, h * 0.5, Math.max(w, h) * 0.62);
@@ -304,7 +325,7 @@ export function mountLine(host, { zones, machines, ready = [], rackCount = 0, da
       for (const pz of [SW0, SW1, WALL_Z]) { const p = mesh(RB(0.05, WALL_H + 0.03, 0.05, 0.012), M.metal, wx, padY + (WALL_H + 0.03) / 2, pz); p.castShadow = true; sc.add(p); }
     }
     // header sign on the plinth's front face: department name + head, white on navy
-    const sw = W - 0.08, sh = padH - 0.06, scw = Math.min(2048, Math.round(sw * 220)), sch = Math.round(scw * sh / sw);
+    const sw = W - 0.08, sh = padH - 0.06, scw = Math.min(2048, Math.round(sw * (lite ? 140 : 220))), sch = Math.round(scw * sh / sw);
     const signTex = tex(scw, sch, (g, w, h) => {
       const name = String(zn.label || zn.k).toUpperCase(); let head = zn.head || "";
       g.fillStyle = C[zn.tone] || C.idle; if (zn.tone === "idle") g.globalAlpha = 0.45; rr(g, h * 0.22, h * 0.26, h * 0.1, h * 0.48, h * 0.05); g.fill(); g.globalAlpha = 1;
@@ -426,6 +447,7 @@ export function mountLine(host, { zones, machines, ready = [], rackCount = 0, da
     }
   }
 
+  mark("dash3d-scene");
   // ---- shadow camera fitted tightly to the floor ----
   const TOPY = padY + BOX_H + 0.3;
   key.position.set(-TOT * 0.18, 14, 10); key.target.position.set(0, 0, 0);
@@ -553,21 +575,49 @@ export function mountLine(host, { zones, machines, ready = [], rackCount = 0, da
     r.render(sc, cam);
     api.frames++;
     if (api.onFrame) api.onFrame();
+    if (api.frames === 1) { try { performance.mark("dash3d-first"); } catch { /* old browser */ } if (api.onFirst) api.onFirst(); }
     if (moving) raf = requestAnimationFrame(frame); // idle → no loop
     else lastFrame = 0;
   }
-  function kick() { if (!raf && run && visible) raf = requestAnimationFrame(frame); }
+  let compiled = false; // true once the shaders are compiled (first frame waits for it)
+  function kick() { if (!raf && run && visible && compiled) raf = requestAnimationFrame(frame); }
   const ro = new ResizeObserver(resize); ro.observe(host);
   const io = new IntersectionObserver(([e]) => { visible = e.isIntersecting; kick(); }); io.observe(host);
   const onVis = () => kick(); document.addEventListener("visibilitychange", onVis);
   resize();
+  // Compile every shader before the first draw, off the critical path where the
+  // browser supports parallel compile (KHR_parallel_shader_compile).
+  {
+    const go = () => { if (!run || compiled) return; compiled = true; try { performance.mark("dash3d-compiled"); } catch { /* old browser */ } kick(); };
+    // Own poll instead of compileAsync(): that one throws from a timer if the scene is
+    // disposed mid-compile (leaving the 3D view early). Without the parallel-compile
+    // extension the driver links on first use, so the first draw just follows a yield.
+    try {
+      const mats = r.compile(sc, cam), par = r.extensions.has("KHR_parallel_shader_compile");
+      const check = () => {
+        if (!run) return;
+        for (const m of mats) { const pg = r.properties.get(m).currentProgram; if (pg && pg.isReady && !pg.isReady()) { setTimeout(check, 16); return; } }
+        go();
+      };
+      setTimeout(par ? check : go, 0);
+    } catch { go(); }
+  }
 
   const api = {
     update, zoneScreen, machineScreen, kick, pick, onFrame: null, frames: 0, span: TOT, lite,
     layout: () => { if (run && api.onFrame) api.onFrame(); }, // re-place the HTML tags without drawing a WebGL frame
+    onFirst: null,
+    // Swap a photo's small cut-out for the full one (same aspect; new texture, old one disposed).
+    setPhoto(oldPhoto, newPhoto) {
+      const mats = photoMats.get(oldPhoto); if (!run || !mats || !newPhoto || !newPhoto.image) return false;
+      const map = photoTexOf(newPhoto.image), old = new Set();
+      for (const m of mats) { if (m.map) old.add(m.map); m.map = map; }
+      for (const t of old) { t.dispose(); const i = textures.indexOf(t); if (i >= 0) textures.splice(i, 1); }
+      photoMats.delete(oldPhoto); photoMats.set(newPhoto, mats); kick(); return true;
+    },
     setHover: (sn) => setHover(sn ? units.get(String(sn)) || null : null),
     isZoomed: () => zoomTarget === 1,
-    info: () => ({ calls: r.info.render.calls, triangles: r.info.render.triangles, geometries: r.info.memory.geometries, textures: r.info.memory.textures, dpr: r.getPixelRatio(), shadows: r.shadowMap.enabled }),
+    info: () => ({ calls: r.info.render.calls, triangles: r.info.render.triangles, geometries: r.info.memory.geometries, textures: r.info.memory.textures, dpr: r.getPixelRatio(), shadows: r.shadowMap.enabled, programs: (r.info.programs || []).length }),
     stop() {
       if (!run) return;
       run = false; cancelAnimationFrame(raf); raf = 0;

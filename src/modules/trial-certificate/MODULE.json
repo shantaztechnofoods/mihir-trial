@@ -1,9 +1,10 @@
 {
   "name": "trial-certificate",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "frozen": true,
   "liveLock": false,
   "requiresCore": 1,
+  "requiresShell": 6,
   "exports": [
     "TC_SHEET_CSS",
     "TrialCertificateModal",
@@ -13,7 +14,12 @@
   ],
   "dependsOn": {},
   "handlers": [],
-  "stores": [],
+  "ownHandlers": [
+    "handleUpdateTrialCertificate"
+  ],
+  "stores": [
+    "stores/machinesStore.js"
+  ],
   "shared": [
     "shared/components/LeadIcon.jsx",
     "shared/printFormat.js",

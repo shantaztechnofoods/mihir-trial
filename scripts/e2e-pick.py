@@ -4,7 +4,12 @@
   e2e-pick.py --shard K N          suites for CI shard K of N (CI uses N=8; longest-first into the lightest
                                    bin, by the CI-measured seconds in tests/e2e/timings.txt)
   e2e-pick.py --changed <base>     suites related to files changed since <base> (incl. uncommitted);
-                                   reasons go to stderr. The FULL suite always runs in CI.
+                                   reasons go to stderr.
+  e2e-pick.py --shard K N --from "a b c"   CI shard K of N of just these suites (same balancing)
+  e2e-pick.py --plan <base>        CI plan for a feature-branch push (key=value lines for $GITHUB_OUTPUT):
+                                   mode=pick|full, suites, count, shards (JSON list). "full" when the related
+                                   suites are most of the suite time anyway. The FULL suite always runs in CI on
+                                   main, batch/**, modules/** and ci/** pushes (see .github/workflows/ci.yml).
 
 Changed-file -> suite map: a changed suite runs itself; hunks in the screen code (src/app,
 src/modules, src/shared — the former src/App.jsx, split 2026-11-04) are mapped by the top-level
@@ -23,7 +28,7 @@ MT = ["go-live-workflows", "pending-part-or-comment", "sender-undo", "staff-hold
 # (regex on the App.jsx component name OR on a file path, suites). First match wins.
 COMPONENT_MAP = [
     (r"^(InventoryPage|InwardPage|AddItemModal|ItemImportModal|EditItemModal|QuickStock\w*|Item\w*|ClearDemoDataModal)$", ["store-audit", "perf-budget", "no-delete"]),
-    (r"^(OutwardPage|BOM\w*|Bom\w*|RackFill\w*)$", ["bom-unselected", "fill-rack-pending-item", "store-audit", "no-delete"]),
+    (r"^(OutwardPage|BOM\w*|Bom\w*|RackFill\w*)$", ["bom-create-dialog", "bom-unselected", "fill-rack-pending-item", "store-audit", "no-delete"]),
     (r"^(PendingPage|Pending\w*)$", ["bom-unselected", "part-received-completes", "store-audit"]),
     (r"^(HistoryPage|HR\w*|ReportCenterPage|Report\w*|fmtTs|inDateRange)$", ["reports-v2", "reports-pdf", "perf-budget"]),
     (r"^(VendorsPage|Vendor\w*|OrderPipelinePage|POSearchCenter|PurchasePage|PO\w*|ApprovalsPage|AnalyticsPage)$", ["perf-budget", "store-audit", "no-delete"]),
@@ -79,9 +84,9 @@ def timings():
     return t
 
 
-def shard(k, n):
+def shard(k, n, only=None):
     t = timings()
-    suites = sorted(all_suites(), key=lambda s: -t.get(s, 30.0))   # unknown suites count as 30 s
+    suites = sorted(only if only is not None else all_suites(), key=lambda s: -t.get(s, 30.0))   # unknown suites count as 30 s
     bins = [[0.0, []] for _ in range(n)]
     for s in suites:                                                # longest first into the lightest bin
         b = min(bins, key=lambda x: x[0])
@@ -173,11 +178,40 @@ def changed(base):
     return picked, why
 
 
+PLAN_SHARD_SECS = 300      # suite-seconds per CI shard (a full run is ~2500 s over 8 shards)
+PLAN_FULL_SHARE = 0.6      # related suites >= 60% of all suite time -> just run everything
+
+
+def plan(base):
+    picked, why = changed(base)
+    for w in why:
+        print("  " + w, file=sys.stderr)
+    t = timings()
+    secs = sum(t.get(s, 30.0) for s in picked)
+    total = sum(t.get(s, 30.0) for s in all_suites()) or 1.0
+    if secs >= PLAN_FULL_SHARE * total:
+        return {"mode": "full", "suites": "", "count": str(len(all_suites())), "shards": "[1,2,3,4,5,6,7,8]"}
+    n = max(1, min(8, len(picked), -(-int(secs) // PLAN_SHARD_SECS))) if picked else 0   # never an empty shard
+    return {"mode": "pick", "suites": " ".join(picked), "count": str(len(picked)),
+            "shards": "[" + ",".join(str(i) for i in range(1, n + 1)) + "]"}
+
+
 if __name__ == "__main__":
-    if len(sys.argv) == 4 and sys.argv[1] == "--shard":
+    if len(sys.argv) in (4, 6) and sys.argv[1] == "--shard":
         if not 1 <= int(sys.argv[2]) <= int(sys.argv[3]):
             sys.exit(f"shard {sys.argv[2]} is outside 1..{sys.argv[3]}")
-        print("\n".join(shard(int(sys.argv[2]), int(sys.argv[3]))))
+        only = None
+        if len(sys.argv) == 6:
+            if sys.argv[4] != "--from":
+                sys.exit("usage: --shard K N --from \"suite suite ...\"")
+            only = sys.argv[5].split()
+            missing = [s for s in only if not os.path.exists(os.path.join(E2E, s + ".mjs"))]
+            if missing:
+                sys.exit(f"unknown suite(s): {' '.join(missing)}")
+        print("\n".join(shard(int(sys.argv[2]), int(sys.argv[3]), only)))
+    elif len(sys.argv) == 3 and sys.argv[1] == "--plan":
+        for k, v in plan(sys.argv[2]).items():
+            print(f"{k}={v}")
     elif len(sys.argv) == 3 and sys.argv[1] == "--changed":
         picked, why = changed(sys.argv[2])
         for w in why:

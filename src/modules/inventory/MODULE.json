@@ -1,10 +1,10 @@
 {
   "name": "inventory",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "frozen": false,
   "liveLock": false,
   "requiresCore": 1,
-  "requiresShell": 4,
+  "requiresShell": 6,
   "exports": [
     "InventoryPage",
     "InwardPage",
@@ -26,38 +26,33 @@
     ]
   },
   "handlers": [
-    "computeBOMDeletionInfo",
     "flashSaveError",
     "goToPage",
-    "handleAbortMachineCreate",
-    "handleAddOutward",
-    "handleCreateBOM",
-    "handleCreateMachine",
-    "handleDeleteBOM",
-    "handleDuplicateBOM",
-    "handleRemoveRackMachine",
-    "handleRenameBOM",
-    "handleRestoreBOM",
-    "handleSaveBomChecklist",
-    "handleUpdateBOM",
     "handleUpdateStock",
-    "logAudit",
-    "raiseNotIssuedJobs"
+    "logAudit"
   ],
   "ownHandlers": [
+    "handleAbortMachineCreate",
+    "handleAddOutward",
     "handleBulkAddItems",
     "handleClearPending",
     "handleCreateItemRow",
+    "handleCreateMachine",
     "handleDeleteItemRow",
     "handleFulfillGroup",
     "handleFulfillPending",
     "handleInwardComplete",
+    "handleRemoveRackMachine",
     "handleRestoreItemRow",
     "handleSetItemDefaultRate",
-    "handleUpdateItemRow"
+    "handleUpdateItemRow",
+    "raiseNotIssuedJobs"
   ],
   "stores": [
     "stores/itemsStore.js",
+    "stores/machinesStore.js",
+    "stores/outwardStore.js",
+    "stores/pendingItemsStore.js",
     "stores/pendingStore.js"
   ],
   "shared": [
@@ -76,6 +71,9 @@
   "core": {
     "config": [
       "config/env.js"
+    ],
+    "supabase": [
+      "supabase/client.js"
     ],
     "utils": [
       "utils/archive.js",

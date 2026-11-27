@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # CI: run this shard's share of the browser suites (tests/e2e/*.mjs) against an already built
 # local-mode production bundle.   Usage: scripts/e2e-ci.sh <shard 1..N> <N> <dist-dir>
-# Env: E2E_PAR (suites at a time, default 2), E2E_PORT (default 5183), E2E_LOGS (default e2e-logs).
+# Env: E2E_PAR (suites at a time, default 2), E2E_PORT (default 5183), E2E_LOGS (default e2e-logs),
+#      E2E_SUITES ("a b c": shard only these suites, from the CI plan job; empty = every suite).
 set -uo pipefail
 cd "$(dirname "$0")/.."
 SHARD=${1:?shard}; TOTAL=${2:?total}; DIST=${3:?dist}
@@ -15,7 +16,13 @@ trap 'kill $PREVIEW 2>/dev/null || true' EXIT
 for _ in $(seq 1 60); do curl -s "localhost:$PORT" >/dev/null && break; sleep 0.5; done
 curl -s "localhost:$PORT" >/dev/null || { cat "$LOGS/preview.log"; echo "::error::preview server did not start"; exit 1; }
 
-mapfile -t SUITES < <(python3 scripts/e2e-pick.py --shard "$SHARD" "$TOTAL")
+if [ -n "${E2E_SUITES:-}" ]; then
+  PICK=$(python3 scripts/e2e-pick.py --shard "$SHARD" "$TOTAL" --from "$E2E_SUITES") || { echo "::error::cannot shard E2E_SUITES"; exit 1; }
+else
+  PICK=$(python3 scripts/e2e-pick.py --shard "$SHARD" "$TOTAL") || { echo "::error::cannot shard the suites"; exit 1; }
+fi
+mapfile -t SUITES < <(printf '%s\n' "$PICK" | grep -v '^$')
+[ "${#SUITES[@]}" -gt 0 ] || { echo "::error::shard $SHARD/$TOTAL got no suites"; exit 1; }   # an empty shard must never pass silently
 echo "shard $SHARD/$TOTAL: ${#SUITES[@]} suites, $PAR at a time: ${SUITES[*]}"
 
 run_one(){ local s=$1 t0 rc; t0=$(date +%s)

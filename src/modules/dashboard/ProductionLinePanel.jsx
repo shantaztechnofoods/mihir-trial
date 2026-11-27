@@ -6,11 +6,24 @@ import React, { Suspense, lazy, useEffect, useMemo, useState } from "react";
 import { Check, Timer, AlertTriangle, PauseCircle, Inbox, ChevronRight } from "lucide-react";
 import { buildProductionLine, stageStatusLines, lineSummary } from "./productionLine.js";
 import { formatDuration } from "../../utils/handoverLogic.js";
+import { LinePoster } from "./LinePoster.jsx";
 
 // 3D view (2026-11-06): three.js + the scene load ONLY when "3D view" is tapped
 // (own chunk via dynamic import). The panel always opens on "Line"; the choice
 // is never remembered.
-const Line3DView = lazy(() => import("./Line3DView.jsx"));
+const load3dView = () => import("./Line3DView.jsx");
+const Line3DView = lazy(load3dView);
+// Faster first 3D frame (2026-11-27): once the Dashboard has settled, the 3D
+// chunks are fetched on browser idle (never in the first download, never on
+// Data Saver / 2G), so a tap only has to build the scene.
+function preload3dWhenIdle() {
+  if (typeof window === "undefined") return () => {};
+  const c = navigator.connection; if (c && (c.saveData || /(^|-)2g$/.test(c.effectiveType || ""))) return () => {};
+  let idle = 0;
+  const go = () => { load3dView().then(() => import("./line3d.js")).catch(() => { /* a tap will retry */ }); };
+  const t = setTimeout(() => { idle = window.requestIdleCallback ? window.requestIdleCallback(go, { timeout: 4000 }) : setTimeout(go, 200); }, 2000);
+  return () => { clearTimeout(t); if (idle) (window.cancelIdleCallback || clearTimeout)(idle); };
+}
 // Phones get 3D too (2026-11-27): a swipeable line, light renderer budget (Line3DView / line3d.js).
 
 class Line3DBoundary extends React.Component {
@@ -58,6 +71,7 @@ export function ProductionLinePanel({ machines = [], handovers = [], settings = 
   // Line is the default for everyone on every page open; 3D only after a tap.
   const [view, setView] = useState("line");
   const [note3d, setNote3d] = useState("");
+  useEffect(() => (isOpen ? preload3dWhenIdle() : undefined), [isOpen]);
   const show3d = view === "3d" && isOpen;
   const fail3d = (msg) => { setView("line"); setNote3d(msg); };
   const toggle = () => setIsOpen((v) => { try { localStorage.setItem("erp_dash_line_open", v ? "0" : "1"); } catch {} return !v; });
@@ -84,14 +98,14 @@ export function ProductionLinePanel({ machines = [], handovers = [], settings = 
         <span>{lg.same ? `Target: ${lg.target} in each department` : "Target per department (Settings)"} · {show3d ? "tap a machine" : "tap a stage"}</span>
         <span className="dash-line-views" role="group" aria-label="Production line view" data-line-views>
           <button type="button" aria-pressed={!show3d} data-view="line" onClick={() => setView("line")}>Line</button>
-          <button type="button" aria-pressed={show3d} data-view="3d" onClick={() => { setNote3d(""); setView("3d"); }}>3D view</button>
+          <button type="button" aria-pressed={show3d} data-view="3d" onClick={() => { try { performance.mark("dash3d-tap"); } catch { /* old browser */ } setNote3d(""); setView("3d"); }}>3D view</button>
         </span>
       </div>
       {note3d && <div className="dash-line-note" role="status" data-line-3d-note>{note3d}</div>}
 
       {show3d ? (
         <Line3DBoundary onFail={fail3d}>
-          <Suspense fallback={<div className="dash-line-3d-loading" role="status">Loading 3D view…</div>}>
+          <Suspense fallback={<LinePoster line={line} />}>
             <Line3DView line={line} bomDefs={bomDefs || {}} onFail={fail3d} onOpenMachine={(filter) => open(filter)} />
           </Suspense>
         </Line3DBoundary>
