@@ -1818,3 +1818,30 @@
   .dash-line-views > button::before, .dash-line-views > button[aria-pressed="true"]::before { transform: none; transition: none; }
   .wu-notif-in, .wu-search-in { animation: wu-fade var(--m-micro-out) linear backwards !important; }
 }
+
+/* 2026-11-27 (view sweep, dialogs on phone) — layout only, no colour change.
+   Measured at 360x640 with the soft keyboard up (Android, the app uses
+   interactive-widget=resizes-content, so the layout shrinks to ~370px):
+   - Inward: the focused Notes / Invoice box sat under the bottom tab bar.
+   - New PO: "Submit for Approval" broke onto three lines and the footer took
+     95px of a 341px sheet. */
+@media (pointer: coarse) and (max-width: 767.98px) {
+  /* focus scrolling keeps the box above the bottom tab bar (dialogs and the
+     BOM screen scroll on their own and are left alone) */
+  .app-shell .overflow-y-auto:not(.modal-backdrop *):not(.bom-drawer *) { scroll-padding-bottom: 88px; }
+}
+@media screen and (max-width: 767.98px) {
+  .po-modal-foot { flex-wrap: wrap; padding: 10px 16px !important; row-gap: 6px; }
+  .po-modal-foot > :first-child { flex: 1 0 100%; font-size: 12px !important; }
+  .po-modal-foot > :last-child { flex: 1 1 100%; }
+  .po-modal-foot > :last-child > button { flex: 1 1 auto; justify-content: center; white-space: nowrap; min-height: 44px; padding-left: 8px; padding-right: 8px; }
+}
+/* 360px phones: the three footer buttons only fit on one row without their icons */
+@media screen and (max-width: 374.98px) {
+  .po-modal-foot .lead-icon { display: none; }
+}
+/* keyboard up (short screen): drop the one-line PO summary; the Totals block
+   in the sheet body still shows items and amount once a line is added */
+@media screen and (max-width: 767.98px) and (max-height: 520px) {
+  .po-modal-foot > :first-child { display: none; }
+}
