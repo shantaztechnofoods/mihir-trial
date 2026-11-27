@@ -97,6 +97,7 @@ const FOLDER_FLOORS = {
   "src/modules/machine-tracker": 4000,   // +1000: Phase C moved ~1,120 lines of Machine Tracker writes here from App.jsx
   "src/modules/trial-certificate": 400,
   "src/modules/inventory": 2000,
+  "src/modules/item-master": 1500,  // modules/item-master: Item Master pages + item writes moved here from inventory (~3,000 lines)
   "src/modules/bom": 1200,
   "src/modules/purchase": 1500,
   "src/modules/reports": 1500,

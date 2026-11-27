@@ -1,12 +1,11 @@
 {
   "name": "inventory",
-  "version": "1.3.0",
+  "version": "2.0.0",
   "frozen": false,
   "liveLock": false,
   "requiresCore": 1,
   "requiresShell": 6,
   "exports": [
-    "InventoryPage",
     "InwardPage",
     "OutwardPage",
     "PendingPage"
@@ -34,23 +33,15 @@
   "ownHandlers": [
     "handleAbortMachineCreate",
     "handleAddOutward",
-    "handleBulkAddItems",
     "handleClearPending",
-    "handleCreateItemRow",
     "handleCreateMachine",
-    "handleDeleteItemRow",
     "handleFulfillGroup",
     "handleFulfillPending",
-    "handleInventoryCorrection",
     "handleInwardComplete",
     "handleRemoveRackMachine",
-    "handleRestoreItemRow",
-    "handleSetItemDefaultRate",
-    "handleUpdateItemRow",
     "raiseNotIssuedJobs"
   ],
   "stores": [
-    "stores/itemsStore.js",
     "stores/machinesStore.js",
     "stores/outwardStore.js",
     "stores/pendingItemsStore.js",
@@ -78,11 +69,7 @@
     ],
     "utils": [
       "utils/archive.js",
-      "utils/gst.js",
-      "utils/itemImport.js",
-      "utils/parseDate.js",
-      "utils/rackSlots.js",
-      "utils/storage.js"
+      "utils/rackSlots.js"
     ]
   },
   "npm": [
