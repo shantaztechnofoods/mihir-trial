@@ -15,7 +15,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { listModules, derivedManifest, readManifest, DERIVED_KEYS, DECLARED_KEYS } from "./lib/module-scan.mjs";
+import { listModules, derivedManifest, readManifest, DERIVED_KEYS, DECLARED_KEYS, OPTIONAL_DERIVED_KEYS } from "./lib/module-scan.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const WRITE = process.argv.includes("--write");
@@ -24,7 +24,9 @@ const DEFAULTS = (name) => ({
   name, version: "1.0.0", frozen: false, liveLock: false, requiresCore: 1,
   migrations: [], edgeFunctions: [], serverless: [], notes: [],
 });
-const ORDER = ["name", "version", "frozen", "liveLock", "requiresCore", ...DERIVED_KEYS, "migrations", "edgeFunctions", "serverless", "notes"];
+const ORDER = ["name", "version", "frozen", "liveLock", "requiresCore", "requiresShell", "exports", "dependsOn", "handlers", "ownHandlers",
+  "stores", "shared", "core", "npm", "migrations", "edgeFunctions", "serverless", "notes"];
+const DERIVED = [...DERIVED_KEYS, ...OPTIONAL_DERIVED_KEYS];
 
 let drift = 0;
 for (const mod of listModules(ROOT)) {
@@ -33,8 +35,14 @@ for (const mod of listModules(ROOT)) {
   const derived = derivedManifest(ROOT, mod);
   const base = { ...DEFAULTS(mod), ...(cur || {}) };
   const next = {};
-  for (const k of ORDER) next[k] = DERIVED_KEYS.includes(k) ? derived[k] : base[k];
-  const changed = DERIVED_KEYS.filter((k) => JSON.stringify(cur?.[k]) !== JSON.stringify(derived[k]));
+  // Phase C: a folder with handlers.js gets ownHandlers (derived) and requiresShell (declared, default 1);
+  // optional keys stay absent otherwise.
+  if (derived.ownHandlers && base.requiresShell === undefined) base.requiresShell = 1;
+  for (const k of ORDER) {
+    const v = DERIVED.includes(k) ? derived[k] : base[k];
+    if (v !== undefined) next[k] = v;
+  }
+  const changed = DERIVED.filter((k) => JSON.stringify(cur?.[k]) !== JSON.stringify(derived[k]));
   const unknown = cur ? Object.keys(cur).filter((k) => !ORDER.includes(k)) : [];
   if (!cur || changed.length || unknown.length) {
     drift++;

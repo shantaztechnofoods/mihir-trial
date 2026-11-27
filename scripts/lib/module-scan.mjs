@@ -291,7 +291,8 @@ export function appWiring(root, appRel = "src/app/App.jsx") {
     spreads[m[1]] = objectAfter(code.slice(m.index), /const\s+[A-Za-z_$][\w$]*Props\s*=\s*\{/g);
   }
   const fnsIn = (txt, acc, depth = 0) => {
-    for (const m of txt.matchAll(/\bguarded\.([A-Za-z_$][\w$]*)/g)) if (guardMap[m[1]]) acc.add(guardMap[m[1]]);
+    // only App-body functions: a guarded handler that moved to a module's handlers.js (Phase C) is not an App handler
+    for (const m of txt.matchAll(/\bguarded\.([A-Za-z_$][\w$]*)/g)) if (guardMap[m[1]] && fns.has(guardMap[m[1]])) acc.add(guardMap[m[1]]);
     for (const m of txt.matchAll(/[A-Za-z_$][\w$]*/g)) if (fns.has(m[0])) acc.add(m[0]);
     if (depth < 3) for (const m of txt.matchAll(/\.\.\.\s*([A-Za-z_$][\w$]*Props)\b/g)) if (spreads[m[1]]) fnsIn(spreads[m[1]], acc, depth + 1);
     return acc;
@@ -356,6 +357,39 @@ export function appWiring(root, appRel = "src/app/App.jsx") {
   return out;
 }
 
+// ── Phase C: handlers.js + the App shell object ─────────────────────────────
+// (docs/FOLDER-REPLACE.md §7, docs/SHELL-CONTEXT.md)
+const idList = (txt) => txt.split(",").map((x) => x.trim()).filter(Boolean);
+
+// Keys of `  const shell = { … };` in App.jsx (shorthand keys only), or null.
+export function shellObjectKeys(appCode) {
+  const m = appCode.match(/^ {2}const shell = \{\s*\n([\s\S]*?)^ {2}\};/m);
+  if (!m) return null;
+  return idList(m[1].split("\n").filter((l) => !/^\s*\/\//.test(l)).join(","));
+}
+
+// Names App.jsx takes from each createXxxHandlers(shell) call: { createXxxHandlers: [names] }.
+export function appFactoryCalls(appCode) {
+  const out = {};
+  for (const m of appCode.matchAll(/^ {2}const \{([^}]*)\} = (create[A-Z][\w$]*Handlers)\(shell\);/gm)) out[m[2]] = idList(m[1].replace(/\/\/.*$/gm, ""));
+  return out;
+}
+
+// A module's handlers.js: factory name, shell keys it destructures, names it returns.
+export function handlerFactory(code) {
+  const f = code.match(/^export function (create[A-Z][\w$]*Handlers)\(shell\) \{/m);
+  if (!f) return null;
+  const k = code.match(/^ {2}const \{([^}]*)\} = shell;/m);
+  const r = [...code.matchAll(/^ {2}return \{([^}]*)\};/gm)].pop();
+  const strip = (t) => t.replace(/\/\/.*$/gm, "");
+  return { factory: f[1], shellKeys: k ? idList(strip(k[1])) : [], returns: r ? idList(strip(r[1])) : [] };
+}
+
+export function moduleHandlerFactory(root, mod) {
+  const rel = `src/modules/${mod}/handlers.js`;
+  return isFile(root, rel) ? handlerFactory(read(root, rel)) : null;
+}
+
 // ── manifest ────────────────────────────────────────────────────────────────
 const sorted = (s) => [...s].sort();
 
@@ -368,10 +402,13 @@ export function derivedManifest(root, mod) {
   const dependsOn = {};
   for (const m of Object.keys(scan.dependsOn).sort()) dependsOn[m] = sorted(scan.dependsOn[m]);
   const indexRel = `src/modules/${mod}/index.js`;
+  const fac = moduleHandlerFactory(root, mod);
   return {
     exports: isFile(root, indexRel) ? sorted(parseExports(read(root, indexRel))) : [],
     dependsOn,
     handlers: wiring ? sorted(wiring.handlers) : [],
+    // Phase C: handlers that live in this folder's handlers.js (only when it exists)
+    ...(fac ? { ownHandlers: sorted(fac.returns) } : {}),
     stores: core.stores || [],
     shared: core.shared || [],
     core: Object.fromEntries(Object.entries(core).filter(([g]) => g !== "stores" && g !== "shared")),
@@ -381,6 +418,17 @@ export function derivedManifest(root, mod) {
 
 export const DERIVED_KEYS = ["exports", "dependsOn", "handlers", "stores", "shared", "core", "npm"];
 export const DECLARED_KEYS = ["name", "version", "frozen", "liveLock", "requiresCore", "migrations", "edgeFunctions", "serverless", "notes"];
+// Present only in a folder that has handlers.js (Phase C): derived ownHandlers, declared requiresShell.
+export const OPTIONAL_DERIVED_KEYS = ["ownHandlers"];
+export const OPTIONAL_DECLARED_KEYS = ["requiresShell"];
+
+// SHELL_API of a checkout (0 = no shell object yet, before Phase C).
+export function shellApiVersion(root) {
+  const rel = "src/app/shellVersion.js";
+  if (!isFile(root, rel)) return 0;
+  const m = read(root, rel).match(/export\s+const\s+SHELL_API\s*=\s*(\d+)/);
+  return m ? Number(m[1]) : 0;
+}
 
 export function readManifest(root, mod) {
   const rel = `src/modules/${mod}/MODULE.json`;

@@ -52,11 +52,9 @@
     "handleAssignRackSlot",
     "handleClearPending",
     "handleCreateBOM",
-    "handleCreateChecklistTemplate",
     "handleCreateMachine",
     "handleDeleteAttachment",
     "handleDeleteBOM",
-    "handleDeleteChecklistTemplate",
     "handleDeleteMachine",
     "handleDuplicateBOM",
     "handleFillRack",
@@ -78,7 +76,6 @@
     "handleStartProduction",
     "handleSubmitDuringWorkChecklist",
     "handleUpdateBOM",
-    "handleUpdateChecklistTemplate",
     "handleUpdateMachineStage",
     "handleUpdateStock",
     "handleUpdateTrialCertificate",
@@ -93,8 +90,10 @@
   ],
   "shared": [
     "shared/components/LeadIcon.jsx",
+    "shared/components/MoreRowsNote.jsx",
     "shared/components/OfflineBanner.jsx",
     "shared/components/SafeBoundary.jsx",
+    "shared/components/useProgressiveCount.js",
     "shared/format.js",
     "shared/machineStages.js",
     "shared/ui/Count.jsx",
@@ -124,7 +123,8 @@
   },
   "npm": [
     "lucide-react",
-    "react"
+    "react",
+    "react-dom"
   ],
   "migrations": [
     "021_dept_workflow_phase_a",

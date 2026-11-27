@@ -14,6 +14,7 @@
 //   4. npm packages
 //   5. App.jsx handlers + props wired into the module's components
 //   6. migrations / Edge Functions / serverless files listed in MODULE.json
+//   5b. Phase C: the shell keys its handlers.js needs + the createXxxHandlers(shell) call in Live App.jsx
 //   7. CORE_VERSION (src/shared/coreVersion.js) vs MODULE.json requiresCore
 // and ends with ONE verdict line:
 //   VERDICT: folder-only OK
@@ -26,6 +27,7 @@ import { fileURLToPath } from "node:url";
 import {
   listModules, scanModuleFolder, coreClosure, appWiring, appFunctions, appModuleImports,
   parseExports, parseImports, resolveRel, classify, walk, readManifest, derivedManifest, coreVersion, appFunctionSource,
+  moduleHandlerFactory, shellObjectKeys, appFactoryCalls, shellApiVersion,
 } from "./lib/module-scan.mjs";
 
 const TRIAL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -54,7 +56,8 @@ const scan = scanModuleFolder(TRIAL, mod);
 const R = { module: mod, trial: TRIAL, live: LIVE, version: man.version, requiresCore: man.requiresCore, liveCore: coreVersion(LIVE),
   liveManifestVersion: readManifest(LIVE, mod)?.version || null,
   core: [], coreInfo: [], modules: [], reverse: [], npm: [], npmInfo: [], handlers: [], handlersDiffer: [], props: [], propsInfo: [], mounts: [],
-  migrations: [], edge: [], edgeRedeploy: [], serverless: [], cssInfo: [] };
+  migrations: [], edge: [], edgeRedeploy: [], serverless: [], cssInfo: [],
+  shell: null, requiresShell: man.requiresShell || 0, liveShell: shellApiVersion(LIVE) };
 
 // 1. core files the folder imports directly
 for (const [file, names] of Object.entries(scan.coreNames).sort()) {
@@ -143,6 +146,24 @@ for (const f of liveImporters) {
   }
 }
 
+// 5b. Phase C — the folder's handlers.js runs on the Live shell object
+{
+  const fac = moduleHandlerFactory(TRIAL, mod);
+  if (fac) {
+    const appL = fs.existsSync(path.join(LIVE, "src/app/App.jsx")) ? readL("src/app/App.jsx") : "";
+    const keysL = shellObjectKeys(appL) || [];
+    const callL = appFactoryCalls(appL)[fac.factory];
+    R.shell = {
+      factory: fac.factory,
+      missingKeys: fac.shellKeys.filter((k) => !keysL.includes(k)),
+      call: callL ? "present" : "missing",
+      takesMissing: callL ? fac.returns.filter((n) => !callL.includes(n)) : [],
+      takesGone: callL ? callL.filter((n) => !fac.returns.includes(n)) : [],
+      stillInLiveApp: fac.returns.filter((n) => appFunctions(appL).has(n)),
+    };
+  }
+}
+
 // 6. database / serverless
 for (const id of man.migrations || []) if (!hasL(`supabase/migrations/${id}.sql`)) R.migrations.push(id);
 for (const fn of man.edgeFunctions || []) {
@@ -156,7 +177,8 @@ for (const css of ["src/index.css", "src/world-ui.css"]) if (fs.existsSync(path.
 
 // 7. verdict
 const needCore = R.core.length > 0 || R.npm.length > 0 || R.requiresCore > R.liveCore;
-const needApp = R.handlers.length > 0 || R.props.length > 0 || R.mounts.length > 0 || R.reverse.some((r) => r.from.startsWith("src/app/"));
+const needShell = !!R.shell && (R.shell.missingKeys.length > 0 || R.shell.call === "missing" || R.shell.takesMissing.length > 0 || R.shell.takesGone.length > 0);
+const needApp = needShell || R.handlers.length > 0 || R.props.length > 0 || R.mounts.length > 0 || R.reverse.some((r) => r.from.startsWith("src/app/"));
 const parts = [];
 if (needCore) parts.push(`core v${R.requiresCore}`);
 if (needApp) parts.push("App.jsx changes");
@@ -189,6 +211,13 @@ if (R.handlersDiffer.length) say(`   info: handler bodies that differ Trial vs L
 list("   App.jsx props Trial passes that Live does not", R.props.map((p) => `<${p.component}>: ${p.props.join(", ")}`));
 if (R.mounts.length) list("   components Live App.jsx does not mount yet", R.mounts);
 if (R.propsInfo.length) say(`   info: props Live passes that Trial no longer does: ${R.propsInfo.map((p) => `<${p.component}>: ${p.props.join(", ")}`).join("; ")}`);
+if (R.shell) {
+  say(`5b. Shell (Phase C): ${R.shell.factory} needs SHELL_API ${R.requiresShell}, Live has ${R.liveShell}`);
+  say(`   shell keys Live App.jsx lacks: ${R.shell.missingKeys.length ? R.shell.missingKeys.join(", ") + "  ← add them to Live's \`const shell = { … }\`" : "none"}`);
+  if (R.shell.call === "missing") say(`   Live App.jsx does not call ${R.shell.factory}(shell) — App.jsx step: delete Live's bodies of ${R.shell.stillInLiveApp.join(", ") || "(none found)"} and add \`const { … } = ${R.shell.factory}(shell);\` after the shell object (docs/SHELL-CONTEXT.md)`);
+  if (R.shell.takesMissing.length) say(`   Live's ${R.shell.factory}(shell) line must also take: ${R.shell.takesMissing.join(", ")}`);
+  if (R.shell.takesGone.length) say(`   Live's ${R.shell.factory}(shell) line takes names the folder no longer returns: ${R.shell.takesGone.join(", ")}`);
+}
 list("6. Migrations (MODULE.json) missing in Live", R.migrations);
 list("   Edge Functions missing in Live", R.edge);
 if (R.edgeRedeploy.length) say(`   info: Edge Functions that differ (redeploy with supabase CLI): ${R.edgeRedeploy.join(", ")}`);

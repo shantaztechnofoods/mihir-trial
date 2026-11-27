@@ -8,7 +8,7 @@ import { useAuth } from "../auth/AuthContext.jsx";
 // Migration 030 — fetchDeptRoster reads a minimal view that bypasses the
 // restrictive public.users RLS, so non-super-admin operators actually see
 // the dept roster in the Finish & Transfer worker picker.
-import { fetchDeptRoster, updateUserDepartments } from "../auth/authStore.js";
+import { fetchDeptRoster } from "../auth/authStore.js";
 import LoginPage from "./LoginPage.jsx";
 import AccessDeniedPage from "../shared/components/AccessDeniedPage.jsx";
 import PageErrorBoundary from "../shared/components/PageErrorBoundary.jsx";
@@ -19,18 +19,18 @@ import { archiveBomDef, restoreBomDef, isBomArchived } from "../utils/archive.js
 import { MobileNavContext } from "../shared/components/PageHeader.jsx";
 import { appendAuditWithUser, getAuditLog, subscribeAudit } from "../auth/auditStore.js";
 import { isSupabaseEnabled, ALLOW_DEMO, ENABLED_MODULES_ENV, ERP_INSTANCE } from "../config/env.js";
-import { MODULES, effectiveEnabledModules, isModuleOn, normaliseModuleSelection } from "../utils/modules.js";
+import { effectiveEnabledModules, isModuleOn } from "../utils/modules.js";
 import { getSupabase } from "../supabase/client.js";
 import { loadSettings, saveSettings, saveSettingsKeys } from "../stores/settingsStore.js";
 import { adminSettingsPatch } from "../utils/adminSettingsKeys.js";
-import { listVendors, createVendor, updateVendor, archiveVendor, restoreVendor } from "../stores/vendorsStore.js";
+import { listVendors } from "../stores/vendorsStore.js";
 import { fetchItems, createItem as itemCreate, updateItem as itemUpdate, deleteItem as itemDelete, fetchArchivedItems, restoreItem as itemRestore, updateStockAndHistory } from "../stores/itemsStore.js";
 import { fetchBOMs, createBOM as bomCreate, updateBOM as bomUpdate, renameBOM as bomRename, deleteBOM as bomDelete, restoreBOM as bomRestore } from "../stores/bomsStore.js";
-import { fetchPOs, createPO as poCreate, updatePO as poUpdate, deletePO as poDelete, fetchPOStatus } from "../stores/posStore.js";
-import { fetchInward, createInward, bulkCreateInward, deleteInwardByPO } from "../stores/inwardStore.js";
+import { fetchPOs } from "../stores/posStore.js";
+import { fetchInward, createInward } from "../stores/inwardStore.js";
 import { fetchOutward, createOutward, updateOutwardRef, deleteOutwardByIssueId } from "../stores/outwardStore.js";
 import { fetchPending, bulkCreatePending, updatePending as pendingUpdate, deletePending as pendingDelete, clearAllPending, updatePendingBomKey } from "../stores/pendingStore.js";
-import { fetchFollowUps, createFollowUp as followupCreate, updateFollowUp as followupUpdate, deleteFollowUpsByPO } from "../stores/followupsStore.js";
+import { fetchFollowUps } from "../stores/followupsStore.js";
 import { fetchMachines, createMachine as machineCreate, updateMachine as machineUpdate, updateMachineBomKey, deleteMachine as machineDelete, fetchMachineLockState, appendMachineHistory as machineAppendHistory, STALE_MACHINE_MSG } from "../stores/machinesStore.js";
 import { fetchHandovers, createHandover as handoverCreate, acceptHandover as handoverAccept, releaseHandover, adminCancelHandover, fetchHandoverById } from "../stores/handoverStore.js";
 import { getMySignature, saveMySignature, reauthenticateByPassword } from "../stores/signaturesStore.js";
@@ -60,6 +60,8 @@ import { Sidebar } from "./layout/Sidebar.jsx";
 import { AIPage, AnalyticsPage, DashboardPage, InventoryPage, InwardPage, OutwardPage, PendingPage, MachinePage, OrderPipelinePage, VendorsPage, HistoryPage, ReportCenterPage, SettingsPage, WhatsAppPage, ReadyMachinesPopup, prefetchPage, prefetchPagesWhenIdle } from "./lazyPages.js";
 import { cleanPendingJobs } from "../modules/pending-jobs/index.js";
 import { waAlertTime, waDispatch, waReadSeen, waUnreadCount } from "../modules/whatsapp/index.js";
+import { createSettingsHandlers } from "../modules/settings/handlers.js";
+import { createPurchaseHandlers } from "../modules/purchase/handlers.js";
 import { APP_BUILD } from "../shared/buildInfo.js";
 import { fmtDate, recomputeStatus, roundQty } from "../shared/format.js";
 import { SETTINGS_DEFAULTS } from "../shared/settingsDefaults.js";
@@ -389,39 +391,6 @@ export default function App() {
         gstPresent: !!newSettings.gst,
         ...(adminWrites ? { via: "save_org_setting", keys: adminWrites.map((w) => w.key) } : {}),
       },
-    });
-    return res;
-  };
-
-  // Go-live 2026-11-04 — Settings → Modules (super admin only). Saves the ON
-  // list into the org settings row (settings.enabledModules) and records a
-  // modules_changed audit event. RLS on public.settings already limits writes
-  // to the super admin.
-  const handleSaveModules = async (list) => {
-    if (currentUser?.role !== "super_admin") return { success: false, error: "Only the super admin can change modules." };
-    const next   = normaliseModuleSelection(list);
-    const before = settings || {};
-    const prevOn = MODULES.map((m) => m.id).filter((id) => isModuleOn(id, effectiveEnabledModules(before.enabledModules, null)));
-    const newSettings = { ...before, enabledModules: next };
-    setSettings(newSettings);                            // optimistic UI
-    const res = await saveSettings(newSettings);
-    if (!res.success) {
-      console.warn("[App] handleSaveModules: save failed —", res.error);
-      setSettings((prev) => {
-        const out = { ...prev };
-        if (Object.prototype.hasOwnProperty.call(before, "enabledModules")) out.enabledModules = before.enabledModules;
-        else delete out.enabledModules;
-        return out;
-      });
-      return res;
-    }
-    const turnedOn  = next.filter((id) => !prevOn.includes(id));
-    const turnedOff = prevOn.filter((id) => !next.includes(id));
-    logAudit({
-      type: "modules_changed", module: "Settings",
-      action: `Modules changed${turnedOff.length ? ` · OFF: ${turnedOff.join(", ")}` : ""}${turnedOn.length ? ` · ON: ${turnedOn.join(", ")}` : ""}`,
-      ref: "modules",
-      details: { enabledModules: next, turnedOn, turnedOff },
     });
     return res;
   };
@@ -933,37 +902,6 @@ export default function App() {
 
   const logAudit = (entry) => { appendAuditWithUser(entry); };
 
-  // Admin Data Cleanup (migration 051): the DB function deleted the machines
-  // and linked rows atomically and wrote the authoritative audit row. Here we
-  // drop the same rows from local state, add a local-only audit entry
-  // (mirror:false — no duplicate DB row) and re-hydrate from Supabase.
-  const handleAdminCleanupDone = async (res) => {
-    const ids     = new Set((res?.machines || []).map((m) => String(m.id)));
-    const serials = new Set((res?.machines || []).map((m) => (m.serial || "").trim().toLowerCase()).filter(Boolean));
-    setMachineLog((prev) => prev.filter((m) => !ids.has(String(m.id))));
-    setHandovers((prev) => prev.filter((h) => !ids.has(String(h.machineId))));
-    setPendingHandoverItems((prev) => prev.filter((p) => !ids.has(String(p.machineId))));
-    setChecklistResponses((prev) => prev.filter((r) => !ids.has(String(r.machineId))));
-    setDeptRatings((prev) => prev.filter((r) => !ids.has(String(r.machineId))));
-    setAttachments((prev) => prev.filter((a) => !ids.has(String(a.machineId))));
-    setOutwardLog((prev) => prev.filter((o) => !serials.has((o.serialNo || "").trim().toLowerCase())));
-    appendAuditWithUser({ type: "admin_cleanup", module: "Machine",
-      action: `Admin data cleanup: ${res?.counts?.machine_log ?? ids.size} machine(s) and linked records deleted; ${(res?.keep_ids || []).length} kept`,
-      details: { keepIds: res?.keep_ids || [], deleted: res?.machines || [], counts: res?.counts || {} } }, { mirror: false });
-    if (isSupabaseEnabled()) {
-      try {
-        const [mac, ho, phi, cr, rt, atts, out] = await Promise.all([fetchMachines(), fetchHandovers(), fetchPendingItems(), fetchResponses(), fetchRatings(), fetchAllAttachments(), fetchOutward()]);
-        if (mac)  setMachineLog(mac);
-        if (ho)   setHandovers(ho);
-        if (phi)  setPendingHandoverItems(phi);
-        if (cr)   setChecklistResponses(cr);
-        if (rt)   setDeptRatings(rt);
-        if (atts) setAttachments(atts);
-        if (out)  setOutwardLog(out);
-      } catch (e) { console.warn("[App] re-hydrate after cleanup failed:", e); }
-    }
-  };
-
   const handleUpdateStock = async (category, code, delta, eventType = null) => {
     const dateStr = fmtDate(new Date());
     const event   = eventType || (delta > 0 ? "Restock" : "Usage");
@@ -1021,314 +959,6 @@ export default function App() {
     return { success: true };
   };
 
-  // ── PO handlers ──
-  const handleCreatePO = (data) => {
-    const maxNum = pos.reduce((mx, p) => {
-      const n = parseInt(p.id.replace("PO-", ""), 10);
-      return isNaN(n) ? mx : Math.max(mx, n);
-    }, 0);
-    const dateStr = fmtDate(new Date());
-    const newId   = `PO-${maxNum + 1}`;
-    const count   = (data.lineItems || []).length;
-    const newPO   = {
-      ...data,
-      id: newId, date: dateStr, receivedDate: null,
-      status: data.status || "pending",
-      activityLog: [
-        { action: "Created PO", date: dateStr, note: `${count} item${count !== 1 ? "s" : ""} · ₹${(data.amount || 0).toLocaleString("en-IN")}` },
-      ],
-    };
-    setPos((prev) => [newPO, ...prev]);
-    if (isSupabaseEnabled()) poCreate(newPO).then((r) => { if (!r.success) console.warn("[App] PO create Supabase failed:", r.error); });
-    logAudit({ type: "po_created", module: "Purchase", action: `PO Created: ${newId}`, ref: newId, vendor: data.vendor, amount: data.amount || 0, details: { items: count, status: "pending" } });
-  };
-
-  const handleUpdatePO = (id, updates) => {
-    const dateStr = fmtDate(new Date());
-    const po = pos.find((p) => p.id === id);
-    let supabaseUpdates = { ...updates };
-    setPos((prev) => prev.map((p) => {
-      if (p.id !== id) return p;
-      const log    = p.activityLog || [];
-      const newLog = [...log];
-      if (updates.status === "approved" && p.status !== "approved")
-        newLog.push({ action: "Approved", date: dateStr });
-      if (updates.status === "rejected" && p.status !== "rejected")
-        newLog.push({ action: "Rejected", date: dateStr, note: updates.rejectReason || "No reason given" });
-      supabaseUpdates.activityLog = newLog;
-      return { ...p, ...updates, activityLog: newLog };
-    }));
-    if (isSupabaseEnabled()) poUpdate(id, supabaseUpdates).then((r) => { if (!r.success) console.warn("[App] PO update Supabase failed:", r.error); });
-    if (updates.status === "approved" && po?.status !== "approved")
-      logAudit({ type: "po_approved", module: "Purchase", action: `PO Approved: ${id}`, ref: id, vendor: po?.vendor, amount: po?.amount || 0 });
-    else if (updates.status === "rejected" && po?.status !== "rejected")
-      logAudit({ type: "po_rejected", module: "Purchase", action: `PO Rejected: ${id}`, ref: id, vendor: po?.vendor, amount: po?.amount || 0, details: { reason: updates.rejectReason } });
-    else if (po) {
-      // Generic edit (priority, notes, line items, etc.) — log diff of changed fields only
-      const ignored = new Set(["activityLog"]);
-      const changed = {};
-      const oldSnap = {};
-      Object.keys(updates).forEach((k) => {
-        if (ignored.has(k)) return;
-        if (JSON.stringify(po[k]) !== JSON.stringify(updates[k])) {
-          changed[k] = updates[k];
-          oldSnap[k] = po[k];
-        }
-      });
-      if (Object.keys(changed).length > 0) {
-        logAudit({
-          type: "po_edited", module: "Purchase",
-          action: `PO Edited: ${id} (${Object.keys(changed).join(", ")})`,
-          ref: id, vendor: po.vendor, amount: po.amount || 0,
-          oldValue: oldSnap, newValue: changed,
-        });
-      }
-    }
-  };
-
-  const handleReceivePO = async (id) => {
-    const po = pos.find((p) => p.id === id);
-    if (!po) return;
-    // Duplicate-write guard: already received, or a receive for this PO is already in flight.
-    if (po.status === "received") { console.warn("[App] handleReceivePO: PO already received, ignoring", id); return; }
-    if (receivingRef.current.has(id)) { console.warn("[App] handleReceivePO: receive already in flight, ignoring", id); return; }
-    receivingRef.current.add(id);
-    setTimeout(() => receivingRef.current.delete(id), 2000);  // self-heal so a later reverse→re-receive works
-    // Cross-user race guard: another operator may have received this PO moments
-    // ago on another device — the DB already shows "received" while our copy is
-    // stale. A fresh status read stops a double receive (which would double the
-    // stock). Null (local mode / read error) falls through to the check above.
-    const freshStatus = await fetchPOStatus(id);
-    if (freshStatus === "received") {
-      receivingRef.current.delete(id);
-      flashStockError(`${id}: already received by another operator. Refresh to see current status.`);
-      return;
-    }
-    const dateStr = fmtDate(new Date());
-
-    // Pre-compute how much of each received line item can fulfill pending entries
-    const lineDeductions = {}; // code -> { deduct, fMap }
-    (po.lineItems || []).forEach((li) => {
-      const pending = pendingLog.filter((p) => p.code === li.code && p.pendingQty > 0);
-      if (pending.length === 0) return;
-      let rem = li.qty;
-      const fMap = new Map();
-      for (const p of pending) {
-        if (rem <= 0) break;
-        const can = Math.min(p.pendingQty, rem);
-        rem -= can;
-        const key = p.issueId ? `${p.issueId}::${p.code}` : `${p.code}::${p.bomKey}::${p.date}`;
-        fMap.set(key, can);
-      }
-      if (fMap.size > 0) lineDeductions[li.code] = { deduct: li.qty - rem, fMap };
-    });
-
-    // Update inventory: net of received qty minus auto-fulfilled pending qty
-    setItems((prev) => {
-      const next = { ...prev };
-      po.lineItems.forEach((li) => {
-        if (!next[li.category]) return;
-        const deduct = lineDeductions[li.code]?.deduct || 0;
-        next[li.category] = next[li.category].map((item) => {
-          if (item.code !== li.code) return item;
-          const newStock    = Math.max(0, item.stock + li.qty - deduct);
-          const actualDelta = newStock - item.stock;
-          return {
-            ...item,
-            stock:            newStock,
-            status:           recomputeStatus(newStock, item.min),
-            trend:            [...item.trend.slice(1), newStock],
-            lastPurchaseRate: li.rate || item.lastPurchaseRate,
-            history: [{ date: dateStr, event: `PO: ${id}`, change: actualDelta, qty: newStock }, ...(item.history || [])],
-          };
-        });
-      });
-      return next;
-    });
-
-    // Persist each line-item stock change to Supabase (net of auto-fulfilled pending)
-    if (isSupabaseEnabled()) {
-      Promise.all((po.lineItems || []).map((li) => {
-        const deduct = lineDeductions[li.code]?.deduct || 0;
-        const netDelta = li.qty - deduct;
-        return updateStockAndHistory(li.category, li.code, netDelta, `PO: ${id}`);
-      })).then((results) => {
-        const failed = results.filter((r) => !r.success);
-        if (failed.length) {
-          console.warn("[App] handleReceivePO: some Supabase updates failed", failed);
-          flashStockError(`PO ${id}: ${failed.length} line item(s) failed — ${failed[0]?.error || "movement rejected"}`);
-          reconcileItems();
-        }
-      });
-    }
-
-    // Batch-update pendingLog for all auto-fulfilled items
-    if (Object.keys(lineDeductions).length > 0) {
-      // 2b71bbc — reducer hoisted so we can both compute `newPendingLog` for the
-      // downstream notifyMachineComplete reads AND feed setPendingLog with the
-      // functional form (apply against the LATEST state, not the stale closure
-      // snapshot). Fixes the batched-fulfillment overwrite bug.
-      const applyFulfill = (list) => list.reduce((acc, p) => {
-        const ld = lineDeductions[p.code];
-        if (!ld) { acc.push(p); return acc; }
-        const key = p.issueId ? `${p.issueId}::${p.code}` : `${p.code}::${p.bomKey}::${p.date}`;
-        const can = ld.fMap.get(key) || 0;
-        if (can) {
-          const rem = p.pendingQty - can;
-          if (rem > 0) acc.push({ ...p, pendingQty: rem, issueQty: (p.issueQty || 0) + can });
-        } else { acc.push(p); }
-        return acc;
-      }, []);
-      const newPendingLog = applyFulfill(pendingLog);
-      setPendingLog((prev) => applyFulfill(prev));
-      // Mirror to Supabase: for each pending row touched, decide update vs delete
-      if (isSupabaseEnabled()) {
-        pendingLog.forEach((p) => {
-          const ld = lineDeductions[p.code];
-          if (!ld) return;
-          const key = p.issueId ? `${p.issueId}::${p.code}` : `${p.code}::${p.bomKey}::${p.date}`;
-          const can = ld.fMap.get(key) || 0;
-          if (!can || !p.id) return;
-          const rem = p.pendingQty - can;
-          if (rem > 0) {
-            pendingUpdate(p.id, { pendingQty: rem, issueQty: (p.issueQty || 0) + can })
-              .then((r) => { if (!r.success) console.warn("[App] handleReceivePO: pending update Supabase failed", r.error); });
-          } else {
-            pendingDelete(p.id).then((r) => { if (!r.success) console.warn("[App] handleReceivePO: pending delete Supabase failed", r.error); });
-          }
-        });
-      }
-      // Notify Machine Tracker for any issueIds that are now fully cleared
-      const affectedIds = [...new Set(
-        [...Object.values(lineDeductions)].flatMap(({ fMap }) =>
-          [...fMap.keys()].map((key) => {
-            const p = pendingLog.find((p) => (p.issueId ? `${p.issueId}::${p.code}` : `${p.code}::${p.bomKey}::${p.date}`) === key);
-            return p?.issueId;
-          }).filter(Boolean)
-        )
-      )];
-      affectedIds.forEach((issueId) => notifyMachineComplete(issueId, newPendingLog.filter((p) => p.issueId === issueId)));
-      // The received stock went straight out to these shortfalls — record it
-      // (same as Inward), or the Audit Trail shows a receipt with no trace of
-      // where the stock went.
-      Object.entries(lineDeductions).forEach(([code, { deduct, fMap }]) => {
-        const li = (po.lineItems || []).find((l) => l.code === code);
-        logAudit({
-          type: "pending_fulfilled", module: "Pending",
-          action: `Auto-fulfilled on PO receive ${id}: ${li?.name || code} × ${roundQty(deduct)}`,
-          ref: code, itemCode: code, itemName: li?.name || code,
-          qty: roundQty(deduct), vendor: po.vendor,
-          details: { auto: "po", po: id, items: [...fMap.entries()].map(([k, q]) => `${k}×${q}`) },
-        });
-      });
-    }
-
-    const newLog = [...(po.activityLog || []), { action: "Received", date: dateStr, note: "Stock updated automatically" }];
-    setPos((prev) => prev.map((p) => p.id !== id ? p : { ...p, status: "received", receivedDate: dateStr, activityLog: newLog }));
-    if (isSupabaseEnabled()) poUpdate(id, { status: "received", receivedDate: dateStr, activityLog: newLog }).then((r) => { if (!r.success) console.warn("[App] PO receive Supabase failed:", r.error); });
-    setFollowUps((prev) => prev.filter((f) => f.poId !== id));
-    if (isSupabaseEnabled()) deleteFollowUpsByPO(id).then((r) => { if (!r.success) console.warn("[App] FollowUp delete Supabase failed:", r.error); });
-    logAudit({ type: "po_received", module: "Purchase", action: `PO Received: ${id}`, ref: id, vendor: po.vendor, amount: po.amount || 0, details: { items: (po.lineItems || []).length } });
-    const inwardEntries = (po.lineItems || []).map((li, i) => ({
-      id:     Date.now() + i,
-      date:   dateStr,
-      vendor: po.vendor,
-      item:   li.name,
-      code:   li.code,
-      unit:   li.unit,
-      qty:    li.qty,
-      notes:  `Auto-received via ${id}`,
-      fromPO: id,
-    }));
-    setInwardLog((prev) => [...inwardEntries, ...prev]);
-    if (isSupabaseEnabled()) bulkCreateInward(inwardEntries).then((r) => { if (!r.success) console.warn("[App] Inward bulk Supabase failed:", r.error); });
-  };
-
-  const handleDeletePO = (id) => {
-    const po = pos.find((p) => p.id === id);
-    const isSuperAdmin = currentUser?.role === "super_admin";
-    const wasReceived  = po?.status === "received";
-    setPos((prev) => prev.filter((p) => p.id !== id));
-    if (isSupabaseEnabled()) poDelete(id).then((r) => { if (!r.success) console.warn("[App] PO delete Supabase failed:", r.error); });
-    // Its follow-ups go too (same as Receive): left behind they kept showing
-    // on Order Pipeline and in notifications for a PO that no longer exists.
-    setFollowUps((prev) => prev.filter((f) => f.poId !== id));
-    if (isSupabaseEnabled()) deleteFollowUpsByPO(id).then((r) => { if (!r.success) console.warn("[App] FollowUp delete Supabase failed:", r.error); });
-    logAudit({
-      type: wasReceived ? "po_deleted_received" : "po_deleted",
-      module: "Purchase",
-      action: wasReceived
-        ? `PO Deleted (was received) by ${isSuperAdmin ? "Super Admin" : "Admin"}: ${id}`
-        : `PO Deleted: ${id}`,
-      ref: id, vendor: po?.vendor, amount: po?.amount || 0,
-      oldValue: po ? { status: po.status, amount: po.amount, items: (po.lineItems||[]).length } : null,
-      newValue: null,
-    });
-  };
-
-  // ── Super Admin corrections ──
-  const handleReverseReceive = (id, reason = "") => {
-    if (currentUser?.role !== "super_admin") return { success: false, error: "Only Super Admin can reverse received POs" };
-    const po = pos.find((p) => p.id === id);
-    if (!po || po.status !== "received") return { success: false, error: "PO is not in 'received' state" };
-
-    const dateStr = fmtDate(new Date());
-
-    // Subtract back the qty added when receiving (optimistic local update)
-    setItems((prev) => {
-      const next = { ...prev };
-      (po.lineItems || []).forEach((li) => {
-        if (!next[li.category]) return;
-        next[li.category] = next[li.category].map((item) => {
-          if (item.code !== li.code) return item;
-          const newStock = Math.max(0, item.stock - li.qty);
-          return {
-            ...item,
-            stock:  newStock,
-            status: recomputeStatus(newStock, item.min),
-            trend:  [...item.trend.slice(1), newStock],
-            history: [{ date: dateStr, event: `PO Receive Reversed: ${id}`, change: -li.qty, qty: newStock }, ...(item.history || [])],
-          };
-        });
-      });
-      return next;
-    });
-
-    // Persist each line-item reversal to Supabase (with item_history rows)
-    if (isSupabaseEnabled()) {
-      Promise.all((po.lineItems || []).map((li) =>
-        updateStockAndHistory(li.category, li.code, -li.qty, `PO Receive Reversed: ${id}`)
-      )).then((results) => {
-        const failed = results.filter((r) => !r.success);
-        if (failed.length) {
-          console.warn("[App] handleReverseReceive: some Supabase updates failed", failed);
-          flashStockError(`Reverse ${id}: ${failed.length} line item(s) failed — ${failed[0]?.error || "movement rejected"}`);
-          reconcileItems();
-        }
-      });
-    }
-
-    // Revert PO status to "ordered" (or "pending" if no orderedDate)
-    const revertStatus = po.orderedDate ? "ordered" : "pending";
-    const newLog = [...(po.activityLog || []), { action: "Receive Reversed", date: dateStr, note: reason || "Reversed by Super Admin" }];
-    setPos((prev) => prev.map((p) => p.id !== id ? p : { ...p, status: revertStatus, receivedDate: null, activityLog: newLog }));
-    if (isSupabaseEnabled()) poUpdate(id, { status: revertStatus, receivedDate: null, activityLog: newLog }).then((r) => { if (!r.success) console.warn("[App] PO reverse Supabase failed:", r.error); });
-
-    // Remove inward entries linked to this PO
-    setInwardLog((prev) => prev.filter((e) => e.fromPO !== id));
-    if (isSupabaseEnabled()) deleteInwardByPO(id).then((r) => { if (!r.success) console.warn("[App] Inward delete Supabase failed:", r.error); });
-
-    logAudit({
-      type: "po_receive_reversed", module: "Purchase",
-      action: `Receive Reversed: ${id}${reason ? ` — ${reason}` : ""}`,
-      ref: id, vendor: po.vendor, amount: po.amount || 0,
-      oldValue: { status: "received", receivedDate: po.receivedDate },
-      newValue: { status: revertStatus, receivedDate: null },
-      details: { reason, lineItems: (po.lineItems || []).length },
-    });
-    return { success: true };
-  };
-
   const handleInventoryCorrection = async (category, code, newStock, reason = "") => {
     if (currentUser?.role !== "super_admin") return { success: false, error: "Only Super Admin can perform inventory corrections" };
     const item = items[category]?.find((i) => i.code === code);
@@ -1360,54 +990,6 @@ export default function App() {
       details: { reason, category, delta },
     });
     return { success: true };
-  };
-
-  // ── Pipeline / follow-up handlers ──
-  const handleConfirmOrder = (poId, etaStr) => {
-    const po = pos.find((p) => p.id === poId);
-    if (!po) return;
-    const dateStr  = fmtDate(new Date());
-    const nextDate = new Date(); nextDate.setDate(nextDate.getDate() + 1);
-    const newLog   = [...(po.activityLog || []), { action: "Order Placed", date: dateStr, note: `ETA: ${etaStr}` }];
-    setPos((prev) => prev.map((p) => p.id !== poId ? p : { ...p, status: "ordered", orderedDate: dateStr, eta: etaStr, activityLog: newLog }));
-    if (isSupabaseEnabled()) poUpdate(poId, { status: "ordered", orderedDate: dateStr, eta: etaStr, activityLog: newLog }).then((r) => { if (!r.success) console.warn("[App] PO confirm Supabase failed:", r.error); });
-    logAudit({ type: "po_ordered", module: "Purchase", action: `Order Placed: ${poId}`, ref: poId, vendor: po.vendor, amount: po.amount || 0, details: { eta: etaStr } });
-    const newFU = {
-      id: Date.now(),
-      poId,
-      vendor:       po.vendor,
-      itemNames:    (po.lineItems || []).map((li) => li.name),
-      eta:          etaStr,
-      confirmedDate: dateStr,
-      nextFollowUp:  fmtDate(nextDate),
-      lastFollowUp:  null,
-      frequency:     1,
-    };
-    setFollowUps((prev) => [...prev, newFU]);
-    if (isSupabaseEnabled()) followupCreate(newFU).then((r) => { if (!r.success) console.warn("[App] FollowUp create Supabase failed:", r.error); });
-  };
-
-  const handleFollowUpDone = (id, freq, nextDateStr) => {
-    const dateStr = fmtDate(new Date());
-    const fu      = followUps.find((f) => f.id === id);
-    if (fu) {
-      setPos((prev) => prev.map((p) => {
-        if (p.id !== fu.poId) return p;
-        const log = p.activityLog || [];
-        return { ...p, activityLog: [...log, { action: "Follow Up Done", date: dateStr, note: `Next: ${nextDateStr}` }] };
-      }));
-      logAudit({
-        type: "followup_done", module: "Purchase",
-        action: `Follow-Up: ${fu.poId} — Next: ${nextDateStr}`,
-        ref: fu.poId, vendor: fu.vendor,
-        oldValue: { lastFollowUp: fu.lastFollowUp, nextFollowUp: fu.nextFollowUp, frequency: fu.frequency },
-        newValue: { lastFollowUp: dateStr, nextFollowUp: nextDateStr, frequency: freq },
-      });
-    }
-    setFollowUps((prev) => prev.map((f) =>
-      f.id !== id ? f : { ...f, lastFollowUp: dateStr, nextFollowUp: nextDateStr, frequency: freq }
-    ));
-    if (isSupabaseEnabled()) followupUpdate(id, { lastFollowUp: dateStr, nextFollowUp: nextDateStr, frequency: freq }).then((r) => { if (!r.success) console.warn("[App] FollowUp update Supabase failed:", r.error); });
   };
 
   const handleInwardComplete = async (code, category, inwardQty) => {
@@ -1720,129 +1302,6 @@ export default function App() {
       }
     }
     if (failures.length) console.warn("[App] handleBulkAddItems — per-row failures:", failures);
-    return { imported, updated, failed, failures };
-  };
-
-  // ── Vendor handlers ── (routed through vendorsStore: Supabase when enabled, localStorage otherwise)
-  const handleAddVendor = async (v) => {
-    const res = await createVendor(v);
-    if (!res.success) { console.warn("[App] handleAddVendor failed:", res.error); return; }
-    setVendorList((prev) => [...prev, res.vendor]);
-    logAudit({ type: "vendor_add", module: "Vendor", action: `Vendor Added: ${res.vendor.name}`, ref: res.vendor.name, vendor: res.vendor.name });
-  };
-  const handleEditVendor = async (upd) => {
-    const res = await updateVendor(upd);
-    if (!res.success) { console.warn("[App] handleEditVendor failed:", res.error); return; }
-    setVendorList((prev) => prev.map((v) => v.id === res.vendor.id ? res.vendor : v));
-    logAudit({ type: "vendor_edit", module: "Vendor", action: `Vendor Updated: ${res.vendor.name}`, ref: res.vendor.name, vendor: res.vendor.name });
-  };
-  // Phase 4: vendor delete = hard delete when unused, archive when referenced.
-  // Owner rule (2026-11-05): a vendor is never deleted — it is always
-  // ARCHIVED (hidden from lists and selectors, kept for PO / item history)
-  // and comes back from Vendors → Archived (N).
-  const handleDeleteVendor = async (id) => {
-    const v = vendorList.find((x) => x.id === id);
-    if (!v) return { success: false, error: "vendor not found" };
-    const hasPOs           = pos.some((p) => p.vendor === v.name);
-    const hasLinkedItems   = Object.values(items).some((arr) => (arr || []).some((it) =>
-      (it.vendorLinks || []).some((l) => l.vendorId === v.id) || it.vendor === v.name
-    ));
-    const res = await archiveVendor(v);
-    if (!res.success) { console.warn("[App] handleDeleteVendor archive failed:", res.error); return { success: false, error: res.error }; }
-    setVendorList((prev) => prev.map((x) => x.id === id ? (res.vendor || { ...v, archived: true }) : x));
-    logAudit({
-      type: "vendor_archived", module: "Vendor",
-      action: `Vendor Archived: ${v.name}${hasPOs || hasLinkedItems ? ` (referenced by ${hasPOs ? "POs" : ""}${hasPOs && hasLinkedItems ? " + " : ""}${hasLinkedItems ? "items" : ""})` : ""}`,
-      ref: v.name, vendor: v.name,
-    });
-    return { success: true, mode: "archived" };
-  };
-  const handleRestoreVendor = async (v) => {
-    if (!v) return { success: false, error: "vendor not found" };
-    const res = await restoreVendor(v);
-    if (!res.success) { console.warn("[App] handleRestoreVendor failed:", res.error); return { success: false, error: res.error }; }
-    setVendorList((prev) => prev.map((x) => x.id === v.id ? (res.vendor || { ...v, archived: false }) : x));
-    logAudit({ type: "vendor_restored", module: "Vendor", action: `Vendor Restored: ${v.name}`, ref: v.name, vendor: v.name });
-    return { success: true };
-  };
-  // Per-row vendor import. Replaces the previous all-or-nothing bulk insert so a single
-  // failing row no longer kills the whole batch. Rows tagged _status:"update" merge
-  // missing fields into the existing vendor (operator requirement #5); rows tagged
-  // _status:"ready" become new vendors. Returns { imported, updated, failed, failures }
-  // so the toast can show "Imported X · Updated Y · Failed Z".
-  const handleBulkAddVendors = async (importRows) => {
-    let imported = 0, updated = 0, failed = 0;
-    const failures = [];
-    if (!Array.isArray(importRows) || importRows.length === 0) {
-      return { imported, updated, failed, failures };
-    }
-    const buildNewVendor = (r) => ({
-      id:            r._localId || `V${Date.now().toString(36)}${Math.random().toString(36).slice(2,5)}`,
-      name:          r.name,
-      contactPerson: r.contactPerson || "",
-      phone:         r.phone         || "",
-      email:         r.email         || "",
-      gst:           r.gst           || "",
-      address:       r.address       || "",
-      location:      r.location      || "",
-      category:      r.category      || "",
-      paymentTerms:  r.paymentTerms  || "30 days",
-      status:        "active",
-      priority:      "Approved",
-      leadDays:      0,
-      performance:   0,
-      notes:         "",
-      rating:        4.0,
-      years:         1,
-      annualValue:   "₹0",
-      poCount:       0,
-    });
-    for (const row of importRows) {
-      try {
-        if (row._status === "update" && row._existingId) {
-          // Merge "missing fields only" — never overwrite a field that already has data.
-          const existing = vendorList.find((v) => v.id === row._existingId);
-          if (!existing) { failed++; failures.push({ name: row.name, error: "existing vendor not found" }); continue; }
-          const fillIfBlank = (key) => existing[key] && String(existing[key]).trim() ? existing[key] : (row[key] || existing[key] || "");
-          const merged = {
-            ...existing,
-            contactPerson: fillIfBlank("contactPerson"),
-            phone:         fillIfBlank("phone"),
-            email:         fillIfBlank("email"),
-            gst:           fillIfBlank("gst"),
-            address:       fillIfBlank("address"),
-            location:      fillIfBlank("location"),
-            category:      fillIfBlank("category"),
-            paymentTerms:  fillIfBlank("paymentTerms"),
-          };
-          // Skip the network call if nothing actually changed
-          const dirty = ["contactPerson","phone","email","gst","address","location","category","paymentTerms"]
-            .some((k) => (existing[k] || "") !== (merged[k] || ""));
-          if (!dirty) { continue; }
-          const ures = await updateVendor(merged);
-          if (ures?.success) {
-            updated++;
-            setVendorList((prev) => prev.map((v) => v.id === merged.id ? (ures.vendor || merged) : v));
-            logAudit({ type: "vendor_edit", module: "Vendor", action: `Vendor Updated via Import: ${merged.name}`, ref: merged.name, vendor: merged.name });
-          } else {
-            failed++; failures.push({ name: row.name, error: ures?.error || "update failed" });
-          }
-        } else {
-          const newVendor = buildNewVendor(row);
-          const cres = await createVendor(newVendor);
-          if (cres?.success) {
-            imported++;
-            setVendorList((prev) => [...prev, cres.vendor || newVendor]);
-            logAudit({ type: "vendor_add", module: "Vendor", action: `Vendor Imported: ${newVendor.name}`, ref: newVendor.name, vendor: newVendor.name });
-          } else {
-            failed++; failures.push({ name: row.name, error: cres?.error || "create failed" });
-          }
-        }
-      } catch (e) {
-        failed++; failures.push({ name: row?.name, error: e?.message || String(e) });
-      }
-    }
-    if (failures.length) console.warn("[App] handleBulkAddVendors — per-row failures:", failures);
     return { imported, updated, failed, failures };
   };
 
@@ -3451,39 +2910,6 @@ export default function App() {
     return { success: true, signature: res.signature, replacement: res.replacement };
   };
 
-  // ── Phase B — Checklist template admin ─────────────────────────────────────
-  const handleCreateChecklistTemplate = async (t) => {
-    const res = await createTemplate(t);
-    if (!res.success) return res;
-    setChecklistTemplates((prev) => [res.template, ...prev]);
-    logAudit({
-      type: "checklist_template_created", module: "Settings",
-      action: `Checklist template created: ${t.name} (${t.department})`,
-      ref: t.department,
-      details: { templateId: res.template.id, items: (t.items || []).length },
-    });
-    return res;
-  };
-  const handleUpdateChecklistTemplate = async (id, patch) => {
-    const before = checklistTemplates.find((x) => x.id === id);
-    const res = await updateTemplate(id, patch);
-    if (!res.success) return res;
-    setChecklistTemplates((prev) => prev.map((t) => t.id === id ? { ...t, ...patch, version: (t.version || 1) + 1 } : t));
-    // Owner rule (2026-11-05): templates are never deleted. Switching one off
-    // is its archive, switching it back on its restore — audited as such.
-    const wasOff = before ? before.active === false : false;
-    const archived = patch && patch.active === false && !wasOff;
-    const restored = patch && patch.active === true && wasOff;
-    logAudit({
-      type: archived ? "checklist_template_archived" : restored ? "checklist_template_restored" : "checklist_template_updated", module: "Settings",
-      action: `Checklist template ${archived ? "switched off (archived)" : restored ? "switched on (restored)" : "updated"}: ${patch.name || before?.name || id}`,
-      ref: String(id), details: { patchKeys: Object.keys(patch || {}), department: before?.department || "", bomKey: before?.bomKey || null },
-    });
-    return res;
-  };
-  // Kept as a handler name (regression inventory); never deletes — it switches
-  // the template off (active=false) through the same path as above.
-  const handleDeleteChecklistTemplate = async (id) => handleUpdateChecklistTemplate(id, { active: false });
   // 2026-11-05 — BOM screen → Checklists. Writes ONE BOM's own list for one
   // (department, stage): updates its row (templateId) or creates it. Never
   // deletes — an emptied list is switched off (active=false) so the common
@@ -3510,23 +2936,6 @@ export default function App() {
       details: { templateId: templateId || res.template?.id || null, department, stage, items: clean.length, active: templateId ? !!active : true, change },
     });
     return res;
-  };
-
-  // Migration 029 — save a user's department assignments (admin action).
-  // Updates both Supabase and the in-memory allUsers list so Settings UI
-  // and the Finish & Transfer picker see the change immediately.
-  const handleSaveUserDepartments = async (userId, departments) => {
-    const res = await updateUserDepartments(userId, departments);
-    if (!res.success) return res;
-    setAllUsers((prev) => prev.map((u) => u.id === userId ? { ...u, departments: Array.isArray(departments) ? [...departments] : [] } : u));
-    const u = allUsers.find((x) => x.id === userId);
-    logAudit({
-      type: "user_departments_updated", module: "Settings",
-      action: `Departments updated: ${u?.fullName || u?.username || userId} → ${(departments || []).join(", ") || "none"}`,
-      ref: userId,
-      details: { departments: Array.isArray(departments) ? departments : [] },
-    });
-    return { success: true };
   };
 
   // Migration 028 — During-Work checklist submission. Optional; no stage
@@ -4206,6 +3615,23 @@ export default function App() {
   const lowStockN     = allItemsFlat.filter((i) => i?.status === "critical" || i?.status === "warning").length;
   const pipelineBadge = lowStockN + safePos.filter((p) => !["received","rejected"].includes(p?.status)).length;
 
+  // Folder-replace Phase C (docs/FOLDER-REPLACE.md §7, docs/SHELL-CONTEXT.md):
+  // the ONE object every src/modules/<m>/handlers.js receives. Shorthand keys
+  // only — the current render's state, setters, refs and shell API under
+  // their App names, nothing computed here. Module handler factories are
+  // called right below it, every render (no memo), so their closures see
+  // the same values the in-App handlers saw before the move.
+  const shell = {
+    logAudit, canDo, currentUser, settings, goToPage, flashSaveError, flashStockError,
+    handleUpdateStock, handleRegisterSignature, handleSaveSettings, inFlightRef, rackSlotReservationRef,
+    allUsers, checklistTemplates, setAllUsers, setAttachments, setChecklistResponses, setChecklistTemplates,
+    setDeptRatings, setHandovers, setMachineLog, setOutwardLog, setPendingHandoverItems, setSettings,
+    followUps, items, notifyMachineComplete, pendingLog, pos, receivingRef, reconcileItems, setFollowUps,
+    setInwardLog, setItems, setPendingLog, setPos, setVendorList, vendorList,
+  };
+  const { handleSaveModules, handleAdminCleanupDone, handleCreateChecklistTemplate, handleUpdateChecklistTemplate, handleDeleteChecklistTemplate, handleSaveUserDepartments } = createSettingsHandlers(shell);
+  const { handleCreatePO, handleUpdatePO, handleReceivePO, handleDeletePO, handleReverseReceive, handleConfirmOrder, handleFollowUpDone, handleAddVendor, handleEditVendor, handleDeleteVendor, handleRestoreVendor, handleBulkAddVendors } = createPurchaseHandlers(shell);
+
   // One set of props for BOM Outward, used by the Outward page and by the BOM
   // section embedded at the top of Machine Tracker — so both issue through
   // the same component, data and handlers, never a second copy.
@@ -4416,6 +3842,11 @@ export default function App() {
           surfaces a recoverable fallback (Try again / Go to Dashboard / Reload)
           instead of unmounting the React tree → blank screen. The boundary
           auto-resets when activePage changes, so navigating away clears it. */}
+      {/* The page area is the app's one <main> landmark, so screen readers can
+          jump straight to it. display:contents keeps the page root a direct
+          flex child of .app-shell (index.css / world-ui.css size and animate
+          it as such; those selectors also accept .app-shell > main > .flex-1). */}
+      <main id="main-content" className="contents">
       <PageErrorBoundary
         pageId={activePage}
         buildTag={APP_BUILD}
@@ -4432,6 +3863,7 @@ export default function App() {
             </>
         }
       </PageErrorBoundary>
+      </main>
 
       {/* ── Global overlays ── */}
       {showSearch && (
@@ -4439,7 +3871,7 @@ export default function App() {
         <GlobalSearch
           items={items} pos={pos} vendorList={vendorList} machineLog={machineLog}
           onClose={() => setShowSearch(false)}
-          onNavigate={goToPage}
+          onNavigate={(page) => { goToPage(page); setMobileNavOpen(false); }}
         />
         </SafeBoundary>
       )}
@@ -4449,7 +3881,7 @@ export default function App() {
           notifications={notifications}
           dismissed={dismissedIds}
           onClose={() => setShowNotifs(false)}
-          onNavigate={(page) => { goToPage(page); setShowNotifs(false); }}
+          onNavigate={(page) => { goToPage(page); setShowNotifs(false); setMobileNavOpen(false); }}
           onDismiss={dismissNotif}
           onDismissAll={dismissAllNotifs}
         />

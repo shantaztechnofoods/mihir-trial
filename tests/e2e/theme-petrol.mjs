@@ -1,6 +1,6 @@
-// Petrol Steel theme + Light / Dark / Auto switch (2026-11-05). LOCAL TEST DATA ONLY.
-// Checks: first visit opens LIGHT even on a dark device (owner rule; Auto is an option, not the
-// default); Auto follows the device; light mode is the pre-Petrol blue/white look (light-restore); the header switch sets <html data-theme>, is remembered
+// Petrol Steel theme + Light / Dark switch (2026-11-05; Auto removed by the owner 2026-11-27). LOCAL TEST DATA ONLY.
+// Checks: first visit opens LIGHT even on a dark device (owner rule); there are only two
+// options (no Auto anywhere); an old saved "auto" opens in Light; Dark → petrol dark; light mode is the pre-Petrol blue/white look (light-restore); the header switch sets <html data-theme>, is remembered
 // per browser (reload) and recolours the page; switching moves nothing (no layout change);
 // Settings → Appearance has the same switch; on a phone the header shows one button that
 // steps through the modes; the login screen stays as it was.
@@ -19,7 +19,7 @@ async function open(viewport, colorScheme, mobile = false) {
 const theme = (p) => p.evaluate(() => document.documentElement.getAttribute("data-theme"));
 const bodyBg = (p) => p.evaluate(() => getComputedStyle(document.body).backgroundColor);
 
-// Desktop, device in dark: first visit is LIGHT (default), the old blue/white look; Auto → dark.
+// Desktop, device in dark: first visit is LIGHT (default), the old blue/white look; Dark → petrol dark.
 {
   const { p, ctx, errs } = await open({ width: 1440, height: 900 }, "dark");
   ok("first visit: device dark → still data-theme light on the login page", await theme(p) === "light");
@@ -27,12 +27,13 @@ const bodyBg = (p) => p.evaluate(() => getComputedStyle(document.body).backgroun
   await loginAdmin(p);
   ok("first visit: signed in, page is the old light background", await bodyBg(p) === "rgb(244, 246, 250)", await bodyBg(p));
   const sw = p.locator(".page-header [data-theme-switch='compact']").first();
-  ok("header shows the Light / Dark / Auto switch", await sw.isVisible());
+  ok("header shows the Light / Dark switch", await sw.isVisible());
+  ok("only two options: Light and Dark (no Auto)", await sw.locator("[data-theme-option]").count() === 2 && await p.locator("[data-theme-option='auto']").count() === 0);
   ok("Light is the selected option by default", await sw.locator("[data-theme-option='light']").getAttribute("aria-checked") === "true");
   ok("nothing saved until the person picks", await p.evaluate(() => localStorage.getItem("erp_theme_mode")) === null);
-  await sw.locator("[data-theme-option='auto']").click(); await p.waitForTimeout(400);
-  ok("Auto: device dark → data-theme dark", await theme(p) === "dark");
-  ok("Auto: page is the petrol/navy glass background (spatial glass, 2026-11-27)", await bodyBg(p) === "rgb(11, 20, 27)", await bodyBg(p));
+  await sw.locator("[data-theme-option='dark']").click(); await p.waitForTimeout(400);
+  ok("Dark → data-theme dark", await theme(p) === "dark");
+  ok("Dark: page is the petrol/navy glass background (spatial glass, 2026-11-27)", await bodyBg(p) === "rgb(11, 20, 27)", await bodyBg(p));
 
   const rects = () => p.evaluate(() => [...document.querySelectorAll(".page-header, aside, main, .page-header h1, .page-header-actions")].map((e) => { const r = e.getBoundingClientRect(); return [r.x, r.y, r.width, r.height].map(Math.round).join(","); }).join("|"));
   const before = await rects();
@@ -56,15 +57,17 @@ const bodyBg = (p) => p.evaluate(() => getComputedStyle(document.body).backgroun
 
   await p.locator("aside button.sb-item").filter({ hasText: "Settings" }).first().click(); await settle(p, 1200);
   const full = p.locator("[data-settings-appearance] [data-theme-switch='full']");
-  ok("Settings → Appearance shows the switch with words", await full.isVisible() && /Light/.test(await full.innerText()) && /Dark/.test(await full.innerText()) && /Auto/.test(await full.innerText()));
+  ok("Settings → Appearance shows the switch with words, Light and Dark only", await full.isVisible() && /Light/.test(await full.innerText()) && /Dark/.test(await full.innerText()) && !/Auto/.test(await full.innerText()) && await full.locator("[data-theme-option]").count() === 2);
   await full.locator("[data-theme-option='dark']").click(); await p.waitForTimeout(300);
   ok("Settings → Dark sets dark", await theme(p) === "dark" && await p.evaluate(() => localStorage.getItem("erp_theme_mode")) === "dark");
+  ok("Settings shows one theme switch only (Appearance, not the header too)", await p.locator("[data-theme-switch]:visible").count() === 1);
+  await p.locator("aside button.sb-item").filter({ hasText: "Dashboard" }).first().click(); await settle(p, 1200);
   ok("header switch follows (Dark selected)", await p.locator(".page-header [data-theme-option='dark']").first().getAttribute("aria-checked") === "true");
   ok("no browser errors", errs.length === 0, errs.join(" ; "));
   await ctx.close();
 }
 
-// Phone, device light: one header button steps Light → Dark → Auto.
+// Phone, device light: one header button steps Light → Dark → Light.
 {
   const { p, ctx, errs } = await open({ width: 390, height: 844 }, "light", true);
   ok("first visit (phone): data-theme light", await theme(p) === "light");
@@ -76,12 +79,23 @@ const bodyBg = (p) => p.evaluate(() => getComputedStyle(document.body).backgroun
   await btns.first().click(); await p.waitForTimeout(300);
   ok("tap: Light → Dark", await theme(p) === "dark" && await p.evaluate(() => localStorage.getItem("erp_theme_mode")) === "dark");
   await btns.first().click(); await p.waitForTimeout(300);
-  ok("tap: Dark → Auto (device light → light)", await p.evaluate(() => localStorage.getItem("erp_theme_mode")) === "auto" && await theme(p) === "light");
+  ok("tap: Dark → Light (no Auto step)", await p.evaluate(() => localStorage.getItem("erp_theme_mode")) === "light" && await theme(p) === "light");
+  await btns.first().click(); await p.waitForTimeout(300);
   await p.reload({ waitUntil: "networkidle" }); await settle(p, 1500);
-  ok("next visit opens in the last choice (Auto)", await p.evaluate(() => document.documentElement.getAttribute("data-theme-mode")) === "auto");
+  ok("next visit opens in the last choice (Dark)", await p.evaluate(() => document.documentElement.getAttribute("data-theme-mode")) === "dark" && await theme(p) === "dark");
   const over = await p.evaluate(() => document.documentElement.scrollWidth - innerWidth);
   ok("no sideways scroll on the phone", over <= 0, String(over));
   ok("no browser errors (phone)", errs.length === 0, errs.join(" ; "));
+  await ctx.close();
+}
+// A browser that still has the old "auto" saved, on a dark device, opens in Light.
+{
+  const { p, ctx, errs } = await open({ width: 1440, height: 900 }, "dark");
+  await p.evaluate(() => localStorage.setItem("erp_theme_mode", "auto")); await p.reload({ waitUntil: "networkidle" }); await settle(p, 800);
+  ok("old saved Auto (device dark) → login opens Light", await theme(p) === "light");
+  await loginAdmin(p);
+  ok("old saved Auto → signed in Light, Light selected", await theme(p) === "light" && await p.locator(".page-header [data-theme-option='light']").first().getAttribute("aria-checked") === "true");
+  ok("no browser errors (old Auto)", errs.length === 0, errs.join(" ; "));
   await ctx.close();
 }
 await done(b);

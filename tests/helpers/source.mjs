@@ -57,3 +57,13 @@ export function appSource() {
 export function uiSource() {
   return ["src/app", "src/modules", "src/shared"].flatMap((d) => srcFiles(d)).map(readSrc).join("\n");
 }
+
+// The app shell's writes: src/app/App.jsx plus every module's handlers.js —
+// the handle* functions that folder-replace Phase C moved out of App.jsx
+// verbatim (docs/SHELL-CONTEXT.md). For "the App handlers do X" checks.
+export function appHandlersSource() {
+  const mods = fs.readdirSync(path.join(ROOT, "src/modules"), { withFileTypes: true })
+    .filter((e) => e.isDirectory()).map((e) => `src/modules/${e.name}/handlers.js`).sort()
+    .filter((f) => fs.existsSync(path.join(ROOT, f)));
+  return readSrcs("src/app/App.jsx", ...mods);
+}
