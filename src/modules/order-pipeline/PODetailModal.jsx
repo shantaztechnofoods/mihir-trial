@@ -1,4 +1,4 @@
-// src/modules/purchase/PODetailModal.jsx — moved verbatim from the former single-file src/App.jsx
+// src/modules/order-pipeline/PODetailModal.jsx — moved verbatim from the former single-file src/App.jsx
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
 import React, { useState, useEffect } from "react";
 import { LeadIcon } from "../../shared/components/LeadIcon.jsx";

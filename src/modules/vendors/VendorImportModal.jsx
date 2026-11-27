@@ -1,7 +1,7 @@
-// src/modules/purchase/VendorImportModal.jsx — moved verbatim from the former single-file src/App.jsx
+// src/modules/vendors/VendorImportModal.jsx — moved verbatim from the former single-file src/App.jsx
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
 import React, { useState, useEffect, useRef } from "react";
-import { parseRows as vendorParseRows } from "../../utils/vendorImport.js";
+import { parseRows as vendorParseRows } from "./vendorImport.js";
 import { loadXLSX } from "../../shared/loadXlsx.js";
 import { Btn } from "../../shared/ui/primitives.jsx";
 

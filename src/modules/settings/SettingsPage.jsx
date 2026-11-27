@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { LeadIcon, LeadLabel } from "../../shared/components/LeadIcon.jsx";
 import { SETTINGS_TAB_MODULE } from "../../utils/modules.js";
 import { readDeptWorkflowSettings, writeDeptWorkflowSettings, formatDuration, canConfigureDept } from "../../utils/handoverLogic.js";
-import { POSettings } from "../purchase/index.js";
+import { POSettings } from "../order-pipeline/index.js";
 import { REPORT_LANGS, canEditReportMaster } from "../reports/index.js";
 import { AdminCleanupPanel } from "./AdminCleanupPanel.jsx";
 import { ChecklistAdminPanel } from "./ChecklistAdminPanel.jsx";

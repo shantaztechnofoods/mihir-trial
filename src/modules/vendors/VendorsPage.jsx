@@ -1,4 +1,4 @@
-// src/modules/purchase/VendorsPage.jsx — moved verbatim from the former single-file src/App.jsx
+// src/modules/vendors/VendorsPage.jsx — moved verbatim from the former single-file src/App.jsx
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
 import React, { useState, useEffect, useRef } from "react";
 import { LeadIcon, Glyph } from "../../shared/components/LeadIcon.jsx";

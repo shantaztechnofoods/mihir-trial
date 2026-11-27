@@ -1,4 +1,4 @@
-// src/modules/purchase/VendorModal.jsx — moved verbatim from the former single-file src/App.jsx
+// src/modules/vendors/VendorModal.jsx — moved verbatim from the former single-file src/App.jsx
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
 import React, { useState, useEffect } from "react";
 import { Btn } from "../../shared/ui/primitives.jsx";

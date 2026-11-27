@@ -1,0 +1,48 @@
+{
+  "name": "vendors",
+  "version": "1.0.0",
+  "frozen": false,
+  "liveLock": false,
+  "requiresCore": 1,
+  "requiresShell": 3,
+  "exports": [
+    "VendorsPage"
+  ],
+  "dependsOn": {},
+  "handlers": [],
+  "ownHandlers": [
+    "handleAddVendor",
+    "handleBulkAddVendors",
+    "handleDeleteVendor",
+    "handleEditVendor",
+    "handleRestoreVendor"
+  ],
+  "stores": [
+    "stores/vendorsStore.js"
+  ],
+  "shared": [
+    "shared/components/ArchivedSection.jsx",
+    "shared/components/DebouncedSearchInput.jsx",
+    "shared/components/LeadIcon.jsx",
+    "shared/loadXlsx.js",
+    "shared/ui/Topbar.jsx",
+    "shared/ui/primitives.jsx"
+  ],
+  "core": {
+    "utils": [
+      "utils/archive.js",
+      "utils/whatsapp.js"
+    ]
+  },
+  "npm": [
+    "react"
+  ],
+  "migrations": [
+    "002_master"
+  ],
+  "edgeFunctions": [],
+  "serverless": [],
+  "notes": [
+    "Split out of the former modules/purchase folder (modules/fold-purchase, 2026-11-27)."
+  ]
+}

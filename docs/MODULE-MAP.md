@@ -28,7 +28,8 @@ whether replacing the folder alone is enough **today**.
 | inventory | 9 | 4860 | 30 | NO | BOM-issue part FROZEN |
 | machine-tracker | 14 | 7217 | 42 | NO | FROZEN; **LOCKED in ERP LIVE** |
 | pending-jobs | 5 | 493 | 0 (library) | YES (library) | FROZEN |
-| purchase | 12 | 3815 | 15 | NO | |
+| order-pipeline | 11 | ~3400 | 7 own + 3 shell/inventory | PARTLY | |
+| vendors | 7 | ~1180 | 5 own | YES* | |
 | reports | 12 | 4421 | 0 | YES* (props unchanged) | |
 | settings | 11 | 1981 | 8 | NO | |
 | trial-certificate | 4 | 979 | 0 (library) | YES (library) | FROZEN |
@@ -223,20 +224,25 @@ These are not owned by any one module and would be versioned together as
 * Migrations (from its README): `023_pending_handover_items`, `033_pending_item_assigned_department`, `034_pending_item_kind`, `039_pending_item_parts`, `040_pending_item_policies`, `042_pending_item_update_guard`, `043_pending_item_receive_department`, `052_pending_item_outward`, `054_pending_item_receipts`, `056_pending_item_critical_checks`
 * Edge Functions / serverless: none
 
-### purchase
+### order-pipeline (was half of `purchase`, split 2026-11-27 — modules/fold-purchase)
 
-**Folder-replace alone enough today: NO.** PO / vendor / receive writes are App.jsx handlers; `handleUpdateStock` and `handleFulfillPending` are shared with inventory.
+**Folder-replace alone enough today: PARTLY.** The PO / receive / follow-up writes travel in the folder's `handlers.js` (`createOrderPipelineHandlers(shell)`, `requiresShell` 3); `handleUpdateStock` (shell), `handleFulfillPending` and `handleSetItemDefaultRate` (inventory) stay outside.
 
-* Folder: `src/modules/purchase/` — 12 files, 3815 lines: `ApprovalsPage.jsx`, `OrderPipelinePage.jsx`, `PODetailModal.jsx`, `POModal.jsx`, `POSearchCenter.jsx`, `POSettings.jsx`, `PurchasePage.jsx`, `README.md`, `VendorImportModal.jsx`, `VendorModal.jsx`, `VendorsPage.jsx`, `index.js`
-* Mounted by `src/app/App.jsx`: `<OrderPipelinePage>`, `<VendorsPage>`
-* Other modules it imports: none
-* shared/ (imported by the folder): `shared/components/ArchivedSection.jsx`, `shared/components/DebouncedSearchInput.jsx`, `shared/components/ItemSearchSelect.jsx`, `shared/components/LeadIcon.jsx`, `shared/components/SearchableSelect.jsx`, `shared/format.js`, `shared/loadXlsx.js`, `shared/ui/Topbar.jsx`, `shared/ui/primitives.jsx`
-* utils/ (imported by the folder): `utils/archive.js`, `utils/gst.js`, `utils/parseDate.js`, `utils/poTemplate.js`, `utils/vendorImport.js`, `utils/whatsapp.js`
-* App.jsx handlers wired into it (15): `handleAddVendor`, `handleBulkAddVendors`, `handleConfirmOrder`, `handleCreatePO`, `handleDeletePO`, `handleDeleteVendor`, `handleEditVendor`, `handleFollowUpDone`, `handleFulfillPending`<sup>also inventory</sup>, `handleReceivePO`, `handleRestoreVendor`, `handleReverseReceive`, `handleSetItemDefaultRate`<sup>also inventory, machine-tracker</sup>, `handleUpdatePO`, `handleUpdateStock`<sup>also inventory, machine-tracker</sup>
-* Called indirectly by those handlers: `flashStockError`, `logAudit`
-* Stores / utils those handlers call: `auth/auditStore.js` (appendAuditWithUser); `config/env.js` (isSupabaseEnabled); `shared/format.js` (fmtDate, recomputeStatus, roundQty); `stores/followupsStore.js` (followupCreate, deleteFollowUpsByPO, followupUpdate); `stores/inwardStore.js` (bulkCreateInward, deleteInwardByPO); `stores/itemsStore.js` (updateStockAndHistory, itemCreate, itemUpdate); `stores/pendingStore.js` (pendingDelete, pendingUpdate); `stores/posStore.js` (poUpdate, poCreate, poDelete, fetchPOStatus); `stores/vendorsStore.js` (createVendor, updateVendor, archiveVendor, restoreVendor)
-* Migrations (from its README): `002_master`, `003_transactional`, `015_po_template_columns`, `018_po_gst_and_item_gst_rate`, `019_po_gst_type_check`
+* Folder: `src/modules/order-pipeline/` — `ApprovalsPage.jsx`, `OrderPipelinePage.jsx`, `PODetailModal.jsx`, `POModal.jsx`, `POSearchCenter.jsx`, `POSettings.jsx`, `PurchasePage.jsx`, `SearchableSelect.jsx` (moved in from `shared/components`, only POModal used it), `handlers.js`, `index.js`, `MODULE.json`, `README.md`
+* Mounted by `src/app/App.jsx`: `<OrderPipelinePage>`; `POSettings` is used by modules/settings
+* Shared code it still uses (2+ modules): see its `MODULE.json` (`shared`, `core`, `stores`)
+* Migrations: `002_master`, `003_transactional`, `015_po_template_columns`, `018_po_gst_and_item_gst_rate`, `019_po_gst_type_check`
 * Edge Functions / serverless: `whatsapp-send` (optional: send a PO to the vendor on WhatsApp)
+
+### vendors (was half of `purchase`, split 2026-11-27 — modules/fold-purchase)
+
+**Folder-replace alone enough today: YES*.** Its writes (`handleAddVendor`, `handleEditVendor`, `handleDeleteVendor`, `handleRestoreVendor`, `handleBulkAddVendors`) travel in the folder's `handlers.js` (`createVendorsHandlers(shell)`, `requiresShell` 3). *Live's App.jsx needs the one-time `createVendorsHandlers(shell)` line.
+
+* Folder: `src/modules/vendors/` — `VendorsPage.jsx`, `VendorModal.jsx`, `VendorImportModal.jsx`, `vendorImport.js` (moved in from `utils/`, only this folder used it), `handlers.js`, `index.js`, `MODULE.json`, `README.md`
+* Mounted by `src/app/App.jsx`: `<VendorsPage>`
+* Shared code it still uses (2+ modules): `stores/vendorsStore.js` (App loads vendors), `utils/whatsapp.js` (order-pipeline too), `utils/archive.js`, see its `MODULE.json`
+* Migrations: `002_master` (vendors table)
+* Edge Functions / serverless: none
 
 ### reports
 
@@ -258,7 +264,7 @@ These are not owned by any one module and would be versioned together as
 
 * Folder: `src/modules/settings/` — 11 files, 1981 lines: `AdminCleanupPanel.jsx`, `ChecklistAdminPanel.jsx`, `DepartmentHeadsPanel.jsx`, `DriveBackupPanel.jsx`, `EmployeeMembersPanel.jsx`, `ModulesPanel.jsx`, `README.md`, `ReportMasterPanel.jsx`, `SettingsPage.jsx`, `index.js`, `settingsUi.jsx`
 * Mounted by `src/app/App.jsx`: `<SettingsPage>`
-* Other modules it imports: `modules/reports`, `modules/purchase`
+* Other modules it imports: `modules/reports`, `modules/order-pipeline`
 * shared/ (imported by the folder): `shared/buildInfo.js`, `shared/components/LeadIcon.jsx`, `shared/settingsDefaults.js`, `shared/ui/OrgLayout.jsx`, `shared/ui/SaveMorph.jsx`, `shared/ui/SignaturePad.jsx`, `shared/ui/ThemeSwitch.jsx`, `shared/ui/Topbar.jsx`
 * stores/ (imported by the folder): `stores/adminApi.js`
 * utils/ (imported by the folder): `utils/departmentHeads.js`, `utils/handoverLogic.js`, `utils/haptics.js`, `utils/modules.js`

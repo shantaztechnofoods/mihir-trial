@@ -1,4 +1,4 @@
-// src/modules/purchase/POSearchCenter.jsx — moved verbatim from the former single-file src/App.jsx
+// src/modules/order-pipeline/POSearchCenter.jsx — moved verbatim from the former single-file src/App.jsx
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
 import React, { useEffect, useMemo } from "react";
 import { PURCHASE_TYPES, PURCHASE_TYPE_BY_KEY } from "../../utils/gst.js";

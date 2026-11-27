@@ -9,7 +9,7 @@
     "SettingsPage"
   ],
   "dependsOn": {
-    "purchase": [
+    "order-pipeline": [
       "POSettings"
     ],
     "reports": [

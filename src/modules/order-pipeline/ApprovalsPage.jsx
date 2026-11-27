@@ -1,4 +1,4 @@
-// src/modules/purchase/ApprovalsPage.jsx — moved verbatim from the former single-file src/App.jsx
+// src/modules/order-pipeline/ApprovalsPage.jsx — moved verbatim from the former single-file src/App.jsx
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
 import React from "react";
 import { LeadIcon } from "../../shared/components/LeadIcon.jsx";

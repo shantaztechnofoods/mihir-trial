@@ -3,7 +3,7 @@
 > Not frozen. Changes must still not alter the frozen production flow.
 
 ## What it does
-Company and app settings, report language, PO template (from modules/purchase), the Modules on/off switch (Settings → Modules; ceiling set per deployment by VITE_ENABLED_MODULES, see src/utils/modules.js), checklist templates admin, department employees, department heads (display label on the Dashboard production line — stored in `settings.departmentHeads`, grants no rights), the (disabled) admin cleanup panel, signature registration and the build badge.
+Company and app settings, report language, PO template (from modules/order-pipeline), the Modules on/off switch (Settings → Modules; ceiling set per deployment by VITE_ENABLED_MODULES, see src/utils/modules.js), checklist templates admin, department employees, department heads (display label on the Dashboard production line — stored in `settings.departmentHeads`, grants no rights), the (disabled) admin cleanup panel, signature registration and the build badge.
 
 ## Screens
 - Settings (nav `settings`)
@@ -47,7 +47,7 @@ the results as before — the checklist-template handlers also still reach Inven
 through `outwardPageProps`). `handleSaveSettings`, `handleRegisterSignature` and `moduleOn` are
 shell API and stay in App.jsx. Needs `SHELL_API` ≥ 2 (`requiresShell` in MODULE.json).
 
-Depends on other modules (imported through their `index.js`): `modules/purchase`, `modules/reports`
+Depends on other modules (imported through their `index.js`): `modules/order-pipeline`, `modules/reports`
 Shared code used: `src/shared/buildInfo.js`, `src/shared/components/LeadIcon.jsx`, `src/shared/settingsDefaults.js`, `src/shared/ui/OrgLayout.jsx`, `src/shared/ui/SignaturePad.jsx`, `src/shared/ui/Topbar.jsx`
 Lower layers used: `src/config/`, `src/utils/`
 Used by: `app/App.jsx (shell)`

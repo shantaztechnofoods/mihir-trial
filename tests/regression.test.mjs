@@ -98,7 +98,8 @@ const FOLDER_FLOORS = {
   "src/modules/trial-certificate": 400,
   "src/modules/inventory": 2000,
   "src/modules/bom": 1200,
-  "src/modules/purchase": 1500,
+  "src/modules/order-pipeline": 1500,  // modules/fold-purchase: the former purchase folder split into order-pipeline (~3,400 lines) + vendors (~1,180)
+  "src/modules/vendors": 550,
   "src/modules/reports": 1500,
   "src/modules/settings": 600,
   "src/modules/whatsapp": 900,
