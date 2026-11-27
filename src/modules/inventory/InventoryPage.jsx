@@ -1,6 +1,6 @@
 // src/modules/inventory/InventoryPage.jsx — moved verbatim from the former single-file src/App.jsx
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
-import React, { useState, useEffect, useRef, useMemo, useDeferredValue } from "react";
+import React, { useState, useEffect, useRef, useMemo, useDeferredValue, startTransition } from "react";
 import { LeadIcon, Glyph } from "../../shared/components/LeadIcon.jsx";
 import { useProgressiveCount } from "../../shared/components/useProgressiveCount.js";
 import MoreRowsNote from "../../shared/components/MoreRowsNote.jsx";
@@ -673,136 +673,6 @@ export function InventoryPage({ items, setItems, handleUpdateStock, pos = [], in
 
   return (
     <div className="flex-1 overflow-y-auto">
-      {showModal && <AddItemModal machines={machines} onSave={handleAddItem} onClose={() => setShowModal(false)} vendorList={vendorList} existingCodes={allCodes} />}
-      {showClearDemo && ERP_INSTANCE === "trial" && (
-        <ClearDemoDataModal
-          items={items}
-          bomDefs={bomDefs}
-          onDeleteItem={onDeleteItem}
-          onDeleteBOM={onDeleteBOM}
-          onClose={() => setShowClearDemo(false)}
-          onDone={() => setToast({ status: "safe", name: "Demo data archived", machine: "Cleanup" })}
-        />
-      )}
-
-      {showImport && (
-        <ItemImportModal
-          items={items}
-          onImport={async (importRows /* , readyCount, updateCount */) => {
-            setShowImport(false);
-            // Delegate to App-side handler (per-row, mirrors handleBulkAddVendors so a
-            // single bad row never kills the batch). Falls back to a no-op summary if
-            // the parent didn't pass onBulkAddItems (e.g. legacy render).
-            const res = onBulkAddItems
-              ? await onBulkAddItems(importRows)
-              : { imported: 0, updated: 0, failed: 0 };
-            const r = res || { imported: 0, updated: 0, failed: 0 };
-            // Spec format: "Imported X · Updated Y · Failed Z" — always show all
-            // three counters so the operator can see at a glance what happened.
-            const summary = `Imported ${r.imported} · Updated ${r.updated} · Failed ${r.failed}`;
-            setToast({ status: r.failed > 0 ? "warning" : "safe", name: summary, machine: "Import" });
-            setTimeout(() => setToast(null), 4500);
-          }}
-          onClose={() => setShowImport(false)}
-        />
-      )}
-      {selectedItem && (
-        <ItemDetailModal
-          item={selectedItem.item} category={selectedItem.category}
-          onClose={() => setSelectedItem(null)}
-          onDelete={canDo("inventory","delete") ? () => handleDeleteRequest(selectedItem.category, selectedItem.item.code) : undefined}
-          onUpdateStock={canDo("inventory","adjust") ? (delta) => handleUpdateStock(selectedItem.category, selectedItem.item.code, delta) : undefined}
-          onEdit={canDo("inventory","edit") ? () => { setEditingItem(selectedItem); setSelectedItem(null); } : undefined}
-          vendorList={vendorList}
-          outwardLog={outwardLog}
-          bomDefs={bomDefs}
-          machineLog={machineLog}
-          inwardLog={inwardLog}
-          pos={pos}
-        />
-      )}
-      {editingItem && canDo("inventory","edit") && (
-        <AddItemModal machines={machines} onSave={handleSaveEdit} onClose={() => setEditingItem(null)}
-                      initialValues={{ ...editingItem.item, machine: editingItem.category }} vendorList={vendorList} existingCodes={allCodes}
-                      codeLockReason={(() => {
-                        const code = editingItem.item.code;
-                        const boms = Object.entries(bomDefs).filter(([, d]) => (d.items || []).some((m) => m.code === code)).map(([k]) => k);
-                        if (boms.length) return `used in BOM ${boms.join(", ")}`;
-                        if (pendingLog.some((p) => p.code === code)) return "it has open pending stock";
-                        const po = pos.find((p) => !["rejected", "received"].includes(p.status) && (p.lineItems || []).some((li) => li.code === code));
-                        if (po) return `it is on open purchase order ${po.id}`;
-                        return "";
-                      })()} />
-      )}
-      {quickAdjust && (
-        <QuickStockModal item={quickAdjust.item} mode={quickAdjust.mode}
-                         onConfirm={(delta) => handleUpdateStock(quickAdjust.category, quickAdjust.item.code, delta)}
-                         onClose={() => setQuickAdjust(null)} />
-      )}
-
-      {/* ── Archive Confirmation Modal (2026-11-05: archive, never delete) ── */}
-      {deleteModal && (
-        <div className="modal-backdrop fixed inset-0 z-[60] flex items-center justify-center p-4"
-             style={{ background: "rgba(17,24,39,0.45)", backdropFilter: "blur(12px)" }}
-             onClick={e => e.target === e.currentTarget && setDeleteModal(null)}>
-          <div className="w-full max-w-sm rounded-2xl overflow-hidden"
-               style={{ background: "var(--surface-elevated)", border: "1px solid rgba(239,68,68,0.4)", boxShadow: "0 40px 80px rgba(17,24,39,0.22)", animation: "slideUp 0.25s ease both" }}>
-
-            {/* Header */}
-            <div className="px-5 py-4 border-b border-slate-200" style={{ background: "rgba(239,68,68,0.06)" }}>
-              <div className="text-sm font-black text-amber-700">{archiveConfirmTitle("item", deleteModal.item.name)}</div>
-              <div className="text-[10px] text-slate-500 mt-0.5">{deleteModal.item.name} · {deleteModal.item.code}</div>
-            </div>
-
-            {/* Body */}
-            <div className="px-5 py-4 space-y-3">
-              {deleteModal.blocks.length > 0 && (
-                <div className="space-y-1.5">
-                  <div className="text-[10px] font-bold text-yellow-400 uppercase tracking-[0.06em] mb-2"><LeadIcon e="⚠" />Warning — this item has active data</div>
-                  {deleteModal.blocks.map((b, i) => (
-                    <div key={i} className="flex items-start gap-2.5 px-3 py-2 rounded-xl"
-                         style={{ background: "rgba(234,179,8,0.05)", border: "1px solid rgba(234,179,8,0.15)" }}>
-                      <span className="text-yellow-500 flex-shrink-0 text-xs mt-0.5">⚠</span>
-                      <div>
-                        <div className="text-[10px] font-bold text-yellow-300">{b.reason}</div>
-                        <div className="text-[10px] text-slate-500 mt-0.5">{b.detail}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <div className="text-[11px] text-slate-400 leading-relaxed">
-                <span className="text-slate-900 font-semibold">{deleteModal.item.name}</span> will be hidden from Item Master and selectors. Its stock, rates and history are kept — restore it any time from Archived at the bottom of Item Master.
-              </div>
-            </div>
-
-            {/* Footer — Cancel autofocuses so Enter on an accidental open
-                dismisses the destructive action by default. */}
-            <div className="px-5 py-4 border-t border-slate-200 flex gap-2" style={{ background: "#f8f9fb" }}>
-              <Btn variant="ghost" size="sm" autoFocus onClick={() => setDeleteModal(null)}>Cancel</Btn>
-              <div className="flex-1" />
-              <button onClick={() => handleConfirmDelete(deleteModal.category, deleteModal.item.code)}
-                      className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-lg px-4 py-1.5 text-white border transition-all"
-                      style={{ background: "#b45309", borderColor: "rgba(217,119,6,0.5)", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
-                <LeadIcon e="🗄" />Archive item
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {toast && (
-        <div className="fixed bottom-6 right-6 z-[60] flex items-center gap-3 px-5 py-3.5 rounded-2xl"
-             style={{ background: "var(--surface-raised)", border: `1px solid ${toast.status === "critical" ? "rgba(239,68,68,0.45)" : toast.status === "warning" ? "rgba(217, 119, 6,0.45)" : "rgba(34,197,94,0.45)"}`, boxShadow: "0 20px 60px rgba(17,24,39,0.14)", animation: "slideUp 0.3s ease both" }}>
-          <span className="text-lg">{toast.status === "critical" ? "🔴" : toast.status === "warning" ? "🟠" : "✅"}</span>
-          <div>
-            <div className="text-xs font-black text-slate-900">{toast.name} added</div>
-            <div className="text-[10px] text-slate-500 mt-0.5">Category: {toast.machine}</div>
-          </div>
-          <StatusBadge status={toast.status} />
-          <button onClick={() => setToast(null)} className="ml-1 w-5 h-5 rounded flex items-center justify-center text-slate-600 hover:text-slate-500 text-[10px]">✕</button>
-        </div>
-      )}
 
       <Topbar title="Item Master" subtitle="Unified inventory across all categories">
         <Btn variant="ghost" size="sm" onClick={async () => {
@@ -828,7 +698,7 @@ export function InventoryPage({ items, setItems, handleUpdateStock, pos = [], in
             <LeadIcon e="🧹" />Clear Demo Data
           </button>
         )}
-        {canDo("inventory","add") && <Btn variant="primary" size="sm" onClick={() => setShowModal(true)}>+ Add Item</Btn>}
+        {canDo("inventory","add") && <Btn variant="primary" size="sm" onClick={() => startTransition(() => setShowModal(true))}>+ Add Item</Btn>}
       </Topbar>
 
       <div className="p-6 space-y-4">
@@ -1014,6 +884,143 @@ export function InventoryPage({ items, setItems, handleUpdateStock, pos = [], in
                          getMeta={(r) => `${r.category} · stock ${r.item?.stock ?? 0} ${r.item?.unit || ""}`}
                          canRestore={!!onRestoreItem && canDo("inventory","delete")} onRestore={onRestoreItem} />
       </div>
+
+      {/* perf/inp-modal-order (2026-11-27): popups, the archive confirm and the toast are
+          drawn AFTER the page instead of before it. Inserting a node in front of the page
+          made the browser restyle every following element (Tailwind space-y / divide-y
+          rules use "~"): ~1,150 elements per popup. Same popups, same layers (fixed, z-index).
+          "+ Add Item" mounts its form as a React transition: the button answers in the next
+          frame, the form (≈150 elements) is drawn right after. */}
+      {showModal && <AddItemModal machines={machines} onSave={handleAddItem} onClose={() => setShowModal(false)} vendorList={vendorList} existingCodes={allCodes} />}
+      {showClearDemo && ERP_INSTANCE === "trial" && (
+        <ClearDemoDataModal
+          items={items}
+          bomDefs={bomDefs}
+          onDeleteItem={onDeleteItem}
+          onDeleteBOM={onDeleteBOM}
+          onClose={() => setShowClearDemo(false)}
+          onDone={() => setToast({ status: "safe", name: "Demo data archived", machine: "Cleanup" })}
+        />
+      )}
+
+      {showImport && (
+        <ItemImportModal
+          items={items}
+          onImport={async (importRows /* , readyCount, updateCount */) => {
+            setShowImport(false);
+            // Delegate to App-side handler (per-row, mirrors handleBulkAddVendors so a
+            // single bad row never kills the batch). Falls back to a no-op summary if
+            // the parent didn't pass onBulkAddItems (e.g. legacy render).
+            const res = onBulkAddItems
+              ? await onBulkAddItems(importRows)
+              : { imported: 0, updated: 0, failed: 0 };
+            const r = res || { imported: 0, updated: 0, failed: 0 };
+            // Spec format: "Imported X · Updated Y · Failed Z" — always show all
+            // three counters so the operator can see at a glance what happened.
+            const summary = `Imported ${r.imported} · Updated ${r.updated} · Failed ${r.failed}`;
+            setToast({ status: r.failed > 0 ? "warning" : "safe", name: summary, machine: "Import" });
+            setTimeout(() => setToast(null), 4500);
+          }}
+          onClose={() => setShowImport(false)}
+        />
+      )}
+      {selectedItem && (
+        <ItemDetailModal
+          item={selectedItem.item} category={selectedItem.category}
+          onClose={() => setSelectedItem(null)}
+          onDelete={canDo("inventory","delete") ? () => handleDeleteRequest(selectedItem.category, selectedItem.item.code) : undefined}
+          onUpdateStock={canDo("inventory","adjust") ? (delta) => handleUpdateStock(selectedItem.category, selectedItem.item.code, delta) : undefined}
+          onEdit={canDo("inventory","edit") ? () => { setEditingItem(selectedItem); setSelectedItem(null); } : undefined}
+          vendorList={vendorList}
+          outwardLog={outwardLog}
+          bomDefs={bomDefs}
+          machineLog={machineLog}
+          inwardLog={inwardLog}
+          pos={pos}
+        />
+      )}
+      {editingItem && canDo("inventory","edit") && (
+        <AddItemModal machines={machines} onSave={handleSaveEdit} onClose={() => setEditingItem(null)}
+                      initialValues={{ ...editingItem.item, machine: editingItem.category }} vendorList={vendorList} existingCodes={allCodes}
+                      codeLockReason={(() => {
+                        const code = editingItem.item.code;
+                        const boms = Object.entries(bomDefs).filter(([, d]) => (d.items || []).some((m) => m.code === code)).map(([k]) => k);
+                        if (boms.length) return `used in BOM ${boms.join(", ")}`;
+                        if (pendingLog.some((p) => p.code === code)) return "it has open pending stock";
+                        const po = pos.find((p) => !["rejected", "received"].includes(p.status) && (p.lineItems || []).some((li) => li.code === code));
+                        if (po) return `it is on open purchase order ${po.id}`;
+                        return "";
+                      })()} />
+      )}
+      {quickAdjust && (
+        <QuickStockModal item={quickAdjust.item} mode={quickAdjust.mode}
+                         onConfirm={(delta) => handleUpdateStock(quickAdjust.category, quickAdjust.item.code, delta)}
+                         onClose={() => setQuickAdjust(null)} />
+      )}
+
+      {/* ── Archive Confirmation Modal (2026-11-05: archive, never delete) ── */}
+      {deleteModal && (
+        <div className="modal-backdrop fixed inset-0 z-[60] flex items-center justify-center p-4"
+             style={{ background: "rgba(17,24,39,0.45)", backdropFilter: "blur(12px)" }}
+             onClick={e => e.target === e.currentTarget && setDeleteModal(null)}>
+          <div className="w-full max-w-sm rounded-2xl overflow-hidden"
+               style={{ background: "var(--surface-elevated)", border: "1px solid rgba(239,68,68,0.4)", boxShadow: "0 40px 80px rgba(17,24,39,0.22)", animation: "slideUp 0.25s ease both" }}>
+
+            {/* Header */}
+            <div className="px-5 py-4 border-b border-slate-200" style={{ background: "rgba(239,68,68,0.06)" }}>
+              <div className="text-sm font-black text-amber-700">{archiveConfirmTitle("item", deleteModal.item.name)}</div>
+              <div className="text-[10px] text-slate-500 mt-0.5">{deleteModal.item.name} · {deleteModal.item.code}</div>
+            </div>
+
+            {/* Body */}
+            <div className="px-5 py-4 space-y-3">
+              {deleteModal.blocks.length > 0 && (
+                <div className="space-y-1.5">
+                  <div className="text-[10px] font-bold text-yellow-400 uppercase tracking-[0.06em] mb-2"><LeadIcon e="⚠" />Warning — this item has active data</div>
+                  {deleteModal.blocks.map((b, i) => (
+                    <div key={i} className="flex items-start gap-2.5 px-3 py-2 rounded-xl"
+                         style={{ background: "rgba(234,179,8,0.05)", border: "1px solid rgba(234,179,8,0.15)" }}>
+                      <span className="text-yellow-500 flex-shrink-0 text-xs mt-0.5">⚠</span>
+                      <div>
+                        <div className="text-[10px] font-bold text-yellow-300">{b.reason}</div>
+                        <div className="text-[10px] text-slate-500 mt-0.5">{b.detail}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="text-[11px] text-slate-400 leading-relaxed">
+                <span className="text-slate-900 font-semibold">{deleteModal.item.name}</span> will be hidden from Item Master and selectors. Its stock, rates and history are kept — restore it any time from Archived at the bottom of Item Master.
+              </div>
+            </div>
+
+            {/* Footer — Cancel autofocuses so Enter on an accidental open
+                dismisses the destructive action by default. */}
+            <div className="px-5 py-4 border-t border-slate-200 flex gap-2" style={{ background: "#f8f9fb" }}>
+              <Btn variant="ghost" size="sm" autoFocus onClick={() => setDeleteModal(null)}>Cancel</Btn>
+              <div className="flex-1" />
+              <button onClick={() => handleConfirmDelete(deleteModal.category, deleteModal.item.code)}
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-lg px-4 py-1.5 text-white border transition-all"
+                      style={{ background: "#b45309", borderColor: "rgba(217,119,6,0.5)", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
+                <LeadIcon e="🗄" />Archive item
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-[60] flex items-center gap-3 px-5 py-3.5 rounded-2xl"
+             style={{ background: "var(--surface-raised)", border: `1px solid ${toast.status === "critical" ? "rgba(239,68,68,0.45)" : toast.status === "warning" ? "rgba(217, 119, 6,0.45)" : "rgba(34,197,94,0.45)"}`, boxShadow: "0 20px 60px rgba(17,24,39,0.14)", animation: "slideUp 0.3s ease both" }}>
+          <span className="text-lg">{toast.status === "critical" ? "🔴" : toast.status === "warning" ? "🟠" : "✅"}</span>
+          <div>
+            <div className="text-xs font-black text-slate-900">{toast.name} added</div>
+            <div className="text-[10px] text-slate-500 mt-0.5">Category: {toast.machine}</div>
+          </div>
+          <StatusBadge status={toast.status} />
+          <button onClick={() => setToast(null)} className="ml-1 w-5 h-5 rounded flex items-center justify-center text-slate-600 hover:text-slate-500 text-[10px]">✕</button>
+        </div>
+      )}
     </div>
   );
 }
