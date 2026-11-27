@@ -1,0 +1,122 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   TOUCH POLISH (2026-11-27, feat/premium-mob-*) — phones and portrait tablets.
+   Approved by the handler 27 Nov 17:33 (B1 fields, B2/B3 headers, B5 tab bar,
+   B10 icon picker). Visual only: no handler, label or logic change. Loaded after
+   glass.css. Desktop (mouse, landscape ≥1024) never matches these queries.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── B1 · Fields: 16px text on touch screens ─────────────────────────────────
+   iOS Safari zooms the whole page in when a field under 16px is tapped and does
+   not zoom back. Search, filter and Settings fields were 12–13px. */
+@media screen and (max-width: 1023.98px) and (pointer: coarse) {
+  html body :is(.app-shell, .modal-backdrop) :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]), select, textarea) {
+    font-size: 16px !important;
+  }
+  html body .app-shell :is(input, textarea)::placeholder { font-size: 15px; }
+}
+
+/* Filter bars (Audit Trail, History & Reports) on a phone: a designed grid instead
+   of ragged wrapping — search on its own row, From → To on one row, then the
+   pickers two per row, every box 44px tall and the same width as its neighbour. */
+@media screen and (max-width: 767.98px) {
+  html body .app-shell .filter-bar { gap: 8px !important; padding: 12px 16px !important; align-items: center; }
+  html body .app-shell .filter-bar > * { flex: 1 1 calc(50% - 4px); min-width: 0; }
+  html body .app-shell .filter-bar > :is(input, select) { width: 100%; min-height: 44px; }
+  html body .app-shell .filter-bar > .relative:first-child { flex-basis: 100%; }
+  html body .app-shell .filter-bar > .relative:first-child input { width: 100% !important; min-height: 44px; }
+  html body .app-shell .filter-bar > input[type="date"] { flex: 1 1 calc(50% - 18px); }
+  html body .app-shell .filter-bar > input[type="date"] + span { flex: 0 0 12px; text-align: center; }
+  html body .app-shell .filter-bar > button { flex-basis: 100%; min-height: 44px; }
+}
+
+/* ── B3 · Phone header with two actions (Audit Trail: CSV, Excel) ────────────
+   The two buttons sat on the title row and cut the title to "Audit T…". They
+   now take their own row under the title, equal halves — the same pattern the
+   three-action headers (Item Master, Machine Tracker) already use. */
+@media screen and (max-width: 767.98px) {
+  html body .app-shell .page-header:has(.page-header-actions > button:first-child + button:last-child) { flex-wrap: wrap !important; }
+  html body .app-shell .page-header .page-header-actions:has(> button:first-child + button:last-child) { flex: 1 0 100% !important; width: 100% !important; }
+  html body .app-shell .page-header .page-header-actions > button:first-child:has(+ button:last-child),
+  html body .app-shell .page-header .page-header-actions > button:first-child + button:last-child { flex: 1 1 0; justify-content: center; }
+  /* A three-item row that cannot fit (Order Pipeline: view switch + two wide
+     buttons) wraps to a second line instead of clipping the last button. */
+  html body .app-shell .page-header .page-header-actions { flex-wrap: wrap !important; row-gap: 8px; }
+  html body .app-shell .page-header .page-header-actions > div:first-child:has(> button + button) { flex: 1 0 100%; display: flex; }
+  html body .app-shell .page-header .page-header-actions > div:first-child:has(> button + button) > button { flex: 1 1 0; }
+}
+
+/* ── B2 · Portrait tablet header (768–1024 portrait, e.g. iPad) ──────────────
+   Actions sat beside the title and squeezed it to a 153px column ("Order
+   Pipeline" on 2 lines, subtitle on 5). Title row first, actions on their own
+   row, left-aligned, same 8px rhythm. Landscape 1024 laptops do not match. */
+@media screen and (min-width: 768px) and (max-width: 1024px) and (orientation: portrait) {
+  html body .app-shell .page-header > .flex-1 { flex: 1 1 0 !important; min-width: 0 !important; }
+  html body .app-shell .page-header .page-header-actions { flex: 1 0 100% !important; order: 9; justify-content: flex-start; gap: 8px; }
+}
+
+/* ── B5 · Phone tab bar: readable labels, even rhythm ────────────────────────
+   Labels were 10.5px with 20px icons. 12px semibold labels, 24px icons, 2px
+   label gap, one 56px row — same five places, same words. */
+@media screen and (max-width: 767.98px) {
+  html body .mobile-tabbar > button { font-size: 12px !important; font-weight: 600 !important; letter-spacing: -0.005em; gap: 2px !important; min-height: 56px !important; padding-block: 6px 4px !important; }
+  html body .mobile-tabbar > button > svg { width: 24px; height: 24px; }
+  html body .mobile-tabbar > button > span { line-height: 16px; white-space: nowrap; }
+}
+
+/* ── B10 · Role icon picker: 44px choices on touch ───────────────────────────
+   Ten 32px emoji buttons in a half-width column. On touch the field takes the
+   full row and the choices sit in a 5-column grid of 44px targets. */
+@media screen and (pointer: coarse) {
+  html body .role-icon-field { grid-column: 1 / -1; }
+  html body .role-icon-pick { display: grid !important; grid-template-columns: repeat(5, minmax(44px, 1fr)); gap: 8px !important; }
+  html body .role-icon-pick > button { width: 100% !important; height: 44px !important; border-radius: 12px !important; font-size: 20px !important; }
+}
+
+/* ── Header view switch (Order Pipeline: Pipeline | Search) as a segmented control ──
+   The glass capsule painted both halves the same white, so the chosen view was
+   only a text colour. Apple-style segmented control on touch layouts: a sunk well,
+   the chosen segment a raised chip. Same two buttons, same words, same place. */
+@media screen and (max-width: 767.98px), screen and (min-width: 768px) and (max-width: 1024px) and (orientation: portrait) {
+  html body .app-shell .page-header.page-header .page-header-actions.page-header-actions > div:first-child:has(> button + button) {
+    background: rgba(20, 40, 50, .06) !important; border-color: transparent !important; border-radius: 999px !important; padding: 3px !important; gap: 2px !important;
+    box-shadow: inset 0 1px 2px rgba(20, 40, 50, .08) !important;
+  }
+  html body .app-shell .page-header.page-header .page-header-actions.page-header-actions > div:first-child:has(> button + button) > button:not(.x):not(.y) {
+    background: transparent !important; box-shadow: none !important; border-color: transparent !important; border-radius: 999px !important;
+    color: var(--ink-2, #3d4b55) !important; font-size: 13px !important; font-weight: 600 !important;
+  }
+  html body .app-shell .page-header.page-header .page-header-actions.page-header-actions > div:first-child:has(> button + button) > button[class*="bg-blue-500"]:not(.x):not(.y) {
+    background: #fff !important; color: var(--action, #2640B0) !important;
+    box-shadow: 0 1px 2px rgba(20, 40, 50, .12), 0 3px 8px -2px rgba(20, 40, 50, .14) !important;
+  }
+  html[data-theme="dark"] body .app-shell .page-header.page-header .page-header-actions.page-header-actions > div:first-child:has(> button + button) {
+    background: rgba(0, 0, 0, .28) !important; box-shadow: inset 0 1px 2px rgba(0, 0, 0, .4) !important;
+  }
+  html[data-theme="dark"] body .app-shell .page-header.page-header .page-header-actions.page-header-actions > div:first-child:has(> button + button) > button:not(.x):not(.y) { color: #a9bcc0 !important; }
+  html[data-theme="dark"] body .app-shell .page-header.page-header .page-header-actions.page-header-actions > div:first-child:has(> button + button) > button[class*="bg-blue-500"]:not(.x):not(.y) {
+    background: rgba(255, 255, 255, .14) !important; color: #fff !important; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12), 0 2px 6px rgba(0, 0, 0, .35) !important;
+  }
+}
+
+/* Dark mode: the date fields' calendar glyph was dark-on-dark (Audit Trail filters). */
+@media screen and (max-width: 1023.98px) and (pointer: coarse) {
+  html[data-theme="dark"] body .app-shell input[type="date"] { color-scheme: dark; }
+}
+
+/* Narrow phones (360): five 12px labels need the full width — drop the bar's side padding. */
+@media screen and (max-width: 374.98px) {
+  html body .mobile-tabbar { padding-inline: 0 !important; }
+  html body .mobile-tabbar > button { letter-spacing: -0.02em; }
+}
+
+/* ── B10 · Role dialog in dark mode ──────────────────────────────────────────
+   The icon choices were near-black tiles on the dark sheet, and the chosen
+   "Page Access" tab kept its light-mode ink (#0f141c) on a dark tab: unreadable. */
+@media screen {
+  html[data-theme="dark"] body .role-icon-pick > button[style*="rgba(26, 31, 46, 0.05)"] {
+    background: rgba(255, 255, 255, .06) !important; border-color: rgba(255, 255, 255, .10) !important;
+  }
+  html[data-theme="dark"] body button[style*="background: rgba(26, 31, 46, 0.1)"][style*="color: rgb(15, 20, 28)"] {
+    background: rgba(255, 255, 255, .14) !important; color: #fff !important; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .10), 0 2px 6px rgba(0, 0, 0, .3);
+  }
+}
