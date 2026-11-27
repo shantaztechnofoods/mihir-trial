@@ -185,14 +185,14 @@ export function VendorsPage({ vendorList, pos, items, onAddVendor, onEditVendor,
 
       <Topbar title="Vendor Management" subtitle={`${activeVendors.length} suppliers · ${activeVendors.filter((v) => v.status === "preferred").length} preferred`}>
         <DebouncedSearchInput ref={searchRef} value={search} onChange={setSearch}
-               placeholder="Search vendors..." className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 outline-none w-44 focus:border-[#2E50D6]/40 focus:outline-none transition-colors" />
+               placeholder="Search vendors..." className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 outline-none min-w-0 flex-1 w-auto md:flex-none md:w-44 focus:border-[#2E50D6]/40 focus:outline-none transition-colors" />
         {canDo("vendors","add") && (
           <button onClick={() => setShowImport(true)}
-                  className="text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-900 hover:border-slate-300 transition-all flex items-center gap-1.5">
+                  className="!flex-none text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-900 hover:border-slate-300 transition-all flex items-center gap-1.5">
             <LeadIcon e="⬆" />Import
           </button>
         )}
-        {canDo("vendors","add") && <Btn variant="primary" size="sm" onClick={() => { setEditingVendor(null); setShowModal(true); }}>+ Add Vendor</Btn>}
+        {canDo("vendors","add") && <Btn variant="primary" size="sm" className="!flex-none" onClick={() => { setEditingVendor(null); setShowModal(true); }}>+ Add Vendor</Btn>}
       </Topbar>
 
       <div className="p-6 space-y-6">
