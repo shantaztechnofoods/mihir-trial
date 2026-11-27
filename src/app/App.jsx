@@ -8,7 +8,7 @@ import { useAuth } from "../auth/AuthContext.jsx";
 // Migration 030 — fetchDeptRoster reads a minimal view that bypasses the
 // restrictive public.users RLS, so non-super-admin operators actually see
 // the dept roster in the Finish & Transfer worker picker.
-import { fetchDeptRoster, updateUserDepartments } from "../auth/authStore.js";
+import { fetchDeptRoster } from "../auth/authStore.js";
 import LoginPage from "./LoginPage.jsx";
 import AccessDeniedPage from "../shared/components/AccessDeniedPage.jsx";
 import PageErrorBoundary from "../shared/components/PageErrorBoundary.jsx";
@@ -19,7 +19,7 @@ import { archiveBomDef, restoreBomDef, isBomArchived } from "../utils/archive.js
 import { MobileNavContext } from "../shared/components/PageHeader.jsx";
 import { appendAuditWithUser, getAuditLog, subscribeAudit } from "../auth/auditStore.js";
 import { isSupabaseEnabled, ALLOW_DEMO, ENABLED_MODULES_ENV, ERP_INSTANCE } from "../config/env.js";
-import { MODULES, effectiveEnabledModules, isModuleOn, normaliseModuleSelection } from "../utils/modules.js";
+import { effectiveEnabledModules, isModuleOn } from "../utils/modules.js";
 import { getSupabase } from "../supabase/client.js";
 import { loadSettings, saveSettings, saveSettingsKeys } from "../stores/settingsStore.js";
 import { adminSettingsPatch } from "../utils/adminSettingsKeys.js";
@@ -60,6 +60,7 @@ import { Sidebar } from "./layout/Sidebar.jsx";
 import { AIPage, AnalyticsPage, DashboardPage, InventoryPage, InwardPage, OutwardPage, PendingPage, MachinePage, OrderPipelinePage, VendorsPage, HistoryPage, ReportCenterPage, SettingsPage, WhatsAppPage, ReadyMachinesPopup, prefetchPage, prefetchPagesWhenIdle } from "./lazyPages.js";
 import { cleanPendingJobs } from "../modules/pending-jobs/index.js";
 import { waAlertTime, waDispatch, waReadSeen, waUnreadCount } from "../modules/whatsapp/index.js";
+import { createSettingsHandlers } from "../modules/settings/handlers.js";
 import { APP_BUILD } from "../shared/buildInfo.js";
 import { fmtDate, recomputeStatus, roundQty } from "../shared/format.js";
 import { SETTINGS_DEFAULTS } from "../shared/settingsDefaults.js";
@@ -389,39 +390,6 @@ export default function App() {
         gstPresent: !!newSettings.gst,
         ...(adminWrites ? { via: "save_org_setting", keys: adminWrites.map((w) => w.key) } : {}),
       },
-    });
-    return res;
-  };
-
-  // Go-live 2026-11-04 — Settings → Modules (super admin only). Saves the ON
-  // list into the org settings row (settings.enabledModules) and records a
-  // modules_changed audit event. RLS on public.settings already limits writes
-  // to the super admin.
-  const handleSaveModules = async (list) => {
-    if (currentUser?.role !== "super_admin") return { success: false, error: "Only the super admin can change modules." };
-    const next   = normaliseModuleSelection(list);
-    const before = settings || {};
-    const prevOn = MODULES.map((m) => m.id).filter((id) => isModuleOn(id, effectiveEnabledModules(before.enabledModules, null)));
-    const newSettings = { ...before, enabledModules: next };
-    setSettings(newSettings);                            // optimistic UI
-    const res = await saveSettings(newSettings);
-    if (!res.success) {
-      console.warn("[App] handleSaveModules: save failed —", res.error);
-      setSettings((prev) => {
-        const out = { ...prev };
-        if (Object.prototype.hasOwnProperty.call(before, "enabledModules")) out.enabledModules = before.enabledModules;
-        else delete out.enabledModules;
-        return out;
-      });
-      return res;
-    }
-    const turnedOn  = next.filter((id) => !prevOn.includes(id));
-    const turnedOff = prevOn.filter((id) => !next.includes(id));
-    logAudit({
-      type: "modules_changed", module: "Settings",
-      action: `Modules changed${turnedOff.length ? ` · OFF: ${turnedOff.join(", ")}` : ""}${turnedOn.length ? ` · ON: ${turnedOn.join(", ")}` : ""}`,
-      ref: "modules",
-      details: { enabledModules: next, turnedOn, turnedOff },
     });
     return res;
   };
@@ -932,37 +900,6 @@ export default function App() {
   const dismissAllNotifs = ()  => setDismissedIds((prev) => new Set([...prev, ...notifications.map((n) => n.id)]));
 
   const logAudit = (entry) => { appendAuditWithUser(entry); };
-
-  // Admin Data Cleanup (migration 051): the DB function deleted the machines
-  // and linked rows atomically and wrote the authoritative audit row. Here we
-  // drop the same rows from local state, add a local-only audit entry
-  // (mirror:false — no duplicate DB row) and re-hydrate from Supabase.
-  const handleAdminCleanupDone = async (res) => {
-    const ids     = new Set((res?.machines || []).map((m) => String(m.id)));
-    const serials = new Set((res?.machines || []).map((m) => (m.serial || "").trim().toLowerCase()).filter(Boolean));
-    setMachineLog((prev) => prev.filter((m) => !ids.has(String(m.id))));
-    setHandovers((prev) => prev.filter((h) => !ids.has(String(h.machineId))));
-    setPendingHandoverItems((prev) => prev.filter((p) => !ids.has(String(p.machineId))));
-    setChecklistResponses((prev) => prev.filter((r) => !ids.has(String(r.machineId))));
-    setDeptRatings((prev) => prev.filter((r) => !ids.has(String(r.machineId))));
-    setAttachments((prev) => prev.filter((a) => !ids.has(String(a.machineId))));
-    setOutwardLog((prev) => prev.filter((o) => !serials.has((o.serialNo || "").trim().toLowerCase())));
-    appendAuditWithUser({ type: "admin_cleanup", module: "Machine",
-      action: `Admin data cleanup: ${res?.counts?.machine_log ?? ids.size} machine(s) and linked records deleted; ${(res?.keep_ids || []).length} kept`,
-      details: { keepIds: res?.keep_ids || [], deleted: res?.machines || [], counts: res?.counts || {} } }, { mirror: false });
-    if (isSupabaseEnabled()) {
-      try {
-        const [mac, ho, phi, cr, rt, atts, out] = await Promise.all([fetchMachines(), fetchHandovers(), fetchPendingItems(), fetchResponses(), fetchRatings(), fetchAllAttachments(), fetchOutward()]);
-        if (mac)  setMachineLog(mac);
-        if (ho)   setHandovers(ho);
-        if (phi)  setPendingHandoverItems(phi);
-        if (cr)   setChecklistResponses(cr);
-        if (rt)   setDeptRatings(rt);
-        if (atts) setAttachments(atts);
-        if (out)  setOutwardLog(out);
-      } catch (e) { console.warn("[App] re-hydrate after cleanup failed:", e); }
-    }
-  };
 
   const handleUpdateStock = async (category, code, delta, eventType = null) => {
     const dateStr = fmtDate(new Date());
@@ -3451,39 +3388,6 @@ export default function App() {
     return { success: true, signature: res.signature, replacement: res.replacement };
   };
 
-  // ── Phase B — Checklist template admin ─────────────────────────────────────
-  const handleCreateChecklistTemplate = async (t) => {
-    const res = await createTemplate(t);
-    if (!res.success) return res;
-    setChecklistTemplates((prev) => [res.template, ...prev]);
-    logAudit({
-      type: "checklist_template_created", module: "Settings",
-      action: `Checklist template created: ${t.name} (${t.department})`,
-      ref: t.department,
-      details: { templateId: res.template.id, items: (t.items || []).length },
-    });
-    return res;
-  };
-  const handleUpdateChecklistTemplate = async (id, patch) => {
-    const before = checklistTemplates.find((x) => x.id === id);
-    const res = await updateTemplate(id, patch);
-    if (!res.success) return res;
-    setChecklistTemplates((prev) => prev.map((t) => t.id === id ? { ...t, ...patch, version: (t.version || 1) + 1 } : t));
-    // Owner rule (2026-11-05): templates are never deleted. Switching one off
-    // is its archive, switching it back on its restore — audited as such.
-    const wasOff = before ? before.active === false : false;
-    const archived = patch && patch.active === false && !wasOff;
-    const restored = patch && patch.active === true && wasOff;
-    logAudit({
-      type: archived ? "checklist_template_archived" : restored ? "checklist_template_restored" : "checklist_template_updated", module: "Settings",
-      action: `Checklist template ${archived ? "switched off (archived)" : restored ? "switched on (restored)" : "updated"}: ${patch.name || before?.name || id}`,
-      ref: String(id), details: { patchKeys: Object.keys(patch || {}), department: before?.department || "", bomKey: before?.bomKey || null },
-    });
-    return res;
-  };
-  // Kept as a handler name (regression inventory); never deletes — it switches
-  // the template off (active=false) through the same path as above.
-  const handleDeleteChecklistTemplate = async (id) => handleUpdateChecklistTemplate(id, { active: false });
   // 2026-11-05 — BOM screen → Checklists. Writes ONE BOM's own list for one
   // (department, stage): updates its row (templateId) or creates it. Never
   // deletes — an emptied list is switched off (active=false) so the common
@@ -3510,23 +3414,6 @@ export default function App() {
       details: { templateId: templateId || res.template?.id || null, department, stage, items: clean.length, active: templateId ? !!active : true, change },
     });
     return res;
-  };
-
-  // Migration 029 — save a user's department assignments (admin action).
-  // Updates both Supabase and the in-memory allUsers list so Settings UI
-  // and the Finish & Transfer picker see the change immediately.
-  const handleSaveUserDepartments = async (userId, departments) => {
-    const res = await updateUserDepartments(userId, departments);
-    if (!res.success) return res;
-    setAllUsers((prev) => prev.map((u) => u.id === userId ? { ...u, departments: Array.isArray(departments) ? [...departments] : [] } : u));
-    const u = allUsers.find((x) => x.id === userId);
-    logAudit({
-      type: "user_departments_updated", module: "Settings",
-      action: `Departments updated: ${u?.fullName || u?.username || userId} → ${(departments || []).join(", ") || "none"}`,
-      ref: userId,
-      details: { departments: Array.isArray(departments) ? departments : [] },
-    });
-    return { success: true };
   };
 
   // Migration 028 — During-Work checklist submission. Optional; no stage
@@ -4215,7 +4102,10 @@ export default function App() {
   const shell = {
     logAudit, canDo, currentUser, settings, goToPage, flashSaveError, flashStockError,
     handleUpdateStock, handleRegisterSignature, handleSaveSettings, inFlightRef, rackSlotReservationRef,
+    allUsers, checklistTemplates, setAllUsers, setAttachments, setChecklistResponses, setChecklistTemplates,
+    setDeptRatings, setHandovers, setMachineLog, setOutwardLog, setPendingHandoverItems, setSettings,
   };
+  const { handleSaveModules, handleAdminCleanupDone, handleCreateChecklistTemplate, handleUpdateChecklistTemplate, handleDeleteChecklistTemplate, handleSaveUserDepartments } = createSettingsHandlers(shell);
 
   // One set of props for BOM Outward, used by the Outward page and by the BOM
   // section embedded at the top of Machine Tracker — so both issue through
