@@ -18,8 +18,11 @@ import pw from "/usr/local/lib/node_modules_global/playwright/index.js";
 
 const args = process.argv.slice(2);
 
+const normIds = (s) => s.replace(/url\("#[^"]*"\)/g, 'url("#<local-id>")');
+
 if (args[0] === "--diff") {
   const [A, B] = [args[1], args[2]].map((f) => JSON.parse(fs.readFileSync(f, "utf8")));
+  if (JSON.stringify(A.props) !== JSON.stringify(B.props)) { console.log("DIFFERENT — the two snapshots list different CSS properties (different browsers?)"); process.exit(1); }
   let bad = 0, shown = 0, elems = 0;
   for (const key of Object.keys(A.states)) {
     const a = A.states[key], b = B.states[key];
@@ -30,8 +33,11 @@ if (args[0] === "--diff") {
       elems++;
       const [pa, sa] = a[i], [pb, sb] = b[i];
       if (pa !== pb) { bad++; if (shown++ < 20) console.log(`state ${key}: element ${i} path ${pa} vs ${pb}`); continue; }
-      if (sa === sb) continue;
-      const va = A.table[sa].split("\u0001"), vb = B.table[sb].split("\u0001");
+      // Each snapshot has its own style table, so compare the VALUES, never the indices.
+      // React useId() ids inside url("#…") (e.g. SVG gradient fills) differ between builds/runs: normalised.
+      const ta = normIds(A.table[sa]), tb = normIds(B.table[sb]);
+      if (ta === tb) continue;
+      const va = ta.split("\u0001"), vb = tb.split("\u0001");
       bad++;
       for (let k = 0; k < A.props.length; k++) {
         if (va[k] !== vb[k] && shown < 40) { shown++; console.log(`state ${key}: ${pa}  ${A.props[k]}: ${va[k]} → ${vb[k]}`); }
