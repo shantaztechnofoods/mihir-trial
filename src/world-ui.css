@@ -237,6 +237,8 @@
   .page-header .page-header-actions { flex-wrap: nowrap !important; flex: 0 0 auto !important; width: auto !important; }
   .page-header .page-header-actions button, .page-header .page-header-actions > a { min-height: 40px; white-space: nowrap; }
   .page-header .page-header-actions button[aria-label^="Departments called"] { min-width: 40px; }
+  /* its count badge sits inside the button's corner, not 6px past its edge (scrollWidth 56 in a 50px box) */
+  .page-header .page-header-actions button[aria-label^="Departments called"] > span { top: 4px; right: 4px; }
   /* Touch phones: header actions (Export, Import, + Add Item, + New PO…) get the
      44px tap target the rest of the app uses on touch; mouse layouts keep 40px. */
   @media (pointer: coarse) {
