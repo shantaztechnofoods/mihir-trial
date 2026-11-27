@@ -47,7 +47,8 @@
     "shared/motion/useRowMotion.js",
     "shared/ui/EmptyArt.jsx",
     "shared/ui/Topbar.jsx",
-    "shared/ui/primitives.jsx"
+    "shared/ui/primitives.jsx",
+    "shared/ui/useDialogFocus.js"
   ],
   "core": {
     "config": [
