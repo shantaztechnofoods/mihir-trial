@@ -24,12 +24,12 @@ import { getSupabase } from "../supabase/client.js";
 import { loadSettings, saveSettings, saveSettingsKeys } from "../stores/settingsStore.js";
 import { adminSettingsPatch } from "../utils/adminSettingsKeys.js";
 import { listVendors } from "../stores/vendorsStore.js";
-import { fetchItems, createItem as itemCreate, updateItem as itemUpdate, deleteItem as itemDelete, fetchArchivedItems, restoreItem as itemRestore, updateStockAndHistory } from "../stores/itemsStore.js";
+import { fetchItems, fetchArchivedItems, updateStockAndHistory } from "../stores/itemsStore.js";
 import { fetchBOMs, createBOM as bomCreate, updateBOM as bomUpdate, renameBOM as bomRename, deleteBOM as bomDelete, restoreBOM as bomRestore } from "../stores/bomsStore.js";
 import { fetchPOs } from "../stores/posStore.js";
 import { fetchInward, createInward } from "../stores/inwardStore.js";
 import { fetchOutward, createOutward, updateOutwardRef, deleteOutwardByIssueId } from "../stores/outwardStore.js";
-import { fetchPending, bulkCreatePending, updatePending as pendingUpdate, deletePending as pendingDelete, clearAllPending, updatePendingBomKey } from "../stores/pendingStore.js";
+import { fetchPending, bulkCreatePending, deletePending as pendingDelete, updatePendingBomKey } from "../stores/pendingStore.js";
 import { fetchFollowUps } from "../stores/followupsStore.js";
 import { fetchMachines, createMachine as machineCreate, updateMachine as machineUpdate, updateMachineBomKey, deleteMachine as machineDelete, fetchMachineLockState, appendMachineHistory as machineAppendHistory, STALE_MACHINE_MSG } from "../stores/machinesStore.js";
 import { fetchHandovers, createHandover as handoverCreate, acceptHandover as handoverAccept, releaseHandover, adminCancelHandover, fetchHandoverById } from "../stores/handoverStore.js";
@@ -45,7 +45,6 @@ import { incompleteChecklistJobs, snapshotResponse } from "../utils/checklistLog
 import { useRealtimeTables } from "../realtime/useRealtimeTables.js";
 import { mergeRemoteSettings, parseLocalSync } from "../realtime/liveRecord.js";
 import { isoToDisplayDate } from "../utils/parseDate.js";
-import { generateItemCode } from "../utils/itemImport.js";
 import { isReadyPopupRole, newReadySince, readyAtOf, trialSignedBy, readLastSeenReady, writeLastSeenReady } from "../utils/readyPopup.js";
 import { rackOfBom, firstFreeSlot, canAssignSlot, slotLabel, rackKeyNorm, rackViewLog, bomFillCheck, freeSlotsFor, tierOfSlot } from "../utils/rackSlots.js";
 // 2026-11-04 (fix/perf-1) — recharts loads on demand (Analytics / History & Reports only).
@@ -62,6 +61,7 @@ import { cleanPendingJobs } from "../modules/pending-jobs/index.js";
 import { waAlertTime, waDispatch, waReadSeen, waUnreadCount } from "../modules/whatsapp/index.js";
 import { createSettingsHandlers } from "../modules/settings/handlers.js";
 import { createPurchaseHandlers } from "../modules/purchase/handlers.js";
+import { createInventoryHandlers } from "../modules/inventory/handlers.js";
 import { APP_BUILD } from "../shared/buildInfo.js";
 import { fmtDate, recomputeStatus, roundQty } from "../shared/format.js";
 import { SETTINGS_DEFAULTS } from "../shared/settingsDefaults.js";
@@ -992,319 +992,6 @@ export default function App() {
     return { success: true };
   };
 
-  const handleInwardComplete = async (code, category, inwardQty) => {
-    // Auto-fulfill pending entries for this item with the newly received stock
-    if (category && inwardQty > 0) {
-      const pendingForCode = pendingLog.filter((p) => p.code === code && p.pendingQty > 0);
-      if (pendingForCode.length > 0) {
-        let remaining = inwardQty;
-        let totalToDeduct = 0;
-        const fulfillments = [];
-        for (const p of pendingForCode) {
-          if (remaining <= 0) break;
-          const canFulfill = Math.min(p.pendingQty, remaining);
-          remaining -= canFulfill;
-          totalToDeduct += canFulfill;
-          fulfillments.push({ entry: p, canFulfill });
-        }
-        if (totalToDeduct > 0) {
-          // Wait for the move: if it is refused (Supabase), the stock stays in
-          // the store, so the shortfalls must stay open too.
-          const mv = await handleUpdateStock(category, code, -totalToDeduct, "Auto-fulfill pending");
-          if (mv && mv.success === false) return;
-          // Batch all fulfillments in one setPendingLog to avoid stale-closure overwrites
-          const fulfillMap = new Map(fulfillments.map(({ entry, canFulfill }) => {
-            const key = entry.issueId ? `${entry.issueId}::${entry.code}` : `${entry.code}::${entry.bomKey}::${entry.date}`;
-            return [key, canFulfill];
-          }));
-          // 2b71bbc — functional-form setPendingLog + hoisted reducer so this call
-          // stacks correctly when queued alongside other pending-fulfillment updates.
-          const applyFulfill = (list) => list.reduce((acc, p) => {
-            const key = p.issueId ? `${p.issueId}::${p.code}` : `${p.code}::${p.bomKey}::${p.date}`;
-            const can = fulfillMap.get(key);
-            if (can) {
-              const rem = p.pendingQty - can;
-              if (rem > 0) acc.push({ ...p, pendingQty: rem, issueQty: (p.issueQty || 0) + can });
-            } else { acc.push(p); }
-            return acc;
-          }, []);
-          const newPendingLog = applyFulfill(pendingLog);
-          setPendingLog((prev) => applyFulfill(prev));
-          // Mirror to Supabase: for each fulfilled entry, update or delete
-          if (isSupabaseEnabled()) {
-            fulfillments.forEach(({ entry, canFulfill }) => {
-              if (!entry.id) return;
-              const rem = entry.pendingQty - canFulfill;
-              if (rem > 0) {
-                pendingUpdate(entry.id, { pendingQty: rem, issueQty: (entry.issueQty || 0) + canFulfill })
-                  .then((r) => { if (!r.success) console.warn("[App] handleInwardComplete: pending update Supabase failed", r.error); });
-              } else {
-                pendingDelete(entry.id).then((r) => { if (!r.success) console.warn("[App] handleInwardComplete: pending delete Supabase failed", r.error); });
-              }
-            });
-          }
-          // notify Machine Tracker for each issueId that is now fully cleared
-          const affectedIds = [...new Set(fulfillments.map((f) => f.entry.issueId).filter(Boolean))];
-          affectedIds.forEach((id) => {
-            notifyMachineComplete(id, newPendingLog.filter((p) => p.issueId === id));
-          });
-          // The received stock went straight back out to these machines — record
-          // it, or the Audit Trail shows an inward with no trace of where it went.
-          logAudit({
-            type: "pending_fulfilled", module: "Pending",
-            action: `Auto-fulfilled on Inward: ${fulfillments[0].entry.name || code} × ${roundQty(totalToDeduct)}`,
-            ref: code, itemCode: code, itemName: fulfillments[0].entry.name || code,
-            qty: roundQty(totalToDeduct),
-            details: { auto: "inward", items: fulfillments.map(({ entry, canFulfill }) => `${entry.bomKey || ""}${entry.serialNo ? ` [${entry.serialNo}]` : ""}×${canFulfill}`) },
-          });
-        }
-      }
-    }
-  };
-
-  // ── Item handlers ── (routed through itemsStore: Supabase when enabled, localStorage otherwise)
-  const handleCreateItemRow = async (category, newItem) => {
-    console.log("%c[App] handleCreateItemRow CALLED", "color:#10b981;font-weight:bold", { code: newItem.code, category });
-    let res;
-    try {
-      res = await itemCreate(category, newItem);
-      console.log("%c[App] handleCreateItemRow → itemCreate returned:", "color:#10b981", res);
-    } catch (thrown) {
-      console.error("%c[App] handleCreateItemRow → itemCreate THREW:", "color:#ef4444;font-weight:bold", thrown);
-      return { success: false, error: `itemCreate threw: ${thrown?.message || thrown}` };
-    }
-    if (!res.success) { console.warn("[App] item create failed:", res.error); return { success: false, error: res.error }; }
-    setItems((prev) => ({ ...prev, [category]: [...(prev[category] || []), res.item] }));
-    // Audit trail: creating a new SKU is a master-data change — operators need to be
-    // able to answer "who added FUSE-10A on which date?" in History / Audit Trail.
-    logAudit({
-      type: "item_created", module: "Inventory",
-      action: `Item Created: ${res.item.name} (${res.item.code}) in ${category}`,
-      ref: res.item.code, itemCode: res.item.code, itemName: res.item.name,
-      qty: Number(res.item.stock) || 0,
-      details: { category, unit: res.item.unit, openingStock: Number(res.item.stock) || 0, min: res.item.min, max: res.item.max, vendor: res.item.vendor || "", critical: !!res.item.isCritical },
-    });
-    // If itemsStore had to strip the media columns because migration 016 hasn't been
-    // run, alert the operator — the previous silent retry was the root cause of the
-    // "uploads succeed then disappear on reopen" bug.
-    if (res.mediaStripped) {
-      alert("⚠️ Item saved, but the photo / design file were NOT persisted because the items.photo / design_file columns don't exist in your Supabase yet.\n\nRun supabase/migrations/016_item_media.sql in your Supabase SQL Editor, then re-upload the media on this item.");
-    }
-    return { success: true, item: res.item, mediaStripped: !!res.mediaStripped };
-  };
-  const handleUpdateItemRow = async (origCode, origCategory, updatedItem, newCategory) => {
-    console.info("[App] handleUpdateItemRow", { origCode, origCategory, newCode: updatedItem.code, newCategory });
-    const before = (items[origCategory] || []).find((i) => i.code === origCode);
-    const res = await itemUpdate(origCode, origCategory, updatedItem, newCategory);
-    if (!res.success) { console.warn("[App] item update failed:", res.error); return { success: false, error: res.error }; }
-    const target = newCategory || origCategory;
-    setItems((prev) => {
-      const next = { ...prev };
-      next[origCategory] = (prev[origCategory] || []).filter((i) => i.code !== origCode);
-      next[target] = [...(next[target] || []), { ...res.item, history: updatedItem.history || [] }];
-      return next;
-    });
-    // Audit trail: item master edits (rename / category move / vendor change /
-    // min-max change) are governance-critical. Record enough context to spot
-    // suspicious reconfigurations without replaying stock history.
-    const codeChanged     = res.item.code !== origCode;
-    const categoryChanged = target !== origCategory;
-    logAudit({
-      type: "item_updated", module: "Inventory",
-      action: `Item Updated: ${res.item.name} (${origCode}${codeChanged ? ` → ${res.item.code}` : ""}${categoryChanged ? ` · ${origCategory} → ${target}` : ""})`,
-      ref: res.item.code, itemCode: res.item.code, itemName: res.item.name,
-      oldValue: before ? { code: origCode, category: origCategory, name: before.name, unit: before.unit, min: before.min, max: before.max, vendor: before.vendor || "", critical: !!before.isCritical } : { code: origCode, category: origCategory },
-      newValue: { code: res.item.code, category: target, name: res.item.name, unit: res.item.unit, min: res.item.min, max: res.item.max, vendor: res.item.vendor || "", critical: !!res.item.isCritical },
-    });
-    if (res.mediaStripped) {
-      alert("⚠️ Item saved, but the photo / design file were NOT persisted because the items.photo / design_file columns don't exist in your Supabase yet.\n\nRun supabase/migrations/016_item_media.sql in your Supabase SQL Editor, then re-upload the media on this item.");
-    }
-    return { success: true, item: res.item, mediaStripped: !!res.mediaStripped };
-  };
-  // Owner rule (2026-11-05): an item is never deleted — "Archive" hides it
-  // from every list (is_active=false, migration 008) and keeps the row, its
-  // rates and its history. It comes back from Item Master → Archived (N).
-  const handleDeleteItemRow = async (category, code) => {
-    console.info("[App] handleDeleteItemRow (archive)", { code, category });
-    const before = (items[category] || []).find((i) => i.code === code);
-    const res = await itemDelete(category, code);
-    if (!res.success) { console.warn("[App] item archive failed:", res.error); return { success: false, error: res.error }; }
-    setItems((prev) => ({ ...prev, [category]: (prev[category] || []).filter((i) => i.code !== code) }));
-    if (before) setArchivedItems((prev) => [{ category, item: { ...before, archived: true, archivedAt: new Date().toISOString() } }, ...prev.filter((x) => x.item?.code !== code)]);
-    // Audit trail: capture name, unit and stock at archive time.
-    logAudit({
-      type: "item_archived", module: "Inventory",
-      action: `Item Archived: ${before?.name || code} (${code}) from ${category}`,
-      ref: code, itemCode: code, itemName: before?.name || code,
-      details: { category, stockAtArchive: before?.stock ?? 0, unit: before?.unit || "", vendor: before?.vendor || "" },
-    });
-    return { success: true };
-  };
-  const handleRestoreItemRow = async ({ category, item }) => {
-    const code = item?.code;
-    if (!code) return { success: false, error: "item not found" };
-    const res = await itemRestore(category, code);
-    if (!res.success) { console.warn("[App] item restore failed:", res.error); return { success: false, error: res.error }; }
-    const back = { ...(res.item || item), archived: undefined, archivedAt: undefined };
-    const cat = back.category || category;
-    setItems((prev) => ({ ...prev, [cat]: [...(prev[cat] || []).filter((i) => i.code !== code), { ...back, status: recomputeStatus(back.stock, back.min) }] }));
-    setArchivedItems((prev) => prev.filter((x) => x.item?.code !== code));
-    logAudit({
-      type: "item_restored", module: "Inventory",
-      action: `Item Restored: ${back.name || code} (${code}) to ${cat}`,
-      ref: code, itemCode: code, itemName: back.name || code, details: { category: cat },
-    });
-    return { success: true };
-  };
-
-  // 2026-06-02 — Save-as-Default-Rate from PO modal.
-  // When the operator types a rate on a PO line for an item that has no
-  // historical rate (last == 0 and default == 0) and ticks "Save as Default
-  // Rate", this handler persists the new rate to the item so the next PO line
-  // for the same item auto-fills from it. Fire-and-forget — the line save
-  // shouldn't wait on this round trip.
-  const handleSetItemDefaultRate = async (code, rate) => {
-    const r = Number(rate);
-    if (!code || !isFinite(r) || r <= 0) return { success: false, error: "invalid rate" };
-    // Find which category holds the item — items are grouped that way in state.
-    let cat = null, existing = null;
-    for (const [c, list] of Object.entries(items)) {
-      const hit = (list || []).find((i) => i.code === code);
-      if (hit) { cat = c; existing = hit; break; }
-    }
-    if (!cat || !existing) return { success: false, error: "item not found" };
-    // Only update if the value actually changes — keeps audit noise down.
-    if (Number(existing.defaultPurchaseRate || 0) === r) return { success: true, noop: true };
-    const merged = { ...existing, defaultPurchaseRate: r };
-    const res = await itemUpdate(existing.code, cat, merged, cat);
-    if (!res.success) { console.warn("[App] handleSetItemDefaultRate failed", res.error); return res; }
-    setItems((prev) => ({
-      ...prev,
-      [cat]: (prev[cat] || []).map((i) => i.code === code ? { ...i, defaultPurchaseRate: r } : i),
-    }));
-    logAudit({
-      type: "inventory_edit", module: "Inventory",
-      action: `Default Rate Updated via PO: ${existing.name} (${existing.code}) → ₹${r}`,
-      ref: existing.code, itemCode: existing.code, itemName: existing.name,
-      oldValue: { defaultPurchaseRate: existing.defaultPurchaseRate || 0 },
-      newValue: { defaultPurchaseRate: r },
-    });
-    return { success: true };
-  };
-
-  // Per-row item import. Mirrors handleBulkAddVendors so a single bad row never
-  // kills the batch. Defaults (unit=Nos, category=Mechanical, stock=0, min=0,
-  // lastPurchaseRate=0, location="", vendorLinks=[], photo/designFile=null) are
-  // already baked into the row by itemImport.mapRow — the handler just shovels
-  // them at itemCreate / itemUpdate.
-  //
-  // Update rule: fill ONLY blank fields on the existing item — never overwrite
-  // a populated value. In practice the only thing the import can add to an
-  // existing item is the HSN code (if existing.code was empty, which is rare
-  // — code is the table's PK-style identifier so it's almost always set).
-  // Returns { imported, updated, failed, failures } for the toast.
-  const handleBulkAddItems = async (importRows) => {
-    let imported = 0, updated = 0, failed = 0;
-    const failures = [];
-    if (!Array.isArray(importRows) || importRows.length === 0) return { imported, updated, failed, failures };
-
-    // Build a flat code-set across categories so auto-generated codes don't collide
-    // mid-batch (importRows themselves can also collide on auto-gen).
-    const usedCodes = new Set();
-    for (const arr of Object.values(items)) for (const it of (arr || [])) if (it.code) usedCodes.add(String(it.code).toUpperCase());
-
-    const ensureUniqueCode = (base) => {
-      let c = String(base || "").toUpperCase();
-      if (!c) c = generateItemCode("ITEM").toUpperCase();
-      if (!usedCodes.has(c)) { usedCodes.add(c); return c; }
-      let n = 2;
-      while (usedCodes.has(`${c}-${n}`)) n++;
-      const final = `${c}-${n}`;
-      usedCodes.add(final);
-      return final;
-    };
-
-    for (const row of importRows) {
-      try {
-        if (row._status === "update") {
-          // Locate the existing item — parseRows tagged it, but local state is
-          // the source of truth at write time. Prefer the existing code (which
-          // can match the row code or come via the name-fallback path).
-          const existingCat = row._existingCategory || Object.keys(items).find((cat) =>
-            (items[cat] || []).some((it) =>
-              (row._existingCode && it.code === row._existingCode) ||
-              String(it.name || "").toLowerCase() === String(row.name || "").toLowerCase()
-            )
-          );
-          const existing = (items[existingCat] || []).find((it) =>
-            (row._existingCode && it.code === row._existingCode) ||
-            String(it.name || "").toLowerCase() === String(row.name || "").toLowerCase()
-          );
-          if (!existing) { failed++; failures.push({ name: row.name, error: "existing item not found in state" }); continue; }
-
-          // Fill ONLY blank fields. With the 2-column import the only field the
-          // sheet can contribute is `code` (HSN) — everything else came from
-          // DEFAULTS and would clobber a real value. So we only touch `code`,
-          // and only when the existing item has no code at all.
-          const incomingCode = String(row.code || "").trim();
-          const needsCode = !existing.code && incomingCode;
-          if (!needsCode) { continue; }   // nothing to fill — silent skip
-
-          const merged = { ...existing, code: incomingCode };
-          const ures = await itemUpdate(existing.code, existingCat, merged, existingCat);
-          if (ures?.success) {
-            updated++;
-            setItems((prev) => {
-              const next = { ...prev };
-              next[existingCat] = (prev[existingCat] || []).map((it) => it.code === existing.code ? { ...ures.item, history: existing.history || [] } : it);
-              return next;
-            });
-            logAudit({ type: "inventory_edit", module: "Inventory", action: `Item Updated via Import: ${existing.name}`, ref: incomingCode, itemCode: incomingCode, itemName: existing.name });
-          } else {
-            failed++; failures.push({ name: row.name, error: ures?.error || "update failed" });
-          }
-        } else {
-          // New item — defaults already in the row from mapRow. Auto-gen code
-          // only when HSN was blank, and ensure it's unique against state + this
-          // batch's prior auto-gens.
-          const category = row.category || "Mechanical";
-          const code     = ensureUniqueCode(row.code || generateItemCode(row.name));
-          const stock    = Number(row.stock) || 0;
-          const min      = Number(row.min)   || 0;
-          const newItem = {
-            code,
-            name:             row.name,
-            unit:             row.unit || "Nos",
-            location:         row.location || "",
-            stock, min, max: 0,
-            status:           recomputeStatus(stock, min),
-            trend:            [stock, stock, stock, stock, stock],
-            vendorLinks:      row.vendorLinks || [],
-            vendorId:         "",
-            vendor:           "",
-            vendorPhone:      "",
-            lastPurchaseRate: Number(row.lastPurchaseRate) || 0,
-            photo:            row.photo       || "",
-            designFile:       row.designFile  || "",
-            designName:       row.designName  || "",
-          };
-          const cres = await itemCreate(category, newItem);
-          if (cres?.success) {
-            imported++;
-            setItems((prev) => ({ ...prev, [category]: [...(prev[category] || []), cres.item] }));
-            logAudit({ type: "inventory_add", module: "Inventory", action: `Item Imported: ${newItem.name} (${newItem.code})`, ref: newItem.code, itemCode: newItem.code, itemName: newItem.name, qty: 0 });
-          } else {
-            failed++; failures.push({ name: row.name, error: cres?.error || "create failed" });
-          }
-        }
-      } catch (e) {
-        failed++; failures.push({ name: row?.name, error: e?.message || String(e) });
-      }
-    }
-    if (failures.length) console.warn("[App] handleBulkAddItems — per-row failures:", failures);
-    return { imported, updated, failed, failures };
-  };
-
   // ── BOM / Outward handlers ──
   const handleUpdateBOM  = (key, newBom) => {
     setBomDefs((prev) => ({ ...prev, [key]: newBom }));
@@ -1596,18 +1283,6 @@ export default function App() {
       const it = (entry.items || [])[0] || {};
       logAudit({ type: "outward_manual", module: "Outward", action: `Manual Outward: ${it.name || ""} × ${it.issueQty || 0}`, ref: it.code || "", itemCode: it.code || "", itemName: it.name || "", qty: it.issueQty || 0, details: { dept: entry.dept } });
     }
-  };
-  const handleClearPending  = () => {
-    // One tap wiped every machine's shortfall with no way back — and on the
-    // Outward page the button just says "Clear", which reads like "hide this
-    // banner". Both entry points now ask first.
-    const n = pendingLog.length;
-    if (n === 0) return;
-    if (!window.confirm(`Delete ALL ${n} pending stock line${n === 1 ? "" : "s"} for every machine?\n\nThis cannot be undone. The shortfalls will no longer be tracked.`)) return;
-    setPendingLog([]);
-    if (isSupabaseEnabled()) clearAllPending().then((r) => { if (!r.success) console.warn("[App] Pending clear Supabase failed:", r.error); });
-    logAudit({ type: "pending_cleared", module: "Pending", action: `All pending stock cleared (${n} line${n === 1 ? "" : "s"})`, ref: "",
-               details: { lines: pendingLog.map((p) => `${p.bomKey || ""}${p.serialNo ? ` [${p.serialNo}]` : ""} ${p.code}×${p.pendingQty}`) } });
   };
 
   // ── Machine Tracker handlers ──
@@ -3477,134 +3152,6 @@ export default function App() {
     return res;
   };
 
-  // handleFulfillPending is the single-row Pending-Stock fulfillment handler.
-  // Owns the full mutation: stock move → pending-row reduction → audit event.
-  // Matches handleFulfillGroup's contract so the two handlers are symmetric.
-  //
-  // criticalInput (migration 026) carries the operator's checkbox/serial
-  // confirmation when the item is flagged Critical — null for non-critical
-  // outward and for the system auto-fulfill paths (inward / receive-PO,
-  // which call their own reducer inline and never route through here).
-  const handleFulfillPending = async (entry, issuedQty, criticalInput = null) => {
-    // Clamp to what is actually on hand. Without this, issuing more than the
-    // stock available reduces the pending row by the full amount while
-    // handleUpdateStock only moves what exists — the shortfall silently
-    // disappears. qty === issuedQty whenever stock is sufficient (the normal
-    // case), so this only changes the over-issue edge.
-    const onHand = items[entry.category]?.find((i) => i.code === entry.code)?.stock ?? 0;
-    const qty = Math.max(0, Math.min(issuedQty, onHand));
-    if (qty <= 0) {
-      flashStockError(`${entry.name || entry.code}: no stock on hand to issue`);
-      return;
-    }
-    // Move stock first and WAIT. On a Supabase failure handleUpdateStock reverts
-    // the optimistic UI to DB truth, so we must not touch pending_log — otherwise
-    // the stock comes back but the shortfall is already gone. Local mode always
-    // resolves success, so this is a no-op delay there.
-    const moveRes = await handleUpdateStock(entry.category, entry.code, -qty, `Fulfill: ${entry.bomKey}`);
-    if (moveRes && moveRes.success === false) return;
-
-    const issuedQtyApplied = qty;
-    const matched = (p) => entry.issueId
-      ? (p.issueId === entry.issueId && p.code === entry.code)
-      : (p.code === entry.code && p.bomKey === entry.bomKey && p.date === entry.date);
-    // 2b71bbc — functional-form setPendingLog + hoisted reducer so successive
-    // Give Material clicks on different rows stack correctly even inside the
-    // same React batch.
-    const applyFulfill = (list) => list.reduce((acc, p) => {
-      if (matched(p)) {
-        const rem = p.pendingQty - issuedQtyApplied;
-        if (rem > 0) acc.push({ ...p, pendingQty: rem, issueQty: (p.issueQty || 0) + issuedQtyApplied });
-      } else { acc.push(p); }
-      return acc;
-    }, []);
-    const newLog = applyFulfill(pendingLog);
-    setPendingLog((prev) => applyFulfill(prev));
-    if (isSupabaseEnabled()) {
-      const matchedRow = pendingLog.find(matched);
-      if (matchedRow && matchedRow.id) {
-        const rem = matchedRow.pendingQty - issuedQtyApplied;
-        if (rem > 0) pendingUpdate(matchedRow.id, { pendingQty: rem, issueQty: (matchedRow.issueQty || 0) + issuedQtyApplied }).then((r) => { if (!r.success) console.warn("[App] Pending update Supabase failed:", r.error); });
-        else pendingDelete(matchedRow.id).then((r) => { if (!r.success) console.warn("[App] Pending delete Supabase failed:", r.error); });
-      }
-    }
-    notifyMachineComplete(entry.issueId, newLog);
-    logAudit({
-      type: "pending_fulfilled", module: "Pending",
-      action: `Fulfilled: ${entry.name || entry.code} × ${issuedQtyApplied}`,
-      ref: entry.issueId || entry.code,
-      itemCode: entry.code, itemName: entry.name || entry.code,
-      qty: issuedQtyApplied, serialNo: entry.serialNo || "",
-      details: {
-        bomKey: entry.bomKey,
-        criticalInput: criticalInput || undefined,
-      },
-    });
-  };
-
-  // Atomic batch fulfillment for "Give All" — avoids stale-closure issues.
-  // itemsToFulfill may carry a per-line `criticalInput` from the PendingPage
-  // confirmation modal (migration 026); it's forwarded into the audit payload
-  // so compliance queries can see which serials / checkboxes closed the row.
-  const handleFulfillGroup = async (issueId, itemsToFulfill) => {
-    // Same two guards as handleFulfillPending: never take more than is on
-    // hand (an over-issue floored stock at 0 while the pending row dropped by
-    // the full amount — the shortfall just disappeared), and only reduce the
-    // pending rows whose stock move actually went through.
-    const onHandLeft = {};
-    const clamped = (itemsToFulfill || []).map((e) => {
-      if (!(e.code in onHandLeft)) onHandLeft[e.code] = items[e.category]?.find((i) => i.code === e.code)?.stock ?? 0;
-      const can = roundQty(Math.max(0, Math.min(Number(e.canIssue) || 0, onHandLeft[e.code])));
-      onHandLeft[e.code] = roundQty(onHandLeft[e.code] - can);
-      return { ...e, canIssue: can };
-    }).filter((e) => e.canIssue > 0);
-    if (clamped.length === 0) { flashStockError("No stock on hand to issue"); return; }
-    const moves = await Promise.all(clamped.map((e) =>
-      Promise.resolve(handleUpdateStock(e.category, e.code, -e.canIssue, `Fulfill: ${e.bomKey}`))
-        .then((r) => ({ e, ok: !(r && r.success === false) }), () => ({ e, ok: false }))
-    ));
-    itemsToFulfill = moves.filter((m) => m.ok).map((m) => m.e);
-    if (itemsToFulfill.length === 0) return;
-    const canMap = Object.fromEntries(itemsToFulfill.map((e) => [e.code, e.canIssue]));
-    // 2b71bbc — functional-form setPendingLog + hoisted reducer so Fulfill All
-    // on multiple groups stacks instead of overwriting earlier updates.
-    const applyFulfill = (list) => list.reduce((acc, p) => {
-      if (p.issueId !== issueId) { acc.push(p); return acc; }
-      const can = canMap[p.code];
-      if (!can) { acc.push(p); return acc; }
-      const rem = p.pendingQty - can;
-      if (rem > 0) acc.push({ ...p, pendingQty: rem, issueQty: (p.issueQty || 0) + can });
-      return acc;
-    }, []);
-    const newLog = applyFulfill(pendingLog);
-    setPendingLog((prev) => applyFulfill(prev));
-    if (isSupabaseEnabled()) {
-      // Per affected row: update or delete in Supabase
-      pendingLog.filter((p) => p.issueId === issueId && canMap[p.code]).forEach((p) => {
-        const can = canMap[p.code];
-        const rem = p.pendingQty - can;
-        if (p.id) {
-          if (rem > 0) pendingUpdate(p.id, { pendingQty: rem, issueQty: (p.issueQty || 0) + can }).then((r) => { if (!r.success) console.warn("[App] Pending group-update Supabase failed:", r.error); });
-          else pendingDelete(p.id).then((r) => { if (!r.success) console.warn("[App] Pending group-delete Supabase failed:", r.error); });
-        }
-      });
-    }
-    notifyMachineComplete(issueId, newLog);
-    const criticalConfirmations = itemsToFulfill
-      .filter((e) => e && e.criticalInput)
-      .map((e) => ({ code: e.code, name: e.name, qty: e.canIssue, input: e.criticalInput }));
-    logAudit({
-      type: "pending_fulfilled", module: "Pending",
-      action: `Batch Fulfilled: ${itemsToFulfill.length} items for Issue #${issueId}`,
-      ref: String(issueId),
-      qty: itemsToFulfill.reduce((s, e) => s + e.canIssue, 0),
-      details: {
-        items: itemsToFulfill.map((e) => `${e.code}×${e.canIssue}`),
-        criticalConfirmations: criticalConfirmations.length ? criticalConfirmations : undefined,
-      },
-    });
-  };
-
   const canDo = authCanDo;
 
   // Same defensive coercion as the notifications block above — this also runs
@@ -3628,9 +3175,11 @@ export default function App() {
     setDeptRatings, setHandovers, setMachineLog, setOutwardLog, setPendingHandoverItems, setSettings,
     followUps, items, notifyMachineComplete, pendingLog, pos, receivingRef, reconcileItems, setFollowUps,
     setInwardLog, setItems, setPendingLog, setPos, setVendorList, vendorList,
+    setArchivedItems,
   };
   const { handleSaveModules, handleAdminCleanupDone, handleCreateChecklistTemplate, handleUpdateChecklistTemplate, handleDeleteChecklistTemplate, handleSaveUserDepartments } = createSettingsHandlers(shell);
   const { handleCreatePO, handleUpdatePO, handleReceivePO, handleDeletePO, handleReverseReceive, handleConfirmOrder, handleFollowUpDone, handleAddVendor, handleEditVendor, handleDeleteVendor, handleRestoreVendor, handleBulkAddVendors } = createPurchaseHandlers(shell);
+  const { handleInwardComplete, handleCreateItemRow, handleUpdateItemRow, handleDeleteItemRow, handleRestoreItemRow, handleSetItemDefaultRate, handleBulkAddItems, handleClearPending, handleFulfillPending, handleFulfillGroup } = createInventoryHandlers(shell);
 
   // One set of props for BOM Outward, used by the Outward page and by the BOM
   // section embedded at the top of Machine Tracker — so both issue through
