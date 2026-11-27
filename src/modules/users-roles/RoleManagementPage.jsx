@@ -316,7 +316,7 @@ export default function RoleManagementPage({ canDo }) {
                 {["pages", "actions"].map((tab) => (
                   <button key={tab} onClick={() => setActiveTab(tab)}
                     className="flex-1 py-1.5 rounded-md text-xs font-semibold transition-all capitalize"
-                    style={{ background: activeTab === tab ? "rgba(26,31,46,0.1)" : "transparent", color: activeTab === tab ? "#0f141c" : "#64748b" }}>
+                    style={{ background: activeTab === tab ? "rgba(26,31,46,0.1)" : "transparent", color: activeTab === tab ? "var(--text-strong)" : "var(--text-muted)" }}>
                     {tab === "pages" ? "Page Access" : "Action Permissions"}
                   </button>
                 ))}

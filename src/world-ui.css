@@ -744,7 +744,7 @@
   button.dash-tile:active { transform: scale(.99); }
   .dash-stage { padding: 10px 8px; border-radius: var(--r-sm); background: var(--paper); border: 1px solid var(--line); text-align: center; }
   .dash-stage-value { display: block; font: 650 18px/1 var(--font-ui); color: var(--ink); font-variant-numeric: tabular-nums; }
-  .dash-stage[data-zero] .dash-stage-value { color: var(--ink-4); }
+  .dash-stage[data-zero] .dash-stage-value { color: var(--ink-3); }   /* was --ink-4: 2.57:1 on white (glitch-guard) */
   .dash-stage-label { margin-top: 5px; font-size: 12px; font-weight: 500; color: var(--ink-3); line-height: 1.2; }
   @media (max-width: 639px) {
     .dash-tile--lg { padding: 14px 16px; }
@@ -794,7 +794,7 @@
   .dash-line-head-name { color: var(--ink-2); }
   .dash-line-num { display: block; margin: 0 0 4px; font: 600 32px/1.1 var(--font-ui); letter-spacing: -0.02em; color: var(--ink);
     font-variant-numeric: tabular-nums; animation: dash-line-roll var(--dur-ui) var(--ease-enter) both; }
-  .dash-line-stage[data-zero] .dash-line-num { color: var(--ink-4); }
+  .dash-line-stage[data-zero] .dash-line-num { color: var(--ink-3); }   /* was --ink-4: 2.57:1 on white (glitch-guard) */
   .dash-line-sub { font-size: 12px; line-height: 1.4; color: var(--ink-3); }
   .dash-line-flags { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; min-width: 0; max-width: 100%; }
   .dash-line-flag { display: flex; align-items: flex-start; gap: 4px; font-size: 14px; font-weight: 600; line-height: 1.35; color: var(--ink-3); min-width: 0; }
