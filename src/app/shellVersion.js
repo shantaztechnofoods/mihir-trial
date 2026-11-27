@@ -10,4 +10,4 @@
 // destructures a key the shell object does not have. scripts/module-check.mjs
 // compares the keys by name against a Live checkout.
 // Read only by scripts/tests; the app does not import it.
-export const SHELL_API = 1;
+export const SHELL_API = 2;

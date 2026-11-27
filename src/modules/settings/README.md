@@ -17,6 +17,7 @@ Company and app settings, report language, PO template (from modules/purchase), 
 | `EmployeeMembersPanel.jsx` | 280 |
 | `ModulesPanel.jsx` | 70 |
 | `SettingsPage.jsx` | 789 |
+| `handlers.js` | 140 |
 | `index.js` | 4 |
 | `settingsUi.jsx` | 42 |
 
@@ -38,6 +39,13 @@ The screens here are presentational: state and every write (handler) still live 
 | `<SettingsPage>` | `onUpdateChecklistTemplate` | `handleUpdateChecklistTemplate` |
 | `<SettingsPage>` | `onDeleteChecklistTemplate` | `handleDeleteChecklistTemplate` |
 | `<SettingsPage>` | `onSaveUserDepartments` | `handleSaveUserDepartments` |
+
+**Phase C (docs/SHELL-CONTEXT.md):** `handleSaveModules`, `handleAdminCleanupDone`,
+`handleCreate/Update/DeleteChecklistTemplate` and `handleSaveUserDepartments` now live in this
+folder's `handlers.js` (`createSettingsHandlers(shell)`, moved verbatim; App.jsx calls it and wires
+the results as before — the checklist-template handlers also still reach Inventory / Machine Tracker
+through `outwardPageProps`). `handleSaveSettings`, `handleRegisterSignature` and `moduleOn` are
+shell API and stay in App.jsx. Needs `SHELL_API` ≥ 2 (`requiresShell` in MODULE.json).
 
 Depends on other modules (imported through their `index.js`): `modules/purchase`, `modules/reports`
 Shared code used: `src/shared/buildInfo.js`, `src/shared/components/LeadIcon.jsx`, `src/shared/settingsDefaults.js`, `src/shared/ui/OrgLayout.jsx`, `src/shared/ui/SignaturePad.jsx`, `src/shared/ui/Topbar.jsx`
@@ -87,6 +95,6 @@ Automated: `npm test && npm run build`, then `E2E_ONLY=<suite> scripts/ship.sh c
 See `docs/MODULE-PROMOTION.md`. In short:
 1. Copy this whole folder from the Trial ERP over `src/modules/settings/` in Live (replace, do not merge by hand).
 2. Diff `index.js`: every name other modules import must still be exported (`npm run build` fails if not).
-3. If the Trial change also touched the handlers listed above, copy those handler changes in `src/app/App.jsx` too (handlers are not inside the folder yet).
+3. The handlers in `handlers.js` travel with the folder. Run `node scripts/module-check.mjs settings --against <live>`: section 5b lists shell keys / the `createSettingsHandlers(shell)` line Live's App.jsx still needs (one-time App.jsx step). Changes to the shell handlers (`handleSaveSettings`, `handleRegisterSignature`) still need the App.jsx step.
 4. Apply any NEW migration the change needs (additive, in number order, BEFORE merging) and redeploy any Edge Function listed above that changed.
 5. `npm test`, `npm run build`, the browser suites listed above, then merge; Vercel deploys `main`.
