@@ -14,6 +14,7 @@ WhatsApp inbox: chats, messages, templates, media, unread counts, the agent, plu
 | `WhatsAppPage.jsx` | 1868 |
 | `index.js` | 5 |
 | `waHelpers.js` | 101 |
+| `whatsapp.css` | 316 — every `.wa-*` rule and the `--wa-*` colour tokens, moved verbatim from `src/index.css` (modules/fold-whatsapp-css, 2026-11-27); imported by `WhatsAppPage.jsx`. Only `.wa-icon-btn`'s 44px touch size stays in index.css's shared `@media (pointer: coarse)` block. |
 
 `index.js` is the public surface — the app shell and other modules import only from it:
 `waAlertTime`, `waDispatch`, `waReadSeen`, `waUnreadCount`, `WhatsAppPage`
