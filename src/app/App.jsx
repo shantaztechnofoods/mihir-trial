@@ -56,8 +56,7 @@ import { navItems } from "./layout/navItems.js";
 import { NotificationPanel } from "./layout/NotificationPanel.jsx";
 import { Sidebar } from "./layout/Sidebar.jsx";
 // perf/lazy-pages (2026-11-27) — every page screen is its own on-demand chunk (src/app/lazyPages.js).
-import { AIPage, AnalyticsPage, DashboardPage, InventoryPage, InwardPage, OutwardPage, PendingPage, MachinePage, OrderPipelinePage, VendorsPage, HistoryPage, ReportCenterPage, SettingsPage, WhatsAppPage, prefetchPage, prefetchPagesWhenIdle } from "./lazyPages.js";
-import { ReadyMachinesPopup } from "../modules/machine-tracker/index.js";
+import { AIPage, AnalyticsPage, DashboardPage, InventoryPage, InwardPage, OutwardPage, PendingPage, MachinePage, OrderPipelinePage, VendorsPage, HistoryPage, ReportCenterPage, SettingsPage, WhatsAppPage, ReadyMachinesPopup, prefetchPage, prefetchPagesWhenIdle } from "./lazyPages.js";
 import { cleanPendingJobs } from "../modules/pending-jobs/index.js";
 import { waAlertTime, waDispatch, waReadSeen, waUnreadCount } from "../modules/whatsapp/index.js";
 import { APP_BUILD } from "../shared/buildInfo.js";
@@ -4451,6 +4450,7 @@ export default function App() {
       {/* ── 2026-11-03 — Admin Ready popup (Dashboard / Machine Tracker) ── */}
       {readyAdmin && readyPopupItems.length > 0 && (activePage === "dashboard" || activePage === "machines") && (
         <SafeBoundary name="ready-popup" label="ready machines popup" overlay onClose={markReadySeen}>
+        <React.Suspense fallback={null}>
         <ReadyMachinesPopup
           items={readyPopupItems}
           bomDefs={bomDefs}
@@ -4461,6 +4461,7 @@ export default function App() {
             setMtFilterReq({ filter: "completed", n: Date.now() });
           }}
         />
+        </React.Suspense>
         </SafeBoundary>
       )}
 

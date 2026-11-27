@@ -49,6 +49,10 @@ export const WhatsAppPage      = page("whatsapp", "WhatsAppPage");
 export const HistoryPage       = page("history", "HistoryPage");
 export const ReportCenterPage  = page("reports", "ReportCenterPage");
 export const SettingsPage      = page("settings", "SettingsPage");
+// The "machines ready" popup lives in the Machine Tracker folder; importing it
+// statically through that folder's index.js kept the whole Machine Tracker
+// screen inside the App chunk, so it loads on demand too (overlay, fallback null).
+export const ReadyMachinesPopup = lazy(() => importWithReload(() => import("../modules/machine-tracker/ReadyMachinesPopup.jsx")).then((m) => ({ default: m.ReadyMachinesPopup })));
 
 /** Start downloading a page's code (no-op if unknown or already started). Never throws. */
 export function prefetchPage(id) {
@@ -67,7 +71,7 @@ export function prefetchPagesWhenIdle(order) {
   const next = () => {
     const id = queue.shift();
     if (!id) return;
-    load(id).catch(() => {}).finally(() => idle(next, { timeout: 3000 }));
+    load(id).catch(() => {}).finally(() => idle(next, { timeout: 1000 }));
   };
-  setTimeout(() => idle(next, { timeout: 3000 }), 1500);
+  setTimeout(() => idle(next, { timeout: 1000 }), 300);
 }
