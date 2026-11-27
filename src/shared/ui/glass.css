@@ -1,0 +1,330 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   SPATIAL GLASS (2026-11-27) — the handler's chosen look, applied as an
+   UPGRADE of the current interface (reference: glass-v3-spatial-light).
+   Light = visionOS-style frosted glass on a soft daylight field.
+   Dark  = the matching petrol / navy glass.
+
+   Rules this file keeps:
+   * Surfaces only: background, border COLOUR, box-shadow, border-radius,
+     backdrop-filter, colour. Never width, height, padding, margin, gap,
+     border WIDTH, font-size or letter-spacing, so every element keeps the
+     exact box it had (proved by the overlap probe: 0 boxes moved).
+   * No logic, no markup, no words. Loaded after world-ui.css (main.jsx).
+   * Phones / touch: no backdrop blur at all, solid 96 % surfaces.
+   * prefers-reduced-transparency: solid surfaces, no blur, no sheen.
+   * prefers-reduced-motion: no lift, no press scale added here.
+   * Screen only: printed reports and certificates are never touched.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Tokens ─────────────────────────────────────────────────────────────── */
+@media screen {
+  :root {
+    --g-ease: cubic-bezier(.16, 1, .3, 1);
+    /* the daylight field behind everything */
+    --g-env:
+      radial-gradient(70% 45% at 30% 0%, #ffffff 0%, rgba(255, 255, 255, 0) 70%),
+      radial-gradient(60% 40% at 85% 10%, #eef6ff 0%, rgba(238, 246, 255, 0) 70%),
+      linear-gradient(180deg, #fbfcfd 0%, #f2f5f7 60%, #eceff2 100%);
+    --g-env-solid: #f2f5f7;
+    /* glass material */
+    --g-glass: linear-gradient(160deg, rgba(255, 255, 255, .80) 0%, rgba(255, 255, 255, .58) 50%, rgba(255, 255, 255, .50) 100%);
+    --g-tint: rgba(255, 255, 255, .30);
+    --g-glass-strong: linear-gradient(160deg, rgba(255, 255, 255, .94), rgba(255, 255, 255, .70));
+    --g-solid: rgba(250, 251, 252, .96);           /* phones, touch, reduced transparency */
+    --g-rim: rgba(255, 255, 255, .95);             /* the 1px lit edge */
+    --g-edge: rgba(20, 40, 50, .07);               /* the hairline that separates glass from field */
+    --g-inner: inset 0 1px 0 rgba(255, 255, 255, 1), inset 0 0 0 1px rgba(255, 255, 255, .5);
+    --g-drop: 0 1px 2px rgba(40, 60, 70, .06), 0 16px 32px -16px rgba(40, 60, 75, .24);
+    --g-drop-hi: 0 2px 4px rgba(40, 60, 70, .08), 0 22px 40px -16px rgba(40, 60, 75, .32);
+    --g-well: rgba(20, 40, 50, .05);
+    --g-chip: rgba(20, 40, 50, .07);
+    --g-chip-hi: rgba(255, 255, 255, .92);
+    --g-chip-shadow: inset 0 1px 0 #fff, 0 4px 14px -6px rgba(40, 60, 70, .28);
+    --g-hair: rgba(20, 40, 50, .08);
+    --g-side-tx: #3b4a52;  --g-side-tx2: #56656d;  --g-side-ink: #0c1418;
+    --g-blur: blur(16px) saturate(160%);
+    --g-cta: linear-gradient(180deg, #4b74f2 0%, #2a4fd6 100%);
+    --g-cta-shadow: inset 0 1px 0 rgba(255, 255, 255, .40), inset 0 -1px 0 rgba(0, 0, 0, .16), 0 8px 22px -8px rgba(46, 80, 214, .65);
+    --g-cta-shadow-hi: inset 0 1px 0 rgba(255, 255, 255, .45), 0 12px 28px -8px rgba(46, 80, 214, .8);
+  }
+  /* secondary ink one step darker than world-ui's #667085 (4.4:1 on a glass
+     well) so it clears AA on every glass surface: 5.3:1 on rgb(238,240,242) */
+  :root:not([data-theme="dark"]) { --ink-3: #5a6372; }
+  :root[data-theme="dark"] {
+    --g-env:
+      radial-gradient(60% 40% at 50% -6%, rgba(169, 212, 255, .10) 0%, rgba(169, 212, 255, 0) 70%),
+      radial-gradient(28% 18% at 18% 12%, rgba(255, 217, 163, .07) 0%, rgba(255, 217, 163, 0) 70%),
+      radial-gradient(28% 18% at 82% 10%, rgba(255, 217, 163, .06) 0%, rgba(255, 217, 163, 0) 70%),
+      radial-gradient(80% 50% at 50% 0%, #13222b 0%, rgba(19, 34, 43, 0) 70%),
+      linear-gradient(180deg, #0d1820 0%, #09121a 58%, #070d12 100%);
+    --g-env-solid: #0b141b;
+    --g-glass: linear-gradient(160deg, rgba(255, 255, 255, .13) 0%, rgba(255, 255, 255, .06) 45%, rgba(255, 255, 255, .045) 100%);
+    --g-tint: rgba(30, 44, 52, .55);
+    --g-glass-strong: linear-gradient(160deg, rgba(255, 255, 255, .095), rgba(255, 255, 255, .04));
+    --g-solid: rgba(24, 36, 43, .96);
+    --g-rim: rgba(255, 255, 255, .16);
+    --g-edge: rgba(255, 255, 255, .08);
+    --g-inner: inset 0 1px 0 rgba(255, 255, 255, .20), inset 0 0 0 1px rgba(255, 255, 255, .06);
+    --g-drop: 0 2px 6px rgba(0, 0, 0, .18), 0 20px 40px -16px rgba(0, 0, 0, .6);
+    --g-drop-hi: 0 3px 8px rgba(0, 0, 0, .22), 0 28px 48px -16px rgba(0, 0, 0, .68);
+    --g-well: rgba(0, 0, 0, .22);
+    --g-chip: rgba(255, 255, 255, .08);
+    --g-chip-hi: rgba(255, 255, 255, .16);
+    --g-chip-shadow: inset 0 1px 0 rgba(255, 255, 255, .22), 0 4px 14px -6px rgba(0, 0, 0, .45);
+    --g-hair: rgba(255, 255, 255, .09);
+    --g-side-tx: #c9d5da;  --g-side-tx2: #9fb1b8;  --g-side-ink: #ffffff;
+    --g-cta: linear-gradient(180deg, #2a80e6 0%, #0a56b8 100%);
+    /* status red as TEXT on dark glass: #d5372e measured 3.6:1 → this 6.6:1 */
+    --bad: #ff8a80;
+    --g-cta-shadow: inset 0 1px 0 rgba(255, 255, 255, .38), inset 0 -1px 0 rgba(0, 0, 0, .22), 0 10px 26px -8px rgba(10, 132, 255, .6);
+    --g-cta-shadow-hi: inset 0 1px 0 rgba(255, 255, 255, .45), 0 14px 32px -8px rgba(10, 132, 255, .75);
+
+    /* Petrol → petrol/navy glass. Same token names the whole app already reads
+       (world-ui.css PETROL STEEL block), so every page follows. Text steps are
+       measured against --p-s3 (#24353e, the lightest dark surface):
+       tx1 15.6:1 · tx2 9.4:1 · tx3 6.6:1 (4.8:1 on a pod inside the hero) · priTx 6.9:1. */
+    --p-bg: #0b141b; --p-s1: #17242b; --p-s2: #1c2b33; --p-s3: #24353e;
+    --p-side: #101c23; --p-sideAct: rgba(255, 255, 255, .16);
+    --p-line: #2a3b44; --p-line2: #3e535e;
+    --p-tx1: #eef3f5; --p-tx2: #b9c8ce; --p-tx3: #a7b9c0;
+    --p-pri: #3d9bff; --p-priHov: #63b0ff; --p-priPress: #2b88ee; --p-onPri: #04121f;
+    --p-priTx: #7ab8ff; --p-priWash: #13304a; --p-ring: #7ab8ff; --p-priLine: #26527c;
+    --p-ringHalo: rgba(61, 155, 255, .35); --p-priRgb: 61, 155, 255; --p-pri100: #163a5c;
+    --p-fillStrong: #2a3f4a; --p-fillInk: #2a3f4a; --p-fillMid: #5d727b;
+    --p-toastBg: #eef3f5; --p-toastTx: #101c23; --p-toastLink: #0a63d1;
+  }
+}
+
+/* ── Environment: the field the glass floats on ─────────────────────────── */
+@media screen {
+  /* The field is painted once on its own fixed, composited layer, so content
+     repaints (page switch, dialogs, scrolling) never repaint the gradients. */
+  html body .app-shell { background: var(--g-env-solid) !important; isolation: isolate; }
+  html body .app-shell::before {
+    content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+    background: var(--g-env); will-change: transform; transform: translateZ(0);
+  }
+  html:where([data-theme="dark"]) body, html:where([data-theme="dark"]) body #root { background-color: var(--g-env-solid); }
+}
+
+/* ── Glass material (desktop) ───────────────────────────────────────────── */
+@media screen {
+  /* Big panels: the sidebar rail, the sticky header, the hero card, sections */
+  html body .app-shell .app-sidebar.sidebar-slate {
+    background: var(--g-glass), var(--g-tint) !important;
+    /* no backdrop blur: behind the rail is only the static field, so a blur
+       would cost every frame and show nothing (frame-budget) */
+    -webkit-backdrop-filter: none; backdrop-filter: none;
+    border-right-color: var(--g-edge) !important;
+    box-shadow: inset -1px 0 0 var(--g-rim), 12px 0 40px -28px rgba(40, 60, 75, .30) !important;
+    color: var(--g-side-tx);
+  }
+  html body .app-shell .page-header {
+    background: linear-gradient(180deg, rgba(255, 255, 255, .62), rgba(255, 255, 255, .42)) !important;
+    -webkit-backdrop-filter: var(--g-blur); backdrop-filter: var(--g-blur);
+    border-bottom-color: var(--g-edge) !important;
+  }
+  html[data-theme="dark"] body .app-shell .page-header { background: linear-gradient(180deg, rgba(16, 28, 35, .72), rgba(16, 28, 35, .55)) !important; }
+  html body .app-shell .page-header.is-compact { box-shadow: 0 10px 30px -20px rgba(40, 60, 75, .45); }
+
+  html body .app-shell :is(.section-card, .kpi-tile, .hero-tile, .premium-card, .dash-tile) {
+    background: var(--g-glass), var(--g-tint) !important;
+    border-color: transparent !important;
+    box-shadow: var(--g-inner), var(--g-drop), 0 0 0 1px var(--g-edge) !important;
+  }
+  html body .app-shell .section-card { border-radius: 24px !important; }
+  html body .app-shell .section-card.dash-line { border-radius: 32px !important; }
+  html body .app-shell .dash-tile { border-radius: 24px !important; }
+  html body .app-shell .dash-tile--sm { border-radius: 20px !important; }
+  html body .app-shell :is(.kpi-tile, .hero-tile, .premium-card) { border-radius: 22px !important; }
+
+  @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+    html body .app-shell button.dash-tile { transition: box-shadow .3s var(--g-ease), transform .35s var(--g-ease); }
+    html body .app-shell button.dash-tile:hover { transform: translateY(-2px); box-shadow: var(--g-inner), var(--g-drop-hi), 0 0 0 1px var(--g-edge) !important; }
+    html body .app-shell button.dash-tile:active { transform: translateY(0) scale(.985); transition-duration: .12s; }
+  }
+}
+
+/* ── Sidebar contents ───────────────────────────────────────────────────── */
+@media screen {
+  html body .app-shell .app-sidebar :is(.sb-divider) { border-bottom-color: var(--g-hair) !important; }
+  html body .app-shell .app-sidebar :is(.sb-divider-top) { border-top-color: var(--g-hair) !important; }
+  /* light rail: the logo's tagline and ® are painted for a dark rail — give them ink */
+  html:not([data-theme="dark"]) body .app-sidebar .sb-logo-wide path[fill="#C3CCDB"] { fill: #2b3438; }
+  html:not([data-theme="dark"]) body .app-sidebar .sb-logo-wide path { stroke-opacity: 0; }
+  /* dark rail: the logo sits on a white plate, as in the reference */
+  html[data-theme="dark"] body .app-sidebar .sb-brand { background: rgba(255, 255, 255, .94); border-radius: 18px; box-shadow: inset 0 1px 0 #fff, 0 6px 18px -8px rgba(0, 0, 0, .5); }
+  html[data-theme="dark"] body .app-sidebar .sb-logo-wide path[fill="#C3CCDB"] { fill: #2b3438; }
+  html[data-theme="dark"] body .app-sidebar .sb-logo-wide path { stroke-opacity: 0; }
+
+  html body .app-shell .app-sidebar :is(.sb-search, .sb-iconbtn) {
+    background: var(--g-well) !important; border-color: transparent !important; color: var(--g-side-tx2) !important; border-radius: 999px !important; box-shadow: none !important;
+  }
+  html body .app-shell .app-sidebar .sb-search { color: var(--g-side-tx2) !important; }
+  html body .app-shell .app-sidebar :is(.sb-search, .sb-iconbtn):hover { background: var(--g-chip) !important; color: var(--g-side-ink) !important; }
+  html body .app-shell .app-sidebar .sb-kbd { background: var(--g-chip) !important; border-color: transparent !important; color: var(--g-side-tx) !important; border-radius: 7px; }
+
+  html body .app-shell .app-sidebar .sb-section { color: var(--g-side-tx2) !important; }
+  html body .app-shell .app-sidebar .sb-item { color: var(--g-side-tx) !important; border-radius: 999px !important; }
+  html body .app-shell .app-sidebar .sb-item .sb-icon { color: inherit !important; }
+  html body .app-shell .app-sidebar .sb-item:not(.is-active):hover { background: var(--g-chip) !important; color: var(--g-side-ink) !important; }
+  html body .app-shell .app-sidebar .sb-item.is-active {
+    background: var(--g-chip-hi) !important; color: var(--g-side-ink) !important; box-shadow: var(--g-chip-shadow) !important; font-weight: 600 !important;
+  }
+  html body .app-shell .app-sidebar .sb-item.is-active .sb-icon { color: var(--g-side-ink) !important; }
+  html body .app-shell .app-sidebar .sb-item > span[class*="rounded-full"]:last-child { background: var(--g-chip) !important; color: var(--g-side-tx) !important; }
+  html body .app-shell .app-sidebar .sb-user-trigger { background: var(--g-well) !important; border-radius: 18px !important; }
+  html body .app-shell .app-sidebar .sb-user-trigger:hover, html body .app-shell .app-sidebar .sb-user-trigger.is-open { background: var(--g-chip) !important; }
+  html body .app-shell .app-sidebar .sb-user-name { color: var(--g-side-ink) !important; }
+  html body .app-shell .app-sidebar .sb-user-trigger .sb-user-name + div[style] { color: var(--g-side-tx2) !important; }
+  html body .app-shell .app-sidebar .sb-user-trigger .w-8.h-8.rounded-full[style] { background-color: #0c1418 !important; }
+  html body .app-shell .app-sidebar :is(.sb-user-chevron, .sb-collapse) { color: var(--g-side-tx2) !important; }
+  html body .app-shell .app-sidebar .sb-collapse:hover { background: var(--g-chip) !important; color: var(--g-side-ink) !important; }
+  html body .app-shell .app-sidebar nav::-webkit-scrollbar-thumb { background: var(--g-chip) !important; }
+  html body .app-shell .app-sidebar .absolute.rounded-full.border-\[2px\] { border-color: var(--g-env-solid) !important; }
+}
+
+/* ── Header controls: theme switch + primary action ─────────────────────── */
+@media screen {
+  html body .theme-switch {
+    background: var(--g-glass), var(--g-tint); box-shadow: var(--g-inner), 0 6px 18px -10px rgba(40, 60, 75, .35), 0 0 0 1px var(--g-edge);
+  }
+  html body .theme-switch button { transition: background-color .2s var(--g-ease), color .2s var(--g-ease), transform .15s var(--g-ease); }
+  html body .theme-switch button[aria-checked="true"] { background: var(--g-chip-hi); color: var(--p-tx1); box-shadow: var(--g-chip-shadow); }
+  html:not([data-theme="dark"]) body .theme-switch button[aria-checked="true"] { color: #0c1418; }
+  html body .theme-switch button:active { transform: scale(.96); }
+
+  html body :is(.page-header .page-header-actions, #root, body) .btn-primary-brand:where(:not(:disabled)) {
+    background: var(--g-cta) !important; color: #fff !important; border-color: transparent !important;
+    border-radius: 999px !important; box-shadow: var(--g-cta-shadow) !important;
+    transition: transform .15s var(--g-ease), box-shadow .2s var(--g-ease), filter .2s var(--g-ease) !important;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    html body :is(.page-header .page-header-actions, #root, body) .btn-primary-brand:where(:not(:disabled)):hover { background: var(--g-cta) !important; filter: brightness(1.06); box-shadow: var(--g-cta-shadow-hi) !important; }
+  }
+  html body :is(.page-header .page-header-actions, #root, body) .btn-primary-brand:where(:not(:disabled)):active { transform: scale(.97); }
+}
+
+/* ── Dashboard: production line pods, view switch, attention rows ───────── */
+@media screen {
+  html body .app-shell .dash-line-views {
+    background: var(--g-well) !important; border-color: transparent !important; border-radius: 999px !important;
+  }
+  html body .app-shell .dash-line-views > button { border-radius: 999px !important; }
+  html body .app-shell .dash-line-views > button[aria-pressed="true"] { background: var(--g-chip-hi) !important; box-shadow: var(--g-chip-shadow) !important; color: var(--ink) !important; }
+  html[data-theme="dark"] body .app-shell .dash-line-views > button[aria-pressed="true"] { color: var(--p-tx1) !important; }
+  html body .app-shell .f3-ring { background: var(--g-well) !important; border-color: transparent !important; }
+
+  /* Each stage becomes a raised pod. The pod is painted on ::before, inset
+     4px from the stage's own box, so nothing moves; the chevron (::after)
+     now sits in the gap between two pods, like a connector. */
+  html body .app-shell .dash-line-stage { isolation: isolate; background: none !important; border-radius: 22px; }
+  html body .app-shell .dash-line-strip > .dash-line-stage::before {
+    content: ""; position: absolute; inset: 0 4px; z-index: -1; border: 0; border-radius: 20px; pointer-events: none;
+    background: var(--g-glass-strong), var(--g-tint);
+    box-shadow: var(--g-inner), 0 1px 2px rgba(40, 60, 70, .06), 0 14px 30px -18px rgba(40, 60, 75, .30), 0 0 0 1px var(--g-edge);
+    transition: box-shadow .3s var(--g-ease), transform .35s var(--g-ease);
+  }
+  html[data-theme="dark"] body .app-shell .dash-line-strip > .dash-line-stage::before { box-shadow: var(--g-inner), 0 14px 30px -16px rgba(0, 0, 0, .6), 0 0 0 1px var(--g-edge); }
+  html body .app-shell .dash-line-stage + .dash-line-stage::after { z-index: 1; background: var(--g-env-solid); border-color: var(--g-hair); }
+  html body .app-shell .dash-line-stage:has(.dash-line-flag[data-tone="late"])::before { box-shadow: var(--g-inner), 0 14px 30px -18px rgba(40, 60, 75, .30), 0 0 0 1.5px color-mix(in srgb, var(--bad) 55%, transparent); }
+  html body .app-shell .dash-line-stage:has(.dash-line-flag[data-tone="near"])::before { box-shadow: var(--g-inner), 0 14px 30px -18px rgba(40, 60, 75, .30), 0 0 0 1.5px color-mix(in srgb, var(--wait) 55%, transparent); }
+  @media (hover: hover) and (pointer: fine) {
+    html body .app-shell .dash-line-stage:hover { background: none !important; }
+    html body .app-shell .dash-line-strip > .dash-line-stage:hover::before { box-shadow: var(--g-inner), 0 2px 4px rgba(40, 60, 70, .08), 0 22px 40px -18px rgba(40, 60, 75, .38), 0 0 0 1px var(--g-edge); }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    html body .app-shell .dash-line-strip > .dash-line-stage:hover::before { transform: translateY(-2px); }
+    html body .app-shell .dash-line-stage:active::before { transform: scale(.98); transition-duration: .12s; }
+  }
+  html body .app-shell .dash-line-legend { border-top-color: var(--g-hair) !important; }
+
+  html body .app-shell .dash-line-rows { background: var(--g-well); border-color: transparent !important; border-radius: 18px !important; }
+  html body .app-shell .dash-line-rows > li + li { border-top-color: var(--g-hair) !important; }
+  html body .app-shell .dash-line-rows > li:first-child .dash-line-row { border-radius: 18px 18px 0 0; }
+  html body .app-shell .dash-line-rows > li:last-child .dash-line-row { border-radius: 0 0 18px 18px; }
+  html body .app-shell .dash-line-rows > li:only-child .dash-line-row { border-radius: 18px; }
+  html body .app-shell .dash-line-row { transition: background-color .2s var(--g-ease); }
+  @media (hover: hover) and (pointer: fine) {
+    html body .app-shell .dash-line-row:hover { background: var(--g-chip-hi) !important; }
+    html body .app-shell .dash-line-toggle:hover { background: var(--g-chip) !important; }
+  }
+  html body .app-shell .dash-line-empty { background: var(--g-well); border-color: transparent !important; border-radius: 18px; }
+  html body .app-shell .dash-stage { background: var(--g-well) !important; border-color: transparent !important; border-radius: 14px !important; }
+}
+
+/* ── Phones, tablets with touch: no blur at all — solid 96 % surfaces ──── */
+@media screen and (max-width: 767.98px), screen and (hover: none), screen and (pointer: coarse) {
+  html body .app-shell .app-sidebar.sidebar-slate,
+  html body .app-shell .page-header,
+  html body .mobile-tabbar { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+  html body .app-shell .app-sidebar.sidebar-slate { background: var(--g-solid) !important; }
+  html body .app-shell .page-header { background: var(--g-solid) !important; }
+  html body .mobile-tabbar { background: var(--g-solid) !important; border-top-color: var(--g-edge) !important; }
+  html body .app-shell :is(.section-card, .kpi-tile, .hero-tile, .premium-card, .dash-tile) {
+    background: var(--g-solid) !important; box-shadow: inset 0 1px 0 var(--g-rim), 0 1px 2px rgba(40, 60, 70, .06), 0 10px 24px -16px rgba(40, 60, 75, .28), 0 0 0 1px var(--g-edge) !important;
+  }
+  html body .app-shell .dash-line-strip > .dash-line-stage::before { inset: 0 2px; border-radius: 18px; background: var(--g-solid); }
+}
+@media screen and (max-width: 639px) {
+  html body .app-shell .section-card.dash-line { border-radius: 26px !important; }
+  html body .app-shell .section-card { border-radius: 20px !important; }
+}
+
+/* ── Accessibility fallbacks ────────────────────────────────────────────── */
+@media screen and (prefers-reduced-transparency: reduce) {
+  html body .app-shell .app-sidebar.sidebar-slate, html body .app-shell .page-header, html body .mobile-tabbar {
+    -webkit-backdrop-filter: none !important; backdrop-filter: none !important; background: var(--g-solid) !important;
+  }
+  html body .app-shell :is(.section-card, .kpi-tile, .hero-tile, .premium-card, .dash-tile), html body .theme-switch { background: var(--g-solid) !important; }
+  html body .app-shell .dash-line-strip > .dash-line-stage::before { background: var(--g-solid); }
+  html body .app-shell { background: var(--g-env-solid) !important; }
+}
+@media screen and (prefers-reduced-motion: reduce) {
+  html body .app-shell button.dash-tile, html body .app-shell .dash-line-strip > .dash-line-stage::before { transition: none !important; transform: none !important; }
+}
+
+/* Bell / nav count badge: white on #ef4444 measured 3.8:1 → #d92d20 is 5.0:1 */
+@media screen {
+  html body .app-shell .app-sidebar :is([style*="#ef4444"], [style*="rgb(239, 68, 68)"]) { background-color: #d92d20 !important; background-image: none !important; }
+}
+
+
+/* ── AA for hard-coded hues (coordinator round 2, 2026-11-27) ─────────────
+   Stage tags, rack codes and a few chips paint their text with an inline
+   colour from a JS constant (machineStages.js, RACK_UNIT_COLORS …) that was
+   chosen as a FILL colour: 1.8-3.7:1 as text. Each keeps its hue and moves
+   one step darker in light / lighter in dark until it clears 4.5:1 on white,
+   on its own 12 % tint and on the dark glass. Screen only; reports print as
+   before. Same idea for the Tailwind greys/reds used as small text. */
+@media screen {
+  html:not([data-theme="dark"]) body #root :is([style^="color: rgb(234, 179, 8)"], [style*="; color: rgb(234, 179, 8)"]) { color: #854d0e !important; }
+  html[data-theme="dark"] body #root :is([style^="color: rgb(234, 179, 8)"], [style*="; color: rgb(234, 179, 8)"]) { color: #facc15 !important; }
+  html:not([data-theme="dark"]) body #root :is([style^="color: rgb(202, 138, 4)"], [style*="; color: rgb(202, 138, 4)"]) { color: #854d0e !important; }
+  html[data-theme="dark"] body #root :is([style^="color: rgb(202, 138, 4)"], [style*="; color: rgb(202, 138, 4)"]) { color: #facc15 !important; }
+  html:not([data-theme="dark"]) body #root :is([style^="color: rgb(217, 119, 6)"], [style*="; color: rgb(217, 119, 6)"]) { color: #92400e !important; }
+  html[data-theme="dark"] body #root :is([style^="color: rgb(217, 119, 6)"], [style*="; color: rgb(217, 119, 6)"]) { color: #fbbf24 !important; }
+  html:not([data-theme="dark"]) body #root :is([style^="color: rgb(14, 116, 144)"], [style*="; color: rgb(14, 116, 144)"]) { color: #0e7490 !important; }
+  html[data-theme="dark"] body #root :is([style^="color: rgb(14, 116, 144)"], [style*="; color: rgb(14, 116, 144)"]) { color: #67d8ee !important; }
+  html:not([data-theme="dark"]) body #root :is([style^="color: rgb(8, 145, 178)"], [style*="; color: rgb(8, 145, 178)"]) { color: #0e7490 !important; }
+  html[data-theme="dark"] body #root :is([style^="color: rgb(8, 145, 178)"], [style*="; color: rgb(8, 145, 178)"]) { color: #5fd8f0 !important; }
+  html:not([data-theme="dark"]) body #root :is([style^="color: rgb(22, 163, 74)"], [style*="; color: rgb(22, 163, 74)"]) { color: #15803d !important; }
+  html[data-theme="dark"] body #root :is([style^="color: rgb(22, 163, 74)"], [style*="; color: rgb(22, 163, 74)"]) { color: #5ee08f !important; }
+  html:not([data-theme="dark"]) body #root :is([style^="color: rgb(234, 88, 12)"], [style*="; color: rgb(234, 88, 12)"]) { color: #c2410c !important; }
+  html[data-theme="dark"] body #root :is([style^="color: rgb(234, 88, 12)"], [style*="; color: rgb(234, 88, 12)"]) { color: #fb923c !important; }
+  html:not([data-theme="dark"]) body #root :is([style^="color: rgb(79, 70, 229)"], [style*="; color: rgb(79, 70, 229)"]) { color: #4f46e5 !important; }
+  html[data-theme="dark"] body #root :is([style^="color: rgb(79, 70, 229)"], [style*="; color: rgb(79, 70, 229)"]) { color: #a5b4fc !important; }
+  html:not([data-theme="dark"]) body #root :is([style^="color: rgb(220, 38, 38)"], [style*="; color: rgb(220, 38, 38)"]) { color: #b91c1c !important; }
+  html[data-theme="dark"] body #root :is([style^="color: rgb(220, 38, 38)"], [style*="; color: rgb(220, 38, 38)"]) { color: #ff8a80 !important; }
+  html:not([data-theme="dark"]) body #root :is([style^="color: rgb(107, 114, 128)"], [style*="; color: rgb(107, 114, 128)"]) { color: #525a66 !important; }
+  html[data-theme="dark"] body #root :is([style^="color: rgb(107, 114, 128)"], [style*="; color: rgb(107, 114, 128)"]) { color: #b9c8ce !important; }
+  html:not([data-theme="dark"]) body .app-shell :is(.text-slate-400, .text-gray-400, .text-slate-500, .text-gray-500):where(:not(:disabled)) { color: #56606e !important; }
+  html:not([data-theme="dark"]) body .app-shell :is(.text-red-600, .text-red-500) { color: #b91c1c !important; }
+  html:not([data-theme="dark"]) body .app-shell :is(.text-green-600, .text-emerald-600) { color: #15803d !important; }
+  html:not([data-theme="dark"]) body .app-shell :is(.text-amber-600, .text-orange-600, .text-amber-500, .text-yellow-600) { color: #9a3f07 !important; }
+  /* Report Center (screen view): the faint grey of small meta text 3.1:1 → 5.3:1 */
+  .mr-doc.r4-doc { --r4-faint: #636b7c; }
+  .mr-doc, .rpt-lh, .rpt-titleblock, .report-area { --rpt-faint: #646a74; }
+  /* build badge: white on 92 % green 3.0:1 → solid green-700 5.0:1 */
+  #erp-build-badge { background: #15803d !important; }
+}

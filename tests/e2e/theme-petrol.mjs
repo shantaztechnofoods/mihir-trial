@@ -32,7 +32,7 @@ const bodyBg = (p) => p.evaluate(() => getComputedStyle(document.body).backgroun
   ok("nothing saved until the person picks", await p.evaluate(() => localStorage.getItem("erp_theme_mode")) === null);
   await sw.locator("[data-theme-option='auto']").click(); await p.waitForTimeout(400);
   ok("Auto: device dark → data-theme dark", await theme(p) === "dark");
-  ok("Auto: page is the petrol dark background", await bodyBg(p) === "rgb(8, 19, 21)", await bodyBg(p));
+  ok("Auto: page is the petrol/navy glass background (spatial glass, 2026-11-27)", await bodyBg(p) === "rgb(11, 20, 27)", await bodyBg(p));
 
   const rects = () => p.evaluate(() => [...document.querySelectorAll(".page-header, aside, main, .page-header h1, .page-header-actions")].map((e) => { const r = e.getBoundingClientRect(); return [r.x, r.y, r.width, r.height].map(Math.round).join(","); }).join("|"));
   const before = await rects();
@@ -41,12 +41,15 @@ const bodyBg = (p) => p.evaluate(() => getComputedStyle(document.body).backgroun
   ok("cross-fade class is on while switching", await p.evaluate(() => window.__xf));
   await p.waitForTimeout(400);
   ok("Light → data-theme light", await theme(p) === "light");
+  await p.waitForTimeout(300);
   ok("Light → old light background (pre-Petrol)", await bodyBg(p) === "rgb(244, 246, 250)", await bodyBg(p));
   ok("cross-fade class is removed after the fade", !(await p.evaluate(() => document.documentElement.classList.contains("theme-xf"))));
   ok("switching moved nothing (same boxes)", await rects() === before);
   ok("choice saved in this browser", await p.evaluate(() => localStorage.getItem("erp_theme_mode")) === "light");
-  ok("light: primary button is the old blue", await p.evaluate(() => { const e = document.querySelector(".btn-primary-brand"); return !e || getComputedStyle(e).backgroundColor === "rgb(47, 91, 234)"; }));
-  ok("light: sidebar is the old dark slate", await p.evaluate(() => getComputedStyle(document.querySelector("aside")).backgroundColor) === "rgb(13, 17, 24)");
+  // Spatial glass (2026-11-27, handler's chosen look): the primary action is a cobalt glass pill
+  // (same cobalt family as before), the sidebar is a frosted light-glass rail.
+  ok("light: primary button is the cobalt glass pill", await p.evaluate(() => { const e = document.querySelector(".btn-primary-brand"); if (!e) return true; const s = getComputedStyle(e); return /rgb\(75, 116, 242\).*rgb\(42, 79, 214\)/.test(s.backgroundImage) && s.borderRadius === "999px"; }));
+  ok("light: sidebar is the frosted light-glass rail", await p.evaluate(() => { const s = getComputedStyle(document.querySelector("aside")); return s.backgroundColor === "rgba(255, 255, 255, 0.3)" && /linear-gradient/.test(s.backgroundImage); }));
 
   await p.reload({ waitUntil: "networkidle" }); await settle(p, 1500);
   ok("after reload: still Light (device is dark)", await theme(p) === "light");
