@@ -41,6 +41,7 @@ PR that adds keys to the shell object, and set the module's
 | 3 | modules/c-purchase | `followUps`, `items`, `notifyMachineComplete`, `pendingLog`, `pos`, `receivingRef`, `reconcileItems`, `setFollowUps`, `setInwardLog`, `setItems`, `setPendingLog`, `setPos`, `setVendorList`, `vendorList` |
 | 4 | modules/c-inventory | `setArchivedItems` |
 | 5 | modules/c-bom | `bomDefs`, `call`, `machineLog`, `setBomDefs` — and the first `shell.call` name, `inventory.removeRackMachine` |
+| 6 | modules/c-bom-issue | `authCanDo`, `handovers`, `outwardLog`, `saveFailed` (module-level helper in App.jsx, shell API) |
 
 ## A module's `handlers.js`
 
