@@ -955,3 +955,11 @@
     html body .app-shell .page-header h1 + :is(p, div) { font-size: 15px !important; color: var(--ink-2) !important; margin-top: 6px !important; text-wrap: pretty; }
   }
 }
+
+/* ═══ Glitch guard · contrast (2026-11-27, tests/e2e/visible-ui-guard.mjs) ═══
+   User Management role chip: the role colour as text on its own 13 % tint was
+   2.72:1 in light (#6a7cf2 on #d8def5). In light the text is the role colour
+   mixed 60/40 with ink (5.3:1); dark keeps the bright role colour (passes). */
+@media screen {
+  html:not([data-theme="dark"]) body .um-role-chip { color: color-mix(in srgb, var(--chip) 60%, #0b1220) !important; }
+}
