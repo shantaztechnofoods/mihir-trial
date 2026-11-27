@@ -17,6 +17,7 @@ import { ERP_INSTANCE } from "../../config/env.js";
 import { archiveConfirmTitle } from "../../utils/archive.js";
 import SuccessTick from "../../shared/ui/SuccessTick.jsx";
 import EmptyArt from "../../shared/ui/EmptyArt.jsx";
+import "./item-master.css";
 
 // ─── QUICK STOCK MODAL ───────────────────────────────────────────────────────
 
