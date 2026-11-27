@@ -45,11 +45,8 @@
   "handlers": [
     "flashSaveError",
     "goToPage",
-    "handleAbortMachineCreate",
     "handleAcceptHandover",
-    "handleAddOutward",
     "handleAssignRackSlot",
-    "handleCreateMachine",
     "handleDeleteAttachment",
     "handleDeleteMachine",
     "handleFillRack",
@@ -60,7 +57,6 @@
     "handleReceivePendingItem",
     "handleRegisterSignature",
     "handleReleaseHandover",
-    "handleRemoveRackMachine",
     "handleReserveRackSlot",
     "handleResolvePendingItem",
     "handleSetMachineHold",
@@ -70,8 +66,7 @@
     "handleUpdateStock",
     "handleUpdateTrialCertificate",
     "handleUploadAttachment",
-    "markReadySeen",
-    "raiseNotIssuedJobs"
+    "markReadySeen"
   ],
   "stores": [
     "stores/attachmentsStore.js",

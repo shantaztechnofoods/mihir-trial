@@ -32,7 +32,9 @@ test("H: no user-supplied SVG is injected as markup — signatures render throug
 });
 
 test("K: Remove From Rack goes through rack_remove_machine in Supabase mode, audits after success, local path intact", () => {
-  const body = fn("const handleRemoveRackMachine = async (machineId) => {", "// Adds a \"materials fully issued\" note");
+  // 2026-11-27 Phase C (modules/c-bom-issue): the body moved to src/modules/inventory/handlers.js,
+  // where it is the last handler before the factory's return line.
+  const body = fn("const handleRemoveRackMachine = async (machineId) => {", "  return { handleInwardComplete, ");
   assert.match(body, /if \(!authCanDo\("outward", "delete"\)\)/, "permission check kept");
   assert.match(body, /c\.rpc\("rack_remove_machine", \{ p_machine_id: Number\(machineId\) \}\)/);
   const rpcAt = body.indexOf('rpc("rack_remove_machine"');
@@ -66,7 +68,8 @@ test("J + B: BOM issue creates the machine row first (awaited), audits only afte
   assert.match(drawer, /if \(createdMachine && onAbortMachine\) \{/);
   assert.match(drawer, /machineId: createdMachine \? createdMachine\.id : null/);
   assert.match(app, /if \(data\.serialNo && onCreateMachine && data\.machineId == null && !\(data\.rackSet && data\.rackSet\.mode === "crate"\)\)/, "handleBOMIssue does not create it twice");
-  const abort = fn("const handleAbortMachineCreate = async (", "// 2026-11-01 — issues and pending jobs are TRACKING");
+  // Phase C: next to it in src/modules/inventory/handlers.js is the Remove From Rack handler's comment
+  const abort = fn("const handleAbortMachineCreate = async (", "// Feature 3: remove a machine from the rack.");
   assert.match(abort, /type: "machine_issue_aborted"/);
   assert.ok(!abort.includes("handleUpdateStock("), "abort never touches stock");
 });
