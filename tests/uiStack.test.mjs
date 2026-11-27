@@ -184,8 +184,8 @@ test("theme switch: token flip only, no per-element cross-fade, no [style] selec
   const css = readFileSync(new URL("../src/world-ui.css", import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
   const themeStyleSel = css.split("}").map((r) => r.split("{")[0]).filter((sel) => /data-theme/.test(sel) && /\[style[\^*$|~]?=/.test(sel));
   assert.deepEqual(themeStyleSel, [], "world-ui.css theme rules must not match inline style attributes by substring");
-  assert.doesNotMatch(css, /html\.theme-xf \*[^{]*\{[^}]*transition:(?!\s*none)/, "theme-xf must turn transitions OFF, not on");
-  assert.match(css, /html\.theme-xf \*, html\.theme-xf \*::before, html\.theme-xf \*::after \{ transition: none !important; \}/);
+  assert.doesNotMatch(css, /html\.theme-xf(?::not\(#_\))? \*[^{]*\{[^}]*transition:(?!\s*none)/, "theme-xf must turn transitions OFF, not on");
+  assert.match(css, /html\.theme-xf:not\(#_\) \*, html\.theme-xf:not\(#_\) \*::before, html\.theme-xf:not\(#_\) \*::after \{ transition: none !important; \}/);
   const dark = readFileSync(new URL("../src/shared/theme-inline-dark.css", import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
   for (const sel of dark.split("}").map((r) => r.split("{")[0].trim()).filter((s) => s && !s.startsWith("@"))) {
     assert.match(sel, /data-theme="dark"/, `dark-only sheet rule must be scoped to dark: ${sel.slice(0, 80)}`);

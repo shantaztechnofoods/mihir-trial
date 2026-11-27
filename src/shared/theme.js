@@ -120,12 +120,19 @@ export function coolThemeSwitch() {
 
 export function getThemeMode() { return mode; }
 
+// A tap paints the switch's new state in the very next frame (React re-renders
+// only the switch); the whole-page recolour — one full restyle of every element,
+// the heavy part — runs right after that frame is on screen (rAF → task), so the
+// tap never waits for it. Rapid taps recolour once, to the last choice.
+let swapRaf = 0, swapT = 0;
 export function setThemeMode(next) {
   if (!THEME_MODES.includes(next) || next === mode) return;
   mode = next;
   try { localStorage.setItem(THEME_KEY, next); } catch { /* per-browser preference only */ }
-  apply(true);
   subs.forEach((f) => f());
+  if (typeof requestAnimationFrame !== "function") { apply(true); return; }
+  cancelAnimationFrame(swapRaf); clearTimeout(swapT);
+  swapRaf = requestAnimationFrame(() => { swapT = setTimeout(() => apply(true), 0); });
 }
 
 function subscribe(f) { subs.add(f); return () => subs.delete(f); }

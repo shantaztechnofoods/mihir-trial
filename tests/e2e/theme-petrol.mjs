@@ -42,8 +42,10 @@ const bodyBg = (p) => p.evaluate(() => getComputedStyle(document.body).backgroun
   const before = await rects();
   await p.evaluate(() => { window.__xf = false; new MutationObserver(() => { if (document.documentElement.classList.contains("theme-xf")) window.__xf = true; }).observe(document.documentElement, { attributes: true, attributeFilter: ["class"] }); });
   await sw.locator("[data-theme-option='light']").click();
+  // the switch paints first; the page recolours in the next frames, with no fade
+  await p.waitForFunction(() => getComputedStyle(document.body).backgroundColor === "rgb(244, 246, 250)", null, { timeout: 1000 }).catch(() => {});
   ok("swap class (transitions off) is on while switching", await p.evaluate(() => window.__xf));
-  ok("new colours are on at once (no fade wait)", await bodyBg(p) === "rgb(244, 246, 250)", await bodyBg(p));
+  ok("new colours are on right after the tap (no fade wait)", await bodyBg(p) === "rgb(244, 246, 250)", await bodyBg(p));
   await p.waitForFunction(() => !document.documentElement.classList.contains("theme-xf"), null, { timeout: 2000 }).catch(() => {});
   ok("Light → data-theme light", await theme(p) === "light");
   await p.waitForTimeout(300);
