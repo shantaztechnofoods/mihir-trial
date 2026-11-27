@@ -42,6 +42,7 @@ PR that adds keys to the shell object, and set the module's
 | 4 | modules/c-inventory | `setArchivedItems` |
 | 5 | modules/c-bom | `bomDefs`, `call`, `machineLog`, `setBomDefs` — and the first `shell.call` name, `inventory.removeRackMachine` |
 | 6 | modules/c-bom-issue | `authCanDo`, `handovers`, `outwardLog`, `saveFailed` (module-level helper in App.jsx, shell API) |
+| 7 | modules/c-pending-jobs | `issuePendingRef`, `pendingHandoverItems`, `receivePartRef`, `sendWhatsApp` — and `shell.call` name `inventory.addOutward` |
 
 ## A module's `handlers.js`
 
