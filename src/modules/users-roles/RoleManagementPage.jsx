@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { PageHeader } from "../../shared/components/PageHeader.jsx";
+import "./usersRoles.css";
 import { useAuth } from "../../auth/AuthContext.jsx";
 import { DEFAULT_ROLES } from "../../auth/authStore.js";
 import { appendAuditWithUser } from "../../auth/auditStore.js";
@@ -161,19 +162,19 @@ export default function RoleManagementPage({ canDo }) {
   const inputStyle = { background: "#ffffff", border: "1px solid rgba(26,31,46,0.14)", color: "#111827" };
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="um-page flex-1 flex flex-col overflow-hidden">
       {/* Header */}
       <PageHeader title="Role Management" subtitle={`${Object.keys(roles).length} role${Object.keys(roles).length !== 1 ? "s" : ""} configured`}>
           {isSuperAdmin && (
             <button onClick={handleReset}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-500 hover:text-slate-900 transition-all"
+              className="um-act px-3 py-1.5 rounded-lg text-xs font-medium text-slate-500 hover:text-slate-900 transition-all"
               style={{ background: "rgba(26,31,46,0.05)", border: "1px solid rgba(26,31,46,0.1)" }}>
               Reset to Defaults
             </button>
           )}
           {canCreate && (
             <button onClick={openAdd}
-              className="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all"
+              className="um-act px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all"
               style={{ background: "#2640B0", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
               + New Role
             </button>
@@ -181,7 +182,7 @@ export default function RoleManagementPage({ canDo }) {
         </PageHeader>
 
       {/* Role Cards */}
-      <div className="flex-1 overflow-y-auto px-6 py-5">
+      <div className="rm-grid flex-1 overflow-y-auto px-6 py-5">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {/* Super Admin — always shown, not editable */}
           <div className="rounded-2xl p-5" style={{ background: "rgba(236,72,153,0.06)", border: "1px solid rgba(236,72,153,0.2)" }}>
@@ -200,7 +201,7 @@ export default function RoleManagementPage({ canDo }) {
 
           {Object.entries(roles).map(([key, role]) => (
             <div key={key} className="rounded-2xl p-5" style={{ background: `${role.color}08`, border: `1px solid ${role.color}28` }}>
-              <div className="flex items-start justify-between mb-4">
+              <div className="rm-head flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
                   <span className="text-2xl">{role.icon}</span>
                   <div>
@@ -211,14 +212,14 @@ export default function RoleManagementPage({ canDo }) {
                 <div className="flex gap-1.5">
                   {canEdit && (
                     <button onClick={() => openEdit(key, role)}
-                      className="px-2.5 py-1 rounded-lg text-[10px] font-medium text-slate-600 hover:text-slate-900 transition-all"
+                      className="um-act px-2.5 py-1 rounded-lg text-[10px] font-medium text-slate-600 hover:text-slate-900 transition-all"
                       style={{ background: "rgba(26,31,46,0.06)", border: "1px solid rgba(26,31,46,0.1)" }}>
                       Edit
                     </button>
                   )}
                   {canDelete && (
                     <button onClick={() => setDeleteConfirm(key)}
-                      className="px-2.5 py-1 rounded-lg text-[10px] font-medium text-red-700 hover:text-red-900 transition-all"
+                      className="um-act px-2.5 py-1 rounded-lg text-[10px] font-medium text-red-700 hover:text-red-900 transition-all"
                       style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)" }}>
                       Delete
                     </button>
