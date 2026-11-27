@@ -685,11 +685,11 @@
   html[data-theme="dark"] body :is(.app-shell, .modal-backdrop) :is(input, select, textarea):where(:not(.lg-input, .tc-form *, .mr-paper *)):focus-visible { background-color: rgba(0, 0, 0, .3) !important; border-color: var(--p-ring) !important; box-shadow: 0 0 0 3px var(--p-ringHalo) !important; }
 
   /* secondary buttons (Export, Import, Cancel …): glossy capsules */
-  html body :is(.page-header .page-header-actions button:not(.btn-primary-brand):not([aria-label^="Departments called"]), .modal-backdrop .mt-cancel, .btn-secondary, .btn-ghost.border) {
+  html body :is(.page-header .page-header-actions button:not(.btn-primary-brand):not(.st-save):not([aria-label^="Departments called"]), .modal-backdrop .mt-cancel, .btn-secondary, .btn-ghost.border) {
     background: var(--g-gloss), rgba(255, 255, 255, .72) !important; border-color: rgba(20, 40, 50, .1) !important; border-radius: 999px !important;
     box-shadow: inset 0 1px 0 #fff, 0 1px 2px rgba(40, 60, 70, .06), 0 4px 12px -6px rgba(40, 60, 75, .2) !important;
   }
-  html[data-theme="dark"] body :is(.page-header .page-header-actions button:not(.btn-primary-brand):not([aria-label^="Departments called"]), .modal-backdrop .mt-cancel, .btn-secondary, .btn-ghost.border) {
+  html[data-theme="dark"] body :is(.page-header .page-header-actions button:not(.btn-primary-brand):not(.st-save):not([aria-label^="Departments called"]), .modal-backdrop .mt-cancel, .btn-secondary, .btn-ghost.border) {
     background: var(--g-gloss), rgba(255, 255, 255, .06) !important; border-color: rgba(255, 255, 255, .12) !important; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14), 0 4px 12px -6px rgba(0, 0, 0, .5) !important;
   }
 
@@ -736,3 +736,15 @@
   /* Reports: export buttons (CSV / Excel / PDF) as small glossy capsules */
   html body .app-shell :is(button, a):is([data-export], [aria-label^="Download"], [aria-label^="Export"]) { border-radius: 999px !important; }
 }
+
+/* PR 2/3 gate fixes (measured): slate-500 / green-700 inline text on glass tints,
+   Settings tab grey, the nav count on the active dark item */
+@media screen {
+  html:not([data-theme="dark"]) body #root :is([style^="color: rgb(100, 116, 139)"], [style*="; color: rgb(100, 116, 139)"]) { color: #4b5563 !important; }
+  html[data-theme="dark"] body #root :is([style^="color: rgb(100, 116, 139)"], [style*="; color: rgb(100, 116, 139)"]) { color: #b9c8ce !important; }
+  html:not([data-theme="dark"]) body #root :is([style^="color: rgb(21, 128, 61)"], [style*="; color: rgb(21, 128, 61)"]) { color: #0e6b3d !important; }
+  html[data-theme="dark"] body #root :is([style^="color: rgb(21, 128, 61)"], [style*="; color: rgb(21, 128, 61)"]) { color: #6bd99a !important; }
+  :root:not([data-theme="dark"]) { --st-tabMuted: #56606e; }
+  html[data-theme="dark"] body .app-shell .app-sidebar .sb-item.is-active > span[class*="rounded-full"]:last-child { color: #ffffff !important; background: rgba(255, 255, 255, .14) !important; }
+}
+@media screen { html:not([data-theme="dark"]) body .app-shell :is(.text-emerald-300, .text-emerald-400, .text-green-700) { color: #0b5e35 !important; } }
