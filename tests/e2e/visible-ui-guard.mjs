@@ -235,10 +235,11 @@ for (const W of WIDTHS) {
     for (const theme of THEMES) {
       await setTheme(p, theme);
       const hits = await p.evaluate(probe);
+      n += hits.filter((h) => h.at !== "nav").length;   // this page / pop-up fails on every finding in it (nav: one check below)
       for (const h of hits) {
         const key = `${h.k}|${W}|${theme}|${popup ? "" : h.at === "nav" ? "" : page}|${h.what}`;
         if (keyCount.has(key)) { keyCount.get(key).pages.add(page); continue; }
-        const f = { ...h, W, theme, page, popup, pages: new Set([page]) }; keyCount.set(key, f); all.push(f); n++;
+        const f = { ...h, W, theme, page, popup, pages: new Set([page]) }; keyCount.set(key, f); all.push(f);
       }
       if (hits.length && SHOTS) await p.screenshot({ path: `${SHOTS}/vug-${W}-${theme}-${(page + (popup ? "-" + popup : "")).replace(/[^\w]+/g, "_").slice(0, 60)}.png` }).catch(() => {});
     }
@@ -270,7 +271,7 @@ for (const W of WIDTHS) {
       if ((await dialogs()) > base) await goto(label);
     }
     ok(`${W}: ${label} (+ ${actions.filter((a) => a.t && !a.pressed && !a.dis && !NO_CLICK.test(a.t)).length} pop-ups) — everything visible, named, on screen`, n === 0,
-      all.filter((f) => f.W === W && f.page === label).slice(0, 6).map((f) => `[${f.k}/${f.theme}${f.popup ? "/" + f.popup : ""}] ${f.what}`).join(" ; "));
+      all.filter((f) => f.W === W && f.pages.has(label) && f.at !== "nav").slice(0, 6).map((f) => `[${f.k}/${f.theme}${f.popup ? "/" + f.popup : ""}] ${f.what}`).join(" ; "));
   }
   ok(`${W}: no page errors`, errs.length === 0, errs.join(" | "));
   await ctx.close();
