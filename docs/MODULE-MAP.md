@@ -181,7 +181,8 @@ These are not owned by any one module and would be versioned together as
 > **Update 27 Nov 2026 (modules/item-master):** Item Master (InventoryPage, AddItemModal,
 > ItemDetailModal, ItemImportModal, `itemImport.js`, the item writes) moved to
 > `src/modules/item-master/` — see its README. Inward (InwardPage, `handleInwardComplete`) moved to
-> `src/modules/inward/` (modules/inward). The inventory row/section below is the earlier snapshot.
+> `src/modules/inward/` (modules/inward). Pending Stock (PendingPage, `handleClearPending`, `handleFulfillPending`,
+> `handleFulfillGroup`) moved to `src/modules/pending-stock/` (modules/pending-stock). The inventory row/section below is the earlier snapshot.
 
 ### inventory
 

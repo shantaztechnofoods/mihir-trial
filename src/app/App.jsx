@@ -57,6 +57,7 @@ import { waDispatch, waReadSeen, waUnreadCount } from "../modules/whatsapp/index
 import { createSettingsHandlers } from "../modules/settings/handlers.js";
 import { createPurchaseHandlers } from "../modules/purchase/handlers.js";
 import { createInventoryHandlers } from "../modules/inventory/handlers.js";
+import { createPendingStockHandlers } from "../modules/pending-stock/handlers.js";
 import { createInwardHandlers } from "../modules/inward/handlers.js";
 import { createItemMasterHandlers } from "../modules/item-master/handlers.js";
 import { createBomHandlers } from "../modules/bom/handlers.js";
@@ -1106,7 +1107,8 @@ export default function App() {
   };
   const { handleSaveModules, handleAdminCleanupDone, handleCreateChecklistTemplate, handleUpdateChecklistTemplate, handleDeleteChecklistTemplate, handleSaveUserDepartments } = createSettingsHandlers(shell);
   const { handleCreatePO, handleUpdatePO, handleReceivePO, handleDeletePO, handleReverseReceive, handleConfirmOrder, handleFollowUpDone, handleAddVendor, handleEditVendor, handleDeleteVendor, handleRestoreVendor, handleBulkAddVendors } = createPurchaseHandlers(shell);
-  const { handleClearPending, handleFulfillPending, handleFulfillGroup, handleAddOutward, raiseNotIssuedJobs, handleCreateMachine, handleAbortMachineCreate, handleRemoveRackMachine } = createInventoryHandlers(shell);
+  const { handleAddOutward, raiseNotIssuedJobs, handleCreateMachine, handleAbortMachineCreate, handleRemoveRackMachine } = createInventoryHandlers(shell);
+  const { handleClearPending, handleFulfillPending, handleFulfillGroup } = createPendingStockHandlers(shell);
   const { handleInwardComplete } = createInwardHandlers(shell);
   const { handleCreateItemRow, handleUpdateItemRow, handleDeleteItemRow, handleRestoreItemRow, handleSetItemDefaultRate, handleBulkAddItems, handleInventoryCorrection } = createItemMasterHandlers(shell);
   const { handleUpdateBOM, handleCreateBOM, handleDuplicateBOM, computeBOMDeletionInfo, handleDeleteBOM, handleRestoreBOM, handleRenameBOM, handleSaveBomChecklist } = createBomHandlers(shell);

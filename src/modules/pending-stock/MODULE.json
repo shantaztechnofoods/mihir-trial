@@ -1,0 +1,48 @@
+{
+  "name": "pending-stock",
+  "version": "1.0.0",
+  "frozen": false,
+  "liveLock": false,
+  "requiresCore": 1,
+  "requiresShell": 3,
+  "exports": [
+    "PendingPage"
+  ],
+  "dependsOn": {},
+  "handlers": [
+    "goToPage",
+    "handleUpdateStock"
+  ],
+  "ownHandlers": [
+    "handleClearPending",
+    "handleFulfillGroup",
+    "handleFulfillPending"
+  ],
+  "stores": [
+    "stores/pendingStore.js"
+  ],
+  "shared": [
+    "shared/components/LeadIcon.jsx",
+    "shared/format.js",
+    "shared/machineStages.js",
+    "shared/ui/Topbar.jsx"
+  ],
+  "core": {
+    "config": [
+      "config/env.js"
+    ]
+  },
+  "npm": [
+    "react"
+  ],
+  "migrations": [
+    "003_transactional",
+    "012_stock_movements",
+    "013_record_stock_movement",
+    "026_items_critical",
+    "052_pending_item_outward"
+  ],
+  "edgeFunctions": [],
+  "serverless": [],
+  "notes": []
+}
