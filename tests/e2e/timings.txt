@@ -5,6 +5,7 @@ assembly-start-checklist 30
 back-closes-popup 24
 bell-machine-waiting 33
 bom-checklists 27
+bom-create-dialog 25
 bom-photo 36
 bom-unselected 72
 compact-checklist 26

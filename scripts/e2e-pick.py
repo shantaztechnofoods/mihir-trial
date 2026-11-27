@@ -23,7 +23,7 @@ MT = ["go-live-workflows", "pending-part-or-comment", "sender-undo", "staff-hold
 # (regex on the App.jsx component name OR on a file path, suites). First match wins.
 COMPONENT_MAP = [
     (r"^(InventoryPage|InwardPage|AddItemModal|ItemImportModal|EditItemModal|QuickStock\w*|Item\w*|ClearDemoDataModal)$", ["store-audit", "perf-budget", "no-delete"]),
-    (r"^(OutwardPage|BOM\w*|Bom\w*|RackFill\w*)$", ["bom-unselected", "fill-rack-pending-item", "store-audit", "no-delete"]),
+    (r"^(OutwardPage|BOM\w*|Bom\w*|RackFill\w*)$", ["bom-create-dialog", "bom-unselected", "fill-rack-pending-item", "store-audit", "no-delete"]),
     (r"^(PendingPage|Pending\w*)$", ["bom-unselected", "part-received-completes", "store-audit"]),
     (r"^(HistoryPage|HR\w*|ReportCenterPage|Report\w*|fmtTs|inDateRange)$", ["reports-v2", "reports-pdf", "perf-budget"]),
     (r"^(VendorsPage|Vendor\w*|OrderPipelinePage|POSearchCenter|PurchasePage|PO\w*|ApprovalsPage|AnalyticsPage)$", ["perf-budget", "store-audit", "no-delete"]),
