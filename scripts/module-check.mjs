@@ -27,7 +27,7 @@ import { fileURLToPath } from "node:url";
 import {
   listModules, scanModuleFolder, coreClosure, appWiring, appFunctions, appModuleImports,
   parseExports, parseImports, resolveRel, classify, walk, readManifest, derivedManifest, coreVersion, appFunctionSource,
-  moduleHandlerFactory, shellObjectKeys, appFactoryCalls, shellApiVersion,
+  moduleHandlerFactory, shellObjectKeys, appFactoryCalls, shellApiVersion, shellCallNames, appShellRegistry,
 } from "./lib/module-scan.mjs";
 
 const TRIAL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -160,6 +160,9 @@ for (const f of liveImporters) {
       takesMissing: callL ? fac.returns.filter((n) => !callL.includes(n)) : [],
       takesGone: callL ? callL.filter((n) => !fac.returns.includes(n)) : [],
       stillInLiveApp: fac.returns.filter((n) => appFunctions(appL).has(n)),
+      // shell.call names this folder uses that Live's App.jsx does not register yet
+      callsMissing: shellCallNames(fs.readFileSync(path.join(TRIAL, `src/modules/${mod}/handlers.js`), "utf8"))
+        .filter((n) => !((appShellRegistry(appL) || {})[n])),
     };
   }
 }
@@ -216,6 +219,7 @@ if (R.shell) {
   say(`   shell keys Live App.jsx lacks: ${R.shell.missingKeys.length ? R.shell.missingKeys.join(", ") + "  ← add them to Live's \`const shell = { … }\`" : "none"}`);
   if (R.shell.call === "missing") say(`   Live App.jsx does not call ${R.shell.factory}(shell) — App.jsx step: delete Live's bodies of ${R.shell.stillInLiveApp.join(", ") || "(none found)"} and add \`const { … } = ${R.shell.factory}(shell);\` after the shell object (docs/SHELL-CONTEXT.md)`);
   if (R.shell.takesMissing.length) say(`   Live's ${R.shell.factory}(shell) line must also take: ${R.shell.takesMissing.join(", ")}`);
+  if (R.shell.callsMissing.length) say(`   shell.call names Live App.jsx does not register: ${R.shell.callsMissing.join(", ")}  ← add shellRegistry / call / Object.assign(shellRegistry, { … }) (docs/SHELL-CONTEXT.md)`);
   if (R.shell.takesGone.length) say(`   Live's ${R.shell.factory}(shell) line takes names the folder no longer returns: ${R.shell.takesGone.join(", ")}`);
 }
 list("6. Migrations (MODULE.json) missing in Live", R.migrations);

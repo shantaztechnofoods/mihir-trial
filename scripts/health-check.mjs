@@ -267,7 +267,9 @@ if (ONLY.includes("wiring")) {
     const L = layerOf(f).layer;
     if (L === "lower") continue;      // screen code only (stores/utils have no handlers)
     const src = code.get(f);
-    const used = new Set(src.match(/\bhandle[A-Z][\w$]*/g) || []);
+    // a name inside a "…" string is data, not a reference (e.g. SHELL_CALLS in src/app/shellVersion.js
+    // names the handler a shell.call entry maps to) — only code can throw a ReferenceError
+    const used = new Set(src.replace(/"(?:[^"\\\n]|\\.)*"/g, '""').match(/\bhandle[A-Z][\w$]*/g) || []);
     for (const h of used) {
       const declared = new RegExp(`(?:const|let|var|function)\\s+${h}\\b|(?<![=\\w$])\\{\\s*${h}\\s*(?:[,}=]|:\\s*[\\w$])|,\\s*${h}\\s*(?:[,}=]|:\\s*[\\w$])|\\(\\s*${h}\\s*[,)=]|\\bimport\\b[^;]*\\b${h}\\b`).test(src);
       if (!declared) undeclared.push(`${rel(f)}: ${h}`);

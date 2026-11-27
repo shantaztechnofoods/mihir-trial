@@ -11,6 +11,7 @@ import {
   listModules, derivedManifest, readManifest, scanModuleFolder, parseImports, parseExports,
   directEdgeCalls, edgeCallsViaImports, DERIVED_KEYS, DECLARED_KEYS, walk, classify, resolveRel,
   OPTIONAL_DERIVED_KEYS, OPTIONAL_DECLARED_KEYS, shellObjectKeys, appFactoryCalls, handlerFactory, appFunctions,
+  shellCallNames, shellCallAdapters, appShellRegistry, shellCallList,
 } from "../scripts/lib/module-scan.mjs";
 
 const ROOT = ".";
@@ -187,4 +188,75 @@ test("Phase C: every handlers.js is wired through the shell and fully moved out 
       assert.ok(!keys.includes(h), `${h} is in the shell object — moved handlers come back from the factory, not the shell`);
     }
   }
+});
+
+// ── Phase C: shell.call — cross-module calls (docs/SHELL-CONTEXT.md) ─────────
+test("scanner reads shell.call names, adapters, the App registry and SHELL_CALLS", () => {
+  const h = [
+    "export function createFooHandlers(shell) {",
+    "  const { call } = shell;",
+    '  const handleX = (...args) => call("inventory.x", ...args);',
+    '  // call("not.counted") in a comment',
+    "  const handleA = () => handleX(1);",
+    '  const z = obj.call("not.a.shell.call");',
+    "  return { handleA };",
+    "}",
+  ].join("\n");
+  assert.deepEqual(shellCallNames(h), ["inventory.x"]);
+  assert.deepEqual(shellCallAdapters(h), { "inventory.x": "handleX" });
+  assert.deepEqual(appShellRegistry('  Object.assign(shellRegistry, { "inventory.x": handleX, "bom.y": handleY });'), { "inventory.x": "handleX", "bom.y": "handleY" });
+  assert.equal(appShellRegistry("  const shell = {};"), null);
+});
+
+test("Phase C: every shell.call name is typed, registered in App.jsx and owned", async () => {
+  const { SHELL_API, SHELL_CALLS } = await import("../src/app/shellVersion.js");
+  const list = shellCallList(ROOT);
+  assert.deepEqual(Object.keys(list).sort(), Object.keys(SHELL_CALLS || {}).sort(), "SHELL_CALLS must be one-line entries { handler, owner, since }");
+  const app = fs.readFileSync("src/app/App.jsx", "utf8");
+  const keys = shellObjectKeys(app) || [];
+  const registry = appShellRegistry(app) || {};
+  const appFns = appFunctions(app);
+  const used = new Set();
+  for (const mod of MODULES) {
+    const rel = `src/modules/${mod}/handlers.js`;
+    if (!fs.existsSync(rel)) continue;
+    const code = fs.readFileSync(rel, "utf8");
+    const names = shellCallNames(code);
+    const adapters = shellCallAdapters(code);
+    if (names.length) assert.ok(handlerFactory(code).shellKeys.includes("call"), `${rel} uses call(…) but does not take \`call\` from the shell`);
+    for (const n of names) {
+      used.add(n);
+      assert.ok(list[n], `${rel}: call("${n}") is not in SHELL_CALLS (src/app/shellVersion.js) — add it there and bump SHELL_API`);
+      assert.equal(adapters[n], list[n].handler, `${rel}: call("${n}") must come only through the adapter \`const ${list[n].handler} = (...args) => call("${n}", ...args);\``);
+      assert.notEqual(list[n].owner, mod, `${rel}: call("${n}") — a module does not call its own handler through the shell`);
+      const man = readManifest(ROOT, mod);
+      assert.ok(man.requiresShell >= list[n].since, `${mod}: requiresShell must be >= ${list[n].since} (it calls "${n}")`);
+    }
+    assert.deepEqual(Object.keys(adapters).sort(), names, `${rel}: every call(…) name has exactly one adapter line`);
+  }
+  if (used.size) {
+    assert.ok(keys.includes("call"), "the shell object must carry `call` (makeShellCall(shellRegistry))");
+    assert.match(app, /^ {2}const shellRegistry = \{\};$/m);
+    assert.match(app, /^ {2}const call = makeShellCall\(shellRegistry\);$/m);
+    assert.match(app, /^import \{ makeShellCall \} from "\.\/shellCall\.js";$/m);
+  }
+  for (const [n, e] of Object.entries(list)) {
+    assert.ok(Number.isInteger(e.since) && e.since >= 1 && e.since <= SHELL_API, `SHELL_CALLS "${n}": since must be 1..SHELL_API`);
+    assert.ok(MODULES.includes(e.owner), `SHELL_CALLS "${n}": unknown owner module ${e.owner}`);
+    assert.equal(registry[n], e.handler, `App.jsx must register "${n}": ${e.handler} in Object.assign(shellRegistry, { … })`);
+    // owner has moved it (its ownHandlers), or the owner's move is still to come (still declared in App.jsx)
+    const own = readManifest(ROOT, e.owner).ownHandlers || [];
+    assert.ok(own.includes(e.handler) || appFns.has(e.handler), `SHELL_CALLS "${n}": ${e.handler} is neither in ${e.owner}'s ownHandlers nor declared in App.jsx`);
+    assert.ok(used.has(n), `SHELL_CALLS "${n}" is not used by any handlers.js — remove it (no dead names)`);
+  }
+  assert.deepEqual(Object.keys(registry).sort(), Object.keys(list).sort(), "App.jsx registers exactly the SHELL_CALLS names");
+});
+
+test("shell.call: an unknown name throws, a known one passes args and the result through", async () => {
+  const { makeShellCall } = await import("../src/app/shellCall.js");
+  const reg = {};
+  const call = makeShellCall(reg);
+  reg["inventory.x"] = (a, b) => ({ a, b });
+  assert.deepEqual(call("inventory.x", 1, 2), { a: 1, b: 2 });
+  assert.throws(() => call("inventory.nope"), /shell\.call: unknown "inventory\.nope"/);
 });

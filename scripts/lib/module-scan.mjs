@@ -385,6 +385,35 @@ export function handlerFactory(code) {
   return { factory: f[1], shellKeys: k ? idList(strip(k[1])) : [], returns: r ? idList(strip(r[1])) : [] };
 }
 
+// shell.call (docs/SHELL-CONTEXT.md "Cross-module calls")
+// Names a handlers.js passes to call("…") (sorted, unique).
+export function shellCallNames(code) {
+  return [...new Set([...stripComments(code).matchAll(/(?<![.\w$])call\(\s*"([^"]+)"/g)].map((m) => m[1]))].sort();
+}
+// Adapter lines of a handlers.js: { "m.name": "handleX" } from `  const handleX = (...args) => call("m.name", ...args);`.
+export function shellCallAdapters(code) {
+  const out = {};
+  for (const m of code.matchAll(/^ {2}const ([A-Za-z_$][\w$]*) = \(\.\.\.args\) => call\("([^"]+)", \.\.\.args\);\s*$/gm)) out[m[2]] = m[1];
+  return out;
+}
+// App.jsx registry: { "m.name": "handleX" } from `Object.assign(shellRegistry, { … });`, or null when there is none.
+export function appShellRegistry(appCode) {
+  const m = appCode.match(/^ {2}Object\.assign\(shellRegistry, \{([\s\S]*?)\}\);/m);
+  if (!m) return null;
+  const out = {};
+  for (const p of m[1].matchAll(/"([^"]+)"\s*:\s*([A-Za-z_$][\w$]*)/g)) out[p[1]] = p[2];
+  return out;
+}
+// SHELL_CALLS of a checkout (src/app/shellVersion.js), read as text: { name: { handler, owner, since } }.
+export function shellCallList(root) {
+  const rel = "src/app/shellVersion.js";
+  if (!isFile(root, rel)) return {};
+  const block = read(root, rel).match(/export\s+const\s+SHELL_CALLS\s*=\s*\{([\s\S]*?)\n\};/);
+  const out = {};
+  if (block) for (const m of block[1].matchAll(/"([^"]+)"\s*:\s*\{\s*handler:\s*"([^"]+)",\s*owner:\s*"([^"]+)",\s*since:\s*(\d+)\s*\}/g)) out[m[1]] = { handler: m[2], owner: m[3], since: Number(m[4]) };
+  return out;
+}
+
 export function moduleHandlerFactory(root, mod) {
   const rel = `src/modules/${mod}/handlers.js`;
   return isFile(root, rel) ? handlerFactory(read(root, rel)) : null;
@@ -409,6 +438,8 @@ export function derivedManifest(root, mod) {
     handlers: wiring ? sorted(wiring.handlers) : [],
     // Phase C: handlers that live in this folder's handlers.js (only when it exists)
     ...(fac ? { ownHandlers: sorted(fac.returns) } : {}),
+    // shell.call names this folder's handlers.js uses (only when it uses any)
+    ...(fac && shellCallNames(read(root, `src/modules/${mod}/handlers.js`)).length ? { calls: shellCallNames(read(root, `src/modules/${mod}/handlers.js`)) } : {}),
     stores: core.stores || [],
     shared: core.shared || [],
     core: Object.fromEntries(Object.entries(core).filter(([g]) => g !== "stores" && g !== "shared")),
@@ -419,7 +450,7 @@ export function derivedManifest(root, mod) {
 export const DERIVED_KEYS = ["exports", "dependsOn", "handlers", "stores", "shared", "core", "npm"];
 export const DECLARED_KEYS = ["name", "version", "frozen", "liveLock", "requiresCore", "migrations", "edgeFunctions", "serverless", "notes"];
 // Present only in a folder that has handlers.js (Phase C): derived ownHandlers, declared requiresShell.
-export const OPTIONAL_DERIVED_KEYS = ["ownHandlers"];
+export const OPTIONAL_DERIVED_KEYS = ["ownHandlers", "calls"];
 export const OPTIONAL_DECLARED_KEYS = ["requiresShell"];
 
 // SHELL_API of a checkout (0 = no shell object yet, before Phase C).
