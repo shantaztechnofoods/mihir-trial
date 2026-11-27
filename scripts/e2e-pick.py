@@ -59,7 +59,7 @@ PATH_MAP = [
     (r"^src/shared/components/(LazyCharts|useProgressiveCount|MoreRowsNote|DebouncedSearchInput)", ["perf-budget"]),
     (r"^(src/|index\.html|vite\.config|package(-lock)?\.json|public/)", SMOKE),   # shared shell, styles, deps
 ]
-NO_E2E = re.compile(r"^(docs/|supabase/|scripts/|\.github/|tests/[^e]|tests/e[^2]|.*\.md$|\.gitignore$|\.nvmrc$)")
+NO_E2E = re.compile(r"^(docs/|supabase/|scripts/|\.github/|tests/[^e]|tests/e[^2]|.*\.md$|\.gitignore$|\.nvmrc$|src/modules/[^/]+/MODULE\.json$)")
 
 
 def all_suites():

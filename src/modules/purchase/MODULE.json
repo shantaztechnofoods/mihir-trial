@@ -1,0 +1,69 @@
+{
+  "name": "purchase",
+  "version": "1.0.0",
+  "frozen": false,
+  "liveLock": false,
+  "requiresCore": 1,
+  "exports": [
+    "OrderPipelinePage",
+    "POSettings",
+    "VendorsPage"
+  ],
+  "dependsOn": {},
+  "handlers": [
+    "handleAddVendor",
+    "handleBulkAddVendors",
+    "handleConfirmOrder",
+    "handleCreatePO",
+    "handleDeletePO",
+    "handleDeleteVendor",
+    "handleEditVendor",
+    "handleFollowUpDone",
+    "handleFulfillPending",
+    "handleReceivePO",
+    "handleRestoreVendor",
+    "handleReverseReceive",
+    "handleSetItemDefaultRate",
+    "handleUpdatePO",
+    "handleUpdateStock"
+  ],
+  "stores": [],
+  "shared": [
+    "shared/components/ArchivedSection.jsx",
+    "shared/components/DebouncedSearchInput.jsx",
+    "shared/components/ItemSearchSelect.jsx",
+    "shared/components/LeadIcon.jsx",
+    "shared/components/SearchableSelect.jsx",
+    "shared/format.js",
+    "shared/loadXlsx.js",
+    "shared/ui/Topbar.jsx",
+    "shared/ui/primitives.jsx"
+  ],
+  "core": {
+    "utils": [
+      "utils/archive.js",
+      "utils/gst.js",
+      "utils/parseDate.js",
+      "utils/poTemplate.js",
+      "utils/vendorImport.js",
+      "utils/whatsapp.js"
+    ]
+  },
+  "npm": [
+    "react"
+  ],
+  "migrations": [
+    "002_master",
+    "003_transactional",
+    "015_po_template_columns",
+    "018_po_gst_and_item_gst_rate",
+    "019_po_gst_type_check"
+  ],
+  "edgeFunctions": [
+    "whatsapp-send"
+  ],
+  "serverless": [],
+  "notes": [
+    "whatsapp-send (optional: send a PO to the vendor on WhatsApp)"
+  ]
+}

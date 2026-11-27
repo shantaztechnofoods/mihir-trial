@@ -1,0 +1,35 @@
+{
+  "name": "audit-trail",
+  "version": "1.0.0",
+  "frozen": false,
+  "liveLock": false,
+  "requiresCore": 1,
+  "exports": [
+    "AuditHistoryPage"
+  ],
+  "dependsOn": {},
+  "handlers": [],
+  "stores": [],
+  "shared": [
+    "shared/components/PageHeader.jsx"
+  ],
+  "core": {
+    "auth": [
+      "auth/AuthContext.jsx",
+      "auth/auditStore.js"
+    ],
+    "config": [
+      "config/env.js"
+    ]
+  },
+  "npm": [
+    "react"
+  ],
+  "migrations": [
+    "004_audit",
+    "010_fix_audit_user_fk"
+  ],
+  "edgeFunctions": [],
+  "serverless": [],
+  "notes": []
+}

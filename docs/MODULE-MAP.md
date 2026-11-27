@@ -66,10 +66,9 @@ that the props App.jsx passes did not change.
    `reports/reportV4.css`) — that is the pattern to keep.
 7. **Database and Edge Functions** deploy separately (Supabase), never with
    the folder.
-8. **Two direct deep imports** bypass `index.js`: App.jsx lazy-loads
-   `modules/users-roles/UserManagementPage.jsx`,
-   `modules/users-roles/RoleManagementPage.jsx` and
-   `modules/audit-trail/AuditHistoryPage.jsx` by file path.
+8. ~~Two direct deep imports bypass `index.js`~~ — fixed in folder-replace
+   Phase B: App.jsx now lazy-loads `modules/users-roles/index.js` and
+   `modules/audit-trail/index.js` (tests/moduleManifest.test.mjs keeps it so).
 9. **Dead handlers**: `handleInventoryCorrection` and `handleOverrideRating`
    (its `guarded.overrideRating` wrapper is never passed to a page) are defined
    but not wired to any page.
@@ -138,7 +137,7 @@ These are not owned by any one module and would be versioned together as
 
 ### audit-trail
 
-**Folder-replace alone enough today: YES.** Read-only. Note: App.jsx lazy-imports `modules/audit-trail/AuditHistoryPage.jsx` directly (not via `index.js`), so that file name must not change.
+**Folder-replace alone enough today: YES.** Read-only. App.jsx lazy-loads it through `modules/audit-trail/index.js` (Phase B).
 
 * Folder: `src/modules/audit-trail/` — 3 files, 519 lines: `AuditHistoryPage.jsx`, `README.md`, `index.js`
 * Mounted by `src/app/App.jsx`: `<AuditHistoryPage>`
@@ -286,7 +285,7 @@ These are not owned by any one module and would be versioned together as
 
 ### users-roles
 
-**Folder-replace alone enough today: YES*.** No App.jsx handlers: it writes through `stores/adminApi.js` + the `admin-*` Edge Functions and auth stores itself. App.jsx lazy-imports its two page files directly (not via `index.js`). *Edge Functions and RLS migrations deploy separately.
+**Folder-replace alone enough today: YES*.** No App.jsx handlers: it writes through `stores/adminApi.js` + the `admin-*` Edge Functions and auth stores itself. App.jsx lazy-loads its pages through `modules/users-roles/index.js` (Phase B). *Edge Functions and RLS migrations deploy separately.
 
 * Folder: `src/modules/users-roles/` — 4 files, 1184 lines: `README.md`, `RoleManagementPage.jsx`, `UserManagementPage.jsx`, `index.js`
 * Mounted by `src/app/App.jsx`: `<UserManagementPage>`, `<RoleManagementPage>`

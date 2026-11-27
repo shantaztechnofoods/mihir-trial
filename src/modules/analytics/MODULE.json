@@ -1,0 +1,29 @@
+{
+  "name": "analytics",
+  "version": "1.0.0",
+  "frozen": false,
+  "liveLock": false,
+  "requiresCore": 1,
+  "exports": [
+    "AnalyticsPage"
+  ],
+  "dependsOn": {},
+  "handlers": [],
+  "stores": [],
+  "shared": [
+    "shared/components/LazyCharts.jsx",
+    "shared/components/LeadIcon.jsx",
+    "shared/format.js",
+    "shared/settingsDefaults.js",
+    "shared/ui/Topbar.jsx",
+    "shared/ui/primitives.jsx"
+  ],
+  "core": {},
+  "npm": [
+    "react"
+  ],
+  "migrations": [],
+  "edgeFunctions": [],
+  "serverless": [],
+  "notes": []
+}
