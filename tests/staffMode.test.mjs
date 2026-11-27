@@ -22,7 +22,9 @@ test("staffMode is derived from isAdminUser, and admins keep the full tracker", 
   assert.match(mp, /\{!staffMode && \(\(\) => \{\s*const cards = \[/, "summary-box nav is admin only");
   assert.match(mp, /\{!staffMode && mtTab === "pending" && \(\(\) => \{/, "factory Pending Jobs tab is admin only");
   // 2026-11-04 (fix/harden-2): each card renders inside its own SafeBoundary.
-  assert.match(mp, /\{!staffMode && <DeferredBoard stamp=\{boardStamp\} urgent=\{\[stageMap, expanded, stageEditFor\]\} render=\{\(\) => \(\s*<div className="space-y-4">\s*\{listForTab\(\)\.map\(\(machine\) => <SafeBoundary key=\{machine\.id\} name="machine-card" label="[^"]*" render=\{\(\) => \{/, "All Machines cards are admin only");
+  // 2026-11-27 (perf/machine-tracker): the list is computed once (tabList, empty in staffMode) and drawn in slices.
+  assert.match(mp, /const tabList = staffMode \? \[\] : listForTab\(\);/, "card list is empty for staff");
+  assert.match(mp, /\{!staffMode && <DeferredBoard stamp=\{boardStamp\} urgent=\{\[stageMap, expanded, stageEditFor, cardRows\.shown\]\} render=\{\(\) => \(\s*<div className="space-y-4">\s*\{tabList\.slice\(0, cardRows\.shown\)\.map\(\(machine\) => <SafeBoundary key=\{machine\.id\} name="machine-card" label="[^"]*" render=\{\(\) => \{/, "All Machines cards are admin only");
   assert.match(mp, /\{!staffMode && \(\(\) => \{\s*const view = mtTab === "transfer"/, "screen header is admin only");
 });
 
@@ -88,7 +90,8 @@ test("rack release stays gated by canDo('machines','release') || isAdminUser", (
   assert.match(mp, /data-staff-release=\{h\.id\}[\s\S]*?if \(m\.rackSlot\) \{ setRackPanel\(m\.rackSlot\); return; \}/);
   // the rack view in staffMode: Production Head + (2026-11-04, owner) the Assembly
   // floor login, who starts assembly there; Pull Back stays admin
-  assert.match(mp, /\{\(staffMode \? \(isProdHead \|\| isAssemblyFloor\) : mtTab === "production"\) && \(/);
+  // 2026-11-27 (perf): the rack view joins on the first idle moment (idleReady), same gate otherwise
+  assert.match(mp, /\{idleReady && \(staffMode \? \(isProdHead \|\| isAssemblyFloor\) : mtTab === "production"\) && \(/);
   assert.match(mp, /const canStartAsm = canStartAssembly\(canDo, myDepartments\);/);
   assert.match(mp, /const isAssemblyFloor = staffMode && !isProdHead && canStartAsm;/);
   // Assemble on a set rack unit uses the same gate; Fill / Send / Remove keep their own

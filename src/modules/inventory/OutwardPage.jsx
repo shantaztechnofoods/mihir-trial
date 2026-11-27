@@ -1,8 +1,10 @@
 // src/modules/inventory/OutwardPage.jsx — moved verbatim from the former single-file src/App.jsx
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { LeadIcon, Glyph } from "../../shared/components/LeadIcon.jsx";
 import ItemSearchSelect from "../../shared/components/ItemSearchSelect.jsx";
+import { useProgressiveCount } from "../../shared/components/useProgressiveCount.js";
+import MoreRowsNote from "../../shared/components/MoreRowsNote.jsx";
 import { rackOfBom, rackCapacityFor, slotLabel, setLabel, pairSlotOf, rackBoms } from "../../utils/rackSlots.js";
 import { BOMDrawer, BOMPasteLines, BomChecklistSlots, BomLineCheckPointsModal, BomPhotoField, DeptDurationFields, RackStatusNote, durationsFormFrom, durationsStoreFrom, validateDurationsForm } from "../bom/index.js";
 import { fmtDate, parseStoreQty, roundQty } from "../../shared/format.js";
@@ -78,7 +80,12 @@ export function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, on
   const [createChecklists, setCreateChecklists] = useState([]); // [{ department, stage, name, items, _localId }]
   const canConfigChecklist = canDo("machines","configDept");
 
-  const allFlat  = Object.entries(items).flatMap(([cat, list]) => list.map((i) => ({ ...i, category: cat })));
+  // perf (2026-11-27): the flat item list is derived once per `items` change
+  // (it was rebuilt — 2,000+ object copies — on every render and again for the
+  // Manual Outward picker). Same rows, same order.
+  const allFlat  = useMemo(() => Object.entries(items).flatMap(([cat, list]) => list.map((i) => ({ ...i, category: cat }))), [items]);
+  // perf: Outward History draws a slice, the rest on scroll (Print / Show all draw every row).
+  const outwardLogRows = useProgressiveCount((outwardLog || []).length, "outward-log");
   const findItem = (code) => allFlat.find((i) => i.code === code);
   const findCat  = (code) => findItem(code)?.category;
 
@@ -1019,7 +1026,7 @@ export function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, on
             <div>
               <OLabel text="Select Item" req />
               <ItemSearchSelect
-                items={Object.entries(items).flatMap(([cat, list]) => list.map((it) => ({ ...it, category: cat })))}
+                items={allFlat}
                 value={manualCode}
                 onChange={setManualCode}
                 showStock={true}
@@ -1106,7 +1113,7 @@ export function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, on
                   ))}
                 </tr></thead>
                 <tbody>
-                  {outwardLog.map((entry) => (
+                  {outwardLog.slice(0, outwardLogRows.shown).map((entry) => (
                     <tr key={entry.id} className="border-b border-slate-200 hover:bg-transparent transition-colors">
                       <td className="px-4 py-2 text-[10px] text-slate-500 font-mono">{entry.date}</td>
                       <td className="px-4 py-2">
@@ -1141,6 +1148,11 @@ export function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, on
                       <td className="px-4 py-2 text-[10px] text-slate-500">{entry.note}</td>
                     </tr>
                   ))}
+                  {outwardLogRows.more > 0 && (
+                    <tr ref={outwardLogRows.sentinelRef} data-more-rows={outwardLogRows.more}>
+                      <td colSpan={6} className="px-4 py-3 text-center text-[11px] text-slate-500"><MoreRowsNote rows={outwardLogRows} /></td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
