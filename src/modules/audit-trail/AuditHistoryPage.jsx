@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { LeadIcon } from "../../shared/components/LeadIcon.jsx";
 import { PageHeader } from "../../shared/components/PageHeader.jsx";
 import { useAuth } from "../../auth/AuthContext.jsx";
 import { getAuditLog, subscribeAudit, fetchAuditFromSupabase } from "../../auth/auditStore.js";
@@ -255,12 +256,12 @@ export default function AuditHistoryPage() {
           <button onClick={() => exportCSV(sorted)}
             className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition-all max-sm:!min-h-[44px]"
             style={{ background: "rgba(26,31,46,0.05)", border: "1px solid rgba(26,31,46,0.1)" }}>
-            📥 CSV
+            <LeadIcon e="📥" />CSV
           </button>
           <button onClick={() => exportExcel(sorted)}
             className="px-3 py-1.5 rounded-lg text-xs font-semibold text-emerald-700 hover:text-emerald-900 transition-all max-sm:!min-h-[44px]"
             style={{ background: "rgba(52,211,153,0.08)", border: "1px solid rgba(52,211,153,0.25)" }}>
-            📊 Excel
+            <LeadIcon e="📊" />Excel
           </button>
       </PageHeader>
 

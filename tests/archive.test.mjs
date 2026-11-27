@@ -87,7 +87,7 @@ test("store delete* names archive instead (kept for the regression inventory)", 
 });
 
 test("Clear Demo Data: Trial-only (ERP_INSTANCE), BOMs unticked, archives instead of deleting", () => {
-  const inv = read("src/modules/inventory/InventoryPage.jsx");
+  const inv = read("src/modules/item-master/InventoryPage.jsx");
   assert.match(inv, /import \{ ERP_INSTANCE \} from "..\/..\/config\/env.js"/);
   assert.match(inv, /\{ERP_INSTANCE === "trial" && canDo\("inventory","delete"\) && \(\s*<button onClick=\{\(\) => setShowClearDemo\(true\)\}/, "button rendered only on Trial");
   assert.match(inv, /\{showClearDemo && ERP_INSTANCE === "trial" && \(/, "modal rendered only on Trial");
@@ -102,7 +102,7 @@ test("screens say Archive, list Archived (N) and offer Restore", () => {
   assert.match(out, /Archive BOM/); assert.doesNotMatch(code(out), />\s*Delete BOM\s*</);
   assert.match(out, /<ArchivedSection kind="BOM"/);
   assert.match(out, /canRestore=\{!!onRestoreBOM && canDo\("outward","bom"\)\}/);
-  const inv = read("src/modules/inventory/InventoryPage.jsx");
+  const inv = read("src/modules/item-master/InventoryPage.jsx");
   assert.match(inv, /<ArchivedSection kind="item"/);
   assert.match(inv, /canRestore=\{!!onRestoreItem && canDo\("inventory","delete"\)\}/);
   const ven = read("src/modules/purchase/VendorsPage.jsx");
