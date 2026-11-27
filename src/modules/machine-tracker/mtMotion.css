@@ -184,6 +184,10 @@ html.wu-lite .wu-confetti { display: none !important; }
   .mt-premium .rack-crate { transition: transform var(--m-micro, 140ms) var(--m-ease-out, cubic-bezier(.23, 1, .32, 1)); }
   .mt-premium .rack-crate:active { transform: scale(.98); transition-duration: var(--m-press, 80ms); }
 
+  /* Accept popup steps: 250 / 280 ms → 200 ms; rack crates: 380 ms overshoot → 240 ms ease-out */
+  .mt-premium .accept-step, .mt-premium .accept-pop { animation-duration: var(--m-small, 200ms); animation-timing-function: var(--m-ease-out, cubic-bezier(.23, 1, .32, 1)); }
+  .mt-premium .rack-crate { animation-duration: 240ms; animation-timing-function: var(--m-ease-out, cubic-bezier(.23, 1, .32, 1)); }
+
   /* Checklist bar fill: 320 → 240 ms */
   .mt-premium .ck-prog-track i, .modal-backdrop .ck-prog-track i { transition-duration: 240ms; }
 }
@@ -195,6 +199,7 @@ html.wu-lite .wu-confetti { display: none !important; }
 @media (prefers-reduced-motion: reduce) {
   .mt-premium .modal-backdrop, .mt-premium .modal-backdrop > div,
   .mt-premium .rack-panel-backdrop, .mt-premium .rack-panel-backdrop > .rack-panel { animation: wu-fade var(--m-micro-out, 100ms) linear backwards !important; }
-  .mt-premium .rack-crate, .mt-premium .rack-crate:hover, .mt-premium .rack-crate:active { transition: none; transform: none; }
+  .mt-premium .rack-crate, .mt-premium .rack-crate:hover, .mt-premium .rack-crate:active { transition: none; transform: none; animation: none; }
+  .mt-premium .accept-step, .mt-premium .accept-pop { animation: wu-fade var(--m-micro-out, 100ms) linear backwards; }
   .mt-premium .ck-prog-track i, .modal-backdrop .ck-prog-track i { transition: none; }
 }
