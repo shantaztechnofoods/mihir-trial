@@ -1,14 +1,13 @@
-// src/shared/ui/ThemeSwitch.jsx — Light / Dark / Auto segmented control (2026-11-05).
+// src/shared/ui/ThemeSwitch.jsx — Light / Dark segmented control (2026-11-05; Auto removed 2026-11-27).
 // Used in the page header (compact, icons only) and in Settings → Appearance
 // (with words). Per-browser choice; see src/shared/theme.js.
 import React from "react";
-import { Sun, Moon, SunMoon } from "lucide-react";
+import { Sun, Moon } from "lucide-react";
 import { useThemeMode, setThemeMode, THEME_MODES } from "../theme.js";
 
 const OPTIONS = [
   { id: "light", label: "Light", Icon: Sun },
   { id: "dark",  label: "Dark",  Icon: Moon },
-  { id: "auto",  label: "Auto",  Icon: SunMoon, hint: "Follow this device" },
 ];
 
 const isPhone = () => { try { return window.matchMedia("(max-width: 639.98px)").matches; } catch { return false; } };
