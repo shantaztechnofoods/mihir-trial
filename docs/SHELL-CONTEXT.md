@@ -37,6 +37,7 @@ PR that adds keys to the shell object, and set the module's
 | SHELL_API | PR | keys added |
 |---|---|---|
 | 1 | modules/c-whatsapp (C.0) | `logAudit`, `canDo`, `currentUser`, `settings`, `goToPage`, `flashSaveError`, `flashStockError`, `handleUpdateStock`, `handleRegisterSignature`, `handleSaveSettings`, `inFlightRef`, `rackSlotReservationRef` (the shell API) |
+| 2 | modules/c-settings | `allUsers`, `checklistTemplates`, `setAllUsers`, `setAttachments`, `setChecklistResponses`, `setChecklistTemplates`, `setDeptRatings`, `setHandovers`, `setMachineLog`, `setOutwardLog`, `setPendingHandoverItems`, `setSettings` |
 
 ## A module's `handlers.js`
 
