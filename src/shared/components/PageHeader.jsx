@@ -11,6 +11,11 @@ import { ThemeSwitch } from "../ui/ThemeSwitch.jsx";
 
 export const MobileNavContext = React.createContext(null);
 
+// The words inside a title / subtitle (string, number or JSX), for its tooltip: on a phone
+// the header cuts both to one line with "…" (world-ui.css), the tooltip keeps the full text.
+export const plainText = (n) => (n == null || typeof n === "boolean" ? "" : typeof n === "string" || typeof n === "number" ? String(n)
+  : Array.isArray(n) ? n.map(plainText).join("") : n.props ? plainText(n.props.children) : "").replace(/\s+/g, " ");
+
 export function PageHeader({ title, subtitle, children }) {
   const onMenu = React.useContext(MobileNavContext);
   return (
@@ -24,8 +29,8 @@ export function PageHeader({ title, subtitle, children }) {
         </button>
       )}
       <div className="flex-1 min-w-[150px]">
-        <h1 className="text-[17px] font-extrabold tracking-[-0.02em] leading-tight" style={{ color: "var(--text-strong)" }}>{title}</h1>
-        {subtitle && <div className="text-[11.5px] mt-1 leading-snug" style={{ color: "var(--text-dim)" }}>{subtitle}</div>}
+        <h1 className="text-[17px] font-extrabold tracking-[-0.02em] leading-tight" style={{ color: "var(--text-strong)" }} title={plainText(title).trim() || undefined}>{title}</h1>
+        {subtitle && <div className="text-[11.5px] mt-1 leading-snug" style={{ color: "var(--text-dim)" }} title={plainText(subtitle).trim() || undefined}>{subtitle}</div>}
       </div>
       <ThemeSwitch className="flex-shrink-0" />
       {children && <div className="page-header-actions flex items-center gap-2 flex-wrap">{children}</div>}
