@@ -1,12 +1,16 @@
 // src/modules/purchase/VendorModal.jsx — moved verbatim from the former single-file src/App.jsx
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Btn } from "../../shared/ui/primitives.jsx";
+import { useDialogFocus } from "../../shared/ui/useDialogFocus.js";
 
 // ─── VENDOR MODAL ─────────────────────────────────────────────────────────────
 
 export function VendorModal({ initialVendor, onSave, onClose, existingNames = [] }) {
   const isEdit = Boolean(initialVendor);
+  // Real dialog for keyboard and screen readers: focus moves in, Tab stays inside, focus returns on close.
+  const dlgRef = useRef(null);
+  useDialogFocus(dlgRef);
   useEffect(() => {
     const h = (e) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", h);
@@ -53,7 +57,7 @@ export function VendorModal({ initialVendor, onSave, onClose, existingNames = []
     <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4"
          style={{ background: "rgba(17,24,39,0.45)", backdropFilter: "blur(14px)" }}
          onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl overflow-hidden"
+      <div ref={dlgRef} role="dialog" aria-modal="true" aria-label={isEdit ? "Edit vendor" : "Add new vendor"} className="w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl overflow-hidden"
            style={{ background: "var(--surface-elevated)", border: "1px solid rgba(46, 80, 214,0.35)", boxShadow: "0 32px 80px rgba(17,24,39,0.22), 0 0 60px rgba(46, 80, 214,0.08)", animation: "slideUp 0.2s ease both" }}>
 
         <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between flex-shrink-0">

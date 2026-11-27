@@ -13,6 +13,7 @@ import RootErrorBoundary from './shared/components/RootErrorBoundary.jsx'
 import OfflineBanner from './shared/components/OfflineBanner.jsx'
 import AppErrorBoundary from './shared/components/AppErrorBoundary.jsx'
 import { startSentry, setSentryUser } from './shared/sentry.js'
+import './shared/ui/sheet.css'
 
 // ── Boot build marker ──────────────────────────────────────────────────────────
 // Page-independent proof of which bundle is live. Shows a small green badge in the

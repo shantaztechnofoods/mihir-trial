@@ -45,7 +45,8 @@
     "shared/format.js",
     "shared/loadXlsx.js",
     "shared/ui/Topbar.jsx",
-    "shared/ui/primitives.jsx"
+    "shared/ui/primitives.jsx",
+    "shared/ui/useDialogFocus.js"
   ],
   "core": {
     "config": [

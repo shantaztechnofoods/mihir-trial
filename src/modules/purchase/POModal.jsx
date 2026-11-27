@@ -9,11 +9,15 @@ import SearchableSelect from "../../shared/components/SearchableSelect.jsx";
 import { PURCHASE_TYPES, DEFAULT_PURCHASE_TYPE_KEY, getPurchaseType, calculateGSTBreakdown, filterPurchaseTypes, todayIso } from "../../utils/gst.js";
 import { normalizePOSettings, PO_TEMPLATE_OPTIONS } from "../../utils/poTemplate.js";
 import { Btn } from "../../shared/ui/primitives.jsx";
+import { useDialogFocus } from "../../shared/ui/useDialogFocus.js";
 
 // ─── PO MODAL ─────────────────────────────────────────────────────────────────
 
 export function POModal({ initialPO, vendorList, items, onSave, onClose, prefill = null, pos = [], settings = {}, onSetItemDefaultRate }) {
   const isEdit = Boolean(initialPO);
+  // Real dialog for keyboard and screen readers: focus moves in, Tab stays inside, focus returns on close.
+  const dlgRef = useRef(null);
+  useDialogFocus(dlgRef);
   const poCfg  = normalizePOSettings(settings);
   // ERP keyboard workflow — Esc closes the modal. Backdrop click + X button
   // already worked; this lets the operator dismiss with one hand on the keyboard.
@@ -246,7 +250,7 @@ export function POModal({ initialPO, vendorList, items, onSave, onClose, prefill
     <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4"
          style={{ background: "rgba(17,24,39,0.45)", backdropFilter: "blur(16px)" }}
          onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="w-full max-w-2xl flex flex-col rounded-2xl overflow-hidden"
+      <div ref={dlgRef} role="dialog" aria-modal="true" aria-label={isEdit ? "Edit purchase order" : "Create purchase order"} className="w-full max-w-2xl flex flex-col rounded-2xl overflow-hidden"
            style={{ maxHeight: "92vh", background: "var(--surface-elevated)", border: "1px solid rgba(46, 80, 214,0.32)", boxShadow: "0 40px 100px rgba(17,24,39,0.22),0 0 80px rgba(46, 80, 214,0.1)", animation: "slideUp 0.25s ease both" }}>
         <div className="px-6 py-5 border-b border-slate-200 flex items-center justify-between flex-shrink-0"
              style={{ background: "linear-gradient(90deg,rgba(46, 80, 214,0.11),rgba(38, 64, 176,0.06))" }}>
