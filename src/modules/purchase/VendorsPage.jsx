@@ -6,7 +6,7 @@ import { openVendorWhatsApp, waErrorToast } from "../../utils/whatsapp.js";
 import DebouncedSearchInput from "../../shared/components/DebouncedSearchInput.jsx";
 import { VendorImportModal } from "./VendorImportModal.jsx";
 import { VendorModal } from "./VendorModal.jsx";
-import { Btn, MetricCard, StatusBadge } from "../../shared/ui/primitives.jsx";
+import { Btn, EmptyState, MetricCard, StatusBadge } from "../../shared/ui/primitives.jsx";
 import { Topbar } from "../../shared/ui/Topbar.jsx";
 import ArchivedSection from "../../shared/components/ArchivedSection.jsx";
 import { archiveConfirmTitle } from "../../utils/archive.js";
@@ -275,8 +275,15 @@ export function VendorsPage({ vendorList, pos, items, onAddVendor, onEditVendor,
                 </div>
               </div>
             ))}
-            {filtered.length === 0 && (
+            {filtered.length === 0 && activeVendors.length > 0 && (
               <div className="col-span-3 py-16 text-center text-slate-600 text-sm">No vendors match your search.</div>
+            )}
+            {activeVendors.length === 0 && (
+              <div className="col-span-full">
+                <EmptyState icon="🏢" title="No vendors yet"
+                            desc="Add your first supplier to start raising purchase orders."
+                            action={canDo("vendors","add") ? <Btn variant="primary" size="sm" onClick={() => { setEditingVendor(null); setShowModal(true); }}>+ Add Vendor</Btn> : null} />
+              </div>
             )}
             {/* 2026-11-05 — archived vendors (never deleted): collapsed, Restore
                 guarded by the same permission as Archive. */}
