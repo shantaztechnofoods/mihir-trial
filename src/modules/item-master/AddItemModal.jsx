@@ -6,11 +6,15 @@ import { uploadItemMedia, MAX_UPLOAD_BYTES } from "../../utils/storage.js";
 import { ITEM_GST_RATES } from "../../utils/gst.js";
 import { recomputeStatus } from "../../shared/format.js";
 import { Btn, StatusBadge } from "../../shared/ui/primitives.jsx";
+import { useDialogFocus } from "../../shared/ui/useDialogFocus.js";
 
 // ─── ADD ITEM MODAL ───────────────────────────────────────────────────────────
 
 export function AddItemModal({ machines, onSave, onClose, initialValues = null, vendorList = [], existingCodes = [], codeLockReason = "" }) {
   const isEdit = Boolean(initialValues);
+  // Real dialog for keyboard and screen readers: focus moves in, Tab stays inside, focus returns on close.
+  const dlgRef = useRef(null);
+  useDialogFocus(dlgRef);
   useEffect(() => {
     const h = (e) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", h);
@@ -256,7 +260,7 @@ export function AddItemModal({ machines, onSave, onClose, initialValues = null, 
     <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4"
          style={{ background: "rgba(17,24,39,0.45)", backdropFilter: "blur(14px)" }}
          onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="w-full max-w-2xl flex flex-col rounded-2xl overflow-hidden"
+      <div ref={dlgRef} role="dialog" aria-modal="true" aria-label={isEdit ? "Edit inventory item" : "Add inventory item"} className="w-full max-w-2xl flex flex-col rounded-2xl overflow-hidden"
            style={{
              maxHeight: "92vh",
              background: "var(--surface-elevated)",

@@ -123,7 +123,7 @@ export function AnalyticsPage({ items, pos, vendorList, settings = SETTINGS_DEFA
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="section-card p-5">
             <SectionHeader><LeadIcon e="📊" />PO Value by Month (₹K)</SectionHeader>
-            <ChartSlot height={220}>{({ ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Customized }) => (
+            <ChartSlot height={220} drawIn="analytics">{({ ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Customized }) => (
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={monthlyPOTrend} barSize={28}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(17,24,39,0.08)" />
@@ -139,7 +139,7 @@ export function AnalyticsPage({ items, pos, vendorList, settings = SETTINGS_DEFA
 
           <div className="section-card p-5">
             <SectionHeader><LeadIcon e="📈" />Inventory Turnover Rate</SectionHeader>
-            <ChartSlot height={220}>{({ ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Customized }) => (
+            <ChartSlot height={220} drawIn="analytics">{({ ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Customized }) => (
             <ResponsiveContainer width="100%" height={220}>
               <AreaChart data={pos.length === 0 ? [] : turnoverData}>
                 <defs>
@@ -165,7 +165,7 @@ export function AnalyticsPage({ items, pos, vendorList, settings = SETTINGS_DEFA
             <SectionHeader><LeadIcon e="🥧" />Spend by Category</SectionHeader>
             {spendByCat.length > 0 ? (
               <>
-                <ChartSlot height={180}>{({ ResponsiveContainer, PieChart, Pie, Cell, Tooltip }) => (
+                <ChartSlot height={180} drawIn="analytics">{({ ResponsiveContainer, PieChart, Pie, Cell, Tooltip }) => (
                 <ResponsiveContainer width="100%" height={180}>
                   <PieChart>
                     <Pie isAnimationActive={false} data={spendByCat} cx="50%" cy="50%" innerRadius={45} outerRadius={70} dataKey="value" stroke="none">
@@ -195,7 +195,7 @@ export function AnalyticsPage({ items, pos, vendorList, settings = SETTINGS_DEFA
           <div className="section-card p-5">
             <SectionHeader><LeadIcon e="🏭" />Vendor-wise PO Count</SectionHeader>
             {vendorPOData.length > 0 ? (
-              <ChartSlot height={220}>{({ ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip }) => (
+              <ChartSlot height={220} drawIn="analytics" horizontal>{({ ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip }) => (
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={vendorPOData} layout="vertical" barSize={14}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(17,24,39,0.08)" />
@@ -216,7 +216,7 @@ export function AnalyticsPage({ items, pos, vendorList, settings = SETTINGS_DEFA
 
           <div className="section-card p-5">
             <SectionHeader><LeadIcon e="📉" />Stock Status</SectionHeader>
-            <ChartSlot height={180}>{({ ResponsiveContainer, PieChart, Pie, Cell, Tooltip }) => (
+            <ChartSlot height={180} drawIn="analytics">{({ ResponsiveContainer, PieChart, Pie, Cell, Tooltip }) => (
             <ResponsiveContainer width="100%" height={180}>
               <PieChart>
                 <Pie isAnimationActive={false} data={stockDist} cx="50%" cy="50%" innerRadius={45} outerRadius={70} dataKey="value" stroke="none">

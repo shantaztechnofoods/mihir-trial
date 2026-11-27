@@ -88,10 +88,12 @@
     "shared/components/useProgressiveCount.js",
     "shared/format.js",
     "shared/machineStages.js",
+    "shared/motion/bigMoments.js",
     "shared/ui/Count.jsx",
     "shared/ui/SignaturePad.jsx",
     "shared/ui/Topbar.jsx",
     "shared/ui/toast.js",
+    "shared/ui/useSwap.js",
     "shared/voice/VoiceNote.jsx"
   ],
   "core": {

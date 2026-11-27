@@ -98,6 +98,7 @@ const FOLDER_FLOORS = {
   "src/modules/trial-certificate": 400,
   "src/modules/inventory": 2000,
   "src/modules/item-master": 1500,  // modules/item-master: Item Master pages + item writes moved here from inventory (~3,000 lines)
+  "src/modules/inward": 150,       // modules/inward: Inward page + handleInwardComplete moved here from inventory (~370 lines)
   "src/modules/bom": 1200,
   "src/modules/purchase": 1500,
   "src/modules/reports": 1500,

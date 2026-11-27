@@ -1,6 +1,7 @@
 // src/modules/settings/SettingsPage.jsx — moved verbatim from the former single-file src/App.jsx
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
 import React, { useState, useEffect, useRef } from "react";
+import { useTabIndicator } from "../../shared/motion/useTabIndicator.js";
 import { LeadIcon, LeadLabel } from "../../shared/components/LeadIcon.jsx";
 import { SETTINGS_TAB_MODULE } from "../../utils/modules.js";
 import { readDeptWorkflowSettings, writeDeptWorkflowSettings, formatDuration, canConfigureDept } from "../../utils/handoverLogic.js";
@@ -58,6 +59,8 @@ export function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, on
     setSettings(incoming);
   }, [initialSettings]);
   const [tab,      setTab]      = useState(initialTab);  // Settings tab: company | po | inventory | notifications | data
+  const tabBarRef = useRef(null);
+  useTabIndicator(tabBarRef, tab, { variant: "line" });   // motion3: underline slides
   const [saved,    setSaved]    = useState(false);
   const [backupOk, setBackupOk] = useState(false);
   const logoRef = useRef(null);
@@ -235,11 +238,11 @@ export function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, on
 
       {/* Tab bar */}
       <div className="px-6 pt-4 max-w-5xl">
-        <div className="settings-tabs flex gap-1 border-b border-slate-200 overflow-x-auto">
+        <div ref={tabBarRef} className="settings-tabs flex gap-1 border-b border-slate-200 overflow-x-auto">
           {visibleTabs.map((t) => {
             const sel = t.id === tab;
             return (
-              <button key={t.id} onClick={() => setTab(t.id)}
+              <button key={t.id} onClick={() => setTab(t.id)} data-tab-active={sel ? "" : undefined}
                       className="text-[12px] font-bold px-3.5 py-2.5 -mb-px transition-all whitespace-nowrap"
                       style={{
                         color:       sel ? "var(--st-tabTx, #2E50D6)" : "var(--st-tabMuted, #6b7280)",

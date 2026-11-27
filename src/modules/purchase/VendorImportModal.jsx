@@ -80,7 +80,7 @@ export function VendorImportModal({ vendorList, onImport, onClose }) {
             <div className="text-sm font-black text-slate-900">Import Vendors</div>
             <div className="text-[11px] text-slate-500 mt-0.5">Upload a CSV or Excel file exported from Google Sheets</div>
           </div>
-          <button onClick={onClose} className="text-slate-500 hover:text-slate-900 text-lg leading-none">✕</button>
+          <button onClick={onClose} aria-label="Close" className="text-slate-500 hover:text-slate-900 text-lg leading-none">✕</button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-5">

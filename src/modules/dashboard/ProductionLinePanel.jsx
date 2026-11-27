@@ -2,10 +2,13 @@
 // Read-only view of the machines + hand-overs already in app state; all rules
 // live in productionLine.js (pure, unit-tested). Every coloured state also
 // carries an icon + words, so colour never has to be remembered.
-import React, { Suspense, lazy, useEffect, useMemo, useState } from "react";
+import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
+import { claimFirstShow } from "../../shared/motion/firstShow.js";
 import { Check, Timer, AlertTriangle, PauseCircle, Inbox, ChevronRight } from "lucide-react";
 import { buildProductionLine, stageStatusLines, lineSummary } from "./productionLine.js";
 import { formatDuration } from "../../utils/handoverLogic.js";
+import { useSwap } from "../../shared/ui/useSwap.js";
+import { useTabIndicator } from "../../shared/motion/useTabIndicator.js";
 import { LinePoster } from "./LinePoster.jsx";
 
 // 3D view (2026-11-06): three.js + the scene load ONLY when "3D view" is tapped
@@ -37,8 +40,11 @@ const ICONS = { ok: Check, near: Timer, late: AlertTriangle, hold: PauseCircle, 
 
 function StatusLine({ line }) {
   const Icon = line.icon ? ICONS[line.icon] : null;
+  // motion3: On time → Late (tone change) cross-fades; the live minutes in the
+  // text tick without animating.
+  const swap = useSwap(line.tone);
   return (
-    <div className="dash-line-flag" data-tone={line.tone}>
+    <div key={line.tone} className={`dash-line-flag ${swap}`} data-tone={line.tone}>
       {Icon && <Icon size={13} strokeWidth={2.25} aria-hidden="true" />}
       <span>{line.text}</span>
     </div>
@@ -120,6 +126,13 @@ export function ProductionLinePanel({ machines = [], handovers = [], settings = 
   useEffect(() => (isOpen ? preload3dWhenIdle() : undefined), [isOpen]);
   const show3d = view === "3d" && isOpen;
   const fail3d = (msg) => { setView("line"); setNote3d(msg); };
+  // motion3: the stage cards rise in once, the first time the Line strip shows
+  // in this page load (not on re-render, refresh, 3D ↔ Line or coming back).
+  const lineIn = useRef(null);
+  if (isOpen && !show3d && lineIn.current === null) lineIn.current = claimFirstShow("dash-line");
+  useEffect(() => { if (!lineIn.current) return undefined; const t = setTimeout(() => { lineIn.current = false; }, 600); return () => clearTimeout(t); }, [isOpen, show3d]);
+  const viewsRef = useRef(null);
+  useTabIndicator(viewsRef, `${isOpen}|${show3d}`, { variant: "pill" });   // motion3: Line ↔ 3D pill slides
   const toggle = () => setIsOpen((v) => { try { localStorage.setItem("erp_dash_line_open", v ? "0" : "1"); } catch {} return !v; });
 
   return (
@@ -142,7 +155,7 @@ export function ProductionLinePanel({ machines = [], handovers = [], settings = 
       {isOpen && <div id="dash-line-body" className="dash-line-body" data-line-body>
       <div className="dash-line-meta dash-line-meta-row">
         <span>{lg.same ? `Target: ${lg.target} in each department` : "Target per department (Settings)"} · {show3d ? "tap a machine" : "tap a stage"}</span>
-        <span className="dash-line-views" role="group" aria-label="Production line view" data-line-views>
+        <span ref={viewsRef} className="dash-line-views" role="group" aria-label="Production line view" data-line-views>
           <button type="button" aria-pressed={!show3d} data-view="line" onClick={() => setView("line")}>Line</button>
           <button type="button" aria-pressed={show3d} data-view="3d" onClick={() => { try { performance.mark("dash3d-tap"); } catch { /* old browser */ } setNote3d(""); setView("3d"); }}>3D view</button>
         </span>
@@ -156,7 +169,7 @@ export function ProductionLinePanel({ machines = [], handovers = [], settings = 
           </Suspense>
         </Line3DBoundary>
       ) : (<>
-      <div className="dash-line-strip">
+      <div className={`dash-line-strip${lineIn.current ? " wu-line-in" : ""}`}>
         {line.stages.map((st) => {
           const lines = stageStatusLines(st);
           const label = `${st.label}${st.head ? `, head ${st.head}` : ""}: ${st.count}${st.key === "Ready" ? " ready today" : ""}. ${lines.map((l) => l.text).join(". ")}. Open Machine Tracker`;

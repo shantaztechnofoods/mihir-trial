@@ -220,11 +220,20 @@ export default function Line3DView({ line, bomDefs = {}, onOpenMachine, onFail }
   }, []);
 
   // 1. Photos: cut out once per URL (cached), then mount.
+  // perf/poster-first (2026-11-27): the scene build (step 2, the heavy part) starts
+  // only after the poster has been painted. With no photos (or cached ones) the
+  // promise settles at once and React could run the build in a task BEFORE the
+  // tap's first frame, so the poster waited for the whole three.js scene
+  // (dashboard-line's "poster ≤ 300 ms" missed on CI at 317–328 ms). Next frame
+  // → task → setPhotos: the poster always gets its frame first.
   useEffect(() => {
-    let alive = true;
+    let alive = true, raf = 0, t = 0;
     const urls = [...new Set([...latest.current.machines, ...latest.current.ready].map((m) => m.url).filter(Boolean))];
-    Promise.all(urls.map((u) => cutoutPhoto(u, PHOTO_SMALL).then((p) => [u, p]))).then((pairs) => { if (alive) setPhotos(Object.fromEntries(pairs)); });
-    return () => { alive = false; };
+    Promise.all(urls.map((u) => cutoutPhoto(u, PHOTO_SMALL).then((p) => [u, p]))).then((pairs) => {
+      if (!alive) return;
+      raf = requestAnimationFrame(() => { t = setTimeout(() => { if (alive) setPhotos(Object.fromEntries(pairs)); }, 0); });
+    });
+    return () => { alive = false; cancelAnimationFrame(raf); clearTimeout(t); };
   }, [sig]);
 
   // 2. Scene: mounted when the photos are ready; disposed on unmount / remount.

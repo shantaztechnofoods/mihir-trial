@@ -63,7 +63,7 @@
   }
   /* motion-a (2026-11-06): press in 80 ms, spring back in 260 ms with a hint of overshoot (transform only) */
   .app-shell button:not(:disabled), .lg-root button:not(:disabled) { transition-duration: 260ms, var(--dur-ui), var(--dur-ui), var(--dur-ui), var(--dur-ui); transition-timing-function: cubic-bezier(.34, 1.4, .44, 1), var(--ease-enter), var(--ease-enter), var(--ease-enter), var(--ease-enter); }
-  .app-shell button:not(:disabled):active, .lg-root button:not(:disabled):active { transform: scale(.97); transition-duration: 80ms, var(--dur-ui), var(--dur-ui), var(--dur-ui), var(--dur-ui); transition-timing-function: var(--ease-enter); }
+  .app-shell button:not(:disabled):active, .lg-root button:not(:disabled):active { transform: scale(var(--m-press-scale, .97)); transition-duration: 80ms, var(--dur-ui), var(--dur-ui), var(--dur-ui), var(--dur-ui); transition-timing-function: var(--ease-enter); }
   .app-shell a, .app-shell [role="button"] { -webkit-tap-highlight-color: transparent; }
 
   /* One focus ring everywhere */
@@ -155,9 +155,13 @@
 
   /* Boot skeleton (session restore) */
   .wu-boot { min-height: 100vh; min-height: 100dvh; display: flex; background: var(--canvas); }
-  .wu-boot-side { width: 240px; background: var(--graphite-900); padding: 18px 14px; display: flex; flex-direction: column; gap: 12px; }
-  .wu-boot-side .wu-sk { background: #1B212C !important; height: 14px; border-radius: 6px; }
-  .wu-boot-side .wu-sk::after { background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .07), transparent); }
+  /* The side rail follows the colour mode (it was always dark navy, so a light-mode
+     reload flashed a dark sidebar before the light app appeared — gap audit #3). */
+  .wu-boot-side { width: 240px; background: #fbfcfd; box-shadow: 1px 0 0 rgba(20, 40, 50, .07); padding: 18px 14px; display: flex; flex-direction: column; gap: 12px; }
+  .wu-boot-side .wu-sk { background: #ECEEF2 !important; height: 14px; border-radius: 6px; }
+  :where(html[data-theme="dark"]) .wu-boot-side { background: #0e1e21; box-shadow: 1px 0 0 rgba(255, 255, 255, .06); }
+  :where(html[data-theme="dark"]) .wu-boot-side .wu-sk { background: rgba(255, 255, 255, .07) !important; }
+  :where(html[data-theme="dark"]) .wu-boot-side .wu-sk::after { background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .07), transparent); }
   .wu-boot-main { flex: 1; padding: 24px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
   .wu-boot-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
   .wu-boot-note { font-size: 13px; color: var(--ink-3); font-weight: 500; }
@@ -740,7 +744,7 @@
   button.dash-tile:active { transform: scale(.99); }
   .dash-stage { padding: 10px 8px; border-radius: var(--r-sm); background: var(--paper); border: 1px solid var(--line); text-align: center; }
   .dash-stage-value { display: block; font: 650 18px/1 var(--font-ui); color: var(--ink); font-variant-numeric: tabular-nums; }
-  .dash-stage[data-zero] .dash-stage-value { color: var(--ink-4); }
+  .dash-stage[data-zero] .dash-stage-value { color: var(--ink-3); }   /* was --ink-4: 2.57:1 on white (glitch-guard) */
   .dash-stage-label { margin-top: 5px; font-size: 12px; font-weight: 500; color: var(--ink-3); line-height: 1.2; }
   @media (max-width: 639px) {
     .dash-tile--lg { padding: 14px 16px; }
@@ -790,7 +794,7 @@
   .dash-line-head-name { color: var(--ink-2); }
   .dash-line-num { display: block; margin: 0 0 4px; font: 600 32px/1.1 var(--font-ui); letter-spacing: -0.02em; color: var(--ink);
     font-variant-numeric: tabular-nums; animation: dash-line-roll var(--dur-ui) var(--ease-enter) both; }
-  .dash-line-stage[data-zero] .dash-line-num { color: var(--ink-4); }
+  .dash-line-stage[data-zero] .dash-line-num { color: var(--ink-3); }   /* was --ink-4: 2.57:1 on white (glitch-guard) */
   .dash-line-sub { font-size: 12px; line-height: 1.4; color: var(--ink-3); }
   .dash-line-flags { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; min-width: 0; max-width: 100%; }
   .dash-line-flag { display: flex; align-items: flex-start; gap: 4px; font-size: 14px; font-weight: 600; line-height: 1.35; color: var(--ink-3); min-width: 0; }
@@ -1643,6 +1647,7 @@
    mtMotion.css stays exactly as approved). Visual only — no logic.          */
 :root {
   --m-press: 80ms; --m-release: 160ms;
+  --m-press-scale: .97;   /* motion3: the ONE button press depth (was .975 / .985 / .992 / .97 + 1px drops) */
   --m-micro: 140ms; --m-micro-out: 100ms;
   --m-small: 200ms; --m-small-out: 140ms;
   --m-medium: 260ms; --m-medium-out: 180ms;
@@ -1702,8 +1707,9 @@
 /* ── MOTION v2 batch 2 (2026-11-27): page · menus · tabs · fold · save · numbers ── */
 @media screen {
   /* Page enter: 220 ms / 6 px → 200 ms / 4 px */
-  .app-shell > .flex-1, .app-shell > main > .flex-1, .app-shell > main > div.flex-1, .app-shell > div.flex-1 { animation: wu-page2 var(--m-small) var(--m-ease-out) backwards; }
-  @keyframes wu-page2 { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  /* motion3 E (owner approved 2026-11-27): 240 ms / 8 px (was 200 ms / 4 px) */
+  .app-shell > .flex-1, .app-shell > main > .flex-1, .app-shell > main > div.flex-1, .app-shell > div.flex-1 { animation: wu-page2 240ms var(--m-ease-out) backwards; }
+  @keyframes wu-page2 { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
   .page-scroll > div { animation: none; }   /* duplicate 280 ms page slide on Report Center (shell already enters) */
 
   /* Dropdowns / pickers were snapping open: 140 ms ease-out from the top edge */
@@ -1851,4 +1857,32 @@
 @media screen and (max-width: 767.98px) {
   .org-edit-footer { flex-wrap: nowrap; }
   .org-edit-footer > button { flex: 1 1 0; min-width: 0; padding-left: 12px !important; padding-right: 12px !important; white-space: nowrap; }
+}
+
+/* ═══ MOTION 3 (2026-11-27) — transition-all · reduced-motion safety net ═════
+   1. Tailwind `transition-all` (326 class lists) animated EVERY property that
+      changed, including width / height / padding (layout, each frame). It now
+      animates only paint/composite properties: colours, shadow, opacity,
+      transform, filter — the press scale and hover colours look the same.
+      Kept as `all` (unchanged): elements whose inline style sets a size (the
+      5 progress-bar fills that grow by width) and Machine Tracker (frozen).
+   2. Reduced motion: 36 scoped blocks existed, but nothing guaranteed a NEW
+      animation would honour the setting. This last net makes every remaining
+      animation / transition effectively instant (1 ms, one run) outside
+      Machine Tracker (whose approved reduced-motion fades stay as they are).
+      Spinners keep turning: they say "still working", not decoration.       */
+.transition-all:not([style*="width"]):not([style*="height"]):not(.mt-premium *) {
+  transition-property: color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;
+}
+@media (prefers-reduced-motion: reduce) {
+  :not(.mt-premium):not(.mt-premium *):not(.animate-spin),
+  :not(.mt-premium):not(.mt-premium *)::before,
+  :not(.mt-premium):not(.mt-premium *)::after {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
 }

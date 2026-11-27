@@ -1,0 +1,52 @@
+{
+  "name": "inward",
+  "version": "1.0.0",
+  "frozen": false,
+  "liveLock": false,
+  "requiresCore": 1,
+  "requiresShell": 3,
+  "exports": [
+    "InwardPage"
+  ],
+  "dependsOn": {},
+  "handlers": [
+    "handleUpdateStock",
+    "logAudit"
+  ],
+  "ownHandlers": [
+    "handleInwardComplete"
+  ],
+  "stores": [
+    "stores/pendingStore.js"
+  ],
+  "shared": [
+    "shared/components/ItemSearchSelect.jsx",
+    "shared/components/LeadIcon.jsx",
+    "shared/components/MoreRowsNote.jsx",
+    "shared/components/VendorSearchSelect.jsx",
+    "shared/components/useProgressiveCount.js",
+    "shared/format.js",
+    "shared/loadXlsx.js",
+    "shared/ui/SuccessTick.jsx",
+    "shared/ui/Topbar.jsx",
+    "shared/ui/primitives.jsx"
+  ],
+  "core": {
+    "config": [
+      "config/env.js"
+    ]
+  },
+  "npm": [
+    "react"
+  ],
+  "migrations": [
+    "002_master",
+    "003_transactional",
+    "011_inventory_engine_items",
+    "012_stock_movements",
+    "013_record_stock_movement"
+  ],
+  "edgeFunctions": [],
+  "serverless": [],
+  "notes": []
+}
