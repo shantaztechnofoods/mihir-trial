@@ -82,3 +82,24 @@ export async function saveSettings(value) {
   console.info("[settings:save] supabase ok");
   return { success: true };
 }
+
+// Migration 072 — save single keys (report.master, departmentHeads) through
+// save_org_setting(), which Super Admin AND Admin may call. `value` is the full
+// new settings object (cached locally); `writes` = [{ key, value }].
+export async function saveSettingsKeys(value, writes) {
+  const mode = isSupabaseEnabled() ? "SUPABASE" : "LOCAL";
+  console.info("[settings:saveKeys] start", { mode, keys: (writes || []).map((w) => w.key) });
+  setSettingsLocal(value); // always cache
+  if (!isSupabaseEnabled()) return { success: true };
+  const c = getSupabase();
+  if (!c) return { success: false, error: "Supabase client not initialized" };
+  for (const w of writes || []) {
+    const { error } = await c.rpc("save_org_setting", { p_key: w.key, p_value: w.value });
+    if (error) {
+      console.error("[settings:saveKeys] rpc failed", w.key, error);
+      if (isMissingFunctionError(error)) return { success: false, error: "Saving this setting needs database update 072 — ask the Super Admin." };
+      return { success: false, error: error.message };
+    }
+  }
+  return { success: true };
+}

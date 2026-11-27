@@ -61,3 +61,11 @@ with "Deleting is not allowed — archive instead"; archive / restore UPDATEs st
 cascades; checklist_templates.bom_key is ON DELETE RESTRICT; the transaction-local
 `app.allow_hard_delete=on` escape hatch works only inside its own transaction; the Super Admin machine
 delete and Remove From Rack still work and leave a full row snapshot in audit_log.
+
+## 072 — Admin saves Report Master + Department heads
+
+`bash tests/db/build_local_db.sh 072` then
+`su postgres -c "psql -q -d erp_test -f tests/db/072_admin_settings_tests.sql"` — `save_org_setting()`
+lets an active Super Admin / Admin write only `report.master` and `departmentHeads`; the settings
+table policies stay Super Admin only; Production, disabled Admin, anon and service role are refused;
+the rest of the row (secret keys, company name) is never touched. Against a 071 build the save checks FAIL (the bug).
