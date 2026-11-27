@@ -1029,3 +1029,29 @@
 @media screen {
   html:not([data-theme="dark"]) body .um-role-chip { color: color-mix(in srgb, var(--chip) 60%, #0b1220) !important; }
 }
+
+/* ═══ Premium desk · tokens, page group 1: Item Master (2026-11-27) ═══════════
+   Gap audit: pages used up to 25 border colours, 15-17 radii, 19 text sizes.
+   Item Master is brought onto 3 border tokens, 4 radius tokens and the
+   7-step type scale it already used (11 / 12 / 13 / 14 / 15 / 25 / 34 px).
+   Surfaces only: no box changes beyond radius; scoped to [data-page]. */
+@media screen {
+  :root {
+    --pd-line-1: rgba(20, 40, 50, .08);   /* hairline: cards, rows, chips */
+    --pd-line-2: rgba(20, 40, 50, .14);   /* control: fields, buttons, groups */
+    --pd-line-accent: rgba(46, 80, 214, .38); /* selected / focus-adjacent */
+    --pd-r-chip: 8px; --pd-r-ctl: 12px; --pd-r-card: 20px; --pd-r-pill: 999px;
+  }
+  :root[data-theme="dark"] { --pd-line-1: rgba(255, 255, 255, .08); --pd-line-2: rgba(255, 255, 255, .14); --pd-line-accent: rgba(122, 184, 255, .5); }
+
+  html body #root [data-page="item-master"] .kpi-tile { border-radius: var(--pd-r-card) !important; }
+  html body #root [data-page="item-master"] .page-header .page-header-actions button:not(.btn-primary-brand) { border-color: var(--pd-line-2) !important; }
+  html body #root [data-page="item-master"] div.flex.gap-0\.5.rounded-lg { border-color: var(--pd-line-2) !important; border-radius: var(--pd-r-ctl) !important; }
+  html body #root [data-page="item-master"] div.flex.gap-0\.5.rounded-lg > button { border-radius: var(--pd-r-chip) !important; }
+  html body #root [data-page="item-master"] div.flex.gap-0\.5.rounded-lg > button[class*="border-blue"], html body #root [data-page="item-master"] div.flex.gap-0\.5.rounded-lg > button[style*="border"] { border-color: var(--pd-line-accent) !important; }
+  html body #root [data-page="item-master"] :is(input, select):not([type="checkbox"]):not([type="radio"]) { border-color: var(--pd-line-2) !important; border-radius: var(--pd-r-ctl) !important; }
+  html body #root [data-page="item-master"] div.bg-white.border.rounded-xl { border-color: var(--pd-line-1) !important; border-radius: var(--pd-r-card) !important; }
+  html body #root [data-page="item-master"] .border-t.border-slate-200 { border-top-color: var(--pd-line-1) !important; }
+  html body #root [data-page="item-master"] .wu-cat { border-color: var(--pd-line-1) !important; }
+  html body #root [data-page="item-master"] .wu-rowbtn { border-color: var(--pd-line-2) !important; border-radius: var(--pd-r-chip) !important; }
+}
