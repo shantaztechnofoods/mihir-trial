@@ -5,6 +5,7 @@ import { RefreshCw, Settings, User, Menu, X, MessagesSquare, FileText, Sparkles,
 import { MobileNavContext } from "../../shared/components/PageHeader.jsx";
 import { waAvatarColor, waParseDirectory, waPhoneKey, waReadSeen, waUnreadCount, waWriteSeen } from "./waHelpers.js";
 import { ListSkeleton } from "../../shared/ui/primitives.jsx";
+import "./whatsapp.css";
 
 // ─── WHATSAPP PAGE ───────────────────────────────────────────────────────────
 
