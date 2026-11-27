@@ -172,7 +172,10 @@ const openDashboard = async (p) => { await p.locator("button, a").filter({ hasTe
   for (const [w, hgt] of [[390, 844], [360, 780]]) {
     await p.setViewportSize({ width: w, height: hgt }); await p.waitForTimeout(400);
     ok(`no sideways scroll at ${w}`, await noOverflow(p));
-    ok(`no 3D button on a phone at ${w}`, await p.locator("[data-line-views]").count() === 0);
+    // 2026-11-27: phones get the 3D toggle too (Line stays the default, 44 px buttons).
+    const vInfo = [await p.locator("[data-line-views]").count(), await p.locator('[data-line-views] [data-view="line"]').getAttribute("aria-pressed"), await p.locator("[data-floor-3d]").count()].join(",");
+    ok(`3D button shown on a phone at ${w}, Line pressed by default`, vInfo === "1,true,0", vInfo);
+    ok(`3D toggle buttons are >= 44px on a phone at ${w}`, await p.locator("[data-line-views] button").evaluateAll((els) => els.every((e) => e.getBoundingClientRect().height >= 44)));
     const box = await p.locator("[data-production-line]").boundingBox();
     ok(`panel fits the phone at ${w}`, box && box.x >= 0 && box.x + box.width <= w + 0.5, JSON.stringify(box));
     const cols = await p.locator('[data-production-line] [data-stage]').evaluateAll((els) => new Set(els.map((e) => Math.round(e.getBoundingClientRect().top))).size);
@@ -185,6 +188,38 @@ const openDashboard = async (p) => { await p.locator("button, a").filter({ hasTe
   await p.mouse.move(200, 30); await p.evaluate(() => document.activeElement && document.activeElement.blur()); await p.waitForTimeout(250);
   await p.screenshot({ path: `${shots}/dashboard-line-390x844.png` });
   await p.screenshot({ path: `${shots}/dashboard-line-390x844-full.png`, fullPage: true });
+  // ── Phone 3D (2026-11-27): swipeable line, light budget, same card on tap ──
+  for (const w of [390, 360]) {
+    await p.setViewportSize({ width: w, height: 844 }); await p.waitForTimeout(300);
+    await p.locator('[data-line-views] [data-view="3d"]').click();
+    await p.waitForFunction(() => document.querySelector("[data-floor-3d] canvas") || document.querySelector("[data-line-3d-note]"), null, { timeout: 15000 }).catch(() => {});
+    await settle(p, 800);
+    if (await p.locator("[data-floor-3d] canvas").count() === 1) {
+      ok(`phone 3d ${w}: phone layout with swipeable line + pager`, await p.locator("[data-floor-3d][data-phone] [data-3d-scroll]").count() === 1 && await p.locator("[data-3d-pager]").count() === 1);
+      ok(`phone 3d ${w}: no page sideways scroll`, await noOverflow(p));
+      const inf = await p.evaluate(() => window.__dash3d.info());
+      ok(`phone 3d ${w}: pixel ratio <= 1.5, no shadow map`, inf.dpr <= 1.5 && inf.shadows === false, JSON.stringify(inf));
+      const f0 = await p.evaluate(() => window.__dash3d.frames); await p.waitForTimeout(1200);
+      ok(`phone 3d ${w}: idle draws 0 frames`, await p.evaluate(() => window.__dash3d.frames) === f0);
+      const f1 = await p.evaluate(() => window.__dash3d.frames);
+      await p.locator("[data-3d-pager] button").last().click(); await p.waitForTimeout(900);
+      ok(`phone 3d ${w}: swiping to the next department draws 0 WebGL frames`, await p.evaluate(() => window.__dash3d.frames) === f1);
+      ok(`phone 3d ${w}: pager says the next department`, /Assembly · 2 \/ 6/.test(await p.locator("[data-3d-dept]").innerText()), await p.locator("[data-3d-dept]").innerText());
+      const fs = await p.locator("[data-floor-3d] .f3-tag:not([data-hidden]) b, [data-floor-3d] .f3-tt, [data-floor-3d] .f3-kl, [data-floor-3d] .f3-cs").evaluateAll((els) => Math.min(...els.map((e) => parseFloat(getComputedStyle(e).fontSize))));
+      ok(`phone 3d ${w}: tag / chip / number words are >= 12px`, fs >= 12, String(fs));
+      const over = await p.locator("[data-floor-3d] .f3-tag:not([data-hidden])").evaluateAll((els) => { const r = els.map((e) => e.getBoundingClientRect()); for (let i = 0; i < r.length; i++) for (let j = i + 1; j < r.length; j++) { const a = r[i], c = r[j]; if (a.left < c.right - 1 && c.left < a.right - 1 && a.top < c.bottom - 1 && c.top < a.bottom - 1) return true; } return false; });
+      ok(`phone 3d ${w}: tags never overlap`, !over);
+      const hold = p.locator('[data-floor-3d] .f3-tag[data-s="hold"]'); await hold.scrollIntoViewIfNeeded(); await hold.click(); await settle(p, 500);
+      const pb = await p.locator("[data-3d-popover]").boundingBox();
+      ok(`phone 3d ${w}: tap opens the same card, inside the screen`, pb && pb.x >= 0 && pb.x + pb.width <= w + 0.5 && /On hold – Heater awaited/.test(await p.locator("[data-3d-popover]").innerText()), JSON.stringify(pb));
+      await p.screenshot({ path: `${shots}/dashboard-3d-phone-${w}-card.png` });
+      await p.keyboard.press("Escape"); await settle(p, 300);
+      await p.screenshot({ path: `${shots}/dashboard-3d-phone-${w}.png` });
+      await p.locator('[data-line-views] [data-view="line"]').click(); await settle(p, 400);
+      ok(`phone 3d ${w}: Line removes the scene (disposed)`, await p.locator("[data-floor-3d], .f3-gl canvas").count() === 0 && await p.evaluate(() => !window.__dash3d));
+    } else ok(`phone 3d ${w}: no WebGL → short message, back on Line`, /WebGL|could not/.test(await p.locator("[data-line-3d-note]").innerText()));
+  }
+  await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
   await p.locator("[data-line-toggle]").click(); await settle(p, 600);
   ok("fold at 390: folds, no sideways scroll", await p.locator("[data-line-toggle]").getAttribute("aria-expanded") === "false" && await noOverflow(p));
   const tb = await p.locator("[data-line-toggle]").boundingBox();

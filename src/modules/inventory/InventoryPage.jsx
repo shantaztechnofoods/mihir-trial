@@ -370,19 +370,19 @@ const ItemMasterRow = React.memo(function ItemMasterRow({ item, isNew, canAdjust
           {canAdjust && (
             <button onClick={() => setQuickAdjust({ item: { ...item }, category: item.category, mode: "add" })}
                     title="Add Stock"
-                    className="wu-rowbtn w-6 h-6 rounded flex items-center justify-center text-xs font-black text-green-700 hover:text-green-900 transition-all"
+                    className="wu-rowbtn w-6 h-6 rounded flex items-center justify-center text-xs font-black text-green-700 hover:text-green-900 transition-colors"
                     style={{ background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.22)" }}>＋</button>
           )}
           {canAdjust && (
             <button onClick={() => setQuickAdjust({ item: { ...item }, category: item.category, mode: "remove" })}
                     title="Remove Stock"
-                    className="wu-rowbtn w-6 h-6 rounded flex items-center justify-center text-xs font-black text-amber-700 hover:text-amber-900 transition-all"
+                    className="wu-rowbtn w-6 h-6 rounded flex items-center justify-center text-xs font-black text-amber-700 hover:text-amber-900 transition-colors"
                     style={{ background: "rgba(217, 119, 6,0.1)", border: "1px solid rgba(217, 119, 6,0.22)" }}>－</button>
           )}
           {canEdit && (
             <button onClick={() => setEditingItem({ item: { ...item }, category: item.category })}
                     title="Edit"
-                    className="wu-rowbtn w-6 h-6 rounded flex items-center justify-center text-[11px] text-slate-500 hover:text-slate-900 transition-all"
+                    className="wu-rowbtn w-6 h-6 rounded flex items-center justify-center text-[11px] text-slate-500 hover:text-slate-900 transition-colors"
                     style={{ background: "rgba(17,24,39,0.04)", border: "1px solid rgba(17,24,39,0.10)" }}><Glyph e="✏" size={13} /></button>
           )}
           {item.status !== "safe" && (
@@ -551,7 +551,10 @@ export function InventoryPage({ items, setItems, handleUpdateStock, pos = [], in
   // 2026-11-04 (fix/perf-1) — draw the table in slices (150 rows, more on scroll).
   const canAdjust = canDo("inventory","adjust");
   const canEdit = canDo("inventory","edit");
-  const masterRows = useProgressiveCount(sorted.length, `${deferredSearch}|${statusFilter}|${catFilter}|${sortCol}|${sortDir}`, { step: 100 });
+  // perf (2026-11-27): smaller slices (60 first, 80 per scroll step, was 150/300)
+  // so each batch's style recalculation and paint stays short. Same rows, same
+  // order; Show all and Print still draw every row.
+  const masterRows = useProgressiveCount(sorted.length, `${deferredSearch}|${statusFilter}|${catFilter}|${sortCol}|${sortDir}`, { initial: 60, step: 80 });
   const filteredVal = useMemo(() => sorted.reduce((s, i) => s + (i.stock * (i.lastPurchaseRate || 0)), 0), [sorted]);
   const filtersActive = search || statusFilter !== "all" || catFilter !== "all";
   const clearFilters  = () => { setSearch(""); setStatusFilter("all"); setCatFilter("all"); };

@@ -185,7 +185,7 @@ export function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, on
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <Topbar title={pageTitle} subtitle={`${activeTab.desc} · Build ${APP_BUILD}`}>
+      <Topbar title={pageTitle} subtitle={`${activeTab.desc} · Build ${APP_BUILD}`} themeSwitch={false}>
         {isDirty && !saved && (
           <span className="text-[10px] font-bold px-2.5 py-1 rounded-full"
                 style={{ background: "rgba(217, 119, 6,0.15)", color: "#B45309", border: "1px solid rgba(217, 119, 6,0.35)" }}>
@@ -204,7 +204,7 @@ export function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, on
              style={{ background: "rgba(239,68,68,0.10)", border: "1px solid rgba(239,68,68,0.40)" }}>
           <span className="text-base flex-shrink-0">⚠️</span>
           <div className="min-w-0 flex-1">
-            <div className="text-[12px] font-bold text-red-200">Save failed — settings did NOT persist to Supabase</div>
+            <div className="text-[12px] font-bold text-red-200">Save failed — settings were not saved. Check the internet and press Save again.</div>
             <div className="text-[11px] text-slate-400 mt-0.5 break-words">{saveError}</div>
             <div className="text-[11px] text-slate-500 mt-1">Your local edits are still here. Fix the issue (check console for details) and click Save again.</div>
           </div>
@@ -804,7 +804,7 @@ export function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, on
                    style={{ background: "rgba(17,24,39,0.03)" }}>
                 <div>
                   <div className="text-[13px] font-semibold text-slate-900">Backup Data</div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">Download a full JSON backup of all ERP data</div>
+                  <div className="text-[11px] text-slate-500 mt-0.5">Download a full backup file of all ERP data</div>
                 </div>
                 <button onClick={handleBackup}
                         className="flex-shrink-0 text-[12px] font-bold px-4 py-2 rounded-xl border transition-all"
