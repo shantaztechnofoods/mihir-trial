@@ -39,10 +39,10 @@ export function VendorModal({ initialVendor, onSave, onClose, existingNames = []
     onClose();
   };
 
-  const ILabel = ({ text, req }) => (
-    <div className="text-[11px] font-medium tracking-tight mb-1.5"
+  const ILabel = ({ text, req, id }) => (
+    <div id={id} className="text-[11px] font-medium tracking-tight mb-1.5"
          style={{ color: "#2640B0" }}>
-      {text}{req && <span className="text-red-400 ml-0.5">*</span>}
+      {text}{req && <span className="text-red-400 ml-0.5" aria-hidden="true">*</span>}
     </div>
   );
   const inpCls = (err) =>
@@ -67,52 +67,52 @@ export function VendorModal({ initialVendor, onSave, onClose, existingNames = []
         <div className="p-6 overflow-y-auto">
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
-              <ILabel text="Vendor / Company Name" req />
-              <input value={form.name} onChange={upd("name")} placeholder="e.g. Bharat Lubricants Pvt Ltd" className={inpCls(errors.name)} />
+              <ILabel id="vend-vendor-company-name" text="Vendor / Company Name" req />
+              <input aria-labelledby="vend-vendor-company-name" value={form.name} onChange={upd("name")} placeholder="e.g. Bharat Lubricants Pvt Ltd" className={inpCls(errors.name)} />
               {errors.name && <div className="text-[10px] text-red-600 mt-1">{errors.name}</div>}
             </div>
             <div>
-              <ILabel text="Contact Person" />
-              <input value={form.contactPerson} onChange={upd("contactPerson")} placeholder="e.g. Ramesh Patel" className={inpCls(false)} />
+              <ILabel id="vend-contact-person" text="Contact Person" />
+              <input aria-labelledby="vend-contact-person" value={form.contactPerson} onChange={upd("contactPerson")} placeholder="e.g. Ramesh Patel" className={inpCls(false)} />
             </div>
             <div>
-              <ILabel text="Vendor Priority" />
-              <select value={form.priority} onChange={upd("priority")} className={inpCls(false)} style={selStyle}>
+              <ILabel id="vend-vendor-priority" text="Vendor Priority" />
+              <select aria-labelledby="vend-vendor-priority" value={form.priority} onChange={upd("priority")} className={inpCls(false)} style={selStyle}>
                 <option value="Preferred">Preferred</option>
                 <option value="Approved">Approved</option>
                 <option value="Backup">Backup</option>
               </select>
             </div>
             <div>
-              <ILabel text="Phone" req />
-              <input value={form.phone} onChange={upd("phone")} placeholder="+91 98765 43210" className={inpCls(errors.phone)} />
+              <ILabel id="vend-phone" text="Phone" req />
+              <input aria-labelledby="vend-phone" value={form.phone} onChange={upd("phone")} placeholder="+91 98765 43210" className={inpCls(errors.phone)} />
               {errors.phone && <div className="text-[10px] text-red-600 mt-1">{errors.phone}</div>}
             </div>
             <div>
-              <ILabel text="Email" />
-              <input value={form.email} onChange={upd("email")} placeholder="orders@vendor.com" className={inpCls(false)} />
+              <ILabel id="vend-email" text="Email" />
+              <input aria-labelledby="vend-email" value={form.email} onChange={upd("email")} placeholder="orders@vendor.com" className={inpCls(false)} />
             </div>
             <div>
-              <ILabel text="GST Number" />
-              <input value={form.gst} onChange={upd("gst")} placeholder="24AABCB1234L1ZN" className={inpCls(false)} />
+              <ILabel id="vend-gst-number" text="GST Number" />
+              <input aria-labelledby="vend-gst-number" value={form.gst} onChange={upd("gst")} placeholder="24AABCB1234L1ZN" className={inpCls(false)} />
             </div>
             <div>
-              <ILabel text="Location" />
-              <input value={form.location} onChange={upd("location")} placeholder="City, State" className={inpCls(false)} />
+              <ILabel id="vend-location" text="Location" />
+              <input aria-labelledby="vend-location" value={form.location} onChange={upd("location")} placeholder="City, State" className={inpCls(false)} />
             </div>
             <div>
-              <ILabel text="Category / Specialty" />
-              <input value={form.category} onChange={upd("category")} placeholder="Oils & Lubricants" className={inpCls(false)} />
+              <ILabel id="vend-category-specialty" text="Category / Specialty" />
+              <input aria-labelledby="vend-category-specialty" value={form.category} onChange={upd("category")} placeholder="Oils & Lubricants" className={inpCls(false)} />
             </div>
             <div>
-              <ILabel text="Payment Terms" />
-              <select value={form.paymentTerms} onChange={upd("paymentTerms")} className={inpCls(false)} style={selStyle}>
+              <ILabel id="vend-payment-terms" text="Payment Terms" />
+              <select aria-labelledby="vend-payment-terms" value={form.paymentTerms} onChange={upd("paymentTerms")} className={inpCls(false)} style={selStyle}>
                 {["Immediate","7 days","15 days","30 days","45 days","60 days"].map((t) => <option key={t}>{t}</option>)}
               </select>
             </div>
             <div>
-              <ILabel text="Status" />
-              <select value={form.status} onChange={upd("status")} className={inpCls(false)} style={selStyle}>
+              <ILabel id="vend-status" text="Status" />
+              <select aria-labelledby="vend-status" value={form.status} onChange={upd("status")} className={inpCls(false)} style={selStyle}>
                 <option value="preferred">Preferred</option>
                 <option value="active">Active</option>
                 <option value="review">Under Review</option>
@@ -120,20 +120,20 @@ export function VendorModal({ initialVendor, onSave, onClose, existingNames = []
               </select>
             </div>
             <div>
-              <ILabel text="Lead Days" />
-              <input type="number" min="0" value={form.leadDays} onChange={upd("leadDays")} placeholder="3" className={inpCls(false)} />
+              <ILabel id="vend-lead-days" text="Lead Days" />
+              <input aria-labelledby="vend-lead-days" type="number" min="0" value={form.leadDays} onChange={upd("leadDays")} placeholder="3" className={inpCls(false)} />
             </div>
             <div>
-              <ILabel text="On-time Delivery %" />
-              <input type="number" min="0" max="100" value={form.performance} onChange={upd("performance")} placeholder="90" className={inpCls(false)} />
+              <ILabel id="vend-on-time-delivery" text="On-time Delivery %" />
+              <input aria-labelledby="vend-on-time-delivery" type="number" min="0" max="100" value={form.performance} onChange={upd("performance")} placeholder="90" className={inpCls(false)} />
             </div>
             <div className="col-span-2">
-              <ILabel text="Address" />
-              <input value={form.address} onChange={upd("address")} placeholder="Full address" className={inpCls(false)} />
+              <ILabel id="vend-address" text="Address" />
+              <input aria-labelledby="vend-address" value={form.address} onChange={upd("address")} placeholder="Full address" className={inpCls(false)} />
             </div>
             <div className="col-span-2">
-              <ILabel text="Notes" />
-              <textarea rows={2} value={form.notes} onChange={upd("notes")} placeholder="Internal notes about this vendor..."
+              <ILabel id="vend-notes" text="Notes" />
+              <textarea aria-labelledby="vend-notes" rows={2} value={form.notes} onChange={upd("notes")} placeholder="Internal notes about this vendor..."
                         className={`${inpCls(false)} resize-none`} style={{ minHeight: 56 }} />
             </div>
           </div>

@@ -54,6 +54,7 @@ export default function SearchableSelect({
   filter = defaultFilter,
   autoFocus = false,
   id,
+  ariaLabelledby,
   className = "",
   inputClassName = "",
   disabled = false,
@@ -193,6 +194,7 @@ export default function SearchableSelect({
       <input
         ref={inputRef}
         id={id}
+        aria-labelledby={ariaLabelledby}
         type="text"
         value={visibleText}
         placeholder={placeholder}
