@@ -45,6 +45,7 @@
     "shared/format.js",
     "shared/loadXlsx.js",
     "shared/machineStages.js",
+    "shared/motion/useTabIndicator.js",
     "shared/printFormat.js",
     "shared/settingsDefaults.js",
     "shared/ui/Topbar.jsx"

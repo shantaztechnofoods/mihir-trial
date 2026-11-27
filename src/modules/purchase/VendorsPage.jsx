@@ -1,6 +1,7 @@
 // src/modules/purchase/VendorsPage.jsx — moved verbatim from the former single-file src/App.jsx
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
 import React, { useState, useEffect, useRef } from "react";
+import { useRowMotion } from "../../shared/motion/useRowMotion.js";
 import { LeadIcon, Glyph } from "../../shared/components/LeadIcon.jsx";
 import { openVendorWhatsApp, waErrorToast } from "../../utils/whatsapp.js";
 import DebouncedSearchInput from "../../shared/components/DebouncedSearchInput.jsx";
@@ -66,6 +67,10 @@ export function VendorsPage({ vendorList, pos, items, onAddVendor, onEditVendor,
     );
     return { hasPOs, hasLinkedItems, anyRefs: hasPOs || hasLinkedItems };
   };
+
+  // motion3: cards fade in / out when the search changes
+  const cardsRef = useRef(null);
+  useRowMotion(cardsRef, search);
 
   const filtered = activeVendors.filter((v) => {
     const q = search.toLowerCase();
@@ -206,7 +211,7 @@ export function VendorsPage({ vendorList, pos, items, onAddVendor, onEditVendor,
 
         <div className={`grid gap-4 ${profileVendor ? "grid-cols-1 xl:grid-cols-3" : "grid-cols-1"}`}>
           {/* Cards grid */}
-          <div className={`${profileVendor ? "xl:col-span-2" : ""} grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 content-start`}>
+          <div ref={cardsRef} className={`${profileVendor ? "xl:col-span-2" : ""} grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 content-start`}>
             {filtered.map((v) => (
               <div key={v.id}
                    className={`bg-white border rounded-xl cursor-pointer card-hover transition-all overflow-hidden ${profileVendor?.id === v.id ? "border-[#2E50D6]/40 shadow-[0_0_0_3px_rgba(46, 80, 214,0.06),0_2px_8px_rgba(17,24,39,0.08)]" : "border-slate-200 shadow-sm hover:shadow-md hover:border-slate-300"}`}

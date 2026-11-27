@@ -8,6 +8,7 @@ import { Check, Timer, AlertTriangle, PauseCircle, Inbox, ChevronRight } from "l
 import { buildProductionLine, stageStatusLines, lineSummary } from "./productionLine.js";
 import { formatDuration } from "../../utils/handoverLogic.js";
 import { useSwap } from "../../shared/ui/useSwap.js";
+import { useTabIndicator } from "../../shared/motion/useTabIndicator.js";
 import { LinePoster } from "./LinePoster.jsx";
 
 // 3D view (2026-11-06): three.js + the scene load ONLY when "3D view" is tapped
@@ -130,6 +131,8 @@ export function ProductionLinePanel({ machines = [], handovers = [], settings = 
   const lineIn = useRef(null);
   if (isOpen && !show3d && lineIn.current === null) lineIn.current = claimFirstShow("dash-line");
   useEffect(() => { if (!lineIn.current) return undefined; const t = setTimeout(() => { lineIn.current = false; }, 600); return () => clearTimeout(t); }, [isOpen, show3d]);
+  const viewsRef = useRef(null);
+  useTabIndicator(viewsRef, `${isOpen}|${show3d}`, { variant: "pill" });   // motion3: Line ↔ 3D pill slides
   const toggle = () => setIsOpen((v) => { try { localStorage.setItem("erp_dash_line_open", v ? "0" : "1"); } catch {} return !v; });
 
   return (
@@ -152,7 +155,7 @@ export function ProductionLinePanel({ machines = [], handovers = [], settings = 
       {isOpen && <div id="dash-line-body" className="dash-line-body" data-line-body>
       <div className="dash-line-meta dash-line-meta-row">
         <span>{lg.same ? `Target: ${lg.target} in each department` : "Target per department (Settings)"} · {show3d ? "tap a machine" : "tap a stage"}</span>
-        <span className="dash-line-views" role="group" aria-label="Production line view" data-line-views>
+        <span ref={viewsRef} className="dash-line-views" role="group" aria-label="Production line view" data-line-views>
           <button type="button" aria-pressed={!show3d} data-view="line" onClick={() => setView("line")}>Line</button>
           <button type="button" aria-pressed={show3d} data-view="3d" onClick={() => { try { performance.mark("dash3d-tap"); } catch { /* old browser */ } setNote3d(""); setView("3d"); }}>3D view</button>
         </span>
