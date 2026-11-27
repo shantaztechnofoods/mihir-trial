@@ -163,12 +163,12 @@ export function ChecklistAdminPanel({ templates = [], canConfig = false, onCreat
                     <>
                       <button type="button" onClick={() => moveItem(i, -1)} disabled={i === 0}
                               title="Move up"
-                              className="text-[11px] text-slate-500 hover:text-slate-700 disabled:opacity-30 disabled:cursor-not-allowed px-1">↑</button>
+                              className="st-x text-[11px] text-slate-500 hover:text-slate-700 disabled:opacity-30 disabled:cursor-not-allowed px-1">↑</button>
                       <button type="button" onClick={() => moveItem(i, +1)} disabled={i === editing.items.length - 1}
                               title="Move down"
-                              className="text-[11px] text-slate-500 hover:text-slate-700 disabled:opacity-30 disabled:cursor-not-allowed px-1">↓</button>
+                              className="st-x text-[11px] text-slate-500 hover:text-slate-700 disabled:opacity-30 disabled:cursor-not-allowed px-1">↓</button>
                       <button type="button" onClick={() => removeItem(i)} title="Remove question"
-                              className="text-[11px] text-slate-500 hover:text-red-400 px-1">×</button>
+                              className="st-x text-[11px] text-slate-500 hover:text-red-400 px-1">×</button>
                     </>
                   )}
                 </div>

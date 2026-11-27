@@ -668,7 +668,7 @@ export function POModal({ initialPO, vendorList, items, onSave, onClose, prefill
           )}
         </div>
 
-        <div className="px-6 py-4 border-t border-slate-200 flex items-center justify-between gap-2 flex-shrink-0"
+        <div className="po-modal-foot px-6 py-4 border-t border-slate-200 flex items-center justify-between gap-2 flex-shrink-0"
              style={{ background: "#f8f9fb" }}>
           <div className="text-[10px] text-slate-500">{form.lineItems.length} item{form.lineItems.length !== 1 ? "s" : ""} · ₹{total.toLocaleString("en-IN")}</div>
           <div className="flex gap-2">

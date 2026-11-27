@@ -3355,6 +3355,14 @@ input:focus, select:focus, textarea:focus { box-shadow: 0 0 0 3px rgba(46,80,214
    Layout only, inside the existing card look. Right-sized controls:
    min touch 44px, primary 48px, control text 15px, nothing stretched. */
 .settings-tabs > button { min-height: 44px; }
+/* 2026-11-27 view round 2 — Settings on touch screens (phone + tablet):
+   Save buttons and the small × / ↑ / ↓ chips get a 44px tap area. The chip
+   remove buttons use negative margins so the chips keep their height.
+   Mouse (fine pointer) unchanged. */
+@media (pointer: coarse) {
+  .st-save, [data-save-modules] { min-height: 44px !important; }
+  .st-x { min-width: 32px; min-height: 44px; margin-top: -12px; margin-bottom: -12px; display: inline-flex; align-items: center; justify-content: center; }
+}
 .org-groups { display: flex; flex-direction: column; gap: 12px; }
 .org-group { border: 1px solid var(--border-rim, rgba(17,24,39,0.12)); border-radius: 12px; background: var(--surface-card, #fff); overflow: hidden; }
 .org-group-head { width: 100%; min-height: 52px; display: flex; align-items: center; gap: 10px; padding: 10px 16px; text-align: left; background: rgba(17,24,39,0.03); }
@@ -4002,6 +4010,28 @@ button.rack-btn:disabled { background: #e5e7eb !important; color: #6b7280 !impor
     height: 44px !important; min-height: 44px !important; font-size: 16px;
   }
 }
+/* 2026-11-27 view round 2 — touch tablets (768-1024, coarse pointer): the
+   Machine Tracker gets the same 44px tap targets the phone already has —
+   card buttons, the delay-period switch, rack buttons, popup buttons and
+   popup fields, the signature Clear / Save and the Reports machine picker.
+   Mouse/trackpad screens (fine pointer) are unchanged. */
+@media (pointer: coarse) and (min-width: 768px) {
+  .mt-premium .mt-card-actions > button,
+  .mt-premium .mt-card-actions > select,
+  .mt-premium .mt-card-actions > div > button,
+  .mt-premium .rack-shelf [data-rack-fill],
+  .mt-premium .rack-shelf [data-rack-send],
+  .mt-premium .modal-backdrop button,
+  .mt-premium .rack-panel-backdrop button,
+  .delay-card [data-delay-period] { min-height: 44px !important; }
+  .modal-backdrop select,
+  .modal-backdrop input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),
+  .rpt-menu-select { height: 44px !important; min-height: 44px !important; }
+}
+@media (pointer: coarse) {
+  .sig-pad-btns > button,
+  [data-accept-signature] .sig-pad-btns > button { min-height: 44px !important; }
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Reports v2 (2026-11-04)
@@ -4394,4 +4424,14 @@ button.rack-btn:disabled { background: #e5e7eb !important; color: #6b7280 !impor
 @media (pointer: coarse) {
   [data-report-master] .rm-tick { min-width: 44px; min-height: 44px; justify-content: center; }
   [data-report-master] .rm-tick input[type="checkbox"] { width: 22px; height: 22px; }
+}
+
+/* Glitch sweep 2026-11-27: no page text under 11 px. Captions, chips and table
+   meta were 9-10.5 px on 12 of 16 pages (hard to read at arm's length on a
+   phone). Raised to 11 px in the page area only. Left alone: the sidebar and
+   bottom bar, Machine Tracker (frozen, its own type scale) and popups (owned by
+   the popup layout work). Size only — no colour, weight or spacing change. */
+.app-shell > .flex-1:not(.mt-premium) :is(.text-\[9px\], .text-\[9\.5px\], .text-\[10px\], .text-\[10\.5px\]):not(.modal-backdrop *):not([role="dialog"] *),
+.app-shell > main > .flex-1:not(.mt-premium) :is(.text-\[9px\], .text-\[9\.5px\], .text-\[10px\], .text-\[10\.5px\]):not(.modal-backdrop *):not([role="dialog"] *) {
+  font-size: 11px !important; /* beats the older 9-10.5 px !important phone/tile rules */
 }

@@ -18,9 +18,14 @@
 // panel scrolls it natively, one department per snap). Budget: pixel ratio
 // capped at 1.5, no shadow map (the soft blob shadows stay), no intro motion,
 // no dolly on tap, touch never "hovers" — so a swipe draws zero WebGL frames.
+// Phone v2 (2026-11-27): after the scene is built, every mesh that shares a
+// material is merged into ONE draw call (static scene; the original machine
+// meshes stay, hidden, for tap picking). Glow halos are left out (the lit lamp
+// is enough at phone size). Any data change remounts instead of animating.
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
 const C = { late: "#dc2626", hold: "#7c3aed", near: "#d97706", ok: "#16a34a", idle: "#94a3b8", incoming: "#94a3b8" };
 const BOX_W = 1.9, BOX_H = 1.36, GAP_X = 0.12, PAD_X = 0.48, PAD_D = 3.0, MINZ = 2.6, END_W = 2.3; // v9: a machine never touches its bay edge / andon post
@@ -106,7 +111,7 @@ export function mountLine(host, { zones, machines, ready = [], rackCount = 0, da
   };
   const radial = (inner, outer, mid) => tex(128, 128, (g, w, h) => { const rg = g.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2); rg.addColorStop(0, inner); if (mid) rg.addColorStop(0.35, mid); rg.addColorStop(1, outer); g.fillStyle = rg; g.fillRect(0, 0, w, h); });
   const rr = (g, x, y, w, h, rad) => { g.beginPath(); if (g.roundRect) g.roundRect(x, y, w, h, rad); else g.rect(x, y, w, h); };
-  const RB = (w, h, d, rad = 0.05, seg = 3) => new RoundedBoxGeometry(w, h, d, seg, Math.min(rad, w / 2 - 0.001, h / 2 - 0.001, d / 2 - 0.001));
+  const RB = (w, h, d, rad = 0.05, seg = 3) => new RoundedBoxGeometry(w, h, d, lite ? 1 : seg, /* phone: a corner is ~1 px, one segment reads the same */ Math.min(rad, w / 2 - 0.001, h / 2 - 0.001, d / 2 - 0.001));
   const mesh = (geo, mat, x = 0, y = 0, z = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); return m; };
   const font = "Inter, system-ui, sans-serif";
   const M = {
@@ -121,11 +126,14 @@ export function mountLine(host, { zones, machines, ready = [], rackCount = 0, da
     sign: new THREE.MeshStandardMaterial({ color: dark ? 0x0c2b30 : 0x0f2a5c, roughness: 0.35, metalness: 0.3 }),
   };
   const shadowTex = radial("rgba(0,0,0,1)", "rgba(0,0,0,0)", "rgba(0,0,0,.55)");
-  const shadow = (w, d, o = 0.22, x = 0, z = 0) => { const s = mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, opacity: dark ? o * 1.6 : o, depthWrite: false })); s.rotation.x = -Math.PI / 2; s.position.set(x, 0.012, z); s.renderOrder = 2; return s; };
+  const shadowMats = new Map(); // phone: one material per opacity, so the merge pass can join them
+  const shadowMat = (o) => { const mk = () => new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, opacity: dark ? o * 1.6 : o, depthWrite: false }); if (!lite) return mk(); if (!shadowMats.has(o)) shadowMats.set(o, mk()); return shadowMats.get(o); };
+  const shadow = (w, d, o = 0.22, x = 0, z = 0) => { const s = mesh(new THREE.PlaneGeometry(w, d), shadowMat(o)); s.rotation.x = -Math.PI / 2; s.position.set(x, 0.012, z); s.renderOrder = 2; return s; };
   const flat = (w, d, map, x = 0, y = 0.011, z = 0, opacity = 1, blending = THREE.NormalBlending) => { const s = mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshBasicMaterial({ map, transparent: true, opacity, depthWrite: false, toneMapped: false, blending })); s.rotation.x = -Math.PI / 2; s.position.set(x, y, z); s.renderOrder = 1; return s; };
 
   // ---- andon stack light: shared geometry, one lit lamp + a soft glow halo ----
-  const lampGeo = new THREE.CylinderGeometry(1, 1, 1, 24), capGeo = new THREE.CylinderGeometry(1, 1, 1, 24), poleGeo = new THREE.CylinderGeometry(1, 1, 1, 10);
+  const CS = lite ? 12 : 24; // phone: half the radial segments (a lamp is a few px wide)
+  const lampGeo = new THREE.CylinderGeometry(1, 1, 1, CS), capGeo = new THREE.CylinderGeometry(1, 1, 1, CS), poleGeo = new THREE.CylinderGeometry(1, 1, 1, 10);
   const lampOn = {}, lampOff = {}, haloMat = {};
   for (const k of LAMPS) {
     const col = new THREE.Color(C[k]);
@@ -158,14 +166,17 @@ export function mountLine(host, { zones, machines, ready = [], rackCount = 0, da
   const trackMat = new THREE.MeshBasicMaterial({ color: dark ? 0x3b5a5e : 0xcbd5e1, transparent: true, opacity: dark ? 0.55 : 0.7, depthWrite: false, toneMapped: false, side: THREE.DoubleSide });
   const arcMat = {}; for (const k of ["ok", "near", "late", "hold", "incoming"]) arcMat[k] = new THREE.MeshBasicMaterial({ color: new THREE.Color(C[k]), transparent: true, opacity: 0.95, depthWrite: false, toneMapped: false, side: THREE.DoubleSide });
   const glowTex = { late: radial(C.late + "cc", "rgba(0,0,0,0)"), hold: radial(C.hold + "cc", "rgba(0,0,0,0)") };
+  const glowMats = {}; // phone: shared per state (merged into one draw call)
+  const glowMat = (state) => { const mk = () => new THREE.MeshBasicMaterial({ map: glowTex[state], transparent: true, opacity: dark ? 0.32 : 0.2, depthWrite: false, toneMapped: false }); if (!lite) return mk(); return glowMats[state] || (glowMats[state] = mk()); };
+  const ringKeyOf = (state, share) => { const s = share == null || !Number.isFinite(share) ? null : clamp01(share); return `${state}:${s == null ? "-" : Math.round(s * RING_SEG)}`; };
   const setRing = (g, state, share) => {
     const s = share == null || !Number.isFinite(share) ? null : clamp01(share);
-    const key2 = `${state}:${s == null ? "-" : Math.round(s * RING_SEG)}`;
+    const key2 = ringKeyOf(state, share);
     if (g.userData.ringKey === key2) return;
     g.userData.ringKey = key2;
     const u = g.userData;
     if (u.arc) { u.ringG.remove(u.arc); u.arc.geometry.dispose(); u.arc = null; }
-    if (u.glow) { u.ringG.remove(u.glow); u.glow.geometry.dispose(); u.glow.material.dispose(); u.glow = null; }
+    if (u.glow) { u.ringG.remove(u.glow); u.glow.geometry.dispose(); if (!lite) u.glow.material.dispose(); u.glow = null; }
     if (u.andon) u.andon.set(state);
     const len = state === "hold" || state === "late" ? 1 : s;
     if (len != null && len > 0.005) {
@@ -173,7 +184,7 @@ export function mountLine(host, { zones, machines, ready = [], rackCount = 0, da
       arc.renderOrder = 3; u.ringG.add(arc); u.arc = arc;
     }
     if (state === "late" || state === "hold") {
-      const glow = mesh(new THREE.PlaneGeometry(2.6, 2.6), new THREE.MeshBasicMaterial({ map: glowTex[state], transparent: true, opacity: dark ? 0.32 : 0.2, depthWrite: false, toneMapped: false }));
+      const glow = mesh(new THREE.PlaneGeometry(2.6, 2.6), glowMat(state));
       glow.renderOrder = 2; u.ringG.add(glow); u.glow = glow;
     }
   };
@@ -227,7 +238,7 @@ export function mountLine(host, { zones, machines, ready = [], rackCount = 0, da
     if (has) { const pc = photoCard(m.photo, w, h); g.add(pc.grp); g.userData.mats.push(pc.card.material); if (pc.refl) g.userData.mats.push(pc.refl.material); pc.refl.material.userData.base = pc.refl.material.opacity; }
     else { const s = silhouette(m.family, w); g.add(s.obj); g.userData.h = s.h; }
     g.add(shadow(w * 1.1, 0.8, 0.3, 0, 0.04));
-    g.add(shadow(w * 0.92, 0.26, 0.55, 0, 0.0)); // v9: tight contact shadow right under the base (grounded)
+    g.add(shadow(w * 0.92, 0.26, 0.55, 0, 0.0)); // v9: tight contact shadow right under the base (grounded); phone: merged with all the others
     // floor ring (ellipse under the machine) + a small andon behind its right edge
     const ringG = new THREE.Group(); ringG.rotation.x = -Math.PI / 2; ringG.position.y = 0.014; ringG.scale.set(w * 0.56 + 0.1, 0.58, 1);
     const track = mesh(trackGeo, trackMat); track.renderOrder = 3; ringG.add(track);
@@ -388,6 +399,33 @@ export function mountLine(host, { zones, machines, ready = [], rackCount = 0, da
   const plate = mesh(new THREE.PlaneGeometry(0.95, 0.285), new THREE.MeshBasicMaterial({ map: plateTex, toneMapped: false, transparent: true }), 0, 0.17, 0.92);
   plate.rotation.x = -0.5; readyG.add(plate);
 
+  // ---- phone: one draw call per material (static scene) ----
+  const merged = [];
+  if (lite) {
+    sc.updateMatrixWorld(true);
+    const groups = new Map();
+    sc.traverse((o) => {
+      if (o.isSprite) { o.visible = false; return; } // glow halos: not on a phone
+      if (!o.isMesh || !o.visible) return;
+      const k = o.material.uuid + "|" + o.renderOrder;
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(o);
+    });
+    for (const list of groups.values()) {
+      if (list.length < 2) continue;
+      const geos = list.map((m) => {
+        const g = m.geometry.index ? m.geometry.toNonIndexed() : m.geometry.clone();
+        for (const a of Object.keys(g.attributes)) if (a !== "position" && a !== "normal" && a !== "uv") g.deleteAttribute(a);
+        g.clearGroups(); g.applyMatrix4(m.matrixWorld); return g;
+      });
+      const one = mergeGeometries(geos, false); geos.forEach((g) => g.dispose());
+      if (!one) continue;
+      const mm = new THREE.Mesh(one, list[0].material); mm.renderOrder = list[0].renderOrder; mm.matrixAutoUpdate = false; mm.userData.noPick = true;
+      sc.add(mm); merged.push(mm);
+      for (const m of list) m.visible = false; // kept (hidden) for tap picking; raycasts ignore visibility
+    }
+  }
+
   // ---- shadow camera fitted tightly to the floor ----
   const TOPY = padY + BOX_H + 0.3;
   key.position.set(-TOT * 0.18, 14, 10); key.target.position.set(0, 0, 0);
@@ -442,7 +480,7 @@ export function mountLine(host, { zones, machines, ready = [], rackCount = 0, da
     ray.setFromCamera(ndc, cam); const hit = ray.intersectObjects(parts, true).find((h) => !h.object.userData.noPick);
     let o = hit && hit.object; while (o && !o.userData.sn) o = o.parent; return o || null;
   };
-  const focusOn = () => { const f = picked || hovered; for (const g of units.values()) g.userData.fadeT = !f || g === f ? 1 : 0.28; };
+  const focusOn = () => { if (lite) return; /* phone: merged scene, the tag shows the focus */ const f = picked || hovered; for (const g of units.values()) g.userData.fadeT = !f || g === f ? 1 : 0.28; };
   const setHover = (o) => {
     if (o === hovered) return; hovered = o; r.domElement.style.cursor = o ? "pointer" : "";
     focusOn(); if (onHover) onHover(o ? o.userData.sn : null); kick();
@@ -469,6 +507,8 @@ export function mountLine(host, { zones, machines, ready = [], rackCount = 0, da
     if (!run) return false;
     const nextIds = next.map((m) => String(m.id));
     if (nextIds.length !== ids.length || nextIds.some((id) => !units.has(id))) return false;
+    // phone: the scene is merged — any visible change remounts (rare; no glide)
+    if (lite) { const same = next.every((m) => zoneOf.get(String(m.id)) === m.z && units.get(String(m.id)).userData.ringKey === ringKeyOf(m.state, m.share)); if (same) kick(); return same; }
     const trial = new Map(zoneOf); let moved = false;
     for (const m of next) { const id = String(m.id); if (zoneOf.get(id) !== m.z) { trial.set(id, m.z); moved = true; } }
     if (moved) for (let z = 1; z < N - 1; z++) if (Math.abs(widthOf(z, trial) - ZW[z]) > 1e-6) return false; // bays change → remount
@@ -500,7 +540,7 @@ export function mountLine(host, { zones, machines, ready = [], rackCount = 0, da
       if (glides.has(g.userData.sn)) continue;
       if (Math.abs(g.position.x - g.userData.tx) > 0.001 || Math.abs(g.position.z - g.userData.tz) > 0.001) { g.position.x += (g.userData.tx - g.position.x) * sp; g.position.z += (g.userData.tz - g.position.z) * sp; moving = shadowsMoved = true; }
       if (Math.abs(g.scale.x - g.userData.ts) > 0.001) { g.scale.setScalar(g.scale.x + (g.userData.ts - g.scale.x) * sp); moving = shadowsMoved = true; }
-      const tgt = g === hovered || g === picked ? 0.08 : 0;
+      const tgt = !lite && (g === hovered || g === picked) ? 0.08 : 0;
       if (Math.abs(g.position.y - tgt) > 0.001) { g.position.y += (tgt - g.position.y) * sp; moving = shadowsMoved = true; }
       if (Math.abs(g.userData.fade - g.userData.fadeT) > 0.005) {
         g.userData.fade += (g.userData.fadeT - g.userData.fade) * sp;
@@ -524,6 +564,7 @@ export function mountLine(host, { zones, machines, ready = [], rackCount = 0, da
 
   const api = {
     update, zoneScreen, machineScreen, kick, pick, onFrame: null, frames: 0, span: TOT, lite,
+    layout: () => { if (run && api.onFrame) api.onFrame(); }, // re-place the HTML tags without drawing a WebGL frame
     setHover: (sn) => setHover(sn ? units.get(String(sn)) || null : null),
     isZoomed: () => zoomTarget === 1,
     info: () => ({ calls: r.info.render.calls, triangles: r.info.render.triangles, geometries: r.info.memory.geometries, textures: r.info.memory.textures, dpr: r.getPixelRatio(), shadows: r.shadowMap.enabled }),
@@ -539,7 +580,7 @@ export function mountLine(host, { zones, machines, ready = [], rackCount = 0, da
       sc.traverse((o) => { if (o.geometry) geos.add(o.geometry); const m = o.material; if (m) (Array.isArray(m) ? m : [m]).forEach((x) => mats.add(x)); });
       for (const g of geos) g.dispose();
       for (const m of mats) { if (m.map) m.map.dispose(); m.dispose(); }
-      for (const m of [...Object.values(M), ...Object.values(lampOn), ...Object.values(lampOff), ...Object.values(haloMat), ...Object.values(arcMat), trackMat]) m.dispose();
+      for (const m of [...Object.values(M), ...Object.values(lampOn), ...Object.values(lampOff), ...Object.values(haloMat), ...Object.values(arcMat), trackMat, ...shadowMats.values(), ...Object.values(glowMats)]) m.dispose();
       for (const t of textures) t.dispose();
       for (const g of [lampGeo, capGeo, poleGeo, trackGeo]) g.dispose();
       if (key.shadow.map) key.shadow.map.dispose();

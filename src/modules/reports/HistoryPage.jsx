@@ -124,7 +124,7 @@ export const HRFilterBar = React.memo(function HRFilterBar({ search, setSearch, 
     <div className="flex flex-wrap items-center gap-2 px-6 py-3" style={{ background: "rgba(17,24,39,0.03)", borderBottom: "1px solid rgba(17,24,39,0.04)" }}>
       <div className="relative">
         <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs"><Glyph e="🔍" size={13} /></span>
-        <DebouncedSearchInput value={search} onChange={setSearch} placeholder="Global search…"
+        <DebouncedSearchInput value={search} onChange={setSearch} aria-label="Search history" placeholder="Global search…"
           className="bg-slate-50 border border-slate-200 rounded-lg pl-7 pr-3 py-1.5 text-xs text-slate-700 placeholder-slate-400 outline-none focus:border-blue-500/40 w-52" />
       </div>
       <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
@@ -133,21 +133,21 @@ export const HRFilterBar = React.memo(function HRFilterBar({ search, setSearch, 
       <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
         className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-400 outline-none focus:border-blue-500/40" title="To date" />
       {showVendor && (
-        <select value={vendorFilter} onChange={(e) => setVendorFilter(e.target.value)}
+        <select aria-label="Vendor" value={vendorFilter} onChange={(e) => setVendorFilter(e.target.value)}
           className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-400 outline-none focus:border-blue-500/40">
           <option value="">All Vendors</option>
           {vendorList.map((v) => <option key={v.id||v.name} value={v.name}>{v.name}</option>)}
         </select>
       )}
       {showItem && (
-        <select value={itemFilter} onChange={(e) => setItemFilter(e.target.value)}
+        <select aria-label="Item" value={itemFilter} onChange={(e) => setItemFilter(e.target.value)}
           className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-400 outline-none focus:border-blue-500/40">
           <option value="">All Items</option>
           {allItems.map((i) => <option key={i.code} value={i.code}>{i.name} ({i.code})</option>)}
         </select>
       )}
       {showMachine && (
-        <select value={machineFilter} onChange={(e) => setMachineFilter(e.target.value)}
+        <select aria-label="Machine" value={machineFilter} onChange={(e) => setMachineFilter(e.target.value)}
           className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-400 outline-none focus:border-blue-500/40">
           <option value="">All Machines</option>
           {[...new Set(machineLog.map((m) => m.bomKey))].map((k) => <option key={k} value={k}>{k}</option>)}

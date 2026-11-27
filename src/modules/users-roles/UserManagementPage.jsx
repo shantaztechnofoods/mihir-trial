@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { PageHeader } from "../../shared/components/PageHeader.jsx";
 import "./usersRoles.css";
 import { useAuth } from "../../auth/AuthContext.jsx";
@@ -40,6 +40,19 @@ export default function UserManagementPage({ canDo }) {
   const [deleteConfirm, setDeleteConfirm]   = useState(null);
   const [search, setSearch]         = useState("");
   const [toast,  setToast]          = useState(null);   // { text, type: 'success' | 'error' }
+
+  // Esc closes the top popup (same as its ✕ / Cancel), never while it is saving.
+  useEffect(() => {
+    if (!showModal && !showResetModal && !deleteConfirm) return undefined;
+    const onKey = (e) => {
+      if (e.key !== "Escape") return;
+      if (deleteConfirm) { if (!deleteSubmitting) setDeleteConfirm(null); return; }
+      if (showResetModal) { if (!resetSubmitting) setShowResetModal(false); return; }
+      if (showModal) setShowModal(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showModal, showResetModal, deleteConfirm, deleteSubmitting, resetSubmitting]);
 
   const isSuperAdmin = currentUser?.role === "super_admin";
 
@@ -331,7 +344,7 @@ export default function UserManagementPage({ canDo }) {
 
       {/* Header */}
       <PageHeader title="User Management" subtitle={`${users.length} user${users.length !== 1 ? "s" : ""} in the system`}>
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search users…"
+          <input value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search users" placeholder="Search users…"
             className="um-search px-3 py-1.5 rounded-lg text-xs placeholder-slate-400 outline-none w-full sm:w-44"
             style={inputStyle} />
           {(isSuperAdmin || canDo?.("users", "create")) && (
@@ -439,12 +452,12 @@ export default function UserManagementPage({ canDo }) {
 
       {/* Add/Edit Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(15,20,28,0.45)", backdropFilter: "blur(4px)" }}
+        <div role="dialog" aria-modal="true" aria-label={editUser ? "Edit user" : "Add new user"} className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(15,20,28,0.45)", backdropFilter: "blur(4px)" }}
              onClick={(e) => e.target === e.currentTarget && setShowModal(false)}>
           <div className="w-full max-w-md rounded-2xl p-6 mx-4 max-h-[92dvh] overflow-y-auto" style={{ background: "#ffffff", border: "1px solid rgba(26,31,46,0.1)", boxShadow: "0 32px 80px rgba(15,20,28,0.18)" }}>
             <div className="flex items-center justify-between mb-5">
               <h3 className="font-bold text-sm" style={{ color: "#0f141c" }}>{editUser ? "Edit User" : "Add New User"}</h3>
-              <button onClick={() => setShowModal(false)} className="text-slate-600 hover:text-slate-900 transition-colors text-lg leading-none">✕</button>
+              <button onClick={() => setShowModal(false)} aria-label="Close" className="text-slate-600 hover:text-slate-900 transition-colors text-lg leading-none">✕</button>
             </div>
 
             <form onSubmit={(ev) => { ev.preventDefault(); if (!submitting) handleSave(); }} className="space-y-3.5">
@@ -594,12 +607,12 @@ export default function UserManagementPage({ canDo }) {
 
       {/* Reset Password Modal */}
       {showResetModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(15,20,28,0.45)", backdropFilter: "blur(4px)" }}
+        <div role="dialog" aria-modal="true" aria-label="Reset password" className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(15,20,28,0.45)", backdropFilter: "blur(4px)" }}
              onClick={(e) => { if (!resetSubmitting && e.target === e.currentTarget) setShowResetModal(false); }}>
           <div className="w-full max-w-sm rounded-2xl p-6 mx-4" style={{ background: "#ffffff", border: "1px solid rgba(26,31,46,0.1)", boxShadow: "0 32px 80px rgba(15,20,28,0.18)" }}>
             <div className="flex items-center justify-between mb-5">
               <h3 className="font-bold text-sm" style={{ color: "#0f141c" }}>Reset Password</h3>
-              <button onClick={() => !resetSubmitting && setShowResetModal(false)} className="text-slate-600 hover:text-slate-900 transition-colors text-lg leading-none">✕</button>
+              <button onClick={() => !resetSubmitting && setShowResetModal(false)} aria-label="Close" className="text-slate-600 hover:text-slate-900 transition-colors text-lg leading-none">✕</button>
             </div>
             <form onSubmit={(ev) => { ev.preventDefault(); ev.stopPropagation(); if (!resetSubmitting) handleResetPassword(); }} className="space-y-3.5">
               <div>
@@ -659,7 +672,7 @@ export default function UserManagementPage({ canDo }) {
 
       {/* Delete Confirm */}
       {deleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(15,20,28,0.45)", backdropFilter: "blur(4px)" }}
+        <div role="alertdialog" aria-modal="true" aria-label="Delete user?" className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(15,20,28,0.45)", backdropFilter: "blur(4px)" }}
              onClick={(e) => { if (!deleteSubmitting && e.target === e.currentTarget) setDeleteConfirm(null); }}>
           <div className="w-full max-w-sm rounded-2xl p-6 mx-4" style={{ background: "#ffffff", border: "1px solid rgba(239,68,68,0.25)", boxShadow: "0 32px 80px rgba(15,20,28,0.18)" }}>
             <div className="text-center">
