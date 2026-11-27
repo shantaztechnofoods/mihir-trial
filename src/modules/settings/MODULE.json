@@ -1,9 +1,10 @@
 {
   "name": "settings",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "frozen": false,
   "liveLock": false,
   "requiresCore": 1,
+  "requiresShell": 2,
   "exports": [
     "SettingsPage"
   ],
@@ -22,18 +23,28 @@
     ]
   },
   "handlers": [
+    "handleRegisterSignature",
+    "handleSaveSettings",
+    "moduleOn"
+  ],
+  "ownHandlers": [
     "handleAdminCleanupDone",
     "handleCreateChecklistTemplate",
     "handleDeleteChecklistTemplate",
-    "handleRegisterSignature",
     "handleSaveModules",
-    "handleSaveSettings",
     "handleSaveUserDepartments",
-    "handleUpdateChecklistTemplate",
-    "moduleOn"
+    "handleUpdateChecklistTemplate"
   ],
   "stores": [
-    "stores/adminApi.js"
+    "stores/adminApi.js",
+    "stores/attachmentsStore.js",
+    "stores/checklistsStore.js",
+    "stores/handoverStore.js",
+    "stores/machinesStore.js",
+    "stores/outwardStore.js",
+    "stores/pendingItemsStore.js",
+    "stores/ratingsStore.js",
+    "stores/settingsStore.js"
   ],
   "shared": [
     "shared/buildInfo.js",
@@ -47,7 +58,9 @@
   ],
   "core": {
     "auth": [
-      "auth/AuthContext.jsx"
+      "auth/AuthContext.jsx",
+      "auth/auditStore.js",
+      "auth/authStore.js"
     ],
     "config": [
       "config/env.js"
