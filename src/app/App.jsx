@@ -21,7 +21,8 @@ import { appendAuditWithUser, getAuditLog, subscribeAudit } from "../auth/auditS
 import { isSupabaseEnabled, ALLOW_DEMO, ENABLED_MODULES_ENV, ERP_INSTANCE } from "../config/env.js";
 import { MODULES, effectiveEnabledModules, isModuleOn, normaliseModuleSelection } from "../utils/modules.js";
 import { getSupabase } from "../supabase/client.js";
-import { loadSettings, saveSettings } from "../stores/settingsStore.js";
+import { loadSettings, saveSettings, saveSettingsKeys } from "../stores/settingsStore.js";
+import { adminSettingsPatch } from "../utils/adminSettingsKeys.js";
 import { listVendors, createVendor, updateVendor, archiveVendor, restoreVendor } from "../stores/vendorsStore.js";
 import { fetchItems, createItem as itemCreate, updateItem as itemUpdate, deleteItem as itemDelete, fetchArchivedItems, restoreItem as itemRestore, updateStockAndHistory } from "../stores/itemsStore.js";
 import { fetchBOMs, createBOM as bomCreate, updateBOM as bomUpdate, renameBOM as bomRename, deleteBOM as bomDelete, restoreBOM as bomRestore } from "../stores/bomsStore.js";
@@ -362,7 +363,11 @@ export default function App() {
     if (Object.prototype.hasOwnProperty.call(before, "enabledModules")) newSettings.enabledModules = before.enabledModules;
     else delete newSettings.enabledModules;
     setSettings(newSettings);                            // optimistic UI
-    const res = await saveSettings(newSettings);
+    // Migration 072 — Admin may save only Report Master + Department heads, one
+    // key at a time through save_org_setting(); the settings table itself stays
+    // Super Admin only. Any other change keeps the whole-row save.
+    const adminWrites = currentUser?.role === "Admin" ? adminSettingsPatch(before, newSettings, SETTINGS_DEFAULTS.report) : null;
+    const res = adminWrites ? await saveSettingsKeys(newSettings, adminWrites) : await saveSettings(newSettings);
     if (!res.success) {
       console.warn("[App] handleSaveSettings: Supabase save failed —", res.error);
       return res;
@@ -382,6 +387,7 @@ export default function App() {
         changedFields: changedKeys.filter((k) => k !== "logo"),  // omit logo blob key
         companyName: newSettings.companyName || "",
         gstPresent: !!newSettings.gst,
+        ...(adminWrites ? { via: "save_org_setting", keys: adminWrites.map((w) => w.key) } : {}),
       },
     });
     return res;
