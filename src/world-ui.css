@@ -155,9 +155,13 @@
 
   /* Boot skeleton (session restore) */
   .wu-boot { min-height: 100vh; min-height: 100dvh; display: flex; background: var(--canvas); }
-  .wu-boot-side { width: 240px; background: var(--graphite-900); padding: 18px 14px; display: flex; flex-direction: column; gap: 12px; }
-  .wu-boot-side .wu-sk { background: #1B212C !important; height: 14px; border-radius: 6px; }
-  .wu-boot-side .wu-sk::after { background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .07), transparent); }
+  /* The side rail follows the colour mode (it was always dark navy, so a light-mode
+     reload flashed a dark sidebar before the light app appeared — gap audit #3). */
+  .wu-boot-side { width: 240px; background: #fbfcfd; box-shadow: 1px 0 0 rgba(20, 40, 50, .07); padding: 18px 14px; display: flex; flex-direction: column; gap: 12px; }
+  .wu-boot-side .wu-sk { background: #ECEEF2 !important; height: 14px; border-radius: 6px; }
+  :where(html[data-theme="dark"]) .wu-boot-side { background: #0e1e21; box-shadow: 1px 0 0 rgba(255, 255, 255, .06); }
+  :where(html[data-theme="dark"]) .wu-boot-side .wu-sk { background: rgba(255, 255, 255, .07) !important; }
+  :where(html[data-theme="dark"]) .wu-boot-side .wu-sk::after { background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .07), transparent); }
   .wu-boot-main { flex: 1; padding: 24px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
   .wu-boot-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
   .wu-boot-note { font-size: 13px; color: var(--ink-3); font-weight: 500; }
