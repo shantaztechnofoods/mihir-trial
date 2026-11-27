@@ -646,3 +646,67 @@
     html[data-theme="dark"] body .app-shell button.dash-tile:hover { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .16), inset 0 0 0 1px rgba(255, 255, 255, .08), 0 2px 4px rgba(0, 0, 0, .3), 0 18px 36px -14px rgba(0, 0, 0, .65) !important; }
   }
 }
+
+/* ═══ PR 2 — tables, forms, modals (Item Master, Inward, Outward, PO, Vendors, BOM) ═══
+   Surfaces only: same boxes, same border widths, same labels. */
+@media screen {
+  /* content cards built from Tailwind (bg-white + border + rounded): the calm card layer */
+  html body .app-shell :is(div.bg-white.border, div.bg-white[class*="border-slate"]):is(.rounded-xl, .rounded-2xl):not(:is(.bg-white, .section-card, .modal-backdrop, .rack-set) div) {
+    background: var(--g-sheen), var(--g-card) !important; border-color: rgba(20, 40, 50, .07) !important; border-radius: 20px !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 1), 0 1px 2px rgba(40, 60, 70, .05), 0 12px 28px -16px rgba(40, 60, 75, .18) !important;
+  }
+  html[data-theme="dark"] body .app-shell :is(div.bg-white.border, div.bg-white[class*="border-slate"]):is(.rounded-xl, .rounded-2xl):not(:is(.bg-white, .section-card, .modal-backdrop, .rack-set) div) {
+    border-color: rgba(255, 255, 255, .07) !important; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12), 0 1px 2px rgba(0, 0, 0, .25), 0 12px 28px -16px rgba(0, 0, 0, .5) !important;
+  }
+
+  /* tables: a quiet frosted header, hairline rows, a soft lift on hover */
+  html body .app-shell table:not(.mr-table):not(.rpt-table) thead th { background: rgba(248, 250, 251, .72) !important; border-bottom-color: rgba(20, 40, 50, .08) !important; }
+  html[data-theme="dark"] body .app-shell table:not(.mr-table):not(.rpt-table) thead th { background: rgba(255, 255, 255, .035) !important; border-bottom-color: rgba(255, 255, 255, .08) !important; }
+  html body .app-shell table:not(.mr-table):not(.rpt-table) tbody tr { border-color: rgba(20, 40, 50, .06); }
+  html[data-theme="dark"] body .app-shell table:not(.mr-table):not(.rpt-table) tbody tr { border-color: rgba(255, 255, 255, .06); }
+  @media (hover: hover) and (pointer: fine) {
+    html body .app-shell table:not(.mr-table):not(.rpt-table) tbody tr:hover { background: rgba(255, 255, 255, .78) !important; box-shadow: inset 0 1px 0 #fff, 0 6px 16px -12px rgba(30, 50, 60, .35); }
+    html[data-theme="dark"] body .app-shell table:not(.mr-table):not(.rpt-table) tbody tr:hover { background: rgba(255, 255, 255, .05) !important; box-shadow: none; }
+  }
+  html body .app-shell :is(div.border-t.border-slate-200) { border-top-color: rgba(20, 40, 50, .07) !important; }
+
+  /* inputs, selects, textareas: a soft well, accent ring on focus */
+  html body :is(.app-shell, .modal-backdrop) :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]), select, textarea):where(:not(.lg-input, .tc-form *, .mr-paper *)) {
+    background-color: rgba(255, 255, 255, .78) !important; border-color: rgba(20, 40, 50, .14) !important; border-radius: 12px;
+    box-shadow: inset 0 1px 2px rgba(20, 40, 50, .06);
+    transition: border-color .15s var(--g-ease), box-shadow .15s var(--g-ease), background-color .15s var(--g-ease);
+  }
+  html[data-theme="dark"] body :is(.app-shell, .modal-backdrop) :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]), select, textarea):where(:not(.lg-input, .tc-form *, .mr-paper *)) {
+    background-color: rgba(0, 0, 0, .22) !important; border-color: rgba(255, 255, 255, .12) !important; box-shadow: inset 0 1px 2px rgba(0, 0, 0, .3);
+  }
+  html body :is(.app-shell, .modal-backdrop) :is(input, select, textarea):where(:not(.lg-input, .tc-form *, .mr-paper *)):focus-visible {
+    background-color: #fff !important; border-color: var(--action) !important; box-shadow: 0 0 0 3px var(--action-ring), inset 0 1px 2px rgba(20, 40, 50, .04) !important; outline: none;
+  }
+  html[data-theme="dark"] body :is(.app-shell, .modal-backdrop) :is(input, select, textarea):where(:not(.lg-input, .tc-form *, .mr-paper *)):focus-visible { background-color: rgba(0, 0, 0, .3) !important; border-color: var(--p-ring) !important; box-shadow: 0 0 0 3px var(--p-ringHalo) !important; }
+
+  /* secondary buttons (Export, Import, Cancel …): glossy capsules */
+  html body :is(.page-header .page-header-actions button:not(.btn-primary-brand):not([aria-label^="Departments called"]), .modal-backdrop .mt-cancel, .btn-secondary, .btn-ghost.border) {
+    background: var(--g-gloss), rgba(255, 255, 255, .72) !important; border-color: rgba(20, 40, 50, .1) !important; border-radius: 999px !important;
+    box-shadow: inset 0 1px 0 #fff, 0 1px 2px rgba(40, 60, 70, .06), 0 4px 12px -6px rgba(40, 60, 75, .2) !important;
+  }
+  html[data-theme="dark"] body :is(.page-header .page-header-actions button:not(.btn-primary-brand):not([aria-label^="Departments called"]), .modal-backdrop .mt-cancel, .btn-secondary, .btn-ghost.border) {
+    background: var(--g-gloss), rgba(255, 255, 255, .06) !important; border-color: rgba(255, 255, 255, .12) !important; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14), 0 4px 12px -6px rgba(0, 0, 0, .5) !important;
+  }
+
+  /* modals: a dense glass sheet over a softer scrim */
+  html body .modal-backdrop { background: rgba(16, 26, 34, .34) !important; }
+  html[data-theme="dark"] body .modal-backdrop { background: rgba(0, 0, 0, .5) !important; }
+  html body .modal-backdrop > div:not(.tc-form) {
+    background-image: var(--g-sheen) !important; background-color: rgba(255, 255, 255, .96) !important; border-color: rgba(255, 255, 255, .8) !important;
+    box-shadow: inset 0 1px 0 #fff, 0 0 0 1px rgba(20, 40, 50, .08), 0 40px 90px -30px rgba(20, 40, 60, .45) !important;
+  }
+  html[data-theme="dark"] body .modal-backdrop > div:not(.tc-form) {
+    background-color: rgba(26, 39, 47, .97) !important; border-color: rgba(255, 255, 255, .1) !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14), 0 0 0 1px rgba(255, 255, 255, .06), 0 40px 90px -30px rgba(0, 0, 0, .75) !important;
+  }
+  @media (min-width: 768px) { html body .modal-backdrop > div:not(.tc-form) { border-radius: 26px !important; } }
+}
+@media screen and (prefers-reduced-transparency: reduce) {
+  html body .modal-backdrop > div:not(.tc-form) { background-color: #fff !important; }
+  html[data-theme="dark"] body .modal-backdrop > div:not(.tc-form) { background-color: #1a272f !important; }
+}
