@@ -35,9 +35,11 @@
 
 import { useEffect, useLayoutEffect, useRef } from "react";
 
-const DUR = { out: 180, fly: 300, move: 240, ring: 1100, sheet: 200, dialog: 160, fade: 120 };
+// motion-mt (2026-11-27): popups / sheets / rack drawer exit on the Motion v2
+// timing system (world-ui.css --m-*): exits 140-160 ms ease-in, dim 140 ms.
+const DUR = { out: 180, fly: 300, move: 240, ring: 1100, sheet: 160, dialog: 150, dim: 140, fade: 120 };
 const EASE_MOVE = "cubic-bezier(.65, 0, .35, 1)";
-const EASE_IN = "cubic-bezier(.4, 0, 1, 1)";
+const EASE_IN = "cubic-bezier(.5, 0, .75, 0)";       // = --m-ease-in
 const EASE_DRAWER = "cubic-bezier(.32, .72, 0, 1)";
 const MAX_CHANGES = 8;
 const MAX_CARDS = 40;
@@ -119,18 +121,22 @@ export function dialogGhost(node) {
     ghostHost().appendChild(node);
     const reduce = reducedMotion();
     const phone = window.innerWidth < 768;
+    // Rack View / Pending-jobs drawer: slides back out to the right (laptop)
+    const drawer = node.classList.contains("rack-panel-backdrop");
     const dur = reduce ? DUR.fade : phone ? DUR.sheet : DUR.dialog;
-    node.animate([{ opacity: 1 }, { opacity: 0 }], { duration: dur, easing: "ease-out", fill: "forwards" });
+    node.animate([{ opacity: 1 }, { opacity: 0 }], { duration: reduce ? DUR.fade : DUR.dim, easing: reduce ? "linear" : EASE_IN, fill: "forwards" });
     if (panel && !reduce && canAnimate(panel)) {
       panel.style.animation = "none";
       panel.animate(
         phone
           ? [{ transform: "none" }, { transform: "translateY(100%)" }]
-          : [{ opacity: 1, transform: "none" }, { opacity: 0, transform: "translateY(8px) scale(.985)" }],
-        { duration: dur, easing: phone ? EASE_DRAWER : EASE_IN, fill: "forwards" },
+          : drawer
+            ? [{ opacity: 1, transform: "none" }, { opacity: 0, transform: "translateX(32px)" }]
+            : [{ opacity: 1, transform: "none" }, { opacity: 0, transform: "scale(.97)" }],
+        { duration: dur, easing: EASE_IN, fill: "forwards" },
       );
     }
-    dropLater(node, dur);
+    dropLater(node, Math.max(dur, DUR.dim));
   } catch { try { node.remove(); } catch { /* ignore */ } }
 }
 
@@ -314,7 +320,7 @@ export function useMtMotion(rootRef) {
         for (const m of muts) {
           if (!DIALOG_GHOST) break;
           m.removedNodes.forEach((n) => {
-            if (n.nodeType === 1 && n.classList && n.classList.contains("modal-backdrop")) dialogGhost(n);
+            if (n.nodeType === 1 && n.classList && (n.classList.contains("modal-backdrop") || n.classList.contains("rack-panel-backdrop"))) dialogGhost(n);
           });
         }
         refresh();
