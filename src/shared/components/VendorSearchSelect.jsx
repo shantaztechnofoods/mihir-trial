@@ -40,6 +40,7 @@ export default function VendorSearchSelect({
   placeholder = "Search vendor by name, phone or city…",
   autoFocus = false,
   className = "",
+  ariaLabel,
   maxVisible = 50,
 }) {
   const [query, setQuery]     = useState("");
@@ -113,6 +114,7 @@ export default function VendorSearchSelect({
         onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
         onFocus={(e) => { if (disabled) return; setOpen(true); setQuery(""); setTimeout(() => { try { e.target.select(); } catch {} }, 0); }}
         onKeyDown={onKeyDown}
+        aria-label={ariaLabel}
         placeholder={placeholder}
         disabled={disabled}
         autoComplete="off"

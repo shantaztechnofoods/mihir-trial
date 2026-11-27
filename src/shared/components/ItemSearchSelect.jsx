@@ -49,6 +49,7 @@ export default function ItemSearchSelect({
   maxVisible = 50,
   autoFocus = false,
   className = "",
+  ariaLabel,
 }) {
   const [query, setQuery]         = useState("");
   const [open,  setOpen]          = useState(false);
@@ -152,6 +153,7 @@ export default function ItemSearchSelect({
           setTimeout(() => { try { e.target.select(); } catch {} }, 0);
         }}
         onKeyDown={onKeyDown}
+        aria-label={ariaLabel}
         placeholder={disabled && disabledMsg ? disabledMsg : placeholder}
         disabled={disabled}
         autoComplete="off"

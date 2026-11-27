@@ -269,7 +269,7 @@ export default function AuditHistoryPage() {
         <div className="relative">
           <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs">🔍</span>
           <input value={search} onChange={(e) => { setSearch(e.target.value); setPage(0); }}
-            placeholder="Search action, ref, user, item…"
+            aria-label="Search the audit trail" placeholder="Search action, ref, user, item…"
             className="bg-white border border-slate-200 rounded-lg pl-7 pr-3 py-1.5 text-xs placeholder-slate-400 outline-none focus:border-blue-500/40 w-56"
             style={{ color: "var(--text-strong)" }} />
         </div>
@@ -280,30 +280,30 @@ export default function AuditHistoryPage() {
         <input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(0); }}
           className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 outline-none focus:border-blue-500/40" title="To date" />
 
-        <select value={userFilter} onChange={(e) => { setUserFilter(e.target.value); setPage(0); }}
+        <select aria-label="User" value={userFilter} onChange={(e) => { setUserFilter(e.target.value); setPage(0); }}
           className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 outline-none focus:border-blue-500/40">
           <option value="">All Users</option>
           {allUsers.map((u) => <option key={u} value={u}>{u}</option>)}
         </select>
 
-        <select value={moduleFilter} onChange={(e) => { setModuleFilter(e.target.value); setPage(0); }}
+        <select aria-label="Module" value={moduleFilter} onChange={(e) => { setModuleFilter(e.target.value); setPage(0); }}
           className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 outline-none focus:border-blue-500/40">
           <option value="">All Modules</option>
           {allModules.map((m) => <option key={m} value={m}>{MODULE_LABELS[m] || m}</option>)}
         </select>
 
-        <select value={typeFilter} onChange={(e) => { setTypeFilter(e.target.value); setPage(0); }}
+        <select aria-label="Action type" value={typeFilter} onChange={(e) => { setTypeFilter(e.target.value); setPage(0); }}
           className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 outline-none focus:border-blue-500/40">
           <option value="">All Action Types</option>
           {allTypes.map((t) => <option key={t} value={t}>{TYPE_META[t]?.label || t}</option>)}
         </select>
 
         <input value={poFilter} onChange={(e) => { setPoFilter(e.target.value); setPage(0); }}
-          placeholder="PO # / Ref"
+          aria-label="PO number or reference" placeholder="PO # / Ref"
           className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs placeholder-slate-400 outline-none focus:border-blue-500/40 w-28"
           style={{ color: "var(--text-strong)" }} />
 
-        <select value={vendorFilter} onChange={(e) => { setVendorFilter(e.target.value); setPage(0); }}
+        <select aria-label="Vendor" value={vendorFilter} onChange={(e) => { setVendorFilter(e.target.value); setPage(0); }}
           className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 outline-none focus:border-blue-500/40">
           <option value="">All Vendors</option>
           {allVendors.map((v) => <option key={v} value={v}>{v}</option>)}
@@ -417,7 +417,7 @@ export default function AuditHistoryPage() {
       <div className="px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 flex-shrink-0" style={{ borderTop: "1px solid rgba(26,31,46,0.06)", background: "rgba(26,31,46,0.04)" }}>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
           <span>Rows per page:</span>
-          <select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(0); }}
+          <select aria-label="Rows per page" value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(0); }}
             className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs text-slate-700 outline-none">
             {[10, 25, 50, 100, 250].map((n) => <option key={n} value={n}>{n}</option>)}
           </select>

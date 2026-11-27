@@ -147,7 +147,7 @@ export function AIPage({ items, pos, vendorList = [], bomDefs = {}, machineLog =
             <div className="flex gap-2">
               <input value={input} onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && send(input)}
-                placeholder="Ask about inventory, POs, vendors..."
+                aria-label="Ask the AI assistant" placeholder="Ask about inventory, POs, vendors..."
                 className="flex-1 min-w-0 rounded-lg px-3 py-2.5 text-[13px] outline-none"
                 style={{ background: "var(--surface-base)", border: "1px solid var(--border-rim)", color: "var(--text)" }} />
               <Btn variant="primary" size="sm" className="flex-shrink-0" onClick={() => send(input)}>Send ↗</Btn>

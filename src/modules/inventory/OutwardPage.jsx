@@ -1025,7 +1025,7 @@ export function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, on
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <OLabel text="Select Item" req />
-              <ItemSearchSelect
+              <ItemSearchSelect ariaLabel="Item"
                 items={allFlat}
                 value={manualCode}
                 onChange={setManualCode}
@@ -1037,16 +1037,16 @@ export function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, on
               <OLabel text="Quantity" req />
               <input type="number" min="0" step="any" value={manualQty} onChange={(e) => setManualQty(e.target.value)}
                      onKeyDown={(e) => e.key === "Enter" && handleManualSubmit()}
-                     placeholder="Enter quantity" className={inpCls}
+                     aria-label="Quantity" placeholder="Enter quantity" className={inpCls}
                      style={{ fontVariantNumeric: "tabular-nums", fontFamily: "'Inter',system-ui,sans-serif" }} />
             </div>
             <div>
               <OLabel text="Department / Machine" />
-              <input value={manualDept} onChange={(e) => setManualDept(e.target.value)} placeholder="e.g. Production, M-04" className={inpCls} />
+              <input value={manualDept} onChange={(e) => setManualDept(e.target.value)} aria-label="Department or machine" placeholder="e.g. Production, M-04" className={inpCls} />
             </div>
             <div>
               <OLabel text="Notes" />
-              <input value={manualNotes} onChange={(e) => setManualNotes(e.target.value)} placeholder="e.g. Breakdown repair" className={inpCls} />
+              <input value={manualNotes} onChange={(e) => setManualNotes(e.target.value)} aria-label="Notes" placeholder="e.g. Breakdown repair" className={inpCls} />
             </div>
           </div>
 
