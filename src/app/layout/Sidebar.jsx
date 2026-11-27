@@ -49,7 +49,7 @@ export function Sidebar({ activePage, setActivePage, collapsed, setCollapsed, ba
                 <Search size={14} aria-hidden="true" className="opacity-70" /><span className="flex-1 text-left">Search</span>
                 <kbd className="text-[9px] px-1.5 py-0.5 rounded sb-kbd">⌘K</kbd>
               </button>
-              <button onClick={onNotifsOpen}
+              <button onClick={onNotifsOpen} aria-label={notifCount > 0 ? `Notifications, ${notifCount} new` : "Notifications"}
                 className="relative w-9 h-9 rounded-lg flex items-center justify-center transition-all flex-shrink-0 sb-iconbtn">
                 <Bell size={16} aria-hidden="true" />
                 {notifCount > 0 && (
@@ -64,7 +64,7 @@ export function Sidebar({ activePage, setActivePage, collapsed, setCollapsed, ba
         ) : (
           <div className="flex flex-col items-center gap-2">
             <BrandLogo logo={settings.logo} size={44} rounded={10} />
-            <button onClick={onNotifsOpen} className="relative w-9 h-9 rounded-lg flex items-center justify-center transition-all sb-iconbtn">
+            <button onClick={onNotifsOpen} aria-label={notifCount > 0 ? `Notifications, ${notifCount} new` : "Notifications"} className="relative w-9 h-9 rounded-lg flex items-center justify-center transition-all sb-iconbtn">
               <Bell size={16} aria-hidden="true" />
               {notifCount > 0 && (
                 <span className="absolute -top-1 -right-1 text-[9px] font-black rounded-full flex items-center justify-center"
@@ -73,7 +73,7 @@ export function Sidebar({ activePage, setActivePage, collapsed, setCollapsed, ba
                 </span>
               )}
             </button>
-            <button onClick={onSearchOpen} className="w-9 h-9 rounded-lg flex items-center justify-center transition-all sb-iconbtn"><Search size={16} aria-hidden="true" /></button>
+            <button onClick={onSearchOpen} aria-label="Search" className="w-9 h-9 rounded-lg flex items-center justify-center transition-all sb-iconbtn"><Search size={16} aria-hidden="true" /></button>
           </div>
         )}
       </div>

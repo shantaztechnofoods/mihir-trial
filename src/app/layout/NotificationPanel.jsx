@@ -2,6 +2,7 @@
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
 import React from "react";
 import { EmptyState } from "../../shared/ui/primitives.jsx";
+import { LeadIcon } from "../../shared/components/LeadIcon.jsx";
 
 export function NotificationPanel({ notifications, dismissed, onClose, onNavigate, onDismiss, onDismissAll }) {
   const TYPE_CFG = {
@@ -19,7 +20,7 @@ export function NotificationPanel({ notifications, dismissed, onClose, onNavigat
 
   return (
     <div className="fixed inset-0 z-[90]" onClick={onClose}>
-      <div className="wu-notif-in absolute right-4 top-16 w-[360px] overflow-hidden"
+      <div role="dialog" aria-label="Notifications" className="wu-notif-in absolute right-4 top-16 w-[360px] max-w-[calc(100vw-2rem)] overflow-hidden"
            style={{ background: "#ffffff", border: "1px solid rgba(17,24,39,0.10)", borderRadius: 14, boxShadow: "0 24px 64px rgba(17,24,39,0.18)" }}
            onClick={(e) => e.stopPropagation()}>
 
@@ -48,7 +49,7 @@ export function NotificationPanel({ notifications, dismissed, onClose, onNavigat
                 return (
                   <div key={type} className="mb-1">
                     <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider" style={{ color: cfg.color }}>
-                      {cfg.icon} {cfg.label} ({items.length})
+                      <LeadIcon e={cfg.icon} />{cfg.label} ({items.length})
                     </div>
                     {items.slice(0, 4).map((n) => (
                       <div key={n.id} className="flex items-start gap-2 px-3 py-2.5 rounded-lg group transition-all"
@@ -58,8 +59,9 @@ export function NotificationPanel({ notifications, dismissed, onClose, onNavigat
                           <div className="text-[11px] font-semibold leading-snug" style={{ color: "#111827" }}>{n.title}</div>
                           <div className="text-[10px] text-slate-500 mt-0.5 leading-snug">{n.desc}</div>
                         </button>
-                        <button onClick={() => onDismiss(n.id)}
-                          className="text-[10px] text-slate-400 hover:text-slate-700 transition-colors flex-shrink-0 mt-0.5 opacity-0 group-hover:opacity-100">✕</button>
+                        {/* Shown on hover with a mouse; always shown on touch screens, which have no hover. */}
+                        <button onClick={() => onDismiss(n.id)} aria-label={`Dismiss: ${n.title}`} title="Dismiss"
+                          className="text-[10px] text-slate-400 hover:text-slate-700 transition-colors flex-shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100">✕</button>
                       </div>
                     ))}
                     {items.length > 4 && <div className="px-3 pb-1 text-[10px] text-slate-500">+{items.length - 4} more</div>}
@@ -68,11 +70,6 @@ export function NotificationPanel({ notifications, dismissed, onClose, onNavigat
               })}
             </div>
           )}
-        </div>
-
-        {/* Footer tip */}
-        <div className="px-4 py-2.5 text-[10px]" style={{ borderTop: "1px solid rgba(17,24,39,0.08)", color: "#64748b", background: "#f8f9fb" }}>
-          Alerts update automatically from live ERP data
         </div>
       </div>
     </div>
