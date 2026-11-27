@@ -66,5 +66,21 @@
     });
     new MutationObserver(mark).observe(document.body, { childList: true, subtree: true }); mark();
   }
-  window.__m3p = { glide, rackFill, stamp, sparkle, pages, empties, stepCircles };
+  // B2. empty slots pulse once; then a slot gets its parts: fill-up + count badge
+  function rackPulse() {
+    document.querySelectorAll(".rack-crate").forEach((c) => { if (/Empty/.test(c.innerText)) { c.classList.remove("m3p-pulse"); void c.offsetWidth; c.classList.add("m3p-pulse"); } });
+  }
+  async function rackIssue(crate, total = 12) {
+    crate.classList.add("m3p-slot");
+    const title = [...crate.querySelectorAll("*")].find((e) => e.childElementCount === 0 && /^[MR]-\d+$/.test(e.textContent.trim()));
+    crate.style.setProperty("--rc", title ? getComputedStyle(title).color : "#2E50D6");
+    const fill = document.createElement("i"); fill.className = "m3p-fill"; crate.prepend(fill);
+    const badge = document.createElement("span"); badge.className = "m3p-badge"; badge.textContent = `0/${total}`; crate.appendChild(badge);
+    const t0 = performance.now();
+    await new Promise((res) => { const tick = (t) => { const k = Math.min(1, (t - t0) / 360); badge.textContent = `${Math.round(total * (1 - Math.pow(1 - k, 3)))}/${total}`; k < 1 ? requestAnimationFrame(tick) : res(); }; requestAnimationFrame(tick); });
+    const tw = document.createTreeWalker(crate, NodeFilter.SHOW_TEXT); let n;
+    while ((n = tw.nextNode())) if (/Empty/.test(n.nodeValue)) { n.nodeValue = n.nodeValue.replace("Empty", "Filled ✓"); n.parentElement.classList.add("m3p-filled-word"); break; }
+    crate.querySelectorAll("*").forEach((e) => { if (e.childElementCount === 0 && /Fill Rack|part short|BOM first/.test(e.textContent)) e.style.visibility = "hidden"; });
+  }
+  window.__m3p = { rackPulse, rackIssue, glide, rackFill, stamp, sparkle, pages, empties, stepCircles };
 })();

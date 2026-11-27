@@ -61,3 +61,23 @@
   .m3p-spark { display: none; }
   .m3p-empty .d { animation: none; stroke-dashoffset: 0; }
 }
+
+/* B2. Rack slot gets parts: the slot fills up from the bottom (360 ms), a
+   parts badge ticks 0 → N, the label turns to "Filled ✓". Empty slots pulse
+   once, softly, when the Rack View opens ("these still need parts"). */
+.m3p-slot { position: relative; overflow: hidden; }
+.m3p-fill { position: absolute; inset: 0; z-index: 0; pointer-events: none; transform-origin: 50% 100%;
+  background: linear-gradient(to top, color-mix(in srgb, var(--rc, #2E50D6) 34%, transparent), color-mix(in srgb, var(--rc, #2E50D6) 12%, transparent));
+  animation: m3p-fill 360ms var(--m-ease-out) both; }
+.m3p-slot > *:not(.m3p-fill):not(.m3p-badge) { position: relative; z-index: 1; }
+@keyframes m3p-fill { from { transform: scaleY(0); } to { transform: none; } }
+.m3p-badge { position: absolute; z-index: 2; right: 6px; top: 6px; min-width: 44px; padding: 2px 7px; border-radius: 999px;
+  font: 800 11px/16px system-ui; font-variant-numeric: tabular-nums; text-align: center; color: #fff; background: var(--rc, #2E50D6);
+  box-shadow: 0 2px 6px rgba(17,24,39,.18); animation: m3p-badge 200ms var(--m-ease-out) both; }
+@keyframes m3p-badge { from { opacity: 0; transform: scale(.7); } to { opacity: 1; transform: none; } }
+.m3p-filled-word { color: #15803d !important; font-weight: 800; }
+.m3p-pulse { position: relative; }
+.m3p-pulse::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 3;
+  box-shadow: inset 0 0 0 3px rgba(46,80,214,.55), inset 0 0 18px rgba(46,80,214,.25); animation: m3p-pulse 900ms var(--m-ease-out) both; }
+@keyframes m3p-pulse { from { opacity: 0; } 35% { opacity: 1; } to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .m3p-fill, .m3p-badge, .m3p-pulse::after { animation: none !important; } .m3p-pulse::after { display: none; } }

@@ -47,6 +47,16 @@ if (want("B")) await clip("B-rack-slots-fill", async (p, mark) => {
   await p.locator(".mt-premium").evaluate((el) => { el.scrollTop -= 120; }); await p.waitForTimeout(300);
   await mark(p.locator(":has(> .rack-set)").first(), 20); await p.evaluate(() => window.__m3p.rackFill()); await p.waitForTimeout(2600);
 });
+if (want("B2")) await clip("B2-rack-slot-gets-parts", async (p, mark) => {
+  await gotoMT(p); const rv = p.locator(".rack-crate").first(); await scrollTo(p, rv);
+  await p.locator(".mt-premium").evaluate((el) => { el.scrollTop -= 120; }); await p.waitForTimeout(300);
+  await mark(p.locator(":has(> .rack-set)").first(), 20);
+  await p.waitForTimeout(500); await p.evaluate(() => window.__m3p.rackPulse()); await p.waitForTimeout(1400);
+  await p.evaluate(() => window.__m3p.rackIssue(document.querySelector('.rack-crate[data-slot^="M-15-1"]') || document.querySelectorAll(".rack-crate")[2], 12));
+  await p.waitForTimeout(900);
+  await p.evaluate(() => window.__m3p.rackIssue(document.querySelector('.rack-crate[data-slot^="M-20-1"]') || document.querySelectorAll(".rack-crate")[4], 9));
+  await p.waitForTimeout(1600);
+}, { dur: 6 });
 if (want("C")) await clip("C-trial-certificate-stamp", async (p, mark) => {
   await gotoMT(p); const card = mtCard(p, "SN-105"); await scrollTo(p, card);
   await mark(card); await p.waitForTimeout(600);
