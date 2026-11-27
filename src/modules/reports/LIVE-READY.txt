@@ -1,0 +1,28 @@
+LIVE-READY — src/modules/reports  (version 1.0.0)
+यह file script बनाता है (node scripts/live-ready.mjs) — हाथ से मत बदलो.
+
+सिर्फ़ यह folder बदलना काफ़ी है: हाँ
+  शर्त: नीचे की चीज़ें Live में पहले से होनी चाहिए. Live का CI (scripts/live-guard.mjs) इन्हें खुद जाँचता है —
+  CI लाल हो तो "यह folder अकेले नहीं चलेगा: पहले X डालो" लिखा आएगा; तब Vercel में पुराना deploy Promote करो.
+
+Live में पहले से होना चाहिए:
+  1. Core (shared / stores / utils): CORE_VERSION कम से कम 1
+  2. Database: migration 004 तक लगी हो
+  3. ये folder भी Live में हों (इनके नाम यह folder इस्तेमाल करता है): trial-certificate
+
+Switch: page id history, reports. Live में दिखाने के लिए Vercel की VITE_ENABLED_MODULES में यह id हो और Settings → Modules में ON हो.
+  आज Live में ON: reports.
+वापस जाना हो: Vercel → erp-live → Deployments → पिछला ठीक वाला → "Promote to Production".
+
+──────── English ────────
+
+Folder-only replace is enough: YES
+  Condition: Live must already have everything below. Live CI (scripts/live-guard.mjs) checks it and fails with one line if not.
+
+Live must already have:
+  1. Core (shared / stores / utils): CORE_VERSION at least 1
+  2. Database: migrations applied up to 004
+  3. These folders must be in Live (this folder imports their names): trial-certificate
+
+Switch: page id(s) history, reports must be in VITE_ENABLED_MODULES (Vercel) and ON in Settings → Modules. ON in Live today: reports.
+Rollback: Vercel → erp-live → Deployments → last good one → Promote to Production; then git revert the commit.

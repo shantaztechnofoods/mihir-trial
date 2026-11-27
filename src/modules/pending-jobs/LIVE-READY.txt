@@ -1,0 +1,33 @@
+LIVE-READY — src/modules/pending-jobs  (version 1.1.0)
+यह file script बनाता है (node scripts/live-ready.mjs) — हाथ से मत बदलो.
+
+सिर्फ़ यह folder बदलना काफ़ी है: हाँ
+  शर्त: नीचे की चीज़ें Live में पहले से होनी चाहिए. Live का CI (scripts/live-guard.mjs) इन्हें खुद जाँचता है —
+  CI लाल हो तो "यह folder अकेले नहीं चलेगा: पहले X डालो" लिखा आएगा; तब Vercel में पुराना deploy Promote करो.
+
+Live में पहले से होना चाहिए:
+  1. App shell: SHELL_API कम से कम 7
+  2. Core (shared / stores / utils): CORE_VERSION कम से कम 1
+  3. Database: migration 056 तक लगी हो
+  4. ये folder भी Live में हों (इनके नाम यह folder इस्तेमाल करता है): whatsapp
+  5. App.jsx में createPendingJobsHandlers(shell) वाली line, यही 4 नाम लेती हो
+
+Switch: इसका अपना page नहीं है — यह दूसरे folders के अंदर चलता है. कोई switch नहीं.
+FROZEN: Trial में भी owner की "हाँ" के बिना नहीं बदलता.
+वापस जाना हो: Vercel → erp-live → Deployments → पिछला ठीक वाला → "Promote to Production".
+
+──────── English ────────
+
+Folder-only replace is enough: YES
+  Condition: Live must already have everything below. Live CI (scripts/live-guard.mjs) checks it and fails with one line if not.
+
+Live must already have:
+  1. App shell: SHELL_API at least 7
+  2. Core (shared / stores / utils): CORE_VERSION at least 1
+  3. Database: migrations applied up to 056
+  4. These folders must be in Live (this folder imports their names): whatsapp
+  5. App.jsx calls createPendingJobsHandlers(shell) and takes exactly these 4 names: handleIssuePendingPart, handleRaisePendingItem, handleReceivePendingItem, handleResolvePendingItem
+
+Switch: no page of its own (runs inside other folders); no switch.
+FROZEN in Trial: changes need the owner's yes.
+Rollback: Vercel → erp-live → Deployments → last good one → Promote to Production; then git revert the commit.

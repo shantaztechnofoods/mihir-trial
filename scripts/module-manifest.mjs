@@ -50,6 +50,14 @@ for (const mod of listModules(ROOT)) {
   }
   if (WRITE) fs.writeFileSync(path.join(ROOT, rel), JSON.stringify(next, null, 2) + "\n");
 }
+// LIVE-READY.txt is built from MODULE.json (scripts/live-ready.mjs), so --write refreshes it too.
+if (WRITE) {
+  const { expected } = await import("./live-ready.mjs");
+  for (const [rel, text] of Object.entries(expected(ROOT))) {
+    const p = path.join(ROOT, rel);
+    if (!fs.existsSync(p) || fs.readFileSync(p, "utf8") !== text) fs.writeFileSync(p, text);
+  }
+}
 if (!drift) console.log("All MODULE.json files match the code.");
 else if (WRITE) console.log(`Rewrote ${drift} MODULE.json file(s).`);
 else console.log("Run: node scripts/module-manifest.mjs --write   (then review the diff)");

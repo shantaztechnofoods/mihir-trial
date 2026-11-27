@@ -18,6 +18,30 @@ fallback when a check says "App.jsx changes").
 | `scripts/module-check.mjs` | Trial repo | read-only; compares Trial's folder with a Live checkout |
 | `CORE_VERSION`, `CORE_PATHS` | `src/shared/coreVersion.js` | bumped by hand when core changes in a way a module needs; the test fails if a module `requiresCore` more |
 | `scripts/core-package.mjs` | Trial repo | writes the core package folder (files + FILES.txt + BRIEF.md) |
+| `LIVE-READY.txt` | every `src/modules/<m>/` | `node scripts/live-ready.mjs` (also run by `module-manifest.mjs --write`); `tests/liveReady.test.mjs` fails when one is stale |
+| `scripts/live-guard.mjs` | both repos (ships with the code) | ERP LIVE's CI runs it on every push; read-only |
+
+### LIVE-READY.txt and the Live guard (owner replaces a folder by hand)
+
+`LIVE-READY.txt` sits inside each folder, so it travels with it. Plain Hindi
+first, then English: "सिर्फ़ यह folder बदलना काफ़ी है: हाँ / ना", then what Live
+must already have — `SHELL_API`, `CORE_VERSION`, the highest migration, Edge
+Functions, other folders whose names it imports, the `createXxxHandlers(shell)`
+/ `useXxxHooks` line App.jsx needs, the shell API it is passed, and its on/off
+switch id. It is built from what is inside the folder only (MODULE.json +
+handlers.js / hooks.js + its imports), so it stays true after the copy; no
+dates or commit ids. "ना" today only for Machine Tracker (`liveLock`).
+
+`node scripts/live-guard.mjs [--root <checkout>]` checks the other side: for
+every folder in a checkout, `requiresShell` ≤ `SHELL_API`, `requiresCore` ≤
+`CORE_VERSION`, highest migration ≤ `APPLIED_MIGRATION=NNN` in
+`supabase/LIVE-DB.txt` (Live only; the Live chat updates it after applying a
+migration — no file = skipped), App.jsx's factory / hook lines take exactly what
+the folder returns, the shell has every key and `shell.call` name it uses, and
+every name imported between folders (and by App.jsx) is exported. Each problem is
+one line: `यह folder अकेले नहीं चलेगा: पहले X डालो (src/modules/<m>)`, then English;
+exit 1. Not checked by it: the props App.jsx passes to a page (Phase D moves
+those into the folder) — the Live build and tests still run.
 
 ### MODULE.json fields
 

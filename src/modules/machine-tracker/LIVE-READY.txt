@@ -1,0 +1,42 @@
+LIVE-READY — src/modules/machine-tracker  (version 1.1.0)
+यह file script बनाता है (node scripts/live-ready.mjs) — हाथ से मत बदलो.
+
+सिर्फ़ यह folder बदलना काफ़ी है: ना
+  ना क्यों: Machine Tracker ERP LIVE में LOCKED है — पहले ERP LIVE chat में "हाँ" दो, फिर ही बदलो.
+  और: नीचे की चीज़ें Live में पहले से होनी चाहिए. Live का CI (scripts/live-guard.mjs) इन्हें खुद जाँचता है —
+  CI लाल हो तो "यह folder अकेले नहीं चलेगा: पहले X डालो" लिखा आएगा; तब Vercel में पुराना deploy Promote करो.
+
+Live में पहले से होना चाहिए:
+  1. App shell: SHELL_API कम से कम 8
+  2. Core (shared / stores / utils): CORE_VERSION कम से कम 1
+  3. Database: migration 064 तक लगी हो
+  4. Edge Function (Supabase में deployed): voice-transcribe, whatsapp-send
+  5. ये folder भी Live में हों (इनके नाम यह folder इस्तेमाल करता है): bom, pending-jobs, reports, trial-certificate, whatsapp
+  6. App.jsx में createMachineTrackerHandlers(shell) वाली line, यही 16 नाम लेती हो
+  7. App.jsx में useMachineTrackerHooks({ … }) वाली line
+  8. App.jsx (shell) ये दे: flashSaveError, goToPage, handleRegisterSignature, handleUpdateStock
+
+Switch: page id machines. Live में दिखाने के लिए Vercel की VITE_ENABLED_MODULES में यह id हो और Settings → Modules में ON हो.
+  आज Live में ON: machines.
+FROZEN: Trial में भी owner की "हाँ" के बिना नहीं बदलता.
+वापस जाना हो: Vercel → erp-live → Deployments → पिछला ठीक वाला → "Promote to Production".
+
+──────── English ────────
+
+Folder-only replace is enough: NO
+  Why not: Machine Tracker is LOCKED in ERP LIVE — the owner's "haan" in the ERP LIVE chat comes first.
+  Also: Live must already have everything below. Live CI (scripts/live-guard.mjs) checks it and fails with one line if not.
+
+Live must already have:
+  1. App shell: SHELL_API at least 8
+  2. Core (shared / stores / utils): CORE_VERSION at least 1
+  3. Database: migrations applied up to 064
+  4. Edge Functions deployed in Supabase: voice-transcribe, whatsapp-send
+  5. These folders must be in Live (this folder imports their names): bom, pending-jobs, reports, trial-certificate, whatsapp
+  6. App.jsx calls createMachineTrackerHandlers(shell) and takes exactly these 16 names: acceptHistoryEntry, handleAcceptHandover, handleAssignRackSlot, handleDeleteAttachment, handleDeleteMachine, handleFillRack, handleFinishTransfer, handlePullBackHandover, handleReleaseHandover, handleReserveRackSlot, handleSetMachineHold, handleStartProduction, handleSubmitDuringWorkChecklist, handleUpdateMachineStage, handleUploadAttachment, promoteAcceptedMachine
+  7. App.jsx calls useMachineTrackerHooks({ … }) and takes: markReadySeen
+  8. App.jsx (shell) passes: flashSaveError, goToPage, handleRegisterSignature, handleUpdateStock
+
+Switch: page id(s) machines must be in VITE_ENABLED_MODULES (Vercel) and ON in Settings → Modules. ON in Live today: machines.
+FROZEN in Trial: changes need the owner's yes.
+Rollback: Vercel → erp-live → Deployments → last good one → Promote to Production; then git revert the commit.
