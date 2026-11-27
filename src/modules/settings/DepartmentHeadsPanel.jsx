@@ -6,7 +6,7 @@
 // own (persistPatch → handleSaveSettings → settings_updated audit event).
 import React, { useEffect, useState } from "react";
 import { HEAD_DEPARTMENTS, readDepartmentHeads, setDepartmentHead, cleanHeadName, userDisplayName } from "../../utils/departmentHeads.js";
-import SaveMorph from "../../shared/ui/SaveMorph.jsx";
+import SaveMorph from "./SaveMorph.jsx";
 
 const TYPED = "__typed";
 const ctl = "w-full bg-white border border-slate-200 rounded-lg px-3 text-[14px] text-slate-900 outline-none disabled:opacity-60";
