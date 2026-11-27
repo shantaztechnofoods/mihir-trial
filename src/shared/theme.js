@@ -1,8 +1,10 @@
-// src/shared/theme.js — Light / Dark / Auto colour mode (Petrol Steel theme, 2026-11-05).
+// src/shared/theme.js — Light / Dark colour mode (Petrol Steel theme, 2026-11-05).
 //
 // Each person picks a mode; it is remembered in this browser only (localStorage,
 // every access wrapped in try/catch so a private window or blocked storage just
-// falls back to "light"). First visit = LIGHT (owner rule 2026-11-05); Auto is an option, not the default. "auto" follows the operating system and updates live.
+// falls back to "light"). First visit = LIGHT (owner rule 2026-11-05).
+// 2026-11-27 (owner): only TWO options, Light and Dark. "Auto" (follow the
+// device) is gone; a browser that still has "auto" saved opens in Light.
 // The resolved mode lives on <html data-theme="light|dark">; the CSS in
 // world-ui.css reads it (plus a prefers-color-scheme fallback for the moment
 // before this script runs — index.html sets the attribute before first paint).
@@ -11,21 +13,15 @@
 import { useSyncExternalStore } from "react";
 
 export const THEME_KEY = "erp_theme_mode";
-export const THEME_MODES = ["light", "dark", "auto"];
+export const THEME_MODES = ["light", "dark"];
 const META_COLOR = { light: "#0C1424", dark: "#061012" };
-
-const mql = () => {
-  try { return typeof window !== "undefined" && window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null; } catch { return null; }
-};
 
 export function readThemeMode() {
   try { const v = localStorage.getItem(THEME_KEY); return THEME_MODES.includes(v) ? v : "light"; } catch { return "light"; }
 }
 
 export function resolveTheme(mode) {
-  if (mode === "light" || mode === "dark") return mode;
-  const m = mql();
-  return m && m.matches ? "dark" : "light";
+  return mode === "dark" ? "dark" : "light";
 }
 
 let mode = typeof window !== "undefined" ? readThemeMode() : "light";
@@ -63,12 +59,9 @@ export function useThemeMode() {
   return useSyncExternalStore(subscribe, getThemeMode, () => "light");
 }
 
-// Call once at boot: applies the saved mode and follows the OS while on "auto".
+// Call once at boot: applies the saved mode (an old saved "auto" reads as light).
 export function installTheme() {
   apply(false);
-  const m = mql();
-  const onOs = () => { if (mode === "auto") { apply(true); subs.forEach((f) => f()); } };
-  try { m && (m.addEventListener ? m.addEventListener("change", onOs) : m.addListener(onOs)); } catch { /* old browsers */ }
   // Another tab changed the mode: follow it.
   try {
     window.addEventListener("storage", (e) => {
