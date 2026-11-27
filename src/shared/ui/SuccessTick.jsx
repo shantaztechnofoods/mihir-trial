@@ -15,8 +15,8 @@ export default function SuccessTick({ on = null }) {
   if (on !== s.last) { if (on) s.n += 1; s.last = on; }   // first render never plays
   if (!s.n) return null;
   return (
-    <span key={s.n} className="wu-ok" aria-hidden="true">
-      <svg className="wu-ok-tick" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+    <span key={s.n} className="wu-savetick" aria-hidden="true">
+      <svg className="wu-savetick-mark" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
            strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
     </span>
   );
