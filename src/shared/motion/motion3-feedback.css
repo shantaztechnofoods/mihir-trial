@@ -1,0 +1,33 @@
+/* ═══ MOTION 3 (2026-11-27) — save tick · status cross-fade ══════════════════
+   Motion v2 tokens only (world-ui.css --m-*). Visual only: nothing here can
+   block a click (pointer-events:none, aria-hidden).                          */
+
+/* ── Save tick (shared/ui/SuccessTick.jsx) ───────────────────────────────────
+   The button that saved turns green with a ✓ for a moment:
+   green layer 140 ms in (--m-micro), ✓ pops .6 → 1 in 200 ms (--m-small),
+   holds, then fades out in 140 ms (--m-small-out, ease-in) — ~1 s in all. */
+.wu-ok {
+  position: absolute; inset: -1px; z-index: 2; border-radius: inherit;
+  display: flex; align-items: center; justify-content: center;
+  background: #15803d; color: #fff; pointer-events: none;
+  animation: wu-ok-in var(--m-micro) var(--m-ease-out) backwards,
+             wu-ok-out var(--m-small-out) 900ms var(--m-ease-in) forwards;
+}
+.wu-ok-tick { animation: wu-ok-pop var(--m-small) 40ms var(--m-ease-out) backwards; }
+@keyframes wu-ok-in  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes wu-ok-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes wu-ok-pop { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: none; } }
+
+/* Accept / Finish & Transfer / Machine Ready success toasts: their ✓ icon pops
+   in the same way (the seal moment itself is unchanged). */
+@media screen {
+  [data-sonner-toast][data-type="success"] [data-icon] > svg { animation: wu-ok-pop var(--m-small) 60ms var(--m-ease-out) backwards; }
+}
+
+/* ── Status chip cross-fade (shared/ui/useSwap.js) ── */
+.wu-swap { animation: wu-ok-in var(--m-micro) var(--m-ease-out) backwards; }
+
+@media (prefers-reduced-motion: reduce) {
+  .wu-ok { animation: wu-ok-in var(--m-micro-out) linear backwards, wu-ok-out var(--m-micro-out) 900ms linear forwards; }
+  .wu-ok-tick, [data-sonner-toast][data-type="success"] [data-icon] > svg, .wu-swap { animation: none; }
+}

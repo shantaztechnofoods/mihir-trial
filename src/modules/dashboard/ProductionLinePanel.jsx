@@ -7,6 +7,7 @@ import { claimFirstShow } from "../../shared/motion/firstShow.js";
 import { Check, Timer, AlertTriangle, PauseCircle, Inbox, ChevronRight } from "lucide-react";
 import { buildProductionLine, stageStatusLines, lineSummary } from "./productionLine.js";
 import { formatDuration } from "../../utils/handoverLogic.js";
+import { useSwap } from "../../shared/ui/useSwap.js";
 import { LinePoster } from "./LinePoster.jsx";
 
 // 3D view (2026-11-06): three.js + the scene load ONLY when "3D view" is tapped
@@ -38,8 +39,11 @@ const ICONS = { ok: Check, near: Timer, late: AlertTriangle, hold: PauseCircle, 
 
 function StatusLine({ line }) {
   const Icon = line.icon ? ICONS[line.icon] : null;
+  // motion3: On time → Late (tone change) cross-fades; the live minutes in the
+  // text tick without animating.
+  const swap = useSwap(line.tone);
   return (
-    <div className="dash-line-flag" data-tone={line.tone}>
+    <div key={line.tone} className={`dash-line-flag ${swap}`} data-tone={line.tone}>
       {Icon && <Icon size={13} strokeWidth={2.25} aria-hidden="true" />}
       <span>{line.text}</span>
     </div>

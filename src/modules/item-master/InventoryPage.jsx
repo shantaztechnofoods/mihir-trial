@@ -14,6 +14,7 @@ import { Topbar } from "../../shared/ui/Topbar.jsx";
 import ArchivedSection from "../../shared/components/ArchivedSection.jsx";
 import { ERP_INSTANCE } from "../../config/env.js";
 import { archiveConfirmTitle } from "../../utils/archive.js";
+import SuccessTick from "../../shared/ui/SuccessTick.jsx";
 
 // ─── QUICK STOCK MODAL ───────────────────────────────────────────────────────
 
@@ -701,7 +702,7 @@ export function InventoryPage({ items, setItems, handleUpdateStock, pos = [], in
             <LeadIcon e="🧹" />Clear Demo Data
           </button>
         )}
-        {canDo("inventory","add") && <Btn variant="primary" size="sm" onClick={() => startTransition(() => setShowModal(true))}>+ Add Item</Btn>}
+        {canDo("inventory","add") && <Btn variant="primary" size="sm" onClick={() => startTransition(() => setShowModal(true))}>+ Add Item<SuccessTick on={toast} /></Btn>}
       </Topbar>
 
       <div className="p-6 space-y-4">

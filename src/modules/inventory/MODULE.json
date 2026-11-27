@@ -57,6 +57,7 @@
     "shared/format.js",
     "shared/loadXlsx.js",
     "shared/machineStages.js",
+    "shared/ui/SuccessTick.jsx",
     "shared/ui/Topbar.jsx",
     "shared/ui/primitives.jsx"
   ],
