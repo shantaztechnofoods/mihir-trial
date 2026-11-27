@@ -2650,7 +2650,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                       <div className="mt-kpi-label text-[9.5px] font-bold uppercase tracking-[0.08em]" style={{ color: c.color }}>{c.label}</div>
                       <span className="w-2 h-2 rounded-full" style={{ background: c.color }} />
                     </div>
-                    <div className="mt-kpi-value text-[26px] font-extrabold leading-none tabular-nums tracking-[-0.02em]" style={{ color: c.color }}>{c.value}</div>
+                    <div className="mt-kpi-value text-[26px] font-extrabold leading-none tabular-nums tracking-[-0.02em]" style={{ color: c.color }}><Count value={c.value} intro="mt" /></div>
                     <div className="mt-kpi-sub text-[10px] mt-2" style={{ color: "var(--text-dim)" }}>{c.sub}</div>
                   </button>
                 );
