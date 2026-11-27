@@ -1,0 +1,47 @@
+{
+  "name": "dashboard",
+  "version": "1.0.0",
+  "frozen": false,
+  "liveLock": false,
+  "requiresCore": 1,
+  "exports": [
+    "DashboardPage"
+  ],
+  "dependsOn": {},
+  "handlers": [
+    "canOpenPage",
+    "goToPage"
+  ],
+  "stores": [
+    "stores/pendingItemsStore.js",
+    "stores/stockMovementsStore.js"
+  ],
+  "shared": [
+    "shared/components/LeadIcon.jsx",
+    "shared/format.js",
+    "shared/settingsDefaults.js",
+    "shared/ui/Count.jsx",
+    "shared/ui/Topbar.jsx",
+    "shared/ui/primitives.jsx"
+  ],
+  "core": {
+    "utils": [
+      "utils/departmentHeads.js",
+      "utils/handoverLogic.js",
+      "utils/readyPopup.js"
+    ]
+  },
+  "npm": [
+    "lucide-react",
+    "react",
+    "three"
+  ],
+  "migrations": [
+    "012_stock_movements"
+  ],
+  "edgeFunctions": [],
+  "serverless": [],
+  "notes": [
+    "012_stock_movements: recent movements"
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "name": "whatsapp",
+  "version": "1.0.0",
+  "frozen": false,
+  "liveLock": false,
+  "requiresCore": 1,
+  "exports": [
+    "WhatsAppPage",
+    "waAlertTime",
+    "waDispatch",
+    "waReadSeen",
+    "waUnreadCount"
+  ],
+  "dependsOn": {},
+  "handlers": [
+    "handleSaveSettings"
+  ],
+  "stores": [
+    "stores/adminApi.js"
+  ],
+  "shared": [
+    "shared/components/PageHeader.jsx",
+    "shared/ui/primitives.jsx"
+  ],
+  "core": {},
+  "npm": [
+    "lucide-react",
+    "react"
+  ],
+  "migrations": [],
+  "edgeFunctions": [
+    "whatsapp-send",
+    "whatsapp-agent"
+  ],
+  "serverless": [
+    "api/whatsapp-agent.js",
+    "api/whatsapp-chats.js",
+    "api/whatsapp-media.js",
+    "api/whatsapp-messages.js",
+    "api/whatsapp-send.js",
+    "api/whatsapp-templates.js",
+    "api/whatsapp-webhook.js"
+  ],
+  "notes": [
+    "whatsapp-send, whatsapp-agent (Supabase Edge Functions); Vercel serverless functions in api/whatsapp-*.js (env CHAKRA_WEBHOOK_SECRET, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)"
+  ]
+}

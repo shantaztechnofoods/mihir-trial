@@ -1,0 +1,45 @@
+{
+  "name": "pending-jobs",
+  "version": "1.0.0",
+  "frozen": true,
+  "liveLock": false,
+  "requiresCore": 1,
+  "exports": [
+    "CRITICAL_MODES",
+    "JobHistory",
+    "PendingJobRows",
+    "cleanPendingJobs",
+    "emptyPendingJob",
+    "flagField",
+    "normalizePendingJob",
+    "pendingItemsProblem"
+  ],
+  "dependsOn": {},
+  "handlers": [],
+  "stores": [
+    "stores/pendingItemsStore.js"
+  ],
+  "shared": [
+    "shared/format.js",
+    "shared/printFormat.js"
+  ],
+  "core": {},
+  "npm": [
+    "react"
+  ],
+  "migrations": [
+    "023_pending_handover_items",
+    "033_pending_item_assigned_department",
+    "034_pending_item_kind",
+    "039_pending_item_parts",
+    "040_pending_item_policies",
+    "042_pending_item_update_guard",
+    "043_pending_item_receive_department",
+    "052_pending_item_outward",
+    "054_pending_item_receipts",
+    "056_pending_item_critical_checks"
+  ],
+  "edgeFunctions": [],
+  "serverless": [],
+  "notes": []
+}

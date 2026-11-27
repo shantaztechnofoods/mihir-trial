@@ -1,0 +1,165 @@
+{
+  "name": "machine-tracker",
+  "version": "1.0.0",
+  "frozen": true,
+  "liveLock": true,
+  "requiresCore": 1,
+  "exports": [
+    "MachinePage",
+    "ReadyMachinesPopup"
+  ],
+  "dependsOn": {
+    "bom": [
+      "BomPhotoThumb"
+    ],
+    "pending-jobs": [
+      "CRITICAL_MODES",
+      "JobHistory",
+      "PendingJobRows",
+      "cleanPendingJobs",
+      "emptyPendingJob",
+      "flagField",
+      "pendingItemsProblem"
+    ],
+    "reports": [
+      "AtoZMachineReport",
+      "CustomerMachineReport",
+      "OnHoldReport",
+      "PendingJobsReport",
+      "RPT_PERIODS",
+      "canOpenReport",
+      "machineReportRef",
+      "printWithTitle",
+      "resolveReportMaster",
+      "rptCompany"
+    ],
+    "trial-certificate": [
+      "TrialCertificateModal",
+      "TrialCertificatePrintModal"
+    ],
+    "whatsapp": [
+      "waAlertTime",
+      "waDispatch"
+    ]
+  },
+  "handlers": [
+    "computeBOMDeletionInfo",
+    "flashSaveError",
+    "goToPage",
+    "handleAbortMachineCreate",
+    "handleAcceptHandover",
+    "handleAddOutward",
+    "handleAssignRackSlot",
+    "handleClearPending",
+    "handleCreateBOM",
+    "handleCreateChecklistTemplate",
+    "handleCreateMachine",
+    "handleDeleteAttachment",
+    "handleDeleteBOM",
+    "handleDeleteChecklistTemplate",
+    "handleDeleteMachine",
+    "handleDuplicateBOM",
+    "handleFillRack",
+    "handleFinishTransfer",
+    "handleIssuePendingPart",
+    "handlePullBackHandover",
+    "handleRaisePendingItem",
+    "handleReceivePendingItem",
+    "handleRegisterSignature",
+    "handleReleaseHandover",
+    "handleRemoveRackMachine",
+    "handleRenameBOM",
+    "handleReserveRackSlot",
+    "handleResolvePendingItem",
+    "handleRestoreBOM",
+    "handleSaveBomChecklist",
+    "handleSetItemDefaultRate",
+    "handleSetMachineHold",
+    "handleStartProduction",
+    "handleSubmitDuringWorkChecklist",
+    "handleUpdateBOM",
+    "handleUpdateChecklistTemplate",
+    "handleUpdateMachineStage",
+    "handleUpdateStock",
+    "handleUpdateTrialCertificate",
+    "handleUploadAttachment",
+    "markReadySeen",
+    "raiseNotIssuedJobs"
+  ],
+  "stores": [
+    "stores/attachmentsStore.js",
+    "stores/localDate.js",
+    "stores/pendingItemsStore.js"
+  ],
+  "shared": [
+    "shared/components/LeadIcon.jsx",
+    "shared/components/OfflineBanner.jsx",
+    "shared/components/SafeBoundary.jsx",
+    "shared/format.js",
+    "shared/machineStages.js",
+    "shared/ui/Count.jsx",
+    "shared/ui/SignaturePad.jsx",
+    "shared/ui/Topbar.jsx",
+    "shared/ui/toast.js",
+    "shared/voice/VoiceNote.jsx"
+  ],
+  "core": {
+    "realtime": [
+      "realtime/liveRecord.js"
+    ],
+    "utils": [
+      "utils/checklistLogic.js",
+      "utils/delayReasons.js",
+      "utils/departmentHeads.js",
+      "utils/handoverLogic.js",
+      "utils/haptics.js",
+      "utils/online.js",
+      "utils/rackSlots.js",
+      "utils/ratingLogic.js",
+      "utils/readyPopup.js",
+      "utils/teamMemory.js",
+      "utils/voiceNote.js",
+      "utils/worldMotion.js"
+    ]
+  },
+  "npm": [
+    "lucide-react",
+    "react"
+  ],
+  "migrations": [
+    "021_dept_workflow_phase_a",
+    "022_dept_checklists",
+    "023_pending_handover_items",
+    "024_machine_attachments",
+    "025_department_ratings",
+    "027_machine_dept_durations",
+    "029_dept_employees",
+    "030_dept_roster_view",
+    "031_accept_team_snapshot",
+    "035_role_machine_permissions",
+    "036_rack_release",
+    "038_rack_release_policy",
+    "044_handover_admin_pullback",
+    "045_machine_rack_slot",
+    "047_rack_set_guard",
+    "048_rack_set_serial_guard",
+    "049_rack_unit_guard",
+    "050_handover_main_employee_ref",
+    "051_admin_cleanup",
+    "053_go_live_security",
+    "055_machine_hold",
+    "057_accept_signature",
+    "058_department_rls",
+    "060_super_admin_delete_machine",
+    "063_machine_history_append",
+    "064_realtime_publication"
+  ],
+  "edgeFunctions": [
+    "voice-transcribe",
+    "whatsapp-send"
+  ],
+  "serverless": [],
+  "notes": [
+    "voice-transcribe (mic → text in the during-work / pending-job boxes; secret GEMINI_API_KEY); whatsapp-send (optional stage alerts via modules/whatsapp helpers)"
+  ]
+}
