@@ -14,7 +14,7 @@ import { readDeptWorkflowSettings, isHoldOverdue, RACK_RELEASE_HOPS, canAcceptHa
 import { createResponse } from "../../stores/checklistsStore.js";
 import { createPendingItem, pendingItemIsOpen } from "../../stores/pendingItemsStore.js";
 import { uploadAttachment, deleteAttachment } from "../../stores/attachmentsStore.js";
-import { createRating } from "../../stores/ratingsStore.js";
+import { createRating, overrideRating } from "../../stores/ratingsStore.js";
 import { computeDepartmentRating } from "../../utils/ratingLogic.js";
 import { incompleteChecklistJobs, snapshotResponse } from "../../utils/checklistLogic.js";
 import { rackOfBom, firstFreeSlot, canAssignSlot, slotLabel, rackViewLog, bomFillCheck, tierOfSlot } from "../../utils/rackSlots.js";
@@ -1143,5 +1143,21 @@ export function createMachineTrackerHandlers(shell) {
     return res;
   };
 
-  return { handleUpdateMachineStage, handleStartProduction, handleReserveRackSlot, handleFillRack, handleAssignRackSlot, handleFinishTransfer, acceptHistoryEntry, promoteAcceptedMachine, handleAcceptHandover, handleSubmitDuringWorkChecklist, handlePullBackHandover, handleSetMachineHold, handleDeleteMachine, handleReleaseHandover, handleUploadAttachment, handleDeleteAttachment };
+  // ── Phase B — Rating override (admin only) ────────────────────────────────
+  const handleOverrideRating = async (id, { rating, reason }) => {
+    if (!currentUser?.id) return { success: false, error: "Not authenticated" };
+    const res = await overrideRating(id, { rating, reason, overriddenBy: currentUser.id });
+    if (!res.success) return res;
+    setDeptRatings((prev) => prev.map((r) => r.id === id
+      ? { ...r, rating: Math.max(0, Math.min(5, Math.floor(Number(rating) || 0))), overriddenBy: currentUser.id, overrideReason: reason || "", overriddenAt: new Date().toISOString() }
+      : r));
+    logAudit({
+      type: "rating_overridden", module: "Machine",
+      action: `Rating overridden to ${rating}★`,
+      ref: String(id), details: { reason: reason || "" },
+    });
+    return res;
+  };
+
+  return { handleUpdateMachineStage, handleStartProduction, handleReserveRackSlot, handleFillRack, handleAssignRackSlot, handleFinishTransfer, acceptHistoryEntry, promoteAcceptedMachine, handleAcceptHandover, handleSubmitDuringWorkChecklist, handlePullBackHandover, handleSetMachineHold, handleDeleteMachine, handleReleaseHandover, handleUploadAttachment, handleDeleteAttachment, handleOverrideRating };
 }

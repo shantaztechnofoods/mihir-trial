@@ -1,6 +1,6 @@
 {
   "name": "machine-tracker",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "frozen": true,
   "liveLock": true,
   "requiresCore": 1,
@@ -57,6 +57,7 @@
     "handleDeleteMachine",
     "handleFillRack",
     "handleFinishTransfer",
+    "handleOverrideRating",
     "handlePullBackHandover",
     "handleReleaseHandover",
     "handleReserveRackSlot",

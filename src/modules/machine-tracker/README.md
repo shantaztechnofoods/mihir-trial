@@ -21,7 +21,7 @@ Production flow after the BOM is issued: Active Builds, the Production Rack View
 | `StaffMyDashboard.jsx` | 110 |
 | `checklists.jsx` | 142 |
 | `constants.js` | 22 |
-| `handlers.js` | 1147 |
+| `handlers.js` | 1163 |
 | `hooks.js` | 17 |
 | `index.js` | 5 |
 | `parts.jsx` | 61 |
@@ -76,6 +76,9 @@ setReadySeen })`, called by App.jsx at the hook's old place, above the auth gate
 The pending-item writes are in `modules/pending-jobs/handlers.js`, the certificate write in
 `modules/trial-certificate/handlers.js`, the BOM-issue writes in `modules/inventory/handlers.js`.
 App.jsx passes every one of them to the pages exactly as before (the table above).
+`handleOverrideRating` (admin department-rating override; only its `guarded.overrideRating` wrapper
+references it, no page does today) moved into `handlers.js` as well (modules/c-mt-override-rating,
+pure move) — removing it is a separate owner decision, never part of a move.
 
 Depends on other modules (imported through their `index.js`): `modules/bom`, `modules/pending-jobs`, `modules/reports`, `modules/trial-certificate`, `modules/whatsapp`
 Shared code used: `src/shared/components/LeadIcon.jsx`, `src/shared/components/OfflineBanner.jsx`, `src/shared/components/SafeBoundary.jsx`, `src/shared/format.js`, `src/shared/machineStages.js`, `src/shared/ui/SignaturePad.jsx`, `src/shared/ui/Topbar.jsx`, `src/shared/voice/VoiceNote.jsx`
