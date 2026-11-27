@@ -452,6 +452,9 @@ export function InventoryPage({ items, setItems, handleUpdateStock, pos = [], in
   useEffect(() => {
     try { localStorage.setItem(ATTENTION_KEY, attentionOpen ? "1" : "0"); } catch {}
   }, [attentionOpen]);
+  // perf/inp-modal-order: the toggle's words / arrow change in the next frame; the
+  // list of up to 10 items opens right after (it pushes the table down, a big restyle).
+  const attentionListOpen = useDeferredValue(attentionOpen);
 
   const machines = useMemo(() => Object.keys(items), [items]);
   // Every code in use (archived rows included — the code stays taken), for the
@@ -774,7 +777,7 @@ export function InventoryPage({ items, setItems, handleUpdateStock, pos = [], in
               </button>
               {/* Body — only mounted when expanded. Internal scroll caps the
                   height so 83 chips can't push the table off the page. */}
-              {attentionOpen && (
+              {attentionListOpen && (
                 <div id="erp-attention-body"
                      className="px-4 pb-3 pt-1 flex flex-wrap gap-1.5 overflow-y-auto"
                      style={{ maxHeight: 180, borderTop: "1px solid rgba(239,68,68,0.12)" }}>
