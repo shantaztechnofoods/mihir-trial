@@ -4369,3 +4369,11 @@ button.rack-btn:disabled { background: #e5e7eb !important; color: #6b7280 !impor
 :root[data-theme="dark"] .gs-voice-err{color:#fca5a5;background:rgba(248,113,113,.10)}
 @media (max-width:767px){.gs-esc{display:none}}
 @media (prefers-reduced-motion:reduce){.gs-mic-on::after,.gs-voice-dot{animation:none}.gs-mic-on::after{box-shadow:0 0 0 4px rgba(var(--brand-rgb),.25)}.gs-mic{transition:none}}
+
+/* 2026-11-27 view round 2 — Report Master ticks on touch screens: the 16px
+   checkbox gets a 44px tap area (the label around it), checkbox drawn at 22px.
+   Desktop mouse (fine pointer) unchanged. */
+@media (pointer: coarse) {
+  [data-report-master] .rm-tick { min-width: 44px; min-height: 44px; justify-content: center; }
+  [data-report-master] .rm-tick input[type="checkbox"] { width: 22px; height: 22px; }
+}
