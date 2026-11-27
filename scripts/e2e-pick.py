@@ -59,6 +59,7 @@ PATH_MAP = [
     (r"^src/modules/bom/", ["bom-unselected", "fill-rack-pending-item", "bom-photo", "settings-bom-organised"]),
     (r"^src/modules/inventory/", ["store-audit", "bom-unselected", "perf-budget"]),
     (r"^src/modules/item-master/", ["store-audit", "perf-budget", "no-delete"]),
+    (r"^src/modules/inward/", ["store-audit", "part-received-completes"]),
     (r"^src/modules/reports/", ["reports-v2", "reports-pdf", "perf-budget"]),
     (r"^src/modules/(purchase|analytics)/", ["perf-budget", "store-audit"]),
     (r"^src/modules/settings/", ["settings-bom-organised", "compact-checklist", "dept-staff-create"]),
