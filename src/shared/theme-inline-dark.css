@@ -50,3 +50,8 @@
   html[data-theme="dark"] body :is([style^="color: rgb(109, 40, 217)"], [style*=" color: rgb(109, 40, 217)"], [style^="color: rgb(124, 58, 237)"], [style*=" color: rgb(124, 58, 237)"], [style^="color: rgb(91, 33, 182)"], [style*=" color: rgb(91, 33, 182)"], [style^="color: rgb(67, 56, 202)"], [style*=" color: rgb(67, 56, 202)"], [style^="color: rgb(91, 71, 214)"], [style*=" color: rgb(91, 71, 214)"]):where(:not(.lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .sidebar-slate *)) { color: var(--p-infoTx) !important; }
   html:where([data-theme="dark"]) body :is([style*="background: rgb(239, 68, 68)"], [style*="background-color: rgb(239, 68, 68)"]):where(:not(.lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *)) { background: var(--p-badSolid) !important; }
 }
+/* Audit Trail: the sticky table header paints a cream inline background (#faf8f5);
+   in dark mode it stayed a bright cream band above dark rows (mobile audit 27 Nov). */
+@media screen {
+  html[data-theme="dark"] body .app-shell thead[style*="background: rgb(250, 248, 245)"] { background: var(--p-s2) !important; }
+}

@@ -271,8 +271,8 @@ export function AddItemModal({ machines, onSave, onClose, initialValues = null, 
             <div className="text-[15px] font-semibold text-slate-900 tracking-tight">{isEdit ? "Edit Inventory Item" : "Add Inventory Item"}</div>
             <div className="text-[11px] text-slate-400 mt-0.5">Status auto-calculates from stock vs minimum level</div>
           </div>
-          <button onClick={onClose}
-                  className="w-8 h-8 rounded-lg bg-slate-50 hover:bg-red-500/20 hover:text-red-400 text-slate-500 transition-all duration-200 flex items-center justify-center text-sm font-bold">
+          <button onClick={onClose} aria-label="Close"
+                  className="modal-x w-8 h-8 rounded-lg bg-slate-50 hover:bg-red-500/20 hover:text-red-400 text-slate-500 transition-all duration-200 flex items-center justify-center text-sm font-bold flex-shrink-0">
             ✕
           </button>
         </div>
@@ -706,7 +706,7 @@ export function AddItemModal({ machines, onSave, onClose, initialValues = null, 
           <div className="flex gap-2">
             <Btn variant="ghost" size="sm" onClick={onClose}>Cancel</Btn>
             <button onClick={handleSave}
-                    className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-lg px-3 py-1.5 text-white border transition-all duration-200"
+                    className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-semibold rounded-lg px-3 py-1.5 text-white border transition-all duration-200"
                     style={{
                       background: "linear-gradient(135deg, #2E50D6 0%, #2640B0 100%)",
                       borderColor: "rgba(38, 64, 176,0.5)",
