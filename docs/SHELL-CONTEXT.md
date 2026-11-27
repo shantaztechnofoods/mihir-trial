@@ -39,6 +39,7 @@ PR that adds keys to the shell object, and set the module's
 | 1 | modules/c-whatsapp (C.0) | `logAudit`, `canDo`, `currentUser`, `settings`, `goToPage`, `flashSaveError`, `flashStockError`, `handleUpdateStock`, `handleRegisterSignature`, `handleSaveSettings`, `inFlightRef`, `rackSlotReservationRef` (the shell API) |
 | 2 | modules/c-settings | `allUsers`, `checklistTemplates`, `setAllUsers`, `setAttachments`, `setChecklistResponses`, `setChecklistTemplates`, `setDeptRatings`, `setHandovers`, `setMachineLog`, `setOutwardLog`, `setPendingHandoverItems`, `setSettings` |
 | 3 | modules/c-purchase | `followUps`, `items`, `notifyMachineComplete`, `pendingLog`, `pos`, `receivingRef`, `reconcileItems`, `setFollowUps`, `setInwardLog`, `setItems`, `setPendingLog`, `setPos`, `setVendorList`, `vendorList` |
+| 4 | modules/c-inventory | `setArchivedItems` |
 
 ## A module's `handlers.js`
 
@@ -74,6 +75,56 @@ export function createXxxHandlers(shell) {
   shell keys Live's App.jsx lacks and whether Live already calls the factory.
   Once Live's App.jsx has the keys and the call, a change inside that
   module's handlers travels as **folder-only**.
+
+## Cross-module calls (designed, lands with its first user)
+
+A moved handler sometimes calls a handler that belongs to **another** module.
+Inside the App body that was a plain closure; after both move it cannot be a
+shell key (moved handlers are created *after* the shell object). The path:
+
+```js
+// src/app/App.jsx — next to the shell object (allowed wiring shapes)
+const shellRegistry = {};                              // filled below, read at call time
+const shell = { …, call: makeShellCall(shellRegistry) };   // src/app/shellCall.js
+const { handleAddOutward, … } = createInventoryHandlers(shell);
+Object.assign(shellRegistry, {
+  "inventory.addOutward": handleAddOutward,
+  "inventory.removeRackMachine": handleRemoveRackMachine,
+});
+
+// src/modules/bom/handlers.js — one adapter line, the moved bodies stay byte-identical
+export function createBomHandlers(shell) {
+  const { bomDefs, setBomDefs, call } = shell;
+  const handleRemoveRackMachine = (...args) => call("inventory.removeRackMachine", ...args);
+  …bodies that call handleRemoveRackMachine(…) unchanged…
+}
+```
+
+* `makeShellCall(registry)` → `(name, ...args) => registry[name](...args)`;
+  an unknown name throws `shell.call: unknown "<name>"` (a wiring bug, caught
+  by the manifest test before it ships).
+* **Late-bound:** the registry is read when the handler runs (a click, after
+  render), so factory order does not matter and there is no TDZ. It is a new
+  object every render, like the shell, so a handler from render N calls the
+  render-N handler of the other module — the same values the in-App closure saw.
+* **Typed list** — the only names allowed (`call(...)` with any other string
+  fails the test). Adding one bumps `SHELL_API`:
+
+| name | handler | owner (`ownHandlers` of) | called by | args → result |
+|---|---|---|---|---|
+| `inventory.addOutward` | `handleAddOutward` | inventory (frozen BOM-issue part) | pending-jobs (`handleIssuePendingPart`) | `(entry, pending)` → `{ success, error? }` |
+| `inventory.removeRackMachine` | `handleRemoveRackMachine` | inventory (frozen BOM-issue part) | bom (`handleDeleteBOM`) | `(machineId)` → `Promise<{ success, error? }>` |
+
+  Found by scope-scanning the not-yet-moved groups (C.2 rows 5–8); inventory,
+  settings and purchase make **no** cross-module calls, so nothing uses `call`
+  yet and no code for it is shipped before its first user (no dead code).
+* Checks to add with the first user: split-accounting allows exactly the
+  `shellRegistry` / `Object.assign(shellRegistry, { "m.name": handleX, … })`
+  lines in App.jsx and the `const handleX = (...args) => call("m.name", ...args);`
+  adapter line in a handlers.js; the manifest test checks every `call("…")`
+  name is in this table, registered in App.jsx, and in the owner's `ownHandlers`;
+  MODULE.json gets a derived `calls` list; module-check 5b reports registry
+  names Live lacks.
 
 ## Stays in the shell for good
 

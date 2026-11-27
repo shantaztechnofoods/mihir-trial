@@ -303,8 +303,8 @@ export default function POSettings({ value, onChange, onPersist, isSuperAdmin = 
                 <div key={key} className={full ? "col-span-2" : ""}>
                   <div className={lbl}>{label}</div>
                   {full
-                    ? <textarea value={active[key] || ""} onChange={(e) => patchCompany(active.id, { [key]: e.target.value })} placeholder={placeholder} rows={2} className={inp + " resize-none"} />
-                    : <input value={active[key] || ""} onChange={(e) => patchCompany(active.id, { [key]: e.target.value })} placeholder={placeholder} className={inp} />}
+                    ? <textarea value={active[key] || ""} onChange={(e) => patchCompany(active.id, { [key]: e.target.value })} aria-label={label} placeholder={placeholder} rows={2} className={inp + " resize-none"} />
+                    : <input value={active[key] || ""} onChange={(e) => patchCompany(active.id, { [key]: e.target.value })} aria-label={label} placeholder={placeholder} className={inp} />}
                 </div>
               ))}
             </div>

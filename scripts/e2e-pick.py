@@ -17,7 +17,7 @@ import sys
 
 ROOT = os.environ.get("E2E_PICK_ROOT") or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 E2E = os.path.join(ROOT, "tests", "e2e")
-SMOKE = ["go-live-workflows", "mobile-sweep"]          # whole-app walk-through, phone + desktop
+SMOKE = ["go-live-workflows", "mobile-sweep", "overlap-guard"]   # whole-app walk-through, phone + desktop; no overlaps at 4 widths
 MT = ["go-live-workflows", "pending-part-or-comment", "sender-undo", "staff-hold", "mt-polish", "back-closes-popup", "frame-budget"]
 
 # (regex on the App.jsx component name OR on a file path, suites). First match wins.

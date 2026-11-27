@@ -236,9 +236,9 @@ export function POModal({ initialPO, vendorList, items, onSave, onClose, prefill
 
   const inpCls = `bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-900 placeholder-slate-500 outline-none modal-input`;
   const selStyle = { background: "var(--surface-input)", color: "var(--text)" };
-  const PLabel = ({ text, req }) => (
-    <div className="text-[11px] font-medium tracking-tight mb-1.5" style={{ color: "#2640B0" }}>
-      {text}{req && <span className="text-red-400 ml-0.5">*</span>}
+  const PLabel = ({ text, req, id }) => (
+    <div id={id} className="text-[11px] font-medium tracking-tight mb-1.5" style={{ color: "#2640B0" }}>
+      {text}{req && <span className="text-red-400 ml-0.5" aria-hidden="true">*</span>}
     </div>
   );
 
@@ -262,13 +262,14 @@ export function POModal({ initialPO, vendorList, items, onSave, onClose, prefill
 
             {/* ── ERP step 1 — PO Date & Purchase Type (Busy-style keyboard nav) ── */}
             <div>
-              <PLabel text="PO Date" req />
-              <input type="date" value={form.poDate} onChange={(e) => setF("poDate", e.target.value)}
+              <PLabel id="po-po-date" text="PO Date" req />
+              <input aria-labelledby="po-po-date" type="date" value={form.poDate} onChange={(e) => setF("poDate", e.target.value)}
                      className={`w-full ${inpCls}`} style={{ colorScheme: "dark", fontFamily: "'Inter',system-ui,sans-serif" }} />
             </div>
             <div>
-              <PLabel text="Purchase Type" req />
+              <PLabel id="po-purchase-type" text="Purchase Type" req />
               <SearchableSelect
+                ariaLabelledby="po-purchase-type"
                 options={PURCHASE_TYPES.map((t) => ({ value: t.key, label: t.label, group: t.group }))}
                 value={form.purchaseType}
                 onChange={(v) => setF("purchaseType", v)}
@@ -334,8 +335,8 @@ export function POModal({ initialPO, vendorList, items, onSave, onClose, prefill
                 </div>
                 {/* Fallback dropdown restricted to linked vendors only */}
                 <div className="mt-2">
-                  <div className="text-[10px] text-slate-600 mb-1">Or choose a different linked vendor:</div>
-                  <select value={form.vendor} onChange={(e) => { setVendorErr(false); setF("vendor", e.target.value); }} className={`w-full ${inpCls}`} style={selStyle}>
+                  <div id="po-vendor-other" className="text-[10px] text-slate-600 mb-1">Or choose a different linked vendor:</div>
+                  <select aria-labelledby="po-vendor-other" value={form.vendor} onChange={(e) => { setVendorErr(false); setF("vendor", e.target.value); }} className={`w-full ${inpCls}`} style={selStyle}>
                     <option value="">— Select Vendor —</option>
                     {linkedVendors.map((v) => (
                       <option key={v.id} value={v.name}>
@@ -352,8 +353,8 @@ export function POModal({ initialPO, vendorList, items, onSave, onClose, prefill
               <div className="col-span-2">
                 {/* Label row — shows item-filter badge when active */}
                 <div className="flex items-center gap-2 mb-1.5">
-                  <div className="text-[11px] font-medium tracking-tight" style={{ color: "#2640B0" }}>
-                    Vendor<span className="text-red-400 ml-0.5">*</span>
+                  <div id="po-vendor" className="text-[11px] font-medium tracking-tight" style={{ color: "#2640B0" }}>
+                    Vendor<span className="text-red-400 ml-0.5" aria-hidden="true">*</span>
                   </div>
                   {addCode && itemLinkedVendors.length > 0 && (
                     <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
@@ -367,11 +368,11 @@ export function POModal({ initialPO, vendorList, items, onSave, onClose, prefill
 
                 {/* Search input — shown only when item filter is active */}
                 {addCode && itemLinkedVendors.length > 0 && (
-                  <input value={vendorSearch} onChange={(e) => setVendorSearch(e.target.value)}
+                  <input value={vendorSearch} onChange={(e) => setVendorSearch(e.target.value)} aria-label="Search vendors"
                          placeholder="Search vendors…" className={`w-full mb-2 ${inpCls}`} />
                 )}
 
-                <select value={form.vendor} onChange={(e) => { setVendorErr(false); setF("vendor", e.target.value); }}
+                <select aria-labelledby="po-vendor" value={form.vendor} onChange={(e) => { setVendorErr(false); setF("vendor", e.target.value); }}
                         className={`w-full ${inpCls}`} style={selStyle}>
                   <option value="">— Select Vendor —</option>
                   {addCode && itemLinkedVendors.length > 0
@@ -409,31 +410,31 @@ export function POModal({ initialPO, vendorList, items, onSave, onClose, prefill
             )}
 
             <div>
-              <PLabel text="Issued By (Company)" />
-              <select value={form.companyId} onChange={(e) => setF("companyId", e.target.value)} className={`w-full ${inpCls}`} style={selStyle}>
+              <PLabel id="po-issued-by-company" text="Issued By (Company)" />
+              <select aria-labelledby="po-issued-by-company" value={form.companyId} onChange={(e) => setF("companyId", e.target.value)} className={`w-full ${inpCls}`} style={selStyle}>
                 {poCfg.companies.map((c) => <option key={c.id} value={c.id}>{c.name || "(unnamed)"}</option>)}
               </select>
             </div>
             <div>
-              <PLabel text="PO Template" />
-              <select value={form.template} onChange={(e) => setF("template", e.target.value)} className={`w-full ${inpCls}`} style={selStyle}>
+              <PLabel id="po-po-template" text="PO Template" />
+              <select aria-labelledby="po-po-template" value={form.template} onChange={(e) => setF("template", e.target.value)} className={`w-full ${inpCls}`} style={selStyle}>
                 {PO_TEMPLATE_OPTIONS.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
               </select>
             </div>
             <div>
-              <PLabel text="Priority" />
-              <select value={form.priority} onChange={(e) => setF("priority", e.target.value)} className={`w-full ${inpCls}`} style={selStyle}>
+              <PLabel id="po-priority" text="Priority" />
+              <select aria-labelledby="po-priority" value={form.priority} onChange={(e) => setF("priority", e.target.value)} className={`w-full ${inpCls}`} style={selStyle}>
                 {["urgent","high","normal","low"].map((p) => <option key={p}>{p}</option>)}
               </select>
             </div>
             <div>
-              <PLabel text="Expected Delivery" />
-              <input type="date" value={form.delivery} onChange={(e) => setF("delivery", e.target.value)}
+              <PLabel id="po-expected-delivery" text="Expected Delivery" />
+              <input aria-labelledby="po-expected-delivery" type="date" value={form.delivery} onChange={(e) => setF("delivery", e.target.value)}
                      className={`w-full ${inpCls}`} style={{ colorScheme: "dark", fontFamily: "'Inter',system-ui,sans-serif" }} />
             </div>
             <div className="col-span-2">
-              <PLabel text="Notes" />
-              <input value={form.notes} onChange={(e) => setF("notes", e.target.value)}
+              <PLabel id="po-notes" text="Notes" />
+              <input aria-labelledby="po-notes" value={form.notes} onChange={(e) => setF("notes", e.target.value)}
                      placeholder="e.g. Urgent — machine M-07 down" className={`w-full ${inpCls}`} />
             </div>
           </div>
@@ -519,12 +520,13 @@ export function POModal({ initialPO, vendorList, items, onSave, onClose, prefill
                   disabledMsg={!form.vendor ? "Select vendor first" : ""}
                   placeholder={vendorFilteredItems.length === 0 ? "No items linked to this vendor" : "Search items by name or code…"}
                   showStock={true}
+                  ariaLabel="Item to add"
                 />
               </div>
-              <input type="number" min="1" value={addQty} onChange={(e) => setAddQty(e.target.value)}
+              <input type="number" min="1" aria-label="Quantity" value={addQty} onChange={(e) => setAddQty(e.target.value)}
                      placeholder="Qty" className={`w-20 text-right ${inpCls}`}
                      style={{ fontVariantNumeric: "tabular-nums", fontFamily: "'Inter',system-ui,sans-serif" }} />
-              <input type="number" min="0" value={addRate} onChange={(e) => setAddRate(e.target.value)}
+              <input type="number" min="0" aria-label="Rate (₹)" value={addRate} onChange={(e) => setAddRate(e.target.value)}
                      placeholder="Rate ₹" className={`w-24 text-right ${inpCls}`}
                      style={{ fontVariantNumeric: "tabular-nums", fontFamily: "'Inter',system-ui,sans-serif" }}
                      onKeyDown={(e) => e.key === "Enter" && addLine()} />
@@ -668,7 +670,7 @@ export function POModal({ initialPO, vendorList, items, onSave, onClose, prefill
           )}
         </div>
 
-        <div className="px-6 py-4 border-t border-slate-200 flex items-center justify-between gap-2 flex-shrink-0"
+        <div className="po-modal-foot px-6 py-4 border-t border-slate-200 flex items-center justify-between gap-2 flex-shrink-0"
              style={{ background: "#f8f9fb" }}>
           <div className="text-[10px] text-slate-500">{form.lineItems.length} item{form.lineItems.length !== 1 ? "s" : ""} · ₹{total.toLocaleString("en-IN")}</div>
           <div className="flex gap-2">

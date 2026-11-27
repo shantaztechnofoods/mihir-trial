@@ -12,8 +12,6 @@
   ],
   "dependsOn": {},
   "handlers": [
-    "handleFulfillPending",
-    "handleSetItemDefaultRate",
     "handleUpdateStock"
   ],
   "ownHandlers": [

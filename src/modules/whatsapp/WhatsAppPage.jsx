@@ -820,7 +820,8 @@ export function WhatsAppPage({ settings = {}, onSave, canDo = () => false }) {
 
         <div className="wa-tabs">
           {menuItems.map((item) => (
-            <button key={item.id} onClick={() => setSection(item.id)}
+            <button key={item.id} onClick={() => setSection(item.id)} aria-label={item.label}
+                    aria-current={section === item.id ? "page" : undefined}
                     className={`wa-tab ${section === item.id ? "is-on" : ""}`}>
               <item.Icon size={15} className="flex-shrink-0" aria-hidden="true" />
               <span>{item.label}</span>
@@ -865,7 +866,7 @@ export function WhatsAppPage({ settings = {}, onSave, canDo = () => false }) {
                   <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
                           style={{ color: "var(--wa-ink-2)" }} />
                   <input value={chatSearch} onChange={(e) => setChatSearch(e.target.value)}
-                         placeholder="Search name or number" className="wa-search" />
+                         aria-label="Search chats" placeholder="Search name or number" className="wa-search" />
                 </div>
               </div>
 

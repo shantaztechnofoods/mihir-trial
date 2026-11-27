@@ -20,9 +20,17 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { LINE_STAGES, stageStatusLines, visibleOnLine, tagStatus } from "./productionLine.js";
 import { formatDuration } from "../../utils/handoverLogic.js";
-import { mountLine, webglAvailable } from "./line3d.js";
 import { cutoutPhoto } from "./photoCutout.js";
+import { LinePoster } from "./LinePoster.jsx";
 import "./line3d.css";
+
+// First frame (2026-11-27): this view (React + CSS, small) shows at once with a
+// CSS poster of the line; three.js and the scene come in their own chunk; photos
+// start as small cut-outs and the full ones are swapped in on idle after the
+// first frame.
+const loadLine3d = () => import("./line3d.js");
+const PHOTO_SMALL = 256, PHOTO_FULL_PHONE = 768, PHOTO_FULL = 2048;
+const onIdle = (fn) => (typeof window !== "undefined" && window.requestIdleCallback ? window.requestIdleCallback(fn, { timeout: 3000 }) : setTimeout(fn, 300));
 
 const ICON = { ok: "✓", near: "◷", late: "⚠", hold: "‖", incoming: "→", idle: "" };
 const STAGE_INDEX = Object.fromEntries(LINE_STAGES.map((s, i) => [s.key, i]));
@@ -181,6 +189,9 @@ export default function Line3DView({ line, bomDefs = {}, onOpenMachine, onFail }
   const failRef = useRef(onFail); failRef.current = onFail;
 
   const [photos, setPhotos] = useState(null);
+  const [firstDone, setFirstDone] = useState(false); // the first real 3D frame is on screen
+  const [posterGone, setPosterGone] = useState(false);
+  useEffect(() => { if (!firstDone) return undefined; const t = setTimeout(() => setPosterGone(true), 320); return () => clearTimeout(t); }, [firstDone]);
   const [mountN, setMountN] = useState(0);
   const [hot, setHot] = useState(null);
   const [sel, setSel] = useState(null);
@@ -207,13 +218,20 @@ export default function Line3DView({ line, bomDefs = {}, onOpenMachine, onFail }
   useEffect(() => {
     let alive = true;
     const urls = [...new Set([...latest.current.machines, ...latest.current.ready].map((m) => m.url).filter(Boolean))];
-    Promise.all(urls.map((u) => cutoutPhoto(u).then((p) => [u, p]))).then((pairs) => { if (alive) setPhotos(Object.fromEntries(pairs)); });
+    Promise.all(urls.map((u) => cutoutPhoto(u, PHOTO_SMALL).then((p) => [u, p]))).then((pairs) => { if (alive) setPhotos(Object.fromEntries(pairs)); });
     return () => { alive = false; };
   }, [sig]);
 
   // 2. Scene: mounted when the photos are ready; disposed on unmount / remount.
   useEffect(() => {
     if (!photos || !glRef.current) return undefined;
+    let alive = true, cleanup = null;
+    loadLine3d().then((mod) => { if (alive) cleanup = start(mod) || null; }, (e) => {
+      if (!alive) return; console.warn("[dashboard-3d] failed to load", e); failRef.current?.("3D view could not load. Showing Line.");
+    });
+    return () => { alive = false; if (cleanup) cleanup(); };
+  function start({ mountLine, webglAvailable }) {
+    if (!glRef.current) return undefined;
     if (!webglAvailable()) { failRef.current?.("3D view needs WebGL, which this browser has turned off. Showing Line."); return undefined; }
     const cur = latest.current, ph = (m) => ({ ...m, photo: m.url ? photos[m.url] || null : null });
     let api;
@@ -231,6 +249,7 @@ export default function Line3DView({ line, bomDefs = {}, onOpenMachine, onFail }
       return undefined;
     }
     apiRef.current = api;
+    try { performance.mark("dash3d-built"); } catch { /* old browser */ }
     let chipKey = "", tagKey = "";
     api.onFrame = () => {
       const zs = api.zoneScreen(), kk = zs.map((z) => z.x.toFixed(0) + "," + z.w.toFixed(0)).join("|");
@@ -261,12 +280,22 @@ export default function Line3DView({ line, bomDefs = {}, onOpenMachine, onFail }
     api.kick();
     // Re-run the tag layout when a tag's width changes after it was placed (the web
     // font arriving late, new words), so tags never end up overlapping.
-    const relayout = () => { tagKey = ""; api.kick(); };
+    const relayout = () => { tagKey = ""; if (api.lite) api.layout(); else api.kick(); }; // phone: tags only, no WebGL frame
     let tro = null;
     if (typeof ResizeObserver !== "undefined" && tagsRef.current) { tro = new ResizeObserver(relayout); tagsRef.current.querySelectorAll(".f3-tag").forEach((t) => tro.observe(t)); }
     try { document.fonts?.ready?.then(() => { if (apiRef.current === api) relayout(); }); } catch { /* no font API */ }
     if (typeof window !== "undefined") window.__dash3d = api; // e2e hook (renderer.info)
-    return () => { if (tro) tro.disconnect(); api.stop(); if (apiRef.current === api) apiRef.current = null; if (window.__dash3d === api) window.__dash3d = null; if (trackRef.current) trackRef.current.style.width = ""; };
+    // After the first frame: poster out; then, on idle, the full-size photos replace the small ones.
+    let idleId = 0;
+    api.onFirst = () => {
+      setFirstDone(true);
+      idleId = onIdle(() => {
+        const full = phone ? PHOTO_FULL_PHONE : PHOTO_FULL;
+        for (const [u, small] of Object.entries(photos)) if (small) cutoutPhoto(u, full).then((big) => { if (apiRef.current === api && big) api.setPhoto(small, big); });
+      });
+    };
+    return () => { (window.cancelIdleCallback || clearTimeout)(idleId); if (tro) tro.disconnect(); api.stop(); if (apiRef.current === api) apiRef.current = null; if (window.__dash3d === api) window.__dash3d = null; if (trackRef.current) trackRef.current.style.width = ""; };
+  }
   }, [photos, mountN, wb, phone]);
 
 
@@ -279,7 +308,8 @@ export default function Line3DView({ line, bomDefs = {}, onOpenMachine, onFail }
     else api.kick();
   }, [live]);
   // Tag text changes (time in dept) move nothing in 3D but re-measure the tags.
-  useEffect(() => { apiRef.current?.kick(); });
+  // Phone: a parent re-render (clock tick, other app state) re-places the tags without a WebGL frame (idle = 0 fps).
+  useEffect(() => { const api = apiRef.current; if (!api) return; if (api.lite) api.layout(); else api.kick(); });
 
   // In-place summary: Esc / outside tap closes it.
   const close = () => { setSel(null); apiRef.current?.pick(null); };
@@ -340,6 +370,10 @@ export default function Line3DView({ line, bomDefs = {}, onOpenMachine, onFail }
       <button type="button" className="f3-pop-go" data-open-mt onClick={() => { const k = selIt.kind; close(); onOpenMachine?.(k === "hold" ? "hold" : "active"); }}>Open in Machine Tracker</button>
     </div>
   );
+  // CSS stand-in until the first real 3D frame (fades out, then leaves the DOM).
+  const posterEl = !posterGone && (
+    <div className="f3-poster-over" data-done={firstDone ? "" : undefined} aria-hidden={firstDone || undefined}><LinePoster line={line} /></div>
+  );
   const stageEl = (
     <div className={`f3-stage${hot || sel ? " is-focus" : ""}${sel ? " is-zoom" : ""}`} ref={stageRef}>
       <div className="f3-gl" ref={glRef} role="img" aria-label={summary} />
@@ -369,7 +403,7 @@ export default function Line3DView({ line, bomDefs = {}, onOpenMachine, onFail }
       ))}
       {!phone && emptyEl}
       {!phone && popEl}
-      {!photos && <div className="f3-loading" role="status">Loading 3D view…</div>}
+      {!phone && posterEl}
     </div>
   );
   const chipsEl = (
@@ -400,14 +434,17 @@ export default function Line3DView({ line, bomDefs = {}, onOpenMachine, onFail }
     <div className="f3-wrap" data-floor-3d data-phone ref={wrapRef}>
       {kpisEl}
       {emptyEl}
-      <div className="f3-scroll" ref={scrollRef} data-3d-scroll tabIndex={0} aria-label="Production line, swipe for the next department">
-        <div className="f3-track" ref={trackRef}>
-          {stageEl}
-          {chipsEl}
-          <div className="f3-snaps" ref={snapsRef} aria-hidden="true">
-            {line.stages.map((s2, i) => <span key={s2.key} data-snap={i} />)}
+      <div className="f3-view">
+        <div className="f3-scroll" ref={scrollRef} data-3d-scroll tabIndex={0} aria-label="Production line, swipe for the next department">
+          <div className="f3-track" ref={trackRef}>
+            {stageEl}
+            {chipsEl}
+            <div className="f3-snaps" ref={snapsRef} aria-hidden="true">
+              {line.stages.map((s2, i) => <span key={s2.key} data-snap={i} />)}
+            </div>
           </div>
         </div>
+        {posterEl}
       </div>
       <Pager stages={line.stages} scrollRef={scrollRef} snapsRef={snapsRef} ready={!!photos} />
       {popEl}
