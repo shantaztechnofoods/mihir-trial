@@ -711,6 +711,51 @@
   html[data-theme="dark"] body .modal-backdrop > div:not(.tc-form) { background-color: #1a272f !important; }
 }
 
+/* ═══ Premium desk · inventory (2026-11-27, desktop audit FINDINGS.md I1-I6) ═══
+   Item Master, Inward, Outward, Pending Stock + the item / PO / vendor forms.
+   Type, colour and surfaces only; boxes keep their place. */
+@media screen {
+  /* I1 · numbers: one face. Stock / min / rate / dates were ui-monospace next to
+     Inter; now Inter with tabular figures, so columns still line up digit for digit */
+  html body .app-shell .font-mono:where(:not(.rack-set *, .mr-doc *, .rpt-doc *, code, pre, kbd)) { font-family: var(--font-ui) !important; letter-spacing: 0; }
+  html body :is(.app-shell, .modal-backdrop) :is(td, th, .kpi-tile, .hero-tile, .pending-kpi, .font-mono) { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1, "cv11" 1; }
+
+  /* I2 · form labels: the forms used a brand-blue 11 px label (Inward, Manual
+     Outward, Add Item, PO, Vendor) while Settings used ink; one calm label now */
+  html body :is(.app-shell, .modal-backdrop) div.text-\[11px\].font-medium.tracking-tight:is([style*="color: rgb(38, 64, 176)"]) {
+    color: var(--ink-2) !important; font-size: 12px; font-weight: 600; letter-spacing: -0.005em;
+  }
+  html[data-theme="dark"] body :is(.app-shell, .modal-backdrop) div.text-\[11px\].font-medium.tracking-tight:is([style*="color: rgb(38, 64, 176)"]) { color: var(--p-tx2) !important; }
+
+  /* I3 · the item / vendor search pickers were 34 px tall with 12 px text beside
+     38 px / 13 px fields: one height and one text size per row */
+  html body :is(.app-shell, .modal-backdrop) input.w-full.rounded-lg.pr-8[class*="py-2"] { min-height: 38px; font-size: 13px; }
+
+  /* I4 · Pending Stock summary: the three tiles were flat tints with a 9 px
+     upper-case label; same glass tile as the other KPI cards, tint kept as a wash */
+  html body .app-shell .pending-kpi {
+    border-color: transparent !important; border-radius: 22px !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), inset 0 0 0 1px rgba(20, 40, 50, .06), 0 1px 2px rgba(40, 60, 70, .05), 0 12px 28px -14px rgba(40, 60, 75, .18);
+  }
+  html[data-theme="dark"] body .app-shell .pending-kpi { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12), inset 0 0 0 1px rgba(255, 255, 255, .06), 0 12px 28px -14px rgba(0, 0, 0, .55); }
+  html body .app-shell .pending-kpi > div:first-child { font-size: 13px !important; text-transform: none !important; letter-spacing: -0.01em !important; font-weight: 600 !important; }
+  html body .app-shell .pending-kpi > div:last-child { font-size: 12.5px !important; color: var(--ink-3) !important; }
+
+  /* I5 · empty states: the glyph sits in a soft tinted disc instead of a 48 px emoji */
+  html body .app-shell .empty-glyph { display: inline-grid; place-items: center; width: 64px; height: 64px; border-radius: 999px; font-size: 0; line-height: 0; color: var(--ok);
+    background: color-mix(in srgb, currentColor 12%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 22%, transparent); }
+  html body .app-shell .empty-glyph[data-tone="muted"] { color: var(--ink-3); }
+
+  /* I6 · the coloured action buttons in the inventory forms (Submit Inward green,
+     Issue Stock amber) become capsules like every other action */
+  html body .app-shell button[style*="background: rgb(180, 83, 9)"]:where(:not(:disabled)),
+  html body .app-shell button.rounded-xl.text-white[style*="background: rgb(21, 128, 61)"]:where(:not(:disabled)) {
+    border-radius: 999px !important; border-color: transparent !important;
+    background-image: linear-gradient(180deg, rgba(255, 255, 255, .18) 0%, rgba(255, 255, 255, 0) 52%) !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .3), inset 0 -1px 0 rgba(0, 0, 0, .14), 0 8px 20px -10px rgba(40, 50, 60, .5) !important;
+  }
+}
+
 /* ═══ PR 3 — Machine Tracker, Reports, Settings ═══════════════════════════ */
 @media screen {
   /* Machine Tracker: "Today" filter chips + the delay-period switch as glossy capsules */
