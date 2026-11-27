@@ -1,6 +1,6 @@
 // src/modules/inventory/InventoryPage.jsx — moved verbatim from the former single-file src/App.jsx
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
-import React, { useState, useEffect, useRef, useMemo, useDeferredValue } from "react";
+import React, { useState, useEffect, useRef, useMemo, useDeferredValue, startTransition } from "react";
 import { LeadIcon, Glyph } from "../../shared/components/LeadIcon.jsx";
 import { useProgressiveCount } from "../../shared/components/useProgressiveCount.js";
 import MoreRowsNote from "../../shared/components/MoreRowsNote.jsx";
@@ -452,6 +452,9 @@ export function InventoryPage({ items, setItems, handleUpdateStock, pos = [], in
   useEffect(() => {
     try { localStorage.setItem(ATTENTION_KEY, attentionOpen ? "1" : "0"); } catch {}
   }, [attentionOpen]);
+  // perf/inp-modal-order: the toggle's words / arrow change in the next frame; the
+  // list of up to 10 items opens right after (it pushes the table down, a big restyle).
+  const attentionListOpen = useDeferredValue(attentionOpen);
 
   const machines = useMemo(() => Object.keys(items), [items]);
   // Every code in use (archived rows included — the code stays taken), for the
@@ -673,6 +676,224 @@ export function InventoryPage({ items, setItems, handleUpdateStock, pos = [], in
 
   return (
     <div className="flex-1 overflow-y-auto">
+
+      <Topbar title="Item Master" subtitle="Unified inventory across all categories">
+        <Btn variant="ghost" size="sm" onClick={async () => {
+          // Was a dead button. Exports what the table shows (filters + sort applied).
+          if (!sorted.length) { alert("Nothing to export for current filters."); return; }
+          const XLSX = await loadXLSX();
+          const ws = XLSX.utils.json_to_sheet(sorted.map((i) => ({ Code: i.code, Name: i.name, Category: i.category, Unit: i.unit, Stock: i.stock, Min: i.min, "Rate ₹": i.lastPurchaseRate || 0, Status: i.status, Critical: i.isCritical ? "Yes" : "", Vendor: i.vendor || "", Location: i.location || "" })));
+          const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Items");
+          XLSX.writeFile(wb, `item-master-${new Date().toISOString().slice(0, 10)}.xlsx`);
+        }}><LeadIcon e="⬇️" />Export</Btn>
+        {canDo("inventory","add") && (
+          <button onClick={() => setShowImport(true)}
+                  className="text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-900 hover:border-slate-300 transition-all flex items-center gap-1.5">
+            <LeadIcon e="⬆" />Import Items
+          </button>
+        )}
+        {/* MIHIR TRIAL only (VITE_ERP_INSTANCE=trial) — hidden on ERP LIVE. Archives, never deletes. */}
+        {ERP_INSTANCE === "trial" && canDo("inventory","delete") && (
+          <button onClick={() => setShowClearDemo(true)}
+                  title="Archive demo items and BOMs together (Trial only)"
+                  className="text-xs font-bold px-3 py-1.5 rounded-lg border transition-all flex items-center gap-1.5"
+                  style={{ borderColor: "rgba(217,119,6,0.35)", color: "#b45309" }}>
+            <LeadIcon e="🧹" />Clear Demo Data
+          </button>
+        )}
+        {canDo("inventory","add") && <Btn variant="primary" size="sm" onClick={() => startTransition(() => setShowModal(true))}>+ Add Item</Btn>}
+      </Topbar>
+
+      <div className="p-6 space-y-4">
+        {/* Metric cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <MetricCard label="Total SKUs"    value={totalSKUs.toLocaleString("en-IN")} barPct={totalSKUs ? Math.round((safeCount / totalSKUs) * 100) : 0} barColor="#2E50D6" icon="📦" />
+          <MetricCard label="Critical"      value={String(criticalCount)} valueColor="#dc2626" icon="🚨"
+                      barPct={totalSKUs ? Math.round((criticalCount / totalSKUs) * 100) : 0} barColor="#ef4444" />
+          <MetricCard label="Low Stock"     value={String(warningCount)}  valueColor="#d97706" icon="⚠️"
+                      barPct={totalSKUs ? Math.round((warningCount / totalSKUs) * 100) : 0} barColor="#D97706" />
+          <MetricCard label="Safe"          value={String(safeCount)} valueColor="#15803d" icon="✅"
+                      barPct={totalSKUs ? Math.round((safeCount / totalSKUs) * 100) : 0} barColor="#22c55e" />
+        </div>
+
+        {/* ATTENTION panel — collapsible. Default collapsed so the inventory
+            table stays visible above the fold. Summary always shows the
+            critical/warning counts; the chip list is only revealed when the
+            operator chooses to expand. State persists in localStorage. */}
+        {alerts.length > 0 && (() => {
+          const critCount = alerts.filter((i) => i.status === "critical").length;
+          const warnCount = alerts.filter((i) => i.status === "warning").length;
+          const summary   = critCount > 0 && warnCount > 0
+            ? `${critCount} Critical · ${warnCount} Low Stock`
+            : critCount > 0
+              ? `${critCount} Critical Item${critCount !== 1 ? "s" : ""}`
+              : `${warnCount} Low Stock Item${warnCount !== 1 ? "s" : ""}`;
+          const chipFor = (i) => (
+            <button key={i.code}
+                    onClick={() => setSelectedItem({ item: { ...i }, category: i.category })}
+                    className="text-[10px] font-bold font-mono px-2 py-0.5 rounded-lg transition-all hover:opacity-80 flex-shrink-0"
+                    style={{
+                      background: i.status === "critical" ? "rgba(220,38,38,0.08)" : "rgba(217,119,6,0.08)",
+                      border: i.status === "critical" ? "1px solid rgba(220,38,38,0.22)" : "1px solid rgba(217,119,6,0.22)",
+                      color: i.status === "critical" ? "#dc2626" : "#b45309",
+                    }}>
+              {i.code} · {i.stock} {i.unit}
+            </button>
+          );
+          return (
+            <div className="wu-attn rounded-xl"
+                 style={{ background: "rgba(239,68,68,0.04)", border: "1px solid rgba(239,68,68,0.18)" }}>
+              {/* Header row — clickable, ~60px tall. Always visible. */}
+              <button
+                onClick={() => setAttentionOpen((v) => !v)}
+                aria-expanded={attentionOpen}
+                aria-controls="erp-attention-body"
+                className="w-full flex items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-transparent rounded-xl"
+                style={{ minHeight: 48 }}>
+                <span className="text-[10px] font-black text-red-600 uppercase tracking-[0.08em] flex-shrink-0"><LeadIcon e="⚠" />Attention</span>
+                <span className="text-[11px] font-bold" style={{ color: "var(--text-strong)" }}>({summary})</span>
+                {/* Preview: first 10 chips inline when collapsed, +N more badge */}
+                {!attentionOpen && (
+                  <div className="hidden md:flex items-center gap-1.5 overflow-hidden flex-1 min-w-0">
+                    {/* Preview chips are labels, not buttons: they sit inside the
+                        header toggle and a <button> may not contain a <button>. */}
+                    {alerts.slice(0, 10).map((i) => (
+                      <span key={i.code} className="wu-attn-chip text-[10px] font-bold font-mono px-2 py-0.5 rounded-lg flex-shrink-0" data-status={i.status}
+                            style={{ background: i.status === "critical" ? "rgba(220,38,38,0.08)" : "rgba(217,119,6,0.08)", border: i.status === "critical" ? "1px solid rgba(220,38,38,0.22)" : "1px solid rgba(217,119,6,0.22)", color: i.status === "critical" ? "#dc2626" : "#b45309" }}>
+                        {i.code} · {i.stock} {i.unit}
+                      </span>
+                    ))}
+                    {alerts.length > 10 && (
+                      <span className="text-[10px] font-bold text-slate-400 px-2 py-0.5 rounded-lg flex-shrink-0"
+                            style={{ background: "rgba(17,24,39,0.04)", border: "1px solid var(--border-rim)" }}>
+                        +{alerts.length - 10} more
+                      </span>
+                    )}
+                  </div>
+                )}
+                <span className="ml-auto text-[10px] font-bold text-slate-400 flex items-center gap-1 flex-shrink-0">
+                  {attentionOpen ? "▲ Hide Items" : "▼ Show Items"}
+                </span>
+              </button>
+              {/* Body — only mounted when expanded. Internal scroll caps the
+                  height so 83 chips can't push the table off the page. */}
+              {attentionListOpen && (
+                <div id="erp-attention-body"
+                     className="px-4 pb-3 pt-1 flex flex-wrap gap-1.5 overflow-y-auto"
+                     style={{ maxHeight: 180, borderTop: "1px solid rgba(239,68,68,0.12)" }}>
+                  {alerts.map(chipFor)}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* Filter bar */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex gap-0.5 bg-slate-50 rounded-lg p-0.5 border border-slate-200">
+            {[
+              { key: "all",      label: `All (${totalSKUs})`,              active: "bg-blue-50 text-blue-700 border border-blue-200"       },
+              { key: "critical", label: `Critical (${criticalCount})`,     active: "bg-red-50 text-red-700 border border-red-200"             },
+              { key: "warning",  label: `Low (${warningCount})`,           active: "bg-amber-50 text-amber-700 border border-amber-200"   },
+              { key: "safe",     label: `Safe (${safeCount})`,             active: "bg-green-50 text-green-700 border border-green-200"      },
+            ].map(({ key, label, active }) => (
+              <button key={key} onClick={() => setStatusFilter(key)}
+                      className={`px-3 py-1.5 rounded-md text-[11px] font-bold transition-all ${statusFilter === key ? active : "text-slate-600 hover:text-slate-900"}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <select aria-label="Category" value={catFilter} onChange={(e) => setCatFilter(e.target.value)}
+                  className="border border-slate-200 rounded-lg px-3 py-1.5 text-xs outline-none"
+                  style={{ background: "#ffffff", color: "#111827" }}>
+            <option value="all">All Categories</option>
+            {machines.map((m) => <option key={m} value={m}>{m}</option>)}
+          </select>
+
+          <div className="relative ml-auto">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 text-[11px] pointer-events-none"><Glyph e="🔍" size={13} /></span>
+            <input ref={searchRef} value={search} onChange={(e) => setSearch(e.target.value)}
+                   aria-label="Search items" placeholder="Search code, name, vendor, location..."
+                   className="bg-slate-50 border border-slate-200 rounded-lg pl-7 pr-3 py-1.5 text-xs placeholder-slate-400 outline-none focus:border-blue-500/40 w-72 transition-all"
+                   style={{ color: "var(--text-strong)" }} />
+          </div>
+
+          {filtersActive && (
+            <button onClick={clearFilters}
+                    className="text-[10px] font-bold text-slate-500 hover:text-red-600 px-2.5 py-1.5 rounded-lg border border-slate-200 hover:border-red-500/40 transition-all">
+              ✕ Clear
+            </button>
+          )}
+        </div>
+
+        {/* Master table */}
+        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-slate-200" style={{ background: "rgba(17,24,39,0.03)" }}>
+                  {cols.map(({ col, label }) => (
+                    <th key={label}
+                        onClick={col ? () => toggleSort(col) : undefined}
+                        className={`text-left text-[10px] font-semibold text-slate-600 uppercase tracking-[0.06em] px-4 py-3 ${col ? "cursor-pointer hover:text-slate-900 select-none" : ""}`}>
+                      {label}{col && <SortIcon col={col} />}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {sorted.length === 0 ? (
+                  <tr>
+                    <td colSpan={11} className="px-4 py-12 text-center text-xs text-slate-600">
+                      No items match your filters.
+                      {filtersActive && <button onClick={clearFilters} className="text-blue-600 font-bold ml-1 hover:underline">Clear filters</button>}
+                    </td>
+                  </tr>
+                ) : sorted.slice(0, masterRows.shown).map((item) => (
+                  <ItemMasterRow key={`${item.category}-${item.code}`} item={item}
+                    isNew={lastAddedCode === item.code} canAdjust={canAdjust} canEdit={canEdit}
+                    setSelectedItem={setSelectedItem} setQuickAdjust={setQuickAdjust} setEditingItem={setEditingItem} />
+                ))}
+                {masterRows.more > 0 && (
+                  <tr ref={masterRows.sentinelRef} data-more-rows={masterRows.more}>
+                    <td colSpan={11} className="px-4 py-3 text-center text-[11px]" style={{ color: "var(--text-muted)" }}>
+                      <MoreRowsNote rows={masterRows} />
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Footer */}
+          <div className="px-5 py-3 border-t border-slate-200 flex items-center justify-between"
+               style={{ background: "#f8f9fb" }}>
+            <div className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+              Showing <span className="font-bold" style={{ color: "var(--text-strong)" }}>{sorted.length}</span> of <span className="font-bold" style={{ color: "var(--text-strong)" }}>{totalSKUs}</span> items
+            </div>
+            <div className="text-[11px] tabular-nums" style={{ color: "var(--text-muted)" }}>
+              Inventory Value:{" "}
+              <span className="font-bold" style={{ color: "#2E50D6" }}>₹{filteredVal.toLocaleString("en-IN")}</span>
+              {filtersActive && <span className="ml-1" style={{ color: "var(--text-dim)" }}>(filtered)</span>}
+            </div>
+          </div>
+        </div>
+
+        {/* 2026-11-05 — archived items (never deleted): collapsed, Restore guarded
+            by the same permission as Archive. */}
+        <ArchivedSection kind="item" testId="items" rows={archivedItems || []}
+                         getKey={(r) => r.item?.code} getName={(r) => `${r.item?.name || r.item?.code} (${r.item?.code})`}
+                         getMeta={(r) => `${r.category} · stock ${r.item?.stock ?? 0} ${r.item?.unit || ""}`}
+                         canRestore={!!onRestoreItem && canDo("inventory","delete")} onRestore={onRestoreItem} />
+      </div>
+
+      {/* perf/inp-modal-order (2026-11-27): popups, the archive confirm and the toast are
+          drawn AFTER the page instead of before it. Inserting a node in front of the page
+          made the browser restyle every following element (Tailwind space-y / divide-y
+          rules use "~"): ~1,150 elements per popup. Same popups, same layers (fixed, z-index).
+          "+ Add Item" mounts its form as a React transition: the button answers in the next
+          frame, the form (≈150 elements) is drawn right after. */}
       {showModal && <AddItemModal machines={machines} onSave={handleAddItem} onClose={() => setShowModal(false)} vendorList={vendorList} existingCodes={allCodes} />}
       {showClearDemo && ERP_INSTANCE === "trial" && (
         <ClearDemoDataModal
@@ -803,217 +1024,6 @@ export function InventoryPage({ items, setItems, handleUpdateStock, pos = [], in
           <button onClick={() => setToast(null)} className="ml-1 w-5 h-5 rounded flex items-center justify-center text-slate-600 hover:text-slate-500 text-[10px]">✕</button>
         </div>
       )}
-
-      <Topbar title="Item Master" subtitle="Unified inventory across all categories">
-        <Btn variant="ghost" size="sm" onClick={async () => {
-          // Was a dead button. Exports what the table shows (filters + sort applied).
-          if (!sorted.length) { alert("Nothing to export for current filters."); return; }
-          const XLSX = await loadXLSX();
-          const ws = XLSX.utils.json_to_sheet(sorted.map((i) => ({ Code: i.code, Name: i.name, Category: i.category, Unit: i.unit, Stock: i.stock, Min: i.min, "Rate ₹": i.lastPurchaseRate || 0, Status: i.status, Critical: i.isCritical ? "Yes" : "", Vendor: i.vendor || "", Location: i.location || "" })));
-          const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Items");
-          XLSX.writeFile(wb, `item-master-${new Date().toISOString().slice(0, 10)}.xlsx`);
-        }}><LeadIcon e="⬇️" />Export</Btn>
-        {canDo("inventory","add") && (
-          <button onClick={() => setShowImport(true)}
-                  className="text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-900 hover:border-slate-300 transition-all flex items-center gap-1.5">
-            <LeadIcon e="⬆" />Import Items
-          </button>
-        )}
-        {/* MIHIR TRIAL only (VITE_ERP_INSTANCE=trial) — hidden on ERP LIVE. Archives, never deletes. */}
-        {ERP_INSTANCE === "trial" && canDo("inventory","delete") && (
-          <button onClick={() => setShowClearDemo(true)}
-                  title="Archive demo items and BOMs together (Trial only)"
-                  className="text-xs font-bold px-3 py-1.5 rounded-lg border transition-all flex items-center gap-1.5"
-                  style={{ borderColor: "rgba(217,119,6,0.35)", color: "#b45309" }}>
-            <LeadIcon e="🧹" />Clear Demo Data
-          </button>
-        )}
-        {canDo("inventory","add") && <Btn variant="primary" size="sm" onClick={() => setShowModal(true)}>+ Add Item</Btn>}
-      </Topbar>
-
-      <div className="p-6 space-y-4">
-        {/* Metric cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <MetricCard label="Total SKUs"    value={totalSKUs.toLocaleString("en-IN")} barPct={totalSKUs ? Math.round((safeCount / totalSKUs) * 100) : 0} barColor="#2E50D6" icon="📦" />
-          <MetricCard label="Critical"      value={String(criticalCount)} valueColor="#dc2626" icon="🚨"
-                      barPct={totalSKUs ? Math.round((criticalCount / totalSKUs) * 100) : 0} barColor="#ef4444" />
-          <MetricCard label="Low Stock"     value={String(warningCount)}  valueColor="#d97706" icon="⚠️"
-                      barPct={totalSKUs ? Math.round((warningCount / totalSKUs) * 100) : 0} barColor="#D97706" />
-          <MetricCard label="Safe"          value={String(safeCount)} valueColor="#15803d" icon="✅"
-                      barPct={totalSKUs ? Math.round((safeCount / totalSKUs) * 100) : 0} barColor="#22c55e" />
-        </div>
-
-        {/* ATTENTION panel — collapsible. Default collapsed so the inventory
-            table stays visible above the fold. Summary always shows the
-            critical/warning counts; the chip list is only revealed when the
-            operator chooses to expand. State persists in localStorage. */}
-        {alerts.length > 0 && (() => {
-          const critCount = alerts.filter((i) => i.status === "critical").length;
-          const warnCount = alerts.filter((i) => i.status === "warning").length;
-          const summary   = critCount > 0 && warnCount > 0
-            ? `${critCount} Critical · ${warnCount} Low Stock`
-            : critCount > 0
-              ? `${critCount} Critical Item${critCount !== 1 ? "s" : ""}`
-              : `${warnCount} Low Stock Item${warnCount !== 1 ? "s" : ""}`;
-          const chipFor = (i) => (
-            <button key={i.code}
-                    onClick={() => setSelectedItem({ item: { ...i }, category: i.category })}
-                    className="text-[10px] font-bold font-mono px-2 py-0.5 rounded-lg transition-all hover:opacity-80 flex-shrink-0"
-                    style={{
-                      background: i.status === "critical" ? "rgba(220,38,38,0.08)" : "rgba(217,119,6,0.08)",
-                      border: i.status === "critical" ? "1px solid rgba(220,38,38,0.22)" : "1px solid rgba(217,119,6,0.22)",
-                      color: i.status === "critical" ? "#dc2626" : "#b45309",
-                    }}>
-              {i.code} · {i.stock} {i.unit}
-            </button>
-          );
-          return (
-            <div className="wu-attn rounded-xl"
-                 style={{ background: "rgba(239,68,68,0.04)", border: "1px solid rgba(239,68,68,0.18)" }}>
-              {/* Header row — clickable, ~60px tall. Always visible. */}
-              <button
-                onClick={() => setAttentionOpen((v) => !v)}
-                aria-expanded={attentionOpen}
-                aria-controls="erp-attention-body"
-                className="w-full flex items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-transparent rounded-xl"
-                style={{ minHeight: 48 }}>
-                <span className="text-[10px] font-black text-red-600 uppercase tracking-[0.08em] flex-shrink-0"><LeadIcon e="⚠" />Attention</span>
-                <span className="text-[11px] font-bold" style={{ color: "var(--text-strong)" }}>({summary})</span>
-                {/* Preview: first 10 chips inline when collapsed, +N more badge */}
-                {!attentionOpen && (
-                  <div className="hidden md:flex items-center gap-1.5 overflow-hidden flex-1 min-w-0">
-                    {/* Preview chips are labels, not buttons: they sit inside the
-                        header toggle and a <button> may not contain a <button>. */}
-                    {alerts.slice(0, 10).map((i) => (
-                      <span key={i.code} className="wu-attn-chip text-[10px] font-bold font-mono px-2 py-0.5 rounded-lg flex-shrink-0" data-status={i.status}
-                            style={{ background: i.status === "critical" ? "rgba(220,38,38,0.08)" : "rgba(217,119,6,0.08)", border: i.status === "critical" ? "1px solid rgba(220,38,38,0.22)" : "1px solid rgba(217,119,6,0.22)", color: i.status === "critical" ? "#dc2626" : "#b45309" }}>
-                        {i.code} · {i.stock} {i.unit}
-                      </span>
-                    ))}
-                    {alerts.length > 10 && (
-                      <span className="text-[10px] font-bold text-slate-400 px-2 py-0.5 rounded-lg flex-shrink-0"
-                            style={{ background: "rgba(17,24,39,0.04)", border: "1px solid var(--border-rim)" }}>
-                        +{alerts.length - 10} more
-                      </span>
-                    )}
-                  </div>
-                )}
-                <span className="ml-auto text-[10px] font-bold text-slate-400 flex items-center gap-1 flex-shrink-0">
-                  {attentionOpen ? "▲ Hide Items" : "▼ Show Items"}
-                </span>
-              </button>
-              {/* Body — only mounted when expanded. Internal scroll caps the
-                  height so 83 chips can't push the table off the page. */}
-              {attentionOpen && (
-                <div id="erp-attention-body"
-                     className="px-4 pb-3 pt-1 flex flex-wrap gap-1.5 overflow-y-auto"
-                     style={{ maxHeight: 180, borderTop: "1px solid rgba(239,68,68,0.12)" }}>
-                  {alerts.map(chipFor)}
-                </div>
-              )}
-            </div>
-          );
-        })()}
-
-        {/* Filter bar */}
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex gap-0.5 bg-slate-50 rounded-lg p-0.5 border border-slate-200">
-            {[
-              { key: "all",      label: `All (${totalSKUs})`,              active: "bg-blue-50 text-blue-700 border border-blue-200"       },
-              { key: "critical", label: `Critical (${criticalCount})`,     active: "bg-red-50 text-red-700 border border-red-200"             },
-              { key: "warning",  label: `Low (${warningCount})`,           active: "bg-amber-50 text-amber-700 border border-amber-200"   },
-              { key: "safe",     label: `Safe (${safeCount})`,             active: "bg-green-50 text-green-700 border border-green-200"      },
-            ].map(({ key, label, active }) => (
-              <button key={key} onClick={() => setStatusFilter(key)}
-                      className={`px-3 py-1.5 rounded-md text-[11px] font-bold transition-all ${statusFilter === key ? active : "text-slate-600 hover:text-slate-900"}`}>
-                {label}
-              </button>
-            ))}
-          </div>
-
-          <select aria-label="Category" value={catFilter} onChange={(e) => setCatFilter(e.target.value)}
-                  className="border border-slate-200 rounded-lg px-3 py-1.5 text-xs outline-none"
-                  style={{ background: "#ffffff", color: "#111827" }}>
-            <option value="all">All Categories</option>
-            {machines.map((m) => <option key={m} value={m}>{m}</option>)}
-          </select>
-
-          <div className="relative ml-auto">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 text-[11px] pointer-events-none"><Glyph e="🔍" size={13} /></span>
-            <input ref={searchRef} value={search} onChange={(e) => setSearch(e.target.value)}
-                   aria-label="Search items" placeholder="Search code, name, vendor, location..."
-                   className="bg-slate-50 border border-slate-200 rounded-lg pl-7 pr-3 py-1.5 text-xs placeholder-slate-400 outline-none focus:border-blue-500/40 w-72 transition-all"
-                   style={{ color: "var(--text-strong)" }} />
-          </div>
-
-          {filtersActive && (
-            <button onClick={clearFilters}
-                    className="text-[10px] font-bold text-slate-500 hover:text-red-600 px-2.5 py-1.5 rounded-lg border border-slate-200 hover:border-red-500/40 transition-all">
-              ✕ Clear
-            </button>
-          )}
-        </div>
-
-        {/* Master table */}
-        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-slate-200" style={{ background: "rgba(17,24,39,0.03)" }}>
-                  {cols.map(({ col, label }) => (
-                    <th key={label}
-                        onClick={col ? () => toggleSort(col) : undefined}
-                        className={`text-left text-[10px] font-semibold text-slate-600 uppercase tracking-[0.06em] px-4 py-3 ${col ? "cursor-pointer hover:text-slate-900 select-none" : ""}`}>
-                      {label}{col && <SortIcon col={col} />}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {sorted.length === 0 ? (
-                  <tr>
-                    <td colSpan={11} className="px-4 py-12 text-center text-xs text-slate-600">
-                      No items match your filters.
-                      {filtersActive && <button onClick={clearFilters} className="text-blue-600 font-bold ml-1 hover:underline">Clear filters</button>}
-                    </td>
-                  </tr>
-                ) : sorted.slice(0, masterRows.shown).map((item) => (
-                  <ItemMasterRow key={`${item.category}-${item.code}`} item={item}
-                    isNew={lastAddedCode === item.code} canAdjust={canAdjust} canEdit={canEdit}
-                    setSelectedItem={setSelectedItem} setQuickAdjust={setQuickAdjust} setEditingItem={setEditingItem} />
-                ))}
-                {masterRows.more > 0 && (
-                  <tr ref={masterRows.sentinelRef} data-more-rows={masterRows.more}>
-                    <td colSpan={11} className="px-4 py-3 text-center text-[11px]" style={{ color: "var(--text-muted)" }}>
-                      <MoreRowsNote rows={masterRows} />
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Footer */}
-          <div className="px-5 py-3 border-t border-slate-200 flex items-center justify-between"
-               style={{ background: "#f8f9fb" }}>
-            <div className="text-[11px]" style={{ color: "var(--text-muted)" }}>
-              Showing <span className="font-bold" style={{ color: "var(--text-strong)" }}>{sorted.length}</span> of <span className="font-bold" style={{ color: "var(--text-strong)" }}>{totalSKUs}</span> items
-            </div>
-            <div className="text-[11px] tabular-nums" style={{ color: "var(--text-muted)" }}>
-              Inventory Value:{" "}
-              <span className="font-bold" style={{ color: "#2E50D6" }}>₹{filteredVal.toLocaleString("en-IN")}</span>
-              {filtersActive && <span className="ml-1" style={{ color: "var(--text-dim)" }}>(filtered)</span>}
-            </div>
-          </div>
-        </div>
-
-        {/* 2026-11-05 — archived items (never deleted): collapsed, Restore guarded
-            by the same permission as Archive. */}
-        <ArchivedSection kind="item" testId="items" rows={archivedItems || []}
-                         getKey={(r) => r.item?.code} getName={(r) => `${r.item?.name || r.item?.code} (${r.item?.code})`}
-                         getMeta={(r) => `${r.category} · stock ${r.item?.stock ?? 0} ${r.item?.unit || ""}`}
-                         canRestore={!!onRestoreItem && canDo("inventory","delete")} onRestore={onRestoreItem} />
-      </div>
     </div>
   );
 }
