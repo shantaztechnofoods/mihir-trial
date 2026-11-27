@@ -121,7 +121,7 @@ export function hrExportPDF(title, rows, cols, company = {}) {
 // 2026-11-04 (fix/perf-2) — memo: the bar (2,000+ <option>s) re-renders only when its own props change.
 export const HRFilterBar = React.memo(function HRFilterBar({ search, setSearch, dateFrom, setDateFrom, dateTo, setDateTo, vendorFilter, setVendorFilter, vendorList, itemFilter, setItemFilter, allItems, machineFilter, setMachineFilter, machineLog, serialFilter, setSerialFilter, showVendor=true, showItem=true, showMachine=false, showSerial=false, onReset }) {
   return (
-    <div className="flex flex-wrap items-center gap-2 px-6 py-3" style={{ background: "rgba(17,24,39,0.03)", borderBottom: "1px solid rgba(17,24,39,0.04)" }}>
+    <div className="filter-bar flex flex-wrap items-center gap-2 px-6 py-3" style={{ background: "rgba(17,24,39,0.03)", borderBottom: "1px solid rgba(17,24,39,0.04)" }}>
       <div className="relative">
         <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs"><Glyph e="🔍" size={13} /></span>
         <DebouncedSearchInput value={search} onChange={setSearch} aria-label="Search history" placeholder="Global search…"
