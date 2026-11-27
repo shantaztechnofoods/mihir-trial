@@ -17,6 +17,6 @@ export const SHELL_API = 8;
 // the module whose ownHandlers it belongs to, and the SHELL_API that added it.
 // Adding a name bumps SHELL_API. tests/moduleManifest.test.mjs checks every entry.
 export const SHELL_CALLS = {
-  "inventory.removeRackMachine": { handler: "handleRemoveRackMachine", owner: "inventory", since: 5 },
-  "inventory.addOutward": { handler: "handleAddOutward", owner: "inventory", since: 7 },
+  "inventory.removeRackMachine": { handler: "handleRemoveRackMachine", owner: "outward", since: 5 },
+  "inventory.addOutward": { handler: "handleAddOutward", owner: "outward", since: 7 },
 };

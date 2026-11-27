@@ -32,7 +32,7 @@ src/
     components/            BrandLogo, LeadIcon, error boundaries, OfflineBanner, PageHeader,
                            search selects, UserProfileMenu, AccessDeniedPage
   modules/                 one folder per business module (README.md in each)
-    dashboard/  item-master/  inward/  pending-stock/  inventory/  bom/  pending-jobs/  machine-tracker/  trial-certificate/
+    dashboard/  item-master/  inward/  pending-stock/  outward/  bom/  pending-jobs/  machine-tracker/  trial-certificate/
     purchase/   reports/    settings/  analytics/  ai-assistant/  whatsapp/
     audit-trail/  users-roles/
   stores/                  Supabase-aware data access (+ localStorage fallback) — unchanged

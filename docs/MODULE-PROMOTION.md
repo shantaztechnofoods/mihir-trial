@@ -11,7 +11,7 @@ plus the few things that live outside it, listed below. Each module's
 * Read the module's `README.md` (handlers, stores, tables, migrations, Edge
   Functions, tests, frozen status).
 * **Frozen modules** (production flow: `machine-tracker`, `trial-certificate`,
-  `pending-jobs`, `bom`, and the BOM issue part of `inventory`): the owner must
+  `pending-jobs`, `bom`, and the BOM issue part of `outward` — formerly `inventory`): the owner must
   say a clear "yes" for this promotion first.
 * Live and Trial must both be on the module-folder layout.
 

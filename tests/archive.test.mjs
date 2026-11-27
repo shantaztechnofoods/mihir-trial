@@ -98,7 +98,7 @@ test("Clear Demo Data: Trial-only (ERP_INSTANCE), BOMs unticked, archives instea
 });
 
 test("screens say Archive, list Archived (N) and offer Restore", () => {
-  const out = read("src/modules/inventory/OutwardPage.jsx");
+  const out = read("src/modules/outward/OutwardPage.jsx");
   assert.match(out, /Archive BOM/); assert.doesNotMatch(code(out), />\s*Delete BOM\s*</);
   assert.match(out, /<ArchivedSection kind="BOM"/);
   assert.match(out, /canRestore=\{!!onRestoreBOM && canDo\("outward","bom"\)\}/);

@@ -139,8 +139,8 @@ export function createBomHandlers(shell) {
 
 | name | handler | owner (`ownHandlers` of) | called by | args → result |
 |---|---|---|---|---|
-| `inventory.addOutward` | `handleAddOutward` | inventory (frozen BOM-issue part) | pending-jobs (`handleIssuePendingPart`) | `(entry, pending)` → `{ success, error? }` |
-| `inventory.removeRackMachine` | `handleRemoveRackMachine` | inventory (frozen BOM-issue part) | bom (`handleDeleteBOM`) | `(machineId)` → `Promise<{ success, error? }>` |
+| `inventory.addOutward` | `handleAddOutward` | outward (frozen BOM-issue part; folder was `inventory`, name kept) | pending-jobs (`handleIssuePendingPart`) | `(entry, pending)` → `{ success, error? }` |
+| `inventory.removeRackMachine` | `handleRemoveRackMachine` | outward (frozen BOM-issue part; folder was `inventory`, name kept) | bom (`handleDeleteBOM`) | `(machineId)` → `Promise<{ success, error? }>` |
 
   Found by scope-scanning the not-yet-moved groups (C.2 rows 5–8); inventory,
   settings and purchase make **no** cross-module calls. A name enters

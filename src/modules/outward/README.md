@@ -1,7 +1,7 @@
-# Inventory (Outward + BOM issue) — `src/modules/inventory/`
+# Outward (+ BOM issue) — `src/modules/outward/`
 
 > **Partly frozen:** partly — the Outward BOM issue (rack / direct production) is part of the frozen production flow;
-> Item Master moved to `src/modules/item-master/`, Inward to `src/modules/inward/` and Pending Stock to `src/modules/pending-stock/` (pure moves).
+> This folder was `src/modules/inventory/` (renamed by modules/outward, pure move). Item Master moved to `src/modules/item-master/`, Inward to `src/modules/inward/` and Pending Stock to `src/modules/pending-stock/` (pure moves).
 
 ## What it does
 Stock movements: Outward (manual issue and BOM issue to a rack or straight to production) and Pending Stock (shortfalls waiting for material).
@@ -31,7 +31,7 @@ The screens here are presentational: state and every write (handler) still live 
 `handleInwardComplete`, `handleCreateItemRow`, `handleUpdateItemRow`, `handleDeleteItemRow`,
 `handleRestoreItemRow`, `handleSetItemDefaultRate`, `handleBulkAddItems`, `handleClearPending`,
 `handleFulfillPending`, `handleFulfillGroup` — now live in this folder's `handlers.js`
-(`createInventoryHandlers(shell)`, moved verbatim; App.jsx calls it and wires the results as before,
+(`createOutwardHandlers(shell)` (was `createInventoryHandlers`), moved verbatim; App.jsx calls it and wires the results as before,
 incl. `guarded.fulfillPending` / `deleteItemRow` / `restoreItemRow` and the Order Pipeline props
 `onFulfillPending` / `onSetItemDefaultRate`). The inline `onAddInward` arrow stays in App.jsx
 (turning it into a named handler would not be a pure move). The **frozen** Outward BOM-issue writes
@@ -39,7 +39,8 @@ incl. `guarded.fulfillPending` / `deleteItemRow` / `restoreItemRow` and the Orde
 `handleRemoveRackMachine`) moved into the same `handlers.js` too (modules/c-bom-issue, owner/handler
 yes for Trial, 27 Nov 2026) — still owner-locked: change them only with the owner's yes
 (skill `shantaz-erp-frozen-modules`). `handleRemoveRackMachine` is also registered as
-`shell.call("inventory.removeRackMachine")` for bom's `handleDeleteBOM`. The BOM handlers live in
+`shell.call("inventory.removeRackMachine")` for bom's `handleDeleteBOM` (the shell.call names keep their
+`inventory.` prefix so the frozen bom / pending-jobs folders are untouched; owner in SHELL_CALLS = `outward`). The BOM handlers live in
 `modules/bom/handlers.js`. The Item Master writes (`handleCreateItemRow`, `handleUpdateItemRow`,
 `handleDeleteItemRow`, `handleRestoreItemRow`, `handleSetItemDefaultRate`, `handleBulkAddItems`,
 `handleInventoryCorrection`) moved on to `modules/item-master/handlers.js` (modules/item-master); `handleInwardComplete` to
@@ -106,8 +107,8 @@ Automated: `npm test && npm run build`, then `E2E_ONLY=<suite> scripts/ship.sh c
 
 ## Deploy / replace this module in the Live ERP
 See `docs/MODULE-PROMOTION.md`. In short:
-1. Copy this whole folder from the Trial ERP over `src/modules/inventory/` in Live (replace, do not merge by hand).
+1. Copy this whole folder from the Trial ERP over `src/modules/outward/` in Live (replace, do not merge by hand).
 2. Diff `index.js`: every name other modules import must still be exported (`npm run build` fails if not).
-3. The handlers in `handlers.js` travel with the folder. Run `node scripts/module-check.mjs inventory --against <live>`: section 5b lists shell keys / the `createInventoryHandlers(shell)` line Live's App.jsx still needs (one-time App.jsx step). Changes to `handleUpdateStock` (shell API, still in App.jsx) still need the App.jsx step. The BOM-issue handlers are owner-locked; Machine Tracker in ERP LIVE is LOCKED, so promoting them needs the owner's "haan".
+3. The handlers in `handlers.js` travel with the folder. Run `node scripts/module-check.mjs outward --against <live>`: section 5b lists shell keys / the `createOutwardHandlers(shell)` (was `createInventoryHandlers`) line Live's App.jsx still needs (one-time App.jsx step). Changes to `handleUpdateStock` (shell API, still in App.jsx) still need the App.jsx step. The BOM-issue handlers are owner-locked; Machine Tracker in ERP LIVE is LOCKED, so promoting them needs the owner's "haan".
 4. Apply any NEW migration the change needs (additive, in number order, BEFORE merging) and redeploy any Edge Function listed above that changed.
 5. `npm test`, `npm run build`, the browser suites listed above, then merge; Vercel deploys `main`.

@@ -1,6 +1,6 @@
 {
-  "name": "inventory",
-  "version": "2.0.0",
+  "name": "outward",
+  "version": "3.0.0",
   "frozen": false,
   "liveLock": false,
   "requiresCore": 1,

@@ -182,7 +182,8 @@ These are not owned by any one module and would be versioned together as
 > ItemDetailModal, ItemImportModal, `itemImport.js`, the item writes) moved to
 > `src/modules/item-master/` — see its README. Inward (InwardPage, `handleInwardComplete`) moved to
 > `src/modules/inward/` (modules/inward). Pending Stock (PendingPage, `handleClearPending`, `handleFulfillPending`,
-> `handleFulfillGroup`) moved to `src/modules/pending-stock/` (modules/pending-stock). The inventory row/section below is the earlier snapshot.
+> `handleFulfillGroup`) moved to `src/modules/pending-stock/` (modules/pending-stock). What remained — Outward + the
+> frozen BOM issue — is now `src/modules/outward/` (folder renamed by modules/outward; factory `createOutwardHandlers`). The inventory row/section below is the earlier snapshot.
 
 ### inventory
 
