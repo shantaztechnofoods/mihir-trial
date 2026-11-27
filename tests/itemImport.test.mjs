@@ -1,4 +1,4 @@
-// Node-only tests for src/utils/itemImport.js — verifies the operator's actual
+// Node-only tests for src/modules/item-master/itemImport.js — verifies the operator's actual
 // 2-column accounting sheet (Name + HSN Code) maps correctly, defaults are applied
 // per spec, duplicates are detected by Code first / Name fallback, re-import is
 // idempotent, and bad rows are isolated. Run with:
@@ -10,7 +10,7 @@ import assert from "node:assert/strict";
 import {
   ITEM_IMPORT_DEFAULTS, matchAlias, mapRow, parseRows, generateItemCode,
   detectHeaderRow, buildRowsFromSheet, HEADER_SEARCH_LIMIT,
-} from "../src/utils/itemImport.js";
+} from "../src/modules/item-master/itemImport.js";
 
 // ── matchAlias ──────────────────────────────────────────────────────────────
 
