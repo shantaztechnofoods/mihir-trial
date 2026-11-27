@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { PageHeader } from "../../shared/components/PageHeader.jsx";
 import "./usersRoles.css";
 import { useAuth } from "../../auth/AuthContext.jsx";
@@ -57,6 +57,18 @@ export default function RoleManagementPage({ canDo }) {
   const [keyErr,     setKeyErr]     = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [activeTab,  setActiveTab]  = useState("pages");
+
+  // Esc closes the top popup (same as its ✕ / Cancel).
+  useEffect(() => {
+    if (!showModal && !deleteConfirm) return undefined;
+    const onKey = (e) => {
+      if (e.key !== "Escape") return;
+      if (deleteConfirm) { setDeleteConfirm(null); return; }
+      setShowModal(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showModal, deleteConfirm]);
 
   const canEdit = isSuperAdmin || canDo?.("roles", "edit");
   const canCreate = isSuperAdmin || canDo?.("roles", "create");
@@ -241,12 +253,12 @@ export default function RoleManagementPage({ canDo }) {
 
       {/* Edit/Add Modal */}
       {showModal && editForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(15,20,28,0.14)", backdropFilter: "blur(4px)" }}>
+        <div role="dialog" aria-modal="true" aria-label={isNew ? "New role" : `Edit role ${editForm.label}`} className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(15,20,28,0.14)", backdropFilter: "blur(4px)" }}>
           <div className="w-full max-w-2xl rounded-2xl flex flex-col mx-4" style={{ background: "#ffffff", border: "1px solid rgba(26,31,46,0.1)", boxShadow: "0 32px 80px rgba(15,20,28,0.18)", maxHeight: "min(90vh, 90dvh)" }}>
             {/* Modal Header */}
             <div className="flex items-center justify-between px-6 py-4 flex-shrink-0" style={{ borderBottom: "1px solid rgba(26,31,46,0.07)" }}>
               <h3 className="font-bold text-sm" style={{ color: "var(--text-strong)" }}>{isNew ? "New Role" : `Edit: ${editForm.label}`}</h3>
-              <button onClick={() => setShowModal(false)} className="text-slate-600 hover:text-slate-900 transition-colors text-lg leading-none">✕</button>
+              <button onClick={() => setShowModal(false)} aria-label="Close" className="text-slate-600 hover:text-slate-900 transition-colors text-lg leading-none">✕</button>
             </div>
 
             <div className="flex-1 overflow-y-auto px-6 py-4">
@@ -361,7 +373,7 @@ export default function RoleManagementPage({ canDo }) {
 
       {/* Delete Confirm */}
       {deleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(15,20,28,0.14)", backdropFilter: "blur(4px)" }}>
+        <div role="alertdialog" aria-modal="true" aria-label="Delete role?" className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(15,20,28,0.14)", backdropFilter: "blur(4px)" }}>
           <div className="w-full max-w-sm rounded-2xl p-6 mx-4" style={{ background: "#ffffff", border: "1px solid rgba(239,68,68,0.25)", boxShadow: "0 32px 80px rgba(15,20,28,0.18)" }}>
             <div className="text-center">
               <div className="text-3xl mb-3">⚠️</div>
