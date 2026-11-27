@@ -809,6 +809,39 @@
   .dash-line-3d-loading { display: flex; align-items: center; justify-content: center; height: 190px; border-radius: 16px; background: var(--sunk); }
   .f3-ring { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; padding: 2px 12px 2px 2px; border-radius: 999px; background: var(--sunk); border: 1px solid var(--line); }
   .f3-ring + .dash-line-views { margin-left: 0; }
+  /* 3D view stand-in (2026-11-27): plain CSS line shown on the tap, until the first real 3D frame. */
+  .f3-poster { position: relative; display: flex; flex-direction: column; justify-content: flex-end; gap: 8px; min-height: 262px; padding: 14px 12px 10px; border-radius: 16px; overflow: hidden; container-type: inline-size;
+    background: radial-gradient(90% 70% at 50% 100%, rgba(255, 255, 255, .9) 0%, rgba(255, 255, 255, 0) 70%), linear-gradient(180deg, #f8fafc 0%, #eef2f7 48%, #e3e9f1 100%);
+    box-shadow: inset 0 0 0 1px var(--line); }
+  :root[data-theme="dark"] .f3-poster { background: radial-gradient(90% 70% at 50% 100%, rgba(45, 120, 115, .22) 0%, rgba(0, 0, 0, 0) 70%), linear-gradient(180deg, #0c1d1f 0%, #0f2426 50%, #0a191b 100%); }
+  .f3-poster-bays { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+  @container (max-width: 599px) { .f3-poster-bays { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 12px; } }
+  .f3-poster-bay { display: flex; flex-direction: column; min-width: 0; }
+  .f3-poster-floor { display: flex; align-items: flex-end; justify-content: center; gap: 5px; height: 46px; padding: 0 6px 6px; border-radius: 10px 10px 0 0;
+    background: linear-gradient(180deg, transparent 0%, color-mix(in srgb, var(--paper) 80%, transparent) 100%); border: 1px solid var(--line); border-bottom: 0; }
+  .f3-poster-floor > i { display: block; width: 18px; height: 22px; border-radius: 4px 4px 2px 2px; background: linear-gradient(180deg, var(--paper), var(--sunk)); box-shadow: 0 0 0 1px var(--line), 0 4px 6px -4px rgba(15, 23, 42, .4); border-top: 3px solid var(--ok); }
+  .f3-poster-bay[data-t="near"] .f3-poster-floor > i { border-top-color: var(--wait); }
+  .f3-poster-bay[data-t="late"] .f3-poster-floor > i { border-top-color: var(--bad); }
+  .f3-poster-bay[data-t="hold"] .f3-poster-floor > i { border-top-color: #7c3aed; }
+  .f3-poster-bay[data-t="idle"] .f3-poster-floor > i { border-top-color: var(--ink-4, #94a3b8); }
+  .f3-poster-floor > small { font: 600 12px/1 var(--font-ui); color: var(--ink-3); margin-bottom: 4px; }
+  .f3-poster-plate { display: flex; align-items: baseline; gap: 6px; min-width: 0; padding: 6px 8px; border-radius: 0 0 8px 8px; background: #0f2a5c; color: #fff; }
+  :root[data-theme="dark"] .f3-poster-plate { background: #0c2b30; }
+  .f3-poster-plate b { font: 750 16px/1 var(--font-ui); font-variant-numeric: tabular-nums; }
+  .f3-poster-plate span { font: 700 12px/1.2 var(--font-ui); letter-spacing: .04em; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .f3-poster-st { margin-top: 4px; font: 600 12px/1.25 var(--font-ui); color: var(--ok); overflow-wrap: anywhere; }
+  .f3-poster-st u { text-decoration: none; margin-right: 3px; }
+  .f3-poster-bay[data-t="near"] .f3-poster-st { color: var(--wait); }
+  .f3-poster-bay[data-t="late"] .f3-poster-st { color: var(--bad); }
+  .f3-poster-bay[data-t="hold"] .f3-poster-st { color: #6d28d9; }
+  :root[data-theme="dark"] .f3-poster-bay[data-t="hold"] .f3-poster-st { color: var(--p-infoTx, #a8abff); }
+  .f3-poster-bay[data-t="idle"] .f3-poster-st { color: var(--ink-3); font-weight: 500; }
+  .f3-poster-note { font: 500 12px/1 var(--font-ui); color: var(--ink-3); text-align: center; animation: f3-poster-pulse 1.4s ease-in-out infinite alternate; }
+  @keyframes f3-poster-pulse { from { opacity: .55; } to { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .f3-poster-note { animation: none; } }
+  .f3-poster-over { position: absolute; inset: 0; z-index: 4; transition: opacity .25s ease-out; }
+  .f3-poster-over > .f3-poster { height: 100%; }
+  .f3-poster-over[data-done] { opacity: 0; pointer-events: none; }
   .f3-ring svg text { font: 700 11px var(--font-ui); fill: var(--ink); font-variant-numeric: tabular-nums; }
   .f3-ring-track { stroke: var(--line); }
   .f3-ring-fill { stroke: var(--ok); transition: stroke-dashoffset var(--dur-ui, .2s) var(--ease-enter, ease-out); }
