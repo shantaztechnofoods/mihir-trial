@@ -936,10 +936,10 @@ export function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, on
                      onMouseEnter={(e) => { e.currentTarget.style.boxShadow = `0 4px 16px ${bom.color}18`; }}
                      onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "none"; }}>
                   <div className="p-4">
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-3">
                       <div className="w-10 h-10 rounded-xl flex items-center justify-center text-[11px] font-black text-slate-900 flex-shrink-0"
                            style={{ background: bom.color + "22", border: `1px solid ${bom.color}50` }}>{bomKey}</div>
-                      <div className="flex-1 min-w-0">
+                      <div className="flex-1 min-w-[7rem] break-words">
                         <div className="text-sm font-bold text-slate-900">{bomKey}</div>
                         <div className="text-[10px] text-slate-500">{bom.label}</div>
                       </div>
