@@ -291,7 +291,8 @@ export function appWiring(root, appRel = "src/app/App.jsx") {
     spreads[m[1]] = objectAfter(code.slice(m.index), /const\s+[A-Za-z_$][\w$]*Props\s*=\s*\{/g);
   }
   const fnsIn = (txt, acc, depth = 0) => {
-    for (const m of txt.matchAll(/\bguarded\.([A-Za-z_$][\w$]*)/g)) if (guardMap[m[1]]) acc.add(guardMap[m[1]]);
+    // only App-body functions: a guarded handler that moved to a module's handlers.js (Phase C) is not an App handler
+    for (const m of txt.matchAll(/\bguarded\.([A-Za-z_$][\w$]*)/g)) if (guardMap[m[1]] && fns.has(guardMap[m[1]])) acc.add(guardMap[m[1]]);
     for (const m of txt.matchAll(/[A-Za-z_$][\w$]*/g)) if (fns.has(m[0])) acc.add(m[0]);
     if (depth < 3) for (const m of txt.matchAll(/\.\.\.\s*([A-Za-z_$][\w$]*Props)\b/g)) if (spreads[m[1]]) fnsIn(spreads[m[1]], acc, depth + 1);
     return acc;
