@@ -3,6 +3,7 @@
 //   A  Finish & Transfer SN-101 → Electrical, then Accept → stepper token glides
 //   D  Accept a Trial → Ready hand-over → Ready tile sparkles
 //   B2 Fill Rack → serial → Issue Stock into an empty slot → slot fills up + badge
+//   Page switch: per-frame opacity never below 0.9 (cold + warm, 1440 + 390), reduced motion instant
 import pw from "/usr/local/lib/node_modules_global/playwright/index.js";
 import fs from "fs";
 import { BASE } from "./lib/helpers.mjs";
@@ -103,6 +104,45 @@ async function acceptOn(p, sn) {
   const s = await seen(p);
   ok("B2: the slot filled up with the badge", s.includes("wu-slot-fill") && s.includes("wu-slot-badge"), `state ${before} → ${after}; seen ${JSON.stringify(s)}`);
   ok("B2: no page errors", errs.length === 0, errs.join(" | ")); await ctx.close();
+}
+// ── Page switch: never a blank / washed frame (gap audit #2) ──
+// Every animation frame for 700 ms after a sidebar tap, the page area's opacity
+// is sampled; a frame showing the loading skeleton or no page at all counts as 0.
+// Cold = the module's code is not loaded yet; warm = it is.
+{
+  const PAGE = ".app-shell > .flex-1, .app-shell > main > .flex-1, .app-shell > main > div.flex-1, .app-shell > div.flex-1";
+  const sampleSwitch = async (p, label) => p.evaluate(([label, PAGE]) => new Promise((res) => {
+    const btn = [...document.querySelectorAll("nav button, nav a, .mobile-tabbar button, aside button")].find((b) => b.textContent.trim().startsWith(label));
+    if (!btn) { res({ missing: true }); return; }
+    const vals = [], whys = []; const t0 = performance.now();
+    const tick = () => {
+      const el = document.querySelector(PAGE); const sk = document.querySelector("[data-page-loading]");
+      const why = !el ? "no page" : (sk && sk.getClientRects().length) ? "skeleton" : null;
+      vals.push(why ? 0 : Number(getComputedStyle(el).opacity)); if (why) whys.push(why);
+      if (performance.now() - t0 < 700) requestAnimationFrame(tick); else res({ min: Math.min(...vals), frames: vals.length, blank: [...new Set(whys)].join(",") || undefined });
+    };
+    btn.click(); requestAnimationFrame(tick);
+  }), [label, PAGE]);
+  for (const [vw, vh] of [[1440, 900], [390, 844]]) {
+    for (const reduce of [false, true]) {
+      const ctx = await b.newContext({ viewport: { width: vw, height: vh }, reducedMotion: reduce ? "reduce" : "no-preference" });
+      const p = await ctx.newPage(); const errs = []; p.on("pageerror", (e) => errs.push(String(e).slice(0, 200)));
+      await p.goto(BASE, { waitUntil: "networkidle" }); await p.evaluate(`(${goLiveSeed})()`); await p.reload({ waitUntil: "networkidle" });
+      await p.addStyleTag({ content: ".fixed.bottom-0.inset-x-0.z-\\[200\\]{display:none!important}" });
+      await p.locator("#login-username").fill("admin"); await p.locator("#login-password").click(); await p.locator("#login-password").fill("admin123");
+      await p.getByRole("button", { name: "Sign In" }).click(); await p.locator("#login-username").waitFor({ state: "detached" }); await p.waitForTimeout(1500);
+      const tag = `${vw}px${reduce ? " reduced motion" : ""}`;
+      const cold = await sampleSwitch(p, "Vendors"); await p.waitForTimeout(500);
+      const warm = await sampleSwitch(p, "Dashboard"); await p.waitForTimeout(500);
+      const warm2 = await sampleSwitch(p, "Vendors"); await p.waitForTimeout(300);
+      const anims = await p.evaluate((PAGE) => { const el = document.querySelector(PAGE); return el ? el.getAnimations().length : -1; }, PAGE);
+      ok(`page switch ${tag}: cold, no frame below 0.9`, !cold.missing && cold.min >= 0.9, JSON.stringify(cold));
+      ok(`page switch ${tag}: warm, no frame below 0.9`, !warm.missing && warm.min >= 0.9 && warm2.min >= 0.9, JSON.stringify([warm, warm2]));
+      if (reduce) ok(`page switch ${tag}: instant (no page animation)`, anims === 0, `animations ${anims}`);
+      ok(`page switch ${tag}: no page errors`, errs.length === 0, errs.join(" | "));
+      await ctx.close();
+    }
+  }
 }
 console.log(`\n${results.filter(Boolean).length}/${results.length} passed`);
 await b.close(); process.exit(results.every(Boolean) ? 0 : 1);
