@@ -348,7 +348,7 @@ const ItemMasterRow = React.memo(function ItemMasterRow({ item, isNew, canAdjust
         <div className="flex items-center gap-2">
           <span className="text-xs font-bold font-mono tabular-nums" style={{ color: cfg.dot || cfg.style?.color || "var(--text)" }}>{item.stock}</span>
           <div className="w-14 h-1 bg-slate-50 rounded-full overflow-hidden flex-shrink-0">
-            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${stockPct}%`, background: barColor }} />
+            <div className="h-full rounded-full" style={{ width: `${stockPct}%`, background: barColor }} />
           </div>
         </div>
       </td>
