@@ -3657,6 +3657,12 @@ html.erp-offline [data-needs-net]::after {
 .rack-set > .rack-crate > div:first-of-type > * { max-width: 100%; }
 .rack-set > .rack-crate .font-mono.truncate { display: block; width: 100%; }
 
+/* Desktop: the build tag sat bottom-left on top of the sidebar's "Collapse"
+   button and the signed-in user card. Tucked into the top edge instead, the
+   same place it already goes on a phone and on Machine Tracker. */
+@media (min-width: 768px) {
+  #erp-build-badge { top: 2px; bottom: auto !important; left: auto !important; right: 6px; opacity: .75; }
+}
 /* Popups: the build tag never sits on a dialog (desktop and phone). */
 body:has([role="dialog"]) #erp-build-badge,
 body:has(.modal-backdrop) #erp-build-badge,
@@ -4380,4 +4386,12 @@ button.rack-btn:disabled { background: #e5e7eb !important; color: #6b7280 !impor
   .page-header .theme-switch:not(.theme-switch-full) button[aria-checked="true"] { width: 44px; height: 44px; }
   .app-sidebar .sb-iconbtn { min-width: 44px; min-height: 44px; }
   .dash-line-views[data-line-views] > button { min-height: 44px; }
+}
+
+/* 2026-11-27 view round 2 — Report Master ticks on touch screens: the 16px
+   checkbox gets a 44px tap area (the label around it), checkbox drawn at 22px.
+   Desktop mouse (fine pointer) unchanged. */
+@media (pointer: coarse) {
+  [data-report-master] .rm-tick { min-width: 44px; min-height: 44px; justify-content: center; }
+  [data-report-master] .rm-tick input[type="checkbox"] { width: 22px; height: 22px; }
 }

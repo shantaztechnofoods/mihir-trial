@@ -243,6 +243,7 @@ export function appModuleImports(root, appRel = "src/app/App.jsx") {
     if (!imp.spec.startsWith(".")) continue;
     const to = resolveRel(root, appRel, imp.spec);
     const c = classify(to);
+    if (c.kind === "app" && !imp.dynamic && isFile(root, to)) { appLazyHelper(root, to, imp.names, out); continue; }
     if (c.kind !== "module") continue;
     const e = (out[c.module] ||= { names: new Set(), files: new Set(), lazy: [] });
     e.files.add(c.file);
@@ -254,6 +255,24 @@ export function appModuleImports(root, appRel = "src/app/App.jsx") {
     } else imp.names.forEach((n) => e.names.add(n));
   }
   return out;
+}
+
+// A shell helper such as src/app/lazyPages.js that wraps module imports in
+// React lazy(): `key: () => import("…/index.js")` loaders, then
+// `export const X = page("key", …)` or `export const X = lazy(… import("…") …)`.
+// The names App.jsx imports from it count as names imported from that module.
+function appLazyHelper(root, rel, wanted, out) {
+  const code = stripComments(read(root, rel));
+  const modOf = (spec) => { const c = classify(resolveRel(root, rel, spec)); return c.kind === "module" ? c : null; };
+  const byKey = {};
+  for (const m of code.matchAll(/^\s*([A-Za-z_$][\w$]*)\s*:\s*\(\)\s*=>\s*import\(\s*["']([^"']+)["']\s*\)/gm)) byKey[m[1]] = modOf(m[2]);
+  const add = (name, c) => {
+    if (!c || !wanted.includes(name)) return;
+    const e = (out[c.module] ||= { names: new Set(), files: new Set(), lazy: [] });
+    e.files.add(c.file); e.lazy.push(name);
+  };
+  for (const m of code.matchAll(/^export\s+const\s+([A-Za-z_$][\w$]*)\s*=\s*[A-Za-z_$][\w$]*\(\s*["']([^"']+)["']/gm)) add(m[1], byKey[m[2]]);
+  for (const m of code.matchAll(/^export\s+const\s+([A-Za-z_$][\w$]*)\s*=\s*(?:React\.)?lazy\([^\n]*import\(\s*["']([^"']+)["']/gm)) add(m[1], modOf(m[2]));
 }
 
 // For each module: the App.jsx functions and props wired into the components
