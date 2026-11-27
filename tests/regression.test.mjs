@@ -96,9 +96,10 @@ const FOLDER_FLOORS = {
   "src/shared": 1500,
   "src/modules/machine-tracker": 4000,   // +1000: Phase C moved ~1,120 lines of Machine Tracker writes here from App.jsx
   "src/modules/trial-certificate": 400,
-  "src/modules/inventory": 2000,
+  "src/modules/inventory": 1400,      // was 2000; modules/pending-stock moved Pending Stock (~840 lines) out — the 2000 is split 1400 + 600 below (same total)
   "src/modules/item-master": 1500,  // modules/item-master: Item Master pages + item writes moved here from inventory (~3,000 lines)
   "src/modules/inward": 150,       // modules/inward: Inward page + handleInwardComplete moved here from inventory (~370 lines)
+  "src/modules/pending-stock": 600,  // modules/pending-stock: Pending Stock page + fulfil / clear writes moved here from inventory (~840 lines)
   "src/modules/bom": 1200,
   "src/modules/purchase": 1500,
   "src/modules/reports": 1500,
