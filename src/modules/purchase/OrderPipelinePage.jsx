@@ -606,7 +606,7 @@ export function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdateP
                 <div className="text-sm font-black text-slate-900">Select Vendor</div>
                 <div className="text-[10px] text-slate-500 mt-0.5">Vendors with preferred low-stock items, sorted by item count.</div>
               </div>
-              <button onClick={cancelVendorWizard} className="text-slate-500 hover:text-slate-900 text-lg leading-none">✕</button>
+              <button onClick={cancelVendorWizard} aria-label="Close" className="text-slate-500 hover:text-slate-900 text-lg leading-none">✕</button>
             </div>
             {vendorsWithPreferredLowStock.length === 0 ? (
               <div className="py-6 text-center">
