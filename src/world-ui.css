@@ -967,7 +967,8 @@
    default Auto = follow the OS); prefers-color-scheme is the no-JS fallback.
    Status colours keep their meaning, word and icon; only their dark-mode tint
    changes. Screen only: printed reports/certificates are never touched.
-   Switching mode = 200 ms colour-only cross-fade (html.theme-xf), no layout.
+   Switching mode = instant token flip; html.theme-xf turns transitions off for
+   that frame (src/shared/theme.js, perf/inp-theme-toggle), no layout.
    2026-11-05 light-restore (owner): LIGHT mode is the pre-Petrol blue/white look
    again — every remap below is scoped to html[data-theme="dark"] via :where()
    (zero added specificity, so dark mode cascades exactly as before). Only the
@@ -1084,10 +1085,10 @@
   html:where([data-theme="dark"]) body .sp-pill-blue { background: var(--p-priWash); color: var(--p-priTx); }
   html:where([data-theme="dark"]) body .sp-pill-slate { background: var(--p-s3); color: var(--p-tx2); }
 
-  /* 200 ms colour cross-fade while the mode switches; nothing moves */
-  html.theme-xf *, html.theme-xf *::before, html.theme-xf *::after {
-    transition: background-color 200ms ease, color 200ms ease, border-color 200ms ease, fill 200ms ease, stroke 200ms ease, box-shadow 200ms ease !important;
-  }
+  /* Mode switch: transitions OFF while the colours swap */
+  /* :not(#_) lifts this above every class-based "transition … !important" (glass.css
+     buttons, tiles, sidebar items), so NOTHING animates its colour during the swap */
+  html.theme-xf:not(#_) *, html.theme-xf:not(#_) *::before, html.theme-xf:not(#_) *::after { transition: none !important; }
 
   html:where([data-theme="dark"]), :where(html[data-theme="dark"]) body, :where(html[data-theme="dark"]) #root, :where(html[data-theme="dark"]) .app-shell { background-color: var(--p-bg); }
   :where(html[data-theme="dark"]) body { color: var(--p-tx1); }
@@ -1114,7 +1115,6 @@
   html:where([data-theme="dark"]) body [data-my-dashboard-open] { color: var(--p-priTx) !important; }
   html:where([data-theme="dark"]) body .mt-cancel { color: var(--p-tx2) !important; background: var(--p-s1) !important; border-color: var(--p-line2) !important; }
   html:where([data-theme="dark"]) body [data-cl-step-row] > label { background: var(--p-s1); color: var(--p-tx3) !important; border-color: var(--p-line2); }
-  html:where([data-theme="dark"]) body label[style*="rgb(38, 64, 176)"], html:where([data-theme="dark"]) body label[style*="rgb(46, 80, 214)"] { color: var(--p-tx2) !important; }
 
   /* Primary button (shared Btn) + Settings save */
   :where(html[data-theme="dark"]) body .btn-primary-brand, :where(html[data-theme="dark"]) .btn-primary-brand { background: var(--p-pri) !important; color: var(--p-onPri) !important; border-color: var(--p-pri) !important; box-shadow: var(--p-priShadow) !important; }
@@ -1185,9 +1185,6 @@
     .page-header .theme-switch:not(.theme-switch-full) button[aria-checked="false"] { display: none; }
     .page-header .theme-switch:not(.theme-switch-full) button[aria-checked="true"] { width: 40px; height: 40px; border-radius: 12px; border: 1px solid var(--p-line); background: var(--p-s1); box-shadow: none; }
   }
-}
-@media (prefers-reduced-motion: reduce) {
-  html.theme-xf *, html.theme-xf *::before, html.theme-xf *::after { transition: none !important; }
 }
 
 @media screen {
@@ -1448,46 +1445,9 @@
    html[data-theme="dark"] body .hover\:bg-red-600:hover:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)),
   html[data-theme="dark"] body .hover\:bg-red-700:hover:where(:not(.sidebar-slate *, .lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .dark-panel *)) { background-color: var(--p-badHov); }
 }
-/* Inline style={{…}} colours. The browser writes them back as rgb(), so they can be
-   matched: the old cobalt family (#2E50D6 #2640B0 #1D3187 #2F5BEA #2563EB #1D4ED8)
-   becomes petrol in both modes; in dark mode the common white / near-white
-   surfaces and ink greys follow the surface and text tokens. Not inside paper
-   documents, the login scene or the nav rail. */
-@media screen {
-  html:where([data-theme="dark"]) body :is([style*="background: rgb(46, 80, 214)"], [style*="background-color: rgb(46, 80, 214)"], [style*="background: rgb(38, 64, 176)"], [style*="background-color: rgb(38, 64, 176)"], [style*="background: rgb(47, 91, 234)"], [style*="background: rgb(37, 99, 235)"], [style*="background-color: rgb(37, 99, 235)"], [style*="background: rgb(29, 78, 216)"], [style*="background: rgb(29, 49, 135)"]):where(:not(.lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *)) {
-    background: var(--p-pri) !important; color: var(--p-onPri) !important; }
-  html:where([data-theme="dark"]) body :is([style^="color: rgb(46, 80, 214)"], [style*=" color: rgb(46, 80, 214)"], [style^="color: rgb(38, 64, 176)"], [style*=" color: rgb(38, 64, 176)"], [style^="color: rgb(29, 49, 135)"], [style*=" color: rgb(29, 49, 135)"], [style^="color: rgb(37, 99, 235)"], [style*=" color: rgb(37, 99, 235)"], [style^="color: rgb(29, 78, 216)"], [style*=" color: rgb(29, 78, 216)"], [style^="color: rgb(47, 91, 234)"], [style*=" color: rgb(47, 91, 234)"]):where(:not(.lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *)) {
-    color: var(--p-priTx) !important; }
-  html:where([data-theme="dark"]) body :is([style*="background: rgba(46, 80, 214"], [style*="background-color: rgba(46, 80, 214"], [style*="background: rgba(38, 64, 176"], [style*="background: rgba(37, 99, 235"], [style*="background: rgba(47, 91, 234"]):where(:not(.lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *)) {
-    background: var(--p-priWash) !important; }
-  html:where([data-theme="dark"]) body :is([style*="border: 1px solid rgb(46, 80, 214)"], [style*="border: 1px solid rgba(46, 80, 214"], [style*="border: 1px solid rgba(38, 64, 176"], [style*="border: 1.5px solid rgba(46, 80, 214"], [style*="border: 1px solid rgba(37, 99, 235"]):where(:not(.lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *)) {
-    border-color: var(--p-priLine) !important; }
-  html:where([data-theme="dark"]) body :is([style*="border-bottom: 2px solid rgb(46, 80, 214)"], [style*="border-bottom: 2px solid rgb(38, 64, 176)"]) { border-bottom-color: var(--p-pri) !important; }
-  html:where([data-theme="dark"]) body :is([style*="border-left: 3px solid rgb(46, 80, 214)"], [style*="border-left: 2px solid rgb(46, 80, 214)"]) { border-left-color: var(--p-pri) !important; }
-  html:where([data-theme="dark"]) body [style*="box-shadow"][style*="rgba(46, 80, 214"] { box-shadow: var(--p-priShadow) !important; }
-}
-@media screen {
-  html[data-theme="dark"] body :is([style*="background: rgb(255, 255, 255)"], [style*="background-color: rgb(255, 255, 255)"], [style*="background: white"], [style*="background: rgba(255, 255, 255, 0.9"]):where(:not(.lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .sidebar-slate *)) {
-    background: var(--p-s1) !important; }
-  html[data-theme="dark"] body :is([style*="background: rgb(249, 250, 251)"], [style*="background: rgb(248, 250, 252)"], [style*="background: rgb(246, 248, 251)"], [style*="background: rgb(247, 248, 250)"], [style*="background: rgb(246, 247, 249)"], [style*="background: rgb(241, 245, 249)"], [style*="background: rgb(243, 244, 246)"], [style*="background: rgb(244, 246, 250)"], [style*="background: rgb(248, 249, 251)"], [style*="background-color: rgb(248, 249, 251)"], [style*="background: rgb(246, 247, 249)"], [style*="background-color: rgb(249, 250, 251)"], [style*="background-color: rgb(248, 250, 252)"]):where(:not(.lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *)) {
-    background: var(--p-s2) !important; }
-  html[data-theme="dark"] body :is([style^="color: rgb(17, 24, 39)"], [style*=" color: rgb(17, 24, 39)"], [style^="color: rgb(15, 23, 42)"], [style*=" color: rgb(15, 23, 42)"], [style^="color: rgb(11, 18, 32)"], [style*=" color: rgb(11, 18, 32)"], [style^="color: rgb(31, 41, 55)"], [style*=" color: rgb(31, 41, 55)"], [style^="color: rgb(30, 41, 59)"], [style*=" color: rgb(30, 41, 59)"], [style^="color: rgb(0, 0, 0)"], [style*=" color: rgb(0, 0, 0)"]):where(:not(.lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *)) {
-    color: var(--p-tx1) !important; }
-  html[data-theme="dark"] body :is([style^="color: rgb(55, 65, 81)"], [style*=" color: rgb(55, 65, 81)"], [style^="color: rgb(51, 65, 85)"], [style*=" color: rgb(51, 65, 85)"], [style^="color: rgb(71, 85, 105)"], [style*=" color: rgb(71, 85, 105)"], [style^="color: rgb(75, 85, 99)"], [style*=" color: rgb(75, 85, 99)"], [style^="color: rgb(51, 64, 90)"], [style*=" color: rgb(51, 64, 90)"]):where(:not(.lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *)) {
-    color: var(--p-tx2) !important; }
-  html[data-theme="dark"] body :is([style^="color: rgb(107, 114, 128)"], [style*=" color: rgb(107, 114, 128)"], [style^="color: rgb(100, 116, 139)"], [style*=" color: rgb(100, 116, 139)"], [style^="color: rgb(156, 163, 175)"], [style*=" color: rgb(156, 163, 175)"], [style^="color: rgb(148, 163, 184)"], [style*=" color: rgb(148, 163, 184)"]):where(:not(.lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *)) {
-    color: var(--p-tx3) !important; }
-  html[data-theme="dark"] body :is([style*="solid rgb(229, 231, 235)"], [style*="solid rgb(226, 232, 240)"], [style*="solid rgb(230, 232, 236)"], [style*="solid rgb(243, 244, 246)"], [style*="solid rgb(209, 213, 219)"], [style*="solid rgb(203, 213, 225)"], [style*="solid rgba(15, 23, 42"], [style*="solid rgba(17, 24, 39"]):where(:not(.lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *)) {
-    border-color: var(--p-line) !important; }
-}
-@media screen {
-  /* Status words set inline: theme status text (AA on paper and on their own tint, both modes) */
-  html:where([data-theme="dark"]) body :is([style^="color: rgb(220, 38, 38)"], [style*=" color: rgb(220, 38, 38)"], [style^="color: rgb(185, 28, 28)"], [style*=" color: rgb(185, 28, 28)"], [style^="color: rgb(239, 68, 68)"], [style*=" color: rgb(239, 68, 68)"], [style^="color: rgb(153, 27, 27)"], [style*=" color: rgb(153, 27, 27)"]):where(:not(.lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .sidebar-slate *)) { color: var(--p-badTx) !important; }
-  html:where([data-theme="dark"]) body :is([style^="color: rgb(21, 128, 61)"], [style*=" color: rgb(21, 128, 61)"], [style^="color: rgb(22, 163, 74)"], [style*=" color: rgb(22, 163, 74)"], [style^="color: rgb(5, 150, 105)"], [style*=" color: rgb(5, 150, 105)"], [style^="color: rgb(4, 120, 87)"], [style*=" color: rgb(4, 120, 87)"], [style^="color: rgb(22, 101, 52)"], [style*=" color: rgb(22, 101, 52)"], [style^="color: rgb(6, 95, 70)"], [style*=" color: rgb(6, 95, 70)"], [style^="color: rgb(18, 128, 74)"], [style*=" color: rgb(18, 128, 74)"]):where(:not(.lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .sidebar-slate *)) { color: var(--p-okTx) !important; }
-  html[data-theme="dark"] body :is([style^="color: rgb(180, 83, 9)"], [style*=" color: rgb(180, 83, 9)"], [style^="color: rgb(217, 119, 6)"], [style*=" color: rgb(217, 119, 6)"], [style^="color: rgb(146, 64, 14)"], [style*=" color: rgb(146, 64, 14)"], [style^="color: rgb(194, 65, 12)"], [style*=" color: rgb(194, 65, 12)"], [style^="color: rgb(234, 88, 12)"], [style*=" color: rgb(234, 88, 12)"]):where(:not(.lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .sidebar-slate *)) { color: var(--p-warnTx) !important; }
-  html[data-theme="dark"] body :is([style^="color: rgb(109, 40, 217)"], [style*=" color: rgb(109, 40, 217)"], [style^="color: rgb(124, 58, 237)"], [style*=" color: rgb(124, 58, 237)"], [style^="color: rgb(91, 33, 182)"], [style*=" color: rgb(91, 33, 182)"], [style^="color: rgb(67, 56, 202)"], [style*=" color: rgb(67, 56, 202)"], [style^="color: rgb(91, 71, 214)"], [style*=" color: rgb(91, 71, 214)"]):where(:not(.lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *, .sidebar-slate *)) { color: var(--p-infoTx) !important; }
-  html:where([data-theme="dark"]) body :is([style*="background: rgb(239, 68, 68)"], [style*="background-color: rgb(239, 68, 68)"]):where(:not(.lg-root *, .tc-form *, .mr-paper *, .rpt-sheet *)) { background: var(--p-badSolid) !important; }
-}
+/* Inline style={{…}} colour remaps (dark mode only) live in src/shared/theme-inline-dark.css,
+   switched on by src/shared/theme.js only while the page is dark (perf: no style-attribute
+   substring matching in light mode). */
 
 /* ── Dialog dim layers: never blurred (frame-budget 2026-11-05). Every popup
    dim layer used an inline backdrop-filter blur(6–12px) over the whole screen;

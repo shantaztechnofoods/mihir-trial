@@ -12,10 +12,18 @@ import { SETTINGS_DEFAULTS } from "../../shared/settingsDefaults.js";
 
 export function Sidebar({ activePage, setActivePage, collapsed, setCollapsed, badges = {}, canView, onSearchOpen, onNotifsOpen, notifCount = 0, settings = SETTINGS_DEFAULTS, mobileOpen = false, onMobileClose = () => {} }) {
   const visible = navItems.filter((item) => canView ? canView(item.id) : true);
+  // perf/inp-nav (2026-11-27): a tap highlights the page (and slides the phone
+  // drawer away) in the very next frame — only this sidebar re-renders for that;
+  // the page switch itself runs as a React transition, so the old page stays on
+  // screen until the new one is ready (no blank frame). Same page, same rules.
+  const [pending, setPending] = React.useState(null);
+  React.useEffect(() => { setPending(null); }, [activePage, mobileOpen]);
+  const shownPage = pending ?? activePage;
+  const go = (id) => { setPending(id); React.startTransition(() => setActivePage(id)); };
 
   return (
     <aside
-      className={`${collapsed ? "w-16" : "w-60"} app-sidebar sidebar-slate${mobileOpen ? " is-open" : ""} no-print flex flex-col flex-shrink-0 transition-transform duration-200 overflow-hidden relative`}
+      className={`${collapsed ? "w-16" : "w-60"} app-sidebar sidebar-slate${mobileOpen && !pending ? " is-open" : ""} no-print flex flex-col flex-shrink-0 transition-transform duration-200 overflow-hidden relative`}
     >
       {/* ── Logo + Search/Notif ── */}
       <div className="px-3 pt-4 pb-3 flex-shrink-0 sb-divider">
@@ -81,13 +89,13 @@ export function Sidebar({ activePage, setActivePage, collapsed, setCollapsed, ba
       {/* ── Nav (filtered by role) ── */}
       <nav className="flex-1 py-2 overflow-y-auto px-2 space-y-0.5">
         {visible.map((item) => {
-          const isActive = activePage === item.id;
+          const isActive = shownPage === item.id;
           return (
             <div key={item.id}>
               {item.section && !collapsed && (
                 <div className="px-2.5 pt-5 pb-1.5 text-[9px] font-bold tracking-[0.13em] uppercase sb-section">{item.section}</div>
               )}
-              <button onClick={() => setActivePage(item.id)} aria-current={isActive ? "page" : undefined}
+              <button onClick={() => go(item.id)} aria-current={isActive ? "page" : undefined}
                 className={`sb-item w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-all duration-150 relative ${isActive ? "is-active" : ""}`}>
                 {isActive && <div className="sb-indicator" />}
                 <div className={`sb-icon w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors ${isActive ? "is-active" : ""}`}>

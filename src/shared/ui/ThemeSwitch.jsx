@@ -3,7 +3,7 @@
 // (with words). Per-browser choice; see src/shared/theme.js.
 import React from "react";
 import { Sun, Moon } from "lucide-react";
-import { useThemeMode, setThemeMode, THEME_MODES } from "../theme.js";
+import { useThemeMode, setThemeMode, THEME_MODES, warmThemeSwitch, coolThemeSwitch } from "../theme.js";
 
 const OPTIONS = [
   { id: "light", label: "Light", Icon: Sun },
@@ -16,7 +16,11 @@ export function ThemeSwitch({ withLabels = false, className = "" }) {
   const mode = useThemeMode();
   return (
     <div role="radiogroup" aria-label="Colour mode" data-theme-switch={withLabels ? "full" : "compact"}
-         className={`theme-switch${withLabels ? " theme-switch-full" : ""} ${className}`}>
+         className={`theme-switch${withLabels ? " theme-switch-full" : ""} ${className}`}
+         // perf/inp-theme-toggle: get the dark-only sheet ready while the pointer / focus
+         // is on the switch, so the tap itself only flips the tokens (see theme.js).
+         onPointerEnter={warmThemeSwitch} onFocus={warmThemeSwitch}
+         onPointerLeave={coolThemeSwitch} onBlur={coolThemeSwitch}>
       {OPTIONS.map(({ id, label, Icon, hint }) => {
         const on = mode === id;
         return (
