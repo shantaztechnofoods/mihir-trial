@@ -56,9 +56,7 @@ test("parsing ignores junk and unknown ids", () => {
 
 test("App wiring: page-level gates use canOpenPage; embedded gates stay on canView", () => {
   assert.match(APP, /const canOpenPage = useCallback\(\(id\) => moduleOn\(id\) && typeof canView === "function" && canView\(id\)/);
-  // motion3 (2026-11-27): the page area renders the deferred id (shownPage = useDeferredValue(activePage)), same gate
-  assert.match(APP, /const shownPage = useDeferredValue\(activePage\);/, "deferred page id");
-  assert.match(APP, /\{canOpenPage\(shownPage\)\s*\n\s*\? <React\.Suspense[^\n]*\{pages\[shownPage\]/, "page router");
+  assert.match(APP, /\{canOpenPage\(activePage\)\s*\n\s*\? <React\.Suspense[^\n]*\{pages\[activePage\]/, "page router");
   assert.match(APP, /canView=\{canOpenPage\}\s*\n\s*onSearchOpen/, "sidebar");
   assert.match(APP, /navItems\.filter\(\(item\) => canOpenPage\(item\.id\)\)\.length > 1/, "phone tab bar");
   assert.match(APP, /const firstAllowed = navItems\.find\(\(item\) => canOpenPage\(item\.id\)\)/, "redirect");

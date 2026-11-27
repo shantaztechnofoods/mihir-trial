@@ -1,6 +1,6 @@
 // src/app/App.jsx — moved verbatim from the former single-file src/App.jsx
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
-import React, { useState, useEffect, useRef, useCallback, useMemo, useDeferredValue } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 // Navigation icons. Named imports so the bundler keeps only these sixteen.
 import { LayoutDashboard, ArrowUpFromLine, RefreshCw, Wrench, Menu, MessageCircle } from "lucide-react";
 import { useAuth } from "../auth/AuthContext.jsx";
@@ -102,13 +102,6 @@ export default function App() {
   const SEED_DEMO = ALLOW_DEMO && !SUPA;
 
   const [activePage,    setActivePage]    = useState("dashboard");
-  // motion3 (2026-11-27, page-switch "blink"): the page area renders the
-  // DEFERRED page id. The sidebar highlight answers the tap at once
-  // (activePage); the new page renders right after, and if its code is still
-  // downloading (lazy chunk → Suspense) React keeps the OLD page on screen
-  // until the new one can paint — no empty / skeleton frames between pages.
-  // Same page, same state; only when it appears changes.
-  const shownPage = useDeferredValue(activePage);
   useEffect(() => { setSentryPage(activePage); }, [activePage]);   // Sentry tag only (src/shared/sentry.js)
   // Everyone landed on "dashboard" after signing in, including the department
   // logins that have no permission to open it. On a laptop that was a stumble —
@@ -1334,12 +1327,12 @@ export default function App() {
           it as such; those selectors also accept .app-shell > main > .flex-1). */}
       <main id="main-content" className="contents">
       <PageErrorBoundary
-        pageId={shownPage}
+        pageId={activePage}
         buildTag={APP_BUILD}
         onNavigateHome={() => setActivePage("dashboard")}
       >
-        {canOpenPage(shownPage)
-          ? <React.Suspense fallback={<div className="flex-1 p-6" data-page-loading role="status" aria-label="Loading page"><PageSkeleton /></div>}>{pages[shownPage] || <DashboardPage />}</React.Suspense>
+        {canOpenPage(activePage)
+          ? <React.Suspense fallback={<div className="flex-1 p-6" data-page-loading role="status" aria-label="Loading page"><PageSkeleton /></div>}>{pages[activePage] || <DashboardPage />}</React.Suspense>
           : <>
               <Topbar title="Access Denied" />
               <AccessDeniedPage onNavigateHome={() => {
