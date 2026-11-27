@@ -1741,3 +1741,25 @@
   .wu-sm-tick, .wu-sm-word, .mobile-tabbar > button[aria-current="page"] svg, .kpi-value, .progress-bar { animation: none !important; }
   .skeleton::after, .wu-sk::after { animation: none !important; }
 }
+
+/* ── MOTION v2 batch 3 (2026-11-27): list add · empty states ──────────────────
+   A new line (PO line, checklist question) fades + rises 4 px in 200 ms, once,
+   when React mounts it — rows already on screen never move again (no layout
+   animation). Remove stays instant: an exit would hold a dead row on screen.
+   Empty states settle in 200 ms (text first, icon 40 ms later). Bounded lists
+   only — big tables (Item Master, reports) are not animated (frame budget). */
+@media screen {
+  .wu-li-in:not(.mt-premium *) { animation: wu-li var(--m-small) var(--m-ease-out) backwards; }
+  @keyframes wu-li { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  .wu-empty-in:not(.mt-premium *), .app-shell .empty-state:not(.mt-premium *) {
+    animation: wu-li var(--m-small) var(--m-ease-out) backwards;
+  }
+  .wu-empty-in:not(.mt-premium *) > :first-child, .app-shell .empty-state:not(.mt-premium *) > .empty-state-icon {
+    animation: wu-empty-ic var(--m-small) 40ms var(--m-ease-out) backwards;
+  }
+  @keyframes wu-empty-ic { from { opacity: 0; transform: scale(.96); } to { transform: none; } }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wu-li-in:not(.mt-premium *), .wu-empty-in:not(.mt-premium *), .app-shell .empty-state:not(.mt-premium *) { animation: wu-fade var(--m-micro-out) linear backwards !important; }
+  .wu-empty-in:not(.mt-premium *) > :first-child, .app-shell .empty-state:not(.mt-premium *) > .empty-state-icon { animation: none !important; }
+}
