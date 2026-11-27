@@ -1,7 +1,7 @@
 // src/modules/inventory/ItemImportModal.jsx — moved verbatim from the former single-file src/App.jsx
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
 import React, { useState, useEffect, useRef } from "react";
-import { parseRows as itemParseRows, buildRowsFromSheet as itemBuildRowsFromSheet } from "../../utils/itemImport.js";
+import { parseRows as itemParseRows, buildRowsFromSheet as itemBuildRowsFromSheet } from "./itemImport.js";
 import { loadXLSX } from "../../shared/loadXlsx.js";
 import { Btn } from "../../shared/ui/primitives.jsx";
 
