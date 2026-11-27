@@ -19,14 +19,22 @@ BOM lifecycle and editors: the BOM drawer (create / duplicate / rename / safe de
 | `BomFields.jsx` | 131 |
 | `BomLineCheckPointsModal.jsx` | 109 |
 | `bomDurations.js` | 87 |
+| `handlers.js` | 249 |
 | `index.js` | 9 |
 
 `index.js` is the public surface — the app shell and other modules import only from it:
 `BomChecklistSlots`, `BomChecklistsPanel`, `BOMDrawer`, `durationsFormFrom`, `durationsStoreFrom`, `validateDurationsForm`, `BomPhotoField`, `BomPhotoThumb`, `DeptDurationFields`, `RackStatusNote`, `BomLineCheckPointsModal`, `BOMPasteLines`
 
 ## How it plugs into the app
-The screens here are presentational: state and every write (handler) still live in the app shell
-`src/app/App.jsx` and come in as props. Handlers wired into this module's components:
+State lives in the app shell `src/app/App.jsx` and comes in as props.
+
+**Phase C (docs/SHELL-CONTEXT.md):** the BOM writes — `handleUpdateBOM`, `handleCreateBOM`,
+`handleDuplicateBOM`, `computeBOMDeletionInfo`, `handleDeleteBOM`, `handleRestoreBOM`,
+`handleRenameBOM`, `handleSaveBomChecklist` — now live in this folder's `handlers.js`
+(moved verbatim; `createBomHandlers(shell)`, `requiresShell` 5). `handleDeleteBOM` clears
+rack machines through `handleRemoveRackMachine`, which belongs to inventory (BOM issue):
+it is reached through `shell.call("inventory.removeRackMachine", …)` (one adapter line).
+App.jsx passes the returned handlers to the pages exactly as before. Handlers wired into this module's components:
 
 * `handleSaveBomChecklist` (2026-11-05) — BOM screen → Checklists (`BomChecklistsPanel`): saves one BOM's own list for one department × stage (update or create; an emptied list is switched off, never deleted). Prop path: `outwardPageProps.onSaveBomChecklist` → `OutwardPage` → `BOMDrawer`.
 * `handleCreateChecklistTemplate` / `handleUpdateChecklistTemplate` / `handleDeleteChecklistTemplate` — used by the older full-list editor (`BomChecklistSlots`).
@@ -66,6 +74,6 @@ Automated: `npm test && npm run build`, then `E2E_ONLY=<suite> scripts/ship.sh c
 See `docs/MODULE-PROMOTION.md`. In short:
 1. Copy this whole folder from the Trial ERP over `src/modules/bom/` in Live (replace, do not merge by hand).
 2. Diff `index.js`: every name other modules import must still be exported (`npm run build` fails if not).
-3. If the Trial change also touched the handlers listed above, copy those handler changes in `src/app/App.jsx` too (handlers are not inside the folder yet).
+3. The handlers in `handlers.js` travel with the folder. Run `node scripts/module-check.mjs bom --against <live>`: section 5b lists shell keys, the `createBomHandlers(shell)` line and the `shell.call` registry entries Live's App.jsx still needs (one-time App.jsx step). The checklist-template handlers (settings) still come from App.jsx.
 4. Apply any NEW migration the change needs (additive, in number order, BEFORE merging) and redeploy any Edge Function listed above that changed.
 5. `npm test`, `npm run build`, the browser suites listed above, then merge; Vercel deploys `main`.
