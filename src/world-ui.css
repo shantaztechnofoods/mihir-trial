@@ -63,7 +63,7 @@
   }
   /* motion-a (2026-11-06): press in 80 ms, spring back in 260 ms with a hint of overshoot (transform only) */
   .app-shell button:not(:disabled), .lg-root button:not(:disabled) { transition-duration: 260ms, var(--dur-ui), var(--dur-ui), var(--dur-ui), var(--dur-ui); transition-timing-function: cubic-bezier(.34, 1.4, .44, 1), var(--ease-enter), var(--ease-enter), var(--ease-enter), var(--ease-enter); }
-  .app-shell button:not(:disabled):active, .lg-root button:not(:disabled):active { transform: scale(.97); transition-duration: 80ms, var(--dur-ui), var(--dur-ui), var(--dur-ui), var(--dur-ui); transition-timing-function: var(--ease-enter); }
+  .app-shell button:not(:disabled):active, .lg-root button:not(:disabled):active { transform: scale(var(--m-press-scale, .97)); transition-duration: 80ms, var(--dur-ui), var(--dur-ui), var(--dur-ui), var(--dur-ui); transition-timing-function: var(--ease-enter); }
   .app-shell a, .app-shell [role="button"] { -webkit-tap-highlight-color: transparent; }
 
   /* One focus ring everywhere */
@@ -1643,6 +1643,7 @@
    mtMotion.css stays exactly as approved). Visual only — no logic.          */
 :root {
   --m-press: 80ms; --m-release: 160ms;
+  --m-press-scale: .97;   /* motion3: the ONE button press depth (was .975 / .985 / .992 / .97 + 1px drops) */
   --m-micro: 140ms; --m-micro-out: 100ms;
   --m-small: 200ms; --m-small-out: 140ms;
   --m-medium: 260ms; --m-medium-out: 180ms;
@@ -1851,4 +1852,32 @@
 @media screen and (max-width: 767.98px) {
   .org-edit-footer { flex-wrap: nowrap; }
   .org-edit-footer > button { flex: 1 1 0; min-width: 0; padding-left: 12px !important; padding-right: 12px !important; white-space: nowrap; }
+}
+
+/* ═══ MOTION 3 (2026-11-27) — transition-all · reduced-motion safety net ═════
+   1. Tailwind `transition-all` (326 class lists) animated EVERY property that
+      changed, including width / height / padding (layout, each frame). It now
+      animates only paint/composite properties: colours, shadow, opacity,
+      transform, filter — the press scale and hover colours look the same.
+      Kept as `all` (unchanged): elements whose inline style sets a size (the
+      5 progress-bar fills that grow by width) and Machine Tracker (frozen).
+   2. Reduced motion: 36 scoped blocks existed, but nothing guaranteed a NEW
+      animation would honour the setting. This last net makes every remaining
+      animation / transition effectively instant (1 ms, one run) outside
+      Machine Tracker (whose approved reduced-motion fades stay as they are).
+      Spinners keep turning: they say "still working", not decoration.       */
+.transition-all:not([style*="width"]):not([style*="height"]):not(.mt-premium *) {
+  transition-property: color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;
+}
+@media (prefers-reduced-motion: reduce) {
+  :not(.mt-premium):not(.mt-premium *):not(.animate-spin),
+  :not(.mt-premium):not(.mt-premium *)::before,
+  :not(.mt-premium):not(.mt-premium *)::after {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
 }
