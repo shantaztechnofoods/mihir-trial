@@ -56,7 +56,7 @@ import { AIPage, AnalyticsPage, DashboardPage, InventoryPage, InwardPage, Outwar
 import { waDispatch, waReadSeen, waUnreadCount } from "../modules/whatsapp/index.js";
 import { createSettingsHandlers } from "../modules/settings/handlers.js";
 import { createPurchaseHandlers } from "../modules/purchase/handlers.js";
-import { createInventoryHandlers } from "../modules/inventory/handlers.js";
+import { createOutwardHandlers } from "../modules/outward/handlers.js";
 import { createPendingStockHandlers } from "../modules/pending-stock/handlers.js";
 import { createInwardHandlers } from "../modules/inward/handlers.js";
 import { createItemMasterHandlers } from "../modules/item-master/handlers.js";
@@ -1107,7 +1107,7 @@ export default function App() {
   };
   const { handleSaveModules, handleAdminCleanupDone, handleCreateChecklistTemplate, handleUpdateChecklistTemplate, handleDeleteChecklistTemplate, handleSaveUserDepartments } = createSettingsHandlers(shell);
   const { handleCreatePO, handleUpdatePO, handleReceivePO, handleDeletePO, handleReverseReceive, handleConfirmOrder, handleFollowUpDone, handleAddVendor, handleEditVendor, handleDeleteVendor, handleRestoreVendor, handleBulkAddVendors } = createPurchaseHandlers(shell);
-  const { handleAddOutward, raiseNotIssuedJobs, handleCreateMachine, handleAbortMachineCreate, handleRemoveRackMachine } = createInventoryHandlers(shell);
+  const { handleAddOutward, raiseNotIssuedJobs, handleCreateMachine, handleAbortMachineCreate, handleRemoveRackMachine } = createOutwardHandlers(shell);
   const { handleClearPending, handleFulfillPending, handleFulfillGroup } = createPendingStockHandlers(shell);
   const { handleInwardComplete } = createInwardHandlers(shell);
   const { handleCreateItemRow, handleUpdateItemRow, handleDeleteItemRow, handleRestoreItemRow, handleSetItemDefaultRate, handleBulkAddItems, handleInventoryCorrection } = createItemMasterHandlers(shell);

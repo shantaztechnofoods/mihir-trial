@@ -11,7 +11,7 @@ import { createMachine as machineCreate, deleteMachine as machineDelete } from "
 import { rackOfBom, firstFreeSlot, slotLabel, rackKeyNorm, rackViewLog } from "../../utils/rackSlots.js";
 import { getSupabase } from "../../supabase/client.js";
 
-export function createInventoryHandlers(shell) {
+export function createOutwardHandlers(shell) {
   const { authCanDo, currentUser, flashSaveError, handleUpdateStock, handovers, items, logAudit, machineLog, outwardLog, pendingLog, rackSlotReservationRef, reconcileItems, saveFailed, setItems, setMachineLog, setOutwardLog, setPendingHandoverItems, setPendingLog } = shell;
 
   const handleAddOutward = (entry, pending) => {

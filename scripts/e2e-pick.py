@@ -57,7 +57,7 @@ PATH_MAP = [
     # module folders (fallback when a changed declaration matches no COMPONENT_MAP rule)
     (r"^src/modules/(machine-tracker|trial-certificate|pending-jobs)/", MT + ["ready-popup", "delay-reasons", "trial-signature-report"]),
     (r"^src/modules/bom/", ["bom-unselected", "fill-rack-pending-item", "bom-photo", "settings-bom-organised"]),
-    (r"^src/modules/inventory/", ["store-audit", "bom-unselected", "perf-budget"]),
+    (r"^src/modules/outward/", ["store-audit", "bom-unselected", "perf-budget", "bom-create-dialog", "fill-rack-pending-item"]),
     (r"^src/modules/item-master/", ["store-audit", "perf-budget", "no-delete"]),
     (r"^src/modules/inward/", ["store-audit", "part-received-completes"]),
     (r"^src/modules/pending-stock/", ["bom-unselected", "part-received-completes", "store-audit"]),
