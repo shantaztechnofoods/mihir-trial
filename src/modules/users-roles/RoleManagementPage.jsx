@@ -57,18 +57,21 @@ export default function RoleManagementPage({ canDo }) {
   const [keyErr,     setKeyErr]     = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [activeTab,  setActiveTab]  = useState("pages");
+  // Owner rule: every irreversible action asks "Are you sure?" first.
+  const [resetConfirm, setResetConfirm] = useState(false);
 
   // Esc closes the top popup (same as its ✕ / Cancel).
   useEffect(() => {
-    if (!showModal && !deleteConfirm) return undefined;
+    if (!showModal && !deleteConfirm && !resetConfirm) return undefined;
     const onKey = (e) => {
       if (e.key !== "Escape") return;
+      if (resetConfirm) { setResetConfirm(false); return; }
       if (deleteConfirm) { setDeleteConfirm(null); return; }
       setShowModal(false);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [showModal, deleteConfirm]);
+  }, [showModal, deleteConfirm, resetConfirm]);
 
   const canEdit = isSuperAdmin || canDo?.("roles", "edit");
   const canCreate = isSuperAdmin || canDo?.("roles", "create");
@@ -178,7 +181,7 @@ export default function RoleManagementPage({ canDo }) {
       {/* Header */}
       <PageHeader title="Role Management" subtitle={`${Object.keys(roles).length} role${Object.keys(roles).length !== 1 ? "s" : ""} configured`}>
           {isSuperAdmin && (
-            <button onClick={handleReset}
+            <button onClick={() => setResetConfirm(true)}
               className="um-act px-3 py-1.5 rounded-lg text-xs font-medium text-slate-500 hover:text-slate-900 transition-all"
               style={{ background: "rgba(26,31,46,0.05)", border: "1px solid rgba(26,31,46,0.1)" }}>
               Reset to Defaults
@@ -365,6 +368,32 @@ export default function RoleManagementPage({ canDo }) {
                 className="flex-1 py-2 rounded-xl text-xs font-semibold transition-all"
                 style={{ background: "#2640B0", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", opacity: (!editForm.label.trim() || (isNew && !newRoleKey.trim())) ? 0.4 : 1, color: "#ffffff" }}>
                 {isNew ? "Create Role" : "Save Changes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reset to Defaults confirm (in-app, not window.confirm) */}
+      {resetConfirm && (
+        <div role="alertdialog" aria-modal="true" aria-label="Reset all roles?" data-reset-roles-confirm className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(15,20,28,0.14)", backdropFilter: "blur(4px)" }}
+             onClick={(e) => e.target === e.currentTarget && setResetConfirm(false)}>
+          <div className="w-full max-w-sm rounded-2xl p-6 mx-4" style={{ background: "#ffffff", border: "1px solid rgba(239,68,68,0.25)", boxShadow: "0 32px 80px rgba(15,20,28,0.18)" }}>
+            <div className="text-center">
+              <div className="text-3xl mb-3">⚠️</div>
+              <h3 className="font-bold text-sm mb-2" style={{ color: "var(--text-strong)" }}>Are you sure?</h3>
+              <p className="text-xs text-slate-600">Reset all roles to default permissions? This changes every role's access.</p>
+            </div>
+            <div className="flex gap-2.5 mt-6">
+              <button onClick={() => setResetConfirm(false)} autoFocus
+                className="flex-1 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:text-slate-900 transition-all"
+                style={{ background: "rgba(26,31,46,0.05)", border: "1px solid rgba(26,31,46,0.1)" }}>
+                Cancel
+              </button>
+              <button onClick={() => { setResetConfirm(false); handleReset(); }}
+                className="flex-1 py-2 rounded-xl text-xs font-semibold transition-all"
+                style={{ background: "#dc2626", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
+                Reset all roles
               </button>
             </div>
           </div>
