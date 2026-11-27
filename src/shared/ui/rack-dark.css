@@ -1,0 +1,59 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   PRODUCTION RACK VIEW — DARK (2026-11-27, feat/premium-mob-*; handler yes 17:33)
+   Machine Tracker is frozen: this file is COLOUR ONLY — background, border
+   colour, shadow, text colour. No size, spacing, position, markup or logic.
+   Before: in dark mode the shelf, crates and "+ Fill Rack" stayed light steel
+   (#dfe4ea / #e5e7eb) around dark faces, and the crate position chip painted
+   light text on a white chip (unreadable). Now the whole rack sits on the dark
+   glass tokens: a deep shelf with a dimmed wood lip, graphite crates that keep
+   their model colour strip, dark faces with a lit top edge, and AA text.
+   Light mode never matches (every rule is html[data-theme="dark"]).
+   ═══════════════════════════════════════════════════════════════════════════ */
+@media screen {
+  /* the shelf: a recessed dark bay, wood lip kept as a dim edge */
+  html[data-theme="dark"] body .app-shell .rack-shelf {
+    background: linear-gradient(180deg, #10221f00 0%, #0a171a 100%), #0c1b1e !important;
+    border-color: rgba(255, 255, 255, .08) !important;
+    box-shadow: inset 0 -6px 0 rgba(199, 167, 124, .28), inset 0 1px 0 rgba(255, 255, 255, .06), inset 0 12px 24px -12px rgba(0, 0, 0, .6) !important;
+  }
+  /* the M/R pair frame: a faint glass tray */
+  html[data-theme="dark"] body .app-shell .rack-shelf .rack-set {
+    background: linear-gradient(180deg, rgba(255, 255, 255, .05), rgba(255, 255, 255, .02)) !important;
+    border-color: rgba(255, 255, 255, .09) !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .07) !important;
+  }
+  /* the crate: graphite body, the model colour stays as the 7px top strip */
+  html[data-theme="dark"] body .app-shell .rack-crate {
+    background-color: #213840 !important;
+    background-image:
+      linear-gradient(to bottom, var(--crate) 0, var(--crate) 7px, transparent 7px),
+      repeating-linear-gradient(90deg, rgba(255, 255, 255, .035) 0 6px, transparent 6px 14px) !important;
+    border-color: rgba(255, 255, 255, .12) !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06), 0 1px 0 rgba(0, 0, 0, .45), 0 10px 20px -10px rgba(0, 0, 0, .7) !important;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    html[data-theme="dark"] body .app-shell .rack-crate:hover { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08), 0 1px 0 rgba(0, 0, 0, .45), 0 14px 26px -10px rgba(0, 0, 0, .8) !important; }
+  }
+  html[data-theme="dark"] body .app-shell .rack-crate-handle { background: rgba(255, 255, 255, .22) !important; }
+  /* the crate face: the dark card surface with a lit top edge */
+  html[data-theme="dark"] body .app-shell .rack-crate > div.bg-white:first-of-type {
+    background: #0d1c20 !important; border-color: transparent !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .07), 0 0 0 1px rgba(255, 255, 255, .06) !important;
+  }
+  /* "+ Fill Rack" when it cannot be used yet (no BOM): a quiet dashed slot, readable */
+  html[data-theme="dark"] body .app-shell .rack-crate button.rack-btn:disabled {
+    background: rgba(255, 255, 255, .05) !important; color: #a9bcc0 !important;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .12) !important;
+  }
+  /* "+ Fill Rack" ready: the same blue, lit edge so it reads as the action */
+  html[data-theme="dark"] body .app-shell .rack-crate button.rack-btn:not(:disabled) {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .18), 0 6px 14px -8px rgba(29, 78, 216, .8) !important;
+  }
+  /* "Create the R-15 BOM first": was slate #64748b on the dark face (3.4:1) */
+  html[data-theme="dark"] body .app-shell .rack-crate .rack-why { color: #a9bcc0 !important; }
+  /* the position chip under each crate (tablet and up): light text on a white chip */
+  html[data-theme="dark"] body .app-shell .rack-crate > div.bg-white\/90:last-child {
+    background: rgba(255, 255, 255, .08) !important; color: #dbe6e8 !important;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08);
+  }
+}
