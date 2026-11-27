@@ -4010,6 +4010,28 @@ button.rack-btn:disabled { background: #e5e7eb !important; color: #6b7280 !impor
     height: 44px !important; min-height: 44px !important; font-size: 16px;
   }
 }
+/* 2026-11-27 view round 2 — touch tablets (768-1024, coarse pointer): the
+   Machine Tracker gets the same 44px tap targets the phone already has —
+   card buttons, the delay-period switch, rack buttons, popup buttons and
+   popup fields, the signature Clear / Save and the Reports machine picker.
+   Mouse/trackpad screens (fine pointer) are unchanged. */
+@media (pointer: coarse) and (min-width: 768px) {
+  .mt-premium .mt-card-actions > button,
+  .mt-premium .mt-card-actions > select,
+  .mt-premium .mt-card-actions > div > button,
+  .mt-premium .rack-shelf [data-rack-fill],
+  .mt-premium .rack-shelf [data-rack-send],
+  .mt-premium .modal-backdrop button,
+  .mt-premium .rack-panel-backdrop button,
+  .delay-card [data-delay-period] { min-height: 44px !important; }
+  .modal-backdrop select,
+  .modal-backdrop input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),
+  .rpt-menu-select { height: 44px !important; min-height: 44px !important; }
+}
+@media (pointer: coarse) {
+  .sig-pad-btns > button,
+  [data-accept-signature] .sig-pad-btns > button { min-height: 44px !important; }
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Reports v2 (2026-11-04)
