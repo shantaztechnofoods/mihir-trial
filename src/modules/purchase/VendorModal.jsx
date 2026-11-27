@@ -65,7 +65,7 @@ export function VendorModal({ initialVendor, onSave, onClose, existingNames = []
             <div className="text-sm font-black text-slate-900">{isEdit ? "Edit Vendor" : "Add New Vendor"}</div>
             <div className="text-[11px] text-slate-500 mt-0.5">Supplier details &amp; terms</div>
           </div>
-          <button onClick={onClose} className="text-slate-500 hover:text-slate-900 text-lg leading-none">✕</button>
+          <button onClick={onClose} aria-label="Close" className="text-slate-500 hover:text-slate-900 text-lg leading-none">✕</button>
         </div>
 
         <div className="p-6 overflow-y-auto">
