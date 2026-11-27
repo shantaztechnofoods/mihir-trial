@@ -37,7 +37,7 @@ import { readDeptWorkflowSettings, setWorkCalendar, isHoldOverdue, canAcceptHand
 import { fetchTemplates, fetchResponses } from "../stores/checklistsStore.js";
 import { fetchPendingItems } from "../stores/pendingItemsStore.js";
 import { fetchAllAttachments, uploadAttachment, deleteAttachment } from "../stores/attachmentsStore.js";
-import { fetchRatings, overrideRating } from "../stores/ratingsStore.js";
+import { fetchRatings } from "../stores/ratingsStore.js";
 import { useRealtimeTables } from "../realtime/useRealtimeTables.js";
 import { mergeRemoteSettings, parseLocalSync } from "../realtime/liveRecord.js";
 import { isoToDisplayDate } from "../utils/parseDate.js";
@@ -1055,22 +1055,6 @@ export default function App() {
 
   // ── Phase B — Attachments ─────────────────────────────────────────────────
 
-  // ── Phase B — Rating override (admin only) ────────────────────────────────
-  const handleOverrideRating = async (id, { rating, reason }) => {
-    if (!currentUser?.id) return { success: false, error: "Not authenticated" };
-    const res = await overrideRating(id, { rating, reason, overriddenBy: currentUser.id });
-    if (!res.success) return res;
-    setDeptRatings((prev) => prev.map((r) => r.id === id
-      ? { ...r, rating: Math.max(0, Math.min(5, Math.floor(Number(rating) || 0))), overriddenBy: currentUser.id, overrideReason: reason || "", overriddenAt: new Date().toISOString() }
-      : r));
-    logAudit({
-      type: "rating_overridden", module: "Machine",
-      action: `Rating overridden to ${rating}★`,
-      ref: String(id), details: { reason: reason || "" },
-    });
-    return res;
-  };
-
   const canDo = authCanDo;
 
   // Same defensive coercion as the notifications block above — this also runs
@@ -1108,7 +1092,7 @@ export default function App() {
   const { handleUpdateBOM, handleCreateBOM, handleDuplicateBOM, computeBOMDeletionInfo, handleDeleteBOM, handleRestoreBOM, handleRenameBOM, handleSaveBomChecklist } = createBomHandlers(shell);
   const { handleRaisePendingItem, handleResolvePendingItem, handleReceivePendingItem, handleIssuePendingPart } = createPendingJobsHandlers(shell);
   const { handleUpdateTrialCertificate } = createTrialCertificateHandlers(shell);
-  const { handleUpdateMachineStage, handleStartProduction, handleReserveRackSlot, handleFillRack, handleAssignRackSlot, handleFinishTransfer, acceptHistoryEntry, promoteAcceptedMachine, handleAcceptHandover, handleSubmitDuringWorkChecklist, handlePullBackHandover, handleSetMachineHold, handleDeleteMachine, handleReleaseHandover, handleUploadAttachment, handleDeleteAttachment } = createMachineTrackerHandlers(shell);
+  const { handleUpdateMachineStage, handleStartProduction, handleReserveRackSlot, handleFillRack, handleAssignRackSlot, handleFinishTransfer, acceptHistoryEntry, promoteAcceptedMachine, handleAcceptHandover, handleSubmitDuringWorkChecklist, handlePullBackHandover, handleSetMachineHold, handleDeleteMachine, handleReleaseHandover, handleUploadAttachment, handleDeleteAttachment, handleOverrideRating } = createMachineTrackerHandlers(shell);
   Object.assign(shellRegistry, { "inventory.removeRackMachine": handleRemoveRackMachine, "inventory.addOutward": handleAddOutward });
 
   // One set of props for BOM Outward, used by the Outward page and by the BOM
