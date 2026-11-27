@@ -414,6 +414,22 @@ export function shellCallList(root) {
   return out;
 }
 
+// Phase C hooks (a moved handler that uses a React hook runs before the auth gate, so it gets its
+// own small object instead of the shell): `  const { a } = useXxxHooks({ b, c });` in App.jsx.
+export function appHookCalls(appCode) {
+  const out = {};
+  for (const m of appCode.matchAll(/^ {2}const \{([^}]*)\} = (use[A-Z][\w$]*Hooks)\(\{([^}]*)\}\);/gm)) out[m[2]] = { takes: idList(m[1]), passes: idList(m[3]) };
+  return out;
+}
+// A module's hooks.js: hook name, keys it destructures from hookShell, names it returns.
+export function hooksFactory(code) {
+  const f = code.match(/^export function (use[A-Z][\w$]*Hooks)\(hookShell\) \{/m);
+  if (!f) return null;
+  const k = code.match(/^ {2}const \{([^}]*)\} = hookShell;/m);
+  const r = [...code.matchAll(/^ {2}return \{([^}]*)\};/gm)].pop();
+  return { factory: f[1], keys: k ? idList(k[1]) : [], returns: r ? idList(r[1]) : [] };
+}
+
 export function moduleHandlerFactory(root, mod) {
   const rel = `src/modules/${mod}/handlers.js`;
   return isFile(root, rel) ? handlerFactory(read(root, rel)) : null;
@@ -438,6 +454,8 @@ export function derivedManifest(root, mod) {
     handlers: wiring ? sorted(wiring.handlers) : [],
     // Phase C: handlers that live in this folder's handlers.js (only when it exists)
     ...(fac ? { ownHandlers: sorted(fac.returns) } : {}),
+    // Phase C hooks.js (only when it exists)
+    ...(isFile(root, `src/modules/${mod}/hooks.js`) && hooksFactory(read(root, `src/modules/${mod}/hooks.js`)) ? { ownHooks: sorted(hooksFactory(read(root, `src/modules/${mod}/hooks.js`)).returns) } : {}),
     // shell.call names this folder's handlers.js uses (only when it uses any)
     ...(fac && shellCallNames(read(root, `src/modules/${mod}/handlers.js`)).length ? { calls: shellCallNames(read(root, `src/modules/${mod}/handlers.js`)) } : {}),
     stores: core.stores || [],
@@ -450,7 +468,7 @@ export function derivedManifest(root, mod) {
 export const DERIVED_KEYS = ["exports", "dependsOn", "handlers", "stores", "shared", "core", "npm"];
 export const DECLARED_KEYS = ["name", "version", "frozen", "liveLock", "requiresCore", "migrations", "edgeFunctions", "serverless", "notes"];
 // Present only in a folder that has handlers.js (Phase C): derived ownHandlers, declared requiresShell.
-export const OPTIONAL_DERIVED_KEYS = ["ownHandlers", "calls"];
+export const OPTIONAL_DERIVED_KEYS = ["ownHandlers", "ownHooks", "calls"];
 export const OPTIONAL_DECLARED_KEYS = ["requiresShell"];
 
 // SHELL_API of a checkout (0 = no shell object yet, before Phase C).

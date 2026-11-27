@@ -77,6 +77,11 @@ const HEADER = "moved verbatim from the former single-file src/App.jsx";
 //       src/modules/*/handlers.js (inside the factory)
 //                              `  const handleX = (...args) => call("m.name", ...args);` (adapter)
 //       src/app/shellCall.js   new file imported only by App.jsx whose code lines equal SHELL_CALL_SRC below
+//     hooks (a handler that uses a React hook, e.g. useCallback — it must run before App's
+//     auth-gate early returns, where the shell object does not exist yet; SHELL_API 8):
+//       src/app/App.jsx        `  const { a } = useXxxHooks({ b, c });` (identifier lists only)
+//       src/modules/*/hooks.js imported only by App.jsx: `export function useXxxHooks(hookShell) {`
+//                              `  const { b, c } = hookShell;`, `  return { a };` and the closing `}`
 //     src/app/shellVersion.js is metadata (nothing in src imports it; scripts/tests read
 //     SHELL_API / SHELL_CALLS): left out of A on both sides while that holds.
 const SHELL_CALL_SRC = [
@@ -96,7 +101,10 @@ const IDS_INLINE = /^[A-Za-z_$][\w$]*(\s*,\s*[A-Za-z_$][\w$]*)*\s*,?$/;
 function phaseCWiring(file, lines) {
   const keep = [], wiring = [], bad = [];
   const isApp = file === "src/app/App.jsx";
-  const isHandlers = /^src\/modules\/[^/]+\/handlers\.js$/.test(file);
+  const isHooks = /^src\/modules\/[^/]+\/hooks\.js$/.test(file);
+  const isHandlers = /^src\/modules\/[^/]+\/handlers\.js$/.test(file) || isHooks;
+  const FACTORY = isHooks ? /^export function use[A-Z][\w$]*Hooks\(hookShell\) \{\s*$/ : /^export function create[A-Z][\w$]*Handlers\(shell\) \{\s*$/;
+  const SRC = isHooks ? "hookShell" : "shell";
   const code = (l) => !/^\s*(\/\/|\/\*|\*)/.test(l) && l.trim() !== "";
   // A multi-line `<open>` … `<close>` block whose interior is identifier lists only.
   const block = (i, closeRe) => {
@@ -124,27 +132,28 @@ function phaseCWiring(file, lines) {
       if (j < lines.length && /^ {2}\}\);\s*$/.test(lines[j])) { wiring.push(...lines.slice(i, j + 1).filter(code)); i = j; continue; }
       bad.push(`${file}: shellRegistry block holds something other than "m.name": handlerName pairs`); keep.push(l); continue;
     }
+    if (isApp && (m = l.match(/^ {2}const \{\s*(.*?)\s*\} = use[A-Z][\w$]*Hooks\(\{\s*(.*?)\s*\}\);\s*$/)) && IDS_INLINE.test(m[1]) && IDS_INLINE.test(m[2])) { wiring.push(l); continue; }
     if (isApp && (m = l.match(/^ {2}const \{\s*(.*?)\s*\} = create[A-Z][\w$]*Handlers\(shell\);\s*$/)) && IDS_INLINE.test(m[1])) { wiring.push(l); continue; }
     if (isApp && /^ {2}const \{\s*$/.test(l)) {
       const b = block(i, /^ {2}\} = create[A-Z][\w$]*Handlers\(shell\);\s*$/);
       if (b.end >= 0) { wiring.push(...lines.slice(i, b.end + 1).filter(code)); i = b.end; continue; }
     }
-    if (isHandlers && /^export function create[A-Z][\w$]*Handlers\(shell\) \{\s*$/.test(l) && !factoryOpen) { factoryOpen = true; wiring.push(l); continue; }
+    if (isHandlers && FACTORY.test(l) && !factoryOpen) { factoryOpen = true; wiring.push(l); continue; }
     if (isHandlers && factoryOpen) {
-      if ((m = l.match(/^ {2}const \{\s*(.*?)\s*\} = shell;\s*$/)) && IDS_INLINE.test(m[1])) { wiring.push(l); continue; }
+      if ((m = l.match(new RegExp(`^ {2}const \\{\\s*(.*?)\\s*\\} = ${SRC};\\s*$`))) && IDS_INLINE.test(m[1])) { wiring.push(l); continue; }
       if ((m = l.match(/^ {2}return \{\s*(.*?)\s*\};\s*$/)) && IDS_INLINE.test(m[1])) { wiring.push(l); continue; }
-      if (/^ {2}const [A-Za-z_$][\w$]* = \(\.\.\.args\) => call\("[a-z][\w-]*\.[A-Za-z][\w$]*", \.\.\.args\);\s*$/.test(l)) { wiring.push(l); continue; }
+      if (!isHooks && /^ {2}const [A-Za-z_$][\w$]* = \(\.\.\.args\) => call\("[a-z][\w-]*\.[A-Za-z][\w$]*", \.\.\.args\);\s*$/.test(l)) { wiring.push(l); continue; }
       if (/^ {2}(const|return) \{\s*$/.test(l)) {
-        const b = block(i, /^ {2}(\} = shell;|\};)\s*$/);
+        const b = block(i, new RegExp(`^ {2}(\\} = ${SRC};|\\};)\\s*$`));
         if (b.end < 0) { bad.push(`${file}: ${b.why}`); keep.push(l); continue; }
-        if (/^ {2}const/.test(l) !== /\} = shell;/.test(lines[b.end])) { bad.push(`${file}: mismatched wiring block at line ${i + 1}`); keep.push(l); continue; }
+        if (/^ {2}const/.test(l) !== new RegExp(`\\} = ${SRC};`).test(lines[b.end])) { bad.push(`${file}: mismatched wiring block at line ${i + 1}`); keep.push(l); continue; }
         wiring.push(...lines.slice(i, b.end + 1).filter(code)); i = b.end; continue;
       }
       if (/^\}\s*$/.test(l) && !closingSeen && lines.slice(i + 1).every((x) => !code(x))) { closingSeen = true; wiring.push(l); continue; }
     }
     keep.push(l);
   }
-  if (isHandlers && (!factoryOpen || !closingSeen)) bad.push(`${file}: expected exactly one \`export function createXxxHandlers(shell) {\` … \`}\` wrapping the whole file`);
+  if (isHandlers && (!factoryOpen || !closingSeen)) bad.push(`${file}: expected exactly one \`export function ${isHooks ? "useXxxHooks(hookShell)" : "createXxxHandlers(shell)"} {\` … \`}\` wrapping the whole file`);
   return { keep, wiring, bad };
 }
 
@@ -184,7 +193,7 @@ function moveMode(baseSha) {
   });
   const addedInfo = added.map((f) => ({ f, importers: importersOf(f) }));
   // Phase C: src/modules/<m>/handlers.js imported only by src/app/App.jsx is a moved-code file (counted in A).
-  const ownHandlersFile = (x) => /^src\/modules\/([^/]+)\/handlers\.js$/.test(x.f)
+  const ownHandlersFile = (x) => /^src\/modules\/([^/]+)\/(handlers|hooks)\.js$/.test(x.f)
     && x.importers.length === 1 && x.importers[0] === "src/app/App.jsx";
   const metadataOnly = new Set(addedInfo.filter((x) => !x.importers.length).map((x) => x.f));
   // src/app/shellVersion.js: read only by scripts/tests (SHELL_API, SHELL_CALLS) — metadata on both sides while nothing imports it
@@ -229,7 +238,7 @@ function moveMode(baseSha) {
   for (const x of addedInfo) {
     const { f, importers } = x;
     if (x.f === SC) { if (!scOk) good = false; say2(`- ${SC}: shell.call helper — ${scOk ? "imported only by src/app/App.jsx, code lines equal the allowed text (listed in D)" : "NOT the allowed text or imported by something other than App.jsx"}`); continue; }
-    if (ownHandlersFile(x)) { say2(`- ${f}: Phase C handlers file, imported only by src/app/App.jsx (its lines ARE counted in A)`); continue; }
+    if (ownHandlersFile(x)) { say2(`- ${f}: Phase C ${f.endsWith("/hooks.js") ? "hooks" : "handlers"} file, imported only by src/app/App.jsx (its lines ARE counted in A)`); continue; }
     if (importers.length) good = false;
     say2(`- ${f}: ${importers.length ? `IMPORTED by ${importers.join(", ")}` : "not imported by any src file (metadata only; its lines are not counted in A)"}`);
   }

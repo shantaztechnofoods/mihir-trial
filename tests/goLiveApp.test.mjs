@@ -89,7 +89,9 @@ test("C + B: admin stage override refuses an open hand-over, is gated in the UI,
 });
 
 test("D: Accept finds the machine (refetching once) BEFORE the handover is flipped", () => {
-  const body = fn("const handleAcceptHandover = async ({", "const handleRegisterSignature = async");
+  // Phase C (modules/c-machine-tracker): in src/modules/machine-tracker/handlers.js the
+  // During-Work checklist handler's comment follows the Accept handler.
+  const body = fn("const handleAcceptHandover = async ({", "// Migration 028 — During-Work checklist submission.");
   const lookup = body.indexOf("let machine = machineLog.find((m) => String(m.id) === String(handover.machineId));");
   const refetch = body.indexOf("const fresh = await fetchMachines();");
   const refuse = body.indexOf("was not found — refresh the page and try again. The handover has not been accepted.");
@@ -103,7 +105,7 @@ test("A: Machine-module writes that used to fail silently now reach flashSaveErr
   for (const [name, until] of [
     ["const raiseNotIssuedJobs = (", "const handleCreateMachine = async ("],
     ["const handleFinishTransfer = async ({", "// Accept flow: verify password"],
-    ["const handleAcceptHandover = async ({", "const handleRegisterSignature = async"],
+    ["const handleAcceptHandover = async ({", "// Migration 028 — During-Work checklist submission."],
   ]) {
     const body = fn(name, until);
     // every console.warn about a failed save is followed by a visible error within a few lines

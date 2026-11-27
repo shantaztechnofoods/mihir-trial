@@ -21,6 +21,8 @@ Production flow after the BOM is issued: Active Builds, the Production Rack View
 | `StaffMyDashboard.jsx` | 110 |
 | `checklists.jsx` | 142 |
 | `constants.js` | 22 |
+| `handlers.js` | 1147 |
+| `hooks.js` | 17 |
 | `index.js` | 5 |
 | `parts.jsx` | 61 |
 
@@ -59,6 +61,21 @@ The screens here are presentational: state and every write (handler) still live 
 | `<MachinePage>` | `onSubmitDuringWorkChecklist` | `handleSubmitDuringWorkChecklist` |
 | `<ReadyMachinesPopup>` | `onOk` | `markReadySeen` |
 | `<ReadyMachinesPopup>` | `onView` | `markReadySeen` |
+
+**Phase C (docs/SHELL-CONTEXT.md, modules/c-machine-tracker; owner/handler yes for Trial,
+27 Nov 2026):** the Machine Tracker writes — `handleUpdateMachineStage`, `handleStartProduction`,
+`handleReserveRackSlot`, `handleFillRack`, `handleAssignRackSlot` (+ its helper `clearRackSlot`),
+`handleFinishTransfer`, `handleAcceptHandover` (+ `acceptHistoryEntry`, `promoteAcceptedMachine`),
+`handleSubmitDuringWorkChecklist`, `handlePullBackHandover`, `handleSetMachineHold`,
+`handleDeleteMachine`, `handleReleaseHandover`, `handleUploadAttachment`, `handleDeleteAttachment` —
+live in this folder's `handlers.js` (moved verbatim, `createMachineTrackerHandlers(shell)`,
+`requiresShell` 8). `acceptHistoryEntry` / `promoteAcceptedMachine` are returned too: App.jsx's
+stuck-accept repair (`repairStuckAcceptRef`, run from an effect) still calls them.
+`markReadySeen` uses `useCallback`, so it lives in `hooks.js` (`useMachineTrackerHooks({ readyUid,
+setReadySeen })`, called by App.jsx at the hook's old place, above the auth gate — same hook order).
+The pending-item writes are in `modules/pending-jobs/handlers.js`, the certificate write in
+`modules/trial-certificate/handlers.js`, the BOM-issue writes in `modules/inventory/handlers.js`.
+App.jsx passes every one of them to the pages exactly as before (the table above).
 
 Depends on other modules (imported through their `index.js`): `modules/bom`, `modules/pending-jobs`, `modules/reports`, `modules/trial-certificate`, `modules/whatsapp`
 Shared code used: `src/shared/components/LeadIcon.jsx`, `src/shared/components/OfflineBanner.jsx`, `src/shared/components/SafeBoundary.jsx`, `src/shared/format.js`, `src/shared/machineStages.js`, `src/shared/ui/SignaturePad.jsx`, `src/shared/ui/Topbar.jsx`, `src/shared/voice/VoiceNote.jsx`
@@ -144,6 +161,6 @@ Automated: `npm test && npm run build`, then `E2E_ONLY=<suite> scripts/ship.sh c
 See `docs/MODULE-PROMOTION.md`. In short:
 1. Copy this whole folder from the Trial ERP over `src/modules/machine-tracker/` in Live (replace, do not merge by hand).
 2. Diff `index.js`: every name other modules import must still be exported (`npm run build` fails if not).
-3. If the Trial change also touched the handlers listed above, copy those handler changes in `src/app/App.jsx` too (handlers are not inside the folder yet).
+3. The handlers in `handlers.js` / `hooks.js` travel with the folder. Run `node scripts/module-check.mjs machine-tracker --against <live>`: section 5b lists shell keys and the `createMachineTrackerHandlers(shell)` line Live's App.jsx still needs (one-time App.jsx step; also the `useMachineTrackerHooks({ … })` line). **Machine Tracker is LOCKED in ERP LIVE: nothing moves there without the owner's "haan".**
 4. Apply any NEW migration the change needs (additive, in number order, BEFORE merging) and redeploy any Edge Function listed above that changed.
 5. `npm test`, `npm run build`, the browser suites listed above, then merge; Vercel deploys `main`.
