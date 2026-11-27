@@ -12,6 +12,7 @@ import { fmtDate, parseStoreQty, recomputeStatus, roundQty } from "../../shared/
 import { loadXLSX } from "../../shared/loadXlsx.js";
 import { Btn, MetricCard, StatusBadge, statusConfig } from "../../shared/ui/primitives.jsx";
 import SuccessTick from "../../shared/ui/SuccessTick.jsx";
+import EmptyArt from "../../shared/ui/EmptyArt.jsx";
 import { Topbar } from "../../shared/ui/Topbar.jsx";
 import ArchivedSection from "../../shared/components/ArchivedSection.jsx";
 import { ERP_INSTANCE } from "../../config/env.js";
@@ -979,6 +980,7 @@ export function InventoryPage({ items, setItems, handleUpdateStock, pos = [], in
                 {sorted.length === 0 ? (
                   <tr>
                     <td colSpan={11} className="px-4 py-12 text-center text-xs text-slate-600">
+                      <EmptyArt />
                       No items match your filters.
                       {filtersActive && <button onClick={clearFilters} className="text-blue-600 font-bold ml-1 hover:underline">Clear filters</button>}
                     </td>

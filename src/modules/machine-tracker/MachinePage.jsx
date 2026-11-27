@@ -42,6 +42,7 @@ import { NextStepButton, NearLimitStrip, MyWorkPanel, TodayLine } from "./MyWork
 import { tapHaptic } from "../../utils/haptics.js";
 import { pickDraft, draftHasInput, writeDraft, readDraft, clearDraft, applyDraft, DRAFT_RESTORED_TEXT } from "./mtDraft.js";
 import { readDepartmentHeads } from "../../utils/departmentHeads.js";
+import { installBigMoments } from "../../shared/motion/bigMoments.js";
 
 // Staff view building blocks (phone first). Defined once at module level so a
 // re-render (the 60 s timer tick, a toast, a dialog opening) updates the cards
@@ -190,6 +191,8 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
   // 2026-11-03 — { filter, n }: the admin Ready popup's "View in Machine
   // Tracker" opens this page on a given filter (n changes per request).
   filterRequest = null }) {
+  // motion3 (visual only): hand-over glide on the card stepper + Ready sparkle
+  useEffect(() => { installBigMoments(); }, []);
   const [filter,   setFilter]   = useState("active");
   // 2026-10-30 — page layout: two tabs (Production / Transfer & Accept), the
   // Departments Called panel behind a header bell, and a collapsible BOM
@@ -2644,7 +2647,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                             setMtTab(c.tab);
                             if (c.tab !== "pending") setFilter(c.key);
                           }}
-                          className={`kpi-tile status-strip ${c.strip} text-left`}
+                          className={`kpi-tile status-strip ${c.strip} text-left`} data-ready-count={c.key === "completed" ? c.value : undefined}
                           style={isOn ? { borderColor: c.color, boxShadow: `0 0 0 1px ${c.color}, 0 4px 16px -4px ${c.color}55` } : {}}>
                     <div className="flex items-center justify-between mb-2">
                       <div className="mt-kpi-label text-[9.5px] font-bold uppercase tracking-[0.08em]" style={{ color: c.color }}>{c.label}</div>
@@ -3377,7 +3380,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
                         their own stage. */}
                     {!isFloorLogin && (
                     <div className="mt-card-stages flex-1 min-w-[260px]">
-                      <div className="flex items-center">
+                      <div className="flex items-center" data-step-glide={dispIdx}>
                         {DISPLAY_STAGES.map((stage, idx) => {
                           const done    = idx <= dispIdx;
                           const current = idx === dispIdx;

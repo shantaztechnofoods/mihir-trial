@@ -1,0 +1,52 @@
+/* ═══ MOTION 3 big moments (2026-11-27, owner approved A C D E F) ════════════
+   Visual only. Everything under 400 ms except the Ready sparkle (< 800 ms).
+   transform / opacity (and one SVG stroke draw). Reduced motion: instant.   */
+
+/* A. Hand-over: a token glides from the old step to the new one on the card
+   stepper (360 ms, in-out because it travels on screen), the new step pops. */
+.wu-glide-token { position: absolute; z-index: 2; border-radius: 50%; pointer-events: none;
+  border: 2px solid currentColor; background: currentColor; opacity: .9;
+  animation: wu-glide 360ms cubic-bezier(.65, 0, .35, 1) forwards; }
+@keyframes wu-glide { from { transform: none; opacity: .9; } 85% { opacity: .9; } to { transform: translateX(var(--gx)); opacity: 0; } }
+.wu-glide-pop { animation: wu-glide-pop var(--m-small) 300ms var(--m-ease-out) backwards; }
+@keyframes wu-glide-pop { from { transform: scale(.7); } 60% { transform: scale(1.12); } to { transform: none; } }
+
+/* C. Trial Certificate on screen: the quality seal stamps on (320 ms) with an
+   ink ring (300 ms). Print is untouched (@media screen). */
+@media screen {
+  .tc-form .tc-seal { animation: wu-stamp 320ms cubic-bezier(.3, 1.25, .5, 1) 120ms backwards; transform-origin: 50% 50%; }
+  @keyframes wu-stamp { from { opacity: 0; transform: scale(1.7) rotate(-18deg); } to { opacity: .85; transform: none; } }
+}
+
+/* D. Machine reaches Ready: sparkles around the Ready tile + the number pops */
+.wu-spark-host { position: relative; overflow: visible !important; }
+.wu-spark-host::after { content: ""; position: absolute; inset: -2px; border-radius: inherit; pointer-events: none;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, .55), 0 0 22px rgba(34, 197, 94, .35); animation: wu-spark-glow 760ms var(--m-ease-out) both; }
+.wu-spark-host .mt-kpi-value { animation: wu-spark-pop 300ms var(--m-ease-out); }
+.wu-spark { position: absolute; left: 50%; top: 45%; width: 13px; height: 13px; margin: -6.5px; z-index: 30; pointer-events: none;
+  background: var(--c, #f59e0b); clip-path: polygon(50% 0, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0 50%, 39% 39%);
+  animation: wu-spark 720ms var(--m-ease-out) both; }
+@keyframes wu-spark { 0% { opacity: 0; transform: scale(.4); } 20% { opacity: 1; } 60% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(1) rotate(90deg); } }
+@keyframes wu-spark-glow { from { opacity: 0; } 25% { opacity: 1; } to { opacity: 0; } }
+@keyframes wu-spark-pop { from { transform: none; } 40% { transform: scale(1.12); } to { transform: none; } }
+
+/* E. Moving between modules: the page enters in 240 ms / 8 px (world-ui.css
+   wu-page2). No separate header/body stagger: a :nth-child rule would replay
+   on the header whenever a toast is inserted above it. */
+
+/* F. Empty states: the page's own icon draws itself (360 ms) and settles;
+   "no results" tables get a small box + lens drawing (EmptyArt). */
+.wu-empty-icon svg * { stroke-dasharray: 100; stroke-dashoffset: 100; animation: wu-draw 360ms var(--m-ease-out) 40ms forwards; }
+.wu-empty-art { display: block; margin: 0 auto 8px; width: 84px; height: 63px; color: var(--text-dim, #94a3b8); }
+.wu-empty-art .d { stroke-dasharray: 1; stroke-dashoffset: 1; animation: wu-draw 360ms var(--m-ease-out) forwards; }
+.wu-empty-art .d2 { animation-delay: 60ms; }
+.wu-empty-art .lens { transform-box: fill-box; transform-origin: 30% 30%; animation: wu-lens 360ms 120ms var(--m-ease-out) backwards; }
+@keyframes wu-draw { to { stroke-dashoffset: 0; } }
+@keyframes wu-lens { from { opacity: 0; transform: translate(-6px, 4px) rotate(-12deg); } to { opacity: 1; transform: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .wu-glide-token, .wu-spark { display: none; }
+  .wu-glide-pop, .tc-form .tc-seal, .wu-spark-host::after, .wu-spark-host .mt-kpi-value,
+  .wu-empty-art .lens { animation: none !important; }
+  .wu-empty-icon svg *, .wu-empty-art .d { animation: none !important; stroke-dashoffset: 0; }
+}
