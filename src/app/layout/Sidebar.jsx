@@ -87,7 +87,7 @@ export function Sidebar({ activePage, setActivePage, collapsed, setCollapsed, ba
               {item.section && !collapsed && (
                 <div className="px-2.5 pt-5 pb-1.5 text-[9px] font-bold tracking-[0.13em] uppercase sb-section">{item.section}</div>
               )}
-              <button onClick={() => setActivePage(item.id)}
+              <button onClick={() => setActivePage(item.id)} aria-current={isActive ? "page" : undefined}
                 className={`sb-item w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-all duration-150 relative ${isActive ? "is-active" : ""}`}>
                 {isActive && <div className="sb-indicator" />}
                 <div className={`sb-icon w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors ${isActive ? "is-active" : ""}`}>

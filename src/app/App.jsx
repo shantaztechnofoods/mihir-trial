@@ -4396,6 +4396,11 @@ export default function App() {
           surfaces a recoverable fallback (Try again / Go to Dashboard / Reload)
           instead of unmounting the React tree → blank screen. The boundary
           auto-resets when activePage changes, so navigating away clears it. */}
+      {/* The page area is the app's one <main> landmark, so screen readers can
+          jump straight to it. display:contents keeps the page root a direct
+          flex child of .app-shell (index.css / world-ui.css size and animate
+          it as such; those selectors also accept .app-shell > main > .flex-1). */}
+      <main id="main-content" className="contents">
       <PageErrorBoundary
         pageId={activePage}
         buildTag={APP_BUILD}
@@ -4412,6 +4417,7 @@ export default function App() {
             </>
         }
       </PageErrorBoundary>
+      </main>
 
       {/* ── Global overlays ── */}
       {showSearch && (

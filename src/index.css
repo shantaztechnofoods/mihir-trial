@@ -2581,8 +2581,8 @@ body :where(:not(.sidebar-slate):not(.sidebar-slate *):not(.tc-form):not(.tc-for
       were underneath it. Every page body now ends with room for the bar plus
       the iPhone home-indicator inset. */
 @media (max-width: 767.98px) {
-  .app-shell > .flex-1,
-  .app-shell > .flex-1 > .flex-1.overflow-y-auto { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
+  .app-shell > .flex-1, .app-shell > main > .flex-1,
+  .app-shell > .flex-1 > .flex-1.overflow-y-auto, .app-shell > main > .flex-1 > .flex-1.overflow-y-auto { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
   .mobile-tabbar { padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px)); }
 }
 /* 2. Tablet / small laptop (768–1279px): the phone rules above stop at 767px,
@@ -3102,7 +3102,7 @@ body label[style*="rgb(38, 64, 176)"], body label[style*="rgb(46, 80, 214)"] { c
 }
 
 /* Blueprint paper behind the content area */
-main, .app-main, #root > div > .flex-1 {
+main, .app-main, #root > div > .flex-1, #root > div > main > .flex-1 {
   background-image:
     linear-gradient(var(--v2-grid) 1px, transparent 1px),
     linear-gradient(90deg, var(--v2-grid) 1px, transparent 1px);
@@ -3879,8 +3879,8 @@ button.rack-btn:disabled { background: #e5e7eb !important; color: #6b7280 !impor
   .hr-page > .hr-tabs > button { flex-shrink: 0; white-space: nowrap; }
   .sb-search-staff { display: none !important; }
   .sb-kbd { display: none; }
-  .app-shell:not(:has(.mobile-tabbar)) > .flex-1,
-  .app-shell:not(:has(.mobile-tabbar)) > .flex-1 > .flex-1.overflow-y-auto { padding-bottom: env(safe-area-inset-bottom, 0px); }
+  .app-shell:not(:has(.mobile-tabbar)) > .flex-1, .app-shell:not(:has(.mobile-tabbar)) > main > .flex-1,
+  .app-shell:not(:has(.mobile-tabbar)) > .flex-1 > .flex-1.overflow-y-auto, .app-shell:not(:has(.mobile-tabbar)) > main > .flex-1 > .flex-1.overflow-y-auto { padding-bottom: env(safe-area-inset-bottom, 0px); }
   /* New PO: the item picker was squeezed to ~45px next to Qty / Rate / Add.
      Picker gets its own full row; Qty, Rate, Add share the next. */
   .po-add-row { flex-wrap: wrap; }
