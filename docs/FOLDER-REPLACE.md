@@ -173,8 +173,9 @@ const shell = {
   (`createXxxHandlers(shell)` is called in the App body, not in a `useMemo`),
   so closures see the same values as now — no stale-state change.
 * Handlers that today use `useCallback` keep it: they move with their deps
-  array unchanged, and the module exports a hook `useXxxHandlers(shell)`
-  instead of a plain function.
+  array unchanged into `src/modules/<m>/hooks.js` (`useXxxHooks({ … })`, called at the
+  hook's old place above the auth gate — docs/SHELL-CONTEXT.md "A module's hooks.js"). The
+  first plan (`useXxxHandlers(shell)`) could not work: the shell is built after the auth gate.
 
 ### C.1 Per-module move (one PR each)
 

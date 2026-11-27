@@ -43,6 +43,7 @@ PR that adds keys to the shell object, and set the module's
 | 5 | modules/c-bom | `bomDefs`, `call`, `machineLog`, `setBomDefs` — and the first `shell.call` name, `inventory.removeRackMachine` |
 | 6 | modules/c-bom-issue | `authCanDo`, `handovers`, `outwardLog`, `saveFailed` (module-level helper in App.jsx, shell API) |
 | 7 | modules/c-pending-jobs | `issuePendingRef`, `pendingHandoverItems`, `receivePartRef`, `sendWhatsApp` — and `shell.call` name `inventory.addOutward` |
+| 8 | modules/c-machine-tracker | `attachments`, `releaseBusyRef`, `rtMach`, `setBomOpenRequest`, `stuckRepairDoneRef`, `transferringRef` — and the first `hooks.js` (`useMachineTrackerHooks`) |
 
 ## A module's `handlers.js`
 
@@ -64,6 +65,28 @@ export function createXxxHandlers(shell) {
 * `MODULE.json`: `ownHandlers` (derived — the names the factory returns) and
   `requiresShell` (declared). `node scripts/module-manifest.mjs --write`
   writes `ownHandlers` and defaults `requiresShell` to 1.
+
+## A module's `hooks.js` (moved handlers that use a React hook)
+
+A handler declared with `useCallback` (e.g. Machine Tracker's `markReadySeen`) must keep
+running where it ran — above App's auth-gate early returns, where the shell object does not
+exist yet (Rules of Hooks). It moves into `src/modules/<m>/hooks.js`, verbatim, deps array unchanged:
+
+```js
+// src/modules/machine-tracker/hooks.js
+export function useMachineTrackerHooks(hookShell) {
+  const { readyUid, setReadySeen } = hookShell;
+  const markReadySeen = useCallback(() => { … }, [readyUid]);
+  return { markReadySeen };
+}
+// src/app/App.jsx — at the hook's old line, shorthand identifiers only
+const { markReadySeen } = useMachineTrackerHooks({ readyUid, setReadySeen });
+```
+* App.jsx imports it directly (`../modules/<m>/hooks.js`), like `handlers.js`; `index.js`
+  does not re-export it. MODULE.json gets a derived `ownHooks`.
+* `tests/moduleManifest.test.mjs` checks the keys App passes equal the keys the hook
+  destructures, App takes exactly what it returns, none is still declared in App.jsx, and
+  the call sits above the auth gate. split-accounting allows only those frame/call shapes.
 
 ## What checks it
 
