@@ -10,6 +10,7 @@ import fs from "node:fs";
 import {
   listModules, derivedManifest, readManifest, scanModuleFolder, parseImports, parseExports,
   directEdgeCalls, edgeCallsViaImports, DERIVED_KEYS, DECLARED_KEYS, walk, classify, resolveRel,
+  OPTIONAL_DERIVED_KEYS, OPTIONAL_DECLARED_KEYS, shellObjectKeys, appFactoryCalls, handlerFactory, appFunctions,
 } from "../scripts/lib/module-scan.mjs";
 
 const ROOT = ".";
@@ -52,9 +53,9 @@ for (const mod of MODULES) {
     assert.equal(man.name, mod, "name must equal the folder name");
     const keys = Object.keys(man);
     for (const k of [...DECLARED_KEYS, ...DERIVED_KEYS]) assert.ok(keys.includes(k), `missing key "${k}" — ${FIX}`);
-    for (const k of keys) assert.ok(DECLARED_KEYS.includes(k) || DERIVED_KEYS.includes(k), `unknown key "${k}"`);
+    for (const k of keys) assert.ok([...DECLARED_KEYS, ...DERIVED_KEYS, ...OPTIONAL_DECLARED_KEYS, ...OPTIONAL_DERIVED_KEYS].includes(k), `unknown key "${k}"`);
     const derived = derivedManifest(ROOT, mod);
-    for (const k of DERIVED_KEYS) {
+    for (const k of [...DERIVED_KEYS, ...OPTIONAL_DERIVED_KEYS]) {
       assert.deepEqual(man[k], derived[k], `src/modules/${mod}/MODULE.json "${k}" drifted from the code — ${FIX}`);
     }
   });
@@ -110,6 +111,9 @@ test("every module's requiresCore is <= CORE_VERSION (src/shared/coreVersion.js)
   }
 });
 
+// Phase C exception: src/app may import src/modules/<m>/handlers.js directly
+// (docs/SHELL-CONTEXT.md) — through index.js it would pull the module's lazily
+// loaded pages into the main bundle.
 test("src/app and core import module folders only through their index.js", () => {
   const dirs = ["src/app", "src/shared", "src/stores", "src/utils", "src/auth", "src/config", "src/realtime", "src/supabase"];
   const bad = [];
@@ -118,10 +122,69 @@ test("src/app and core import module folders only through their index.js", () =>
       for (const imp of parseImports(fs.readFileSync(f, "utf8"))) {
         if (!imp.spec.startsWith(".")) continue;
         const c = classify(resolveRel(ROOT, f, imp.spec));
-        if (c.kind === "module" && c.file !== "index.js") bad.push(`${f} -> ${imp.spec}`);
+        if (c.kind === "module" && c.file !== "index.js" && !(d === "src/app" && f === "src/app/App.jsx" && c.file === "handlers.js" && !imp.dynamic)) bad.push(`${f} -> ${imp.spec}`);
         if (c.kind === "module" && !d.startsWith("src/app")) bad.push(`${f} (core) imports a module: ${imp.spec}`);
       }
     }
   }
   assert.deepEqual(bad, []);
+});
+
+// ── Phase C: handlers.js in module folders + the App shell object ───────────
+// docs/FOLDER-REPLACE.md §7, docs/SHELL-CONTEXT.md
+test("scanner reads the shell object, factory calls and a handlers.js frame", () => {
+  const app = [
+    "  const shell = {",
+    "    // state",
+    "    items, setItems,",
+    "    logAudit,",
+    "  };",
+    "  const { handleA, handleB } = createFooHandlers(shell);",
+  ].join("\n");
+  assert.deepEqual(shellObjectKeys(app), ["items", "setItems", "logAudit"]);
+  assert.deepEqual(appFactoryCalls(app), { createFooHandlers: ["handleA", "handleB"] });
+  const h = [
+    "export function createFooHandlers(shell) {",
+    "  const { items, setItems, logAudit } = shell;",
+    "  const handleA = () => {};",
+    "  const handleB = () => {};",
+    "  return { handleA, handleB };",
+    "}",
+  ].join("\n");
+  assert.deepEqual(handlerFactory(h), { factory: "createFooHandlers", shellKeys: ["items", "setItems", "logAudit"], returns: ["handleA", "handleB"] });
+});
+
+test("Phase C: every handlers.js is wired through the shell and fully moved out of App.jsx", async () => {
+  const { SHELL_API } = await import("../src/app/shellVersion.js");
+  assert.ok(Number.isInteger(SHELL_API) && SHELL_API >= 1, "SHELL_API must be a whole number >= 1");
+  const app = fs.readFileSync("src/app/App.jsx", "utf8");
+  const keys = shellObjectKeys(app);
+  assert.ok(keys, "src/app/App.jsx must build `const shell = { … };`");
+  assert.equal(new Set(keys).size, keys.length, "duplicate key in the shell object");
+  const calls = appFactoryCalls(app);
+  const appFns = appFunctions(app);
+  for (const mod of MODULES) {
+    const rel = `src/modules/${mod}/handlers.js`;
+    const man = readManifest(ROOT, mod);
+    if (!fs.existsSync(rel)) {
+      assert.equal(man.requiresShell, undefined, `${mod}: requiresShell set but there is no handlers.js`);
+      continue;
+    }
+    const fac = handlerFactory(fs.readFileSync(rel, "utf8"));
+    assert.ok(fac, `${rel} must be \`export function createXxxHandlers(shell) { … }\``);
+    assert.ok(Number.isInteger(man.requiresShell) && man.requiresShell >= 1 && man.requiresShell <= SHELL_API,
+      `${mod}: requiresShell must be 1..SHELL_API (${SHELL_API})`);
+    const missing = fac.shellKeys.filter((k) => !keys.includes(k));
+    assert.deepEqual(missing, [], `${rel} destructures keys the App shell object does not have`);
+    assert.ok(new RegExp(`^import \\{ ${fac.factory} \\} from "\\.\\./modules/${mod}/handlers\\.js";$`, "m").test(app),
+      `App.jsx must import ${fac.factory} from "../modules/${mod}/handlers.js"`);
+    assert.ok(!parseExports(fs.readFileSync(`src/modules/${mod}/index.js`, "utf8")).has(fac.factory),
+      `${mod}/index.js must not re-export ${fac.factory} (only App.jsx uses it, directly)`);
+    assert.ok(calls[fac.factory], `App.jsx must call \`const { … } = ${fac.factory}(shell);\``);
+    assert.deepEqual([...calls[fac.factory]].sort(), [...fac.returns].sort(), `App.jsx takes exactly the names ${fac.factory} returns`);
+    for (const h of fac.returns) {
+      assert.ok(!appFns.has(h), `${h} is still declared in App.jsx — a moved handler must exist only in ${rel}`);
+      assert.ok(!keys.includes(h), `${h} is in the shell object — moved handlers come back from the factory, not the shell`);
+    }
+  }
 });

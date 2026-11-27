@@ -132,7 +132,11 @@ live-verify). Then module folders with `requiresCore` ≤ N can follow (§3).
 * Never hand-edit the derived MODULE.json fields; never weaken
   `tests/moduleManifest.test.mjs` to make it pass.
 
-## 7. Phase C plan — handlers move into the module folders (NOT started)
+## 7. Phase C plan — handlers move into the module folders (in progress)
+
+Status: C.0 (shell object, `SHELL_API`, accounting allow-list, manifest test,
+module-check 5b) lands with the whatsapp PR — contract in `docs/SHELL-CONTEXT.md`.
+Branches use the prefix `modules/c-<m>`.
 
 Today every write (`handle*`) lives in `src/app/App.jsx` and closes over App
 state, so a module that changes a write also needs an App.jsx step (module-check

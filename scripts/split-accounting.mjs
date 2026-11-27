@@ -54,7 +54,70 @@ const HEADER = "moved verbatim from the former single-file src/App.jsx";
 //       * comment-only lines are not code (changed ones are counted as info).
 //  B. A NEW code file is allowed only if nothing in src imports it (so it
 //     cannot change the bundle, e.g. a metadata constant read by scripts).
+//     Exception (folder-replace Phase C, docs/FOLDER-REPLACE.md §7): a new
+//     src/modules/<m>/handlers.js imported ONLY by src/app/App.jsx — its
+//     lines are counted in A (they are the handler bodies moved out of
+//     src/app/App.jsx). App.jsx imports it directly, not through index.js,
+//     so the module's lazily loaded pages stay out of the main bundle.
 //  C. Every module index.js still holds only re-exports.
+//  D. Phase C wiring lines are the only lines allowed to be new, and only in
+//     these exact shapes (the block interiors may hold only identifier lists,
+//     so no logic can hide in them):
+//       src/app/App.jsx        `  const shell = {` … `  };`  (shorthand keys only)
+//                              `  const { a, b } = createXxxHandlers(shell);` (one or more lines)
+//       src/modules/*/handlers.js
+//                              `export function createXxxHandlers(shell) {`
+//                              `  const { a, b } = shell;` (one or more lines)
+//                              `  return { a, b };` (one or more lines) and the closing `}`
+const IDS_LINE = /^\s*[A-Za-z_$][\w$]*(\s*,\s*[A-Za-z_$][\w$]*)*\s*,?\s*$/;
+const IDS_INLINE = /^[A-Za-z_$][\w$]*(\s*,\s*[A-Za-z_$][\w$]*)*\s*,?$/;
+// Returns { keep: lines still counted, wiring: lines taken out (allowed shapes), bad: problems }.
+function phaseCWiring(file, lines) {
+  const keep = [], wiring = [], bad = [];
+  const isApp = file === "src/app/App.jsx";
+  const isHandlers = /^src\/modules\/[^/]+\/handlers\.js$/.test(file);
+  const code = (l) => !/^\s*(\/\/|\/\*|\*)/.test(l) && l.trim() !== "";
+  // A multi-line `<open>` … `<close>` block whose interior is identifier lists only.
+  const block = (i, closeRe) => {
+    let j = i + 1;
+    while (j < lines.length && !closeRe.test(lines[j])) {
+      if (code(lines[j]) && !IDS_LINE.test(lines[j])) return { end: -1, why: `non-identifier line inside a wiring block: ${lines[j].trim()}` };
+      j++;
+    }
+    return j < lines.length ? { end: j } : { end: -1, why: "wiring block is not closed" };
+  };
+  let factoryOpen = false, closingSeen = false;
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i];
+    let m;
+    if (isApp && /^ {2}const shell = \{\s*$/.test(l)) {
+      const b = block(i, /^ {2}\};\s*$/);
+      if (b.end < 0) { bad.push(`${file}: ${b.why}`); keep.push(l); continue; }
+      wiring.push(...lines.slice(i, b.end + 1).filter(code)); i = b.end; continue;
+    }
+    if (isApp && (m = l.match(/^ {2}const \{\s*(.*?)\s*\} = create[A-Z][\w$]*Handlers\(shell\);\s*$/)) && IDS_INLINE.test(m[1])) { wiring.push(l); continue; }
+    if (isApp && /^ {2}const \{\s*$/.test(l)) {
+      const b = block(i, /^ {2}\} = create[A-Z][\w$]*Handlers\(shell\);\s*$/);
+      if (b.end >= 0) { wiring.push(...lines.slice(i, b.end + 1).filter(code)); i = b.end; continue; }
+    }
+    if (isHandlers && /^export function create[A-Z][\w$]*Handlers\(shell\) \{\s*$/.test(l) && !factoryOpen) { factoryOpen = true; wiring.push(l); continue; }
+    if (isHandlers && factoryOpen) {
+      if ((m = l.match(/^ {2}const \{\s*(.*?)\s*\} = shell;\s*$/)) && IDS_INLINE.test(m[1])) { wiring.push(l); continue; }
+      if ((m = l.match(/^ {2}return \{\s*(.*?)\s*\};\s*$/)) && IDS_INLINE.test(m[1])) { wiring.push(l); continue; }
+      if (/^ {2}(const|return) \{\s*$/.test(l)) {
+        const b = block(i, /^ {2}(\} = shell;|\};)\s*$/);
+        if (b.end < 0) { bad.push(`${file}: ${b.why}`); keep.push(l); continue; }
+        if (/^ {2}const/.test(l) !== /\} = shell;/.test(lines[b.end])) { bad.push(`${file}: mismatched wiring block at line ${i + 1}`); keep.push(l); continue; }
+        wiring.push(...lines.slice(i, b.end + 1).filter(code)); i = b.end; continue;
+      }
+      if (/^\}\s*$/.test(l) && !closingSeen && lines.slice(i + 1).every((x) => !code(x))) { closingSeen = true; wiring.push(l); continue; }
+    }
+    keep.push(l);
+  }
+  if (isHandlers && (!factoryOpen || !closingSeen)) bad.push(`${file}: expected exactly one \`export function createXxxHandlers(shell) {\` … \`}\` wrapping the whole file`);
+  return { keep, wiring, bad };
+}
+
 function moveMode(baseSha) {
   const say2 = (s = "") => { report.push(s); console.log(s); };
   const codeFiles = (list) => list.filter((f) => /^src\/.*\.(m?js|jsx)$/.test(f));
@@ -67,9 +130,12 @@ function moveMode(baseSha) {
     const m = src && src.match(new RegExp(`export \\{\\s*default as ${name}\\s*\\} from "\\.\\/([^"]+)";`));
     return m ? `import(${q}${m[1]}${q})` : all;
   });
-  const linesOf = (file, code, readF) => {
+  const wiringLines = [], wiringBad = [];
+  const linesOf = (file, code, readF, side) => {
     const code2 = [], comments = [];
-    for (const l of nonImportLines(code)) {
+    const w = phaseCWiring(file, nonImportLines(code));
+    if (side === "head") { wiringLines.push(...w.wiring.map((l) => `${file}: ${l.trim()}`)); wiringBad.push(...w.bad); }
+    for (const l of w.keep) {
       if (!l.trim()) continue;
       if (isComment(l)) { comments.push(l.trim()); continue; }
       code2.push(norm(lazyIndex(".", file, l, readF)));
@@ -87,10 +153,13 @@ function moveMode(baseSha) {
     return new RegExp(`["']${spec}(?:\\.(?:m?js|jsx))?["']`).test(readHead(g));
   });
   const addedInfo = added.map((f) => ({ f, importers: importersOf(f) }));
+  // Phase C: src/modules/<m>/handlers.js imported only by src/app/App.jsx is a moved-code file (counted in A).
+  const ownHandlersFile = (x) => /^src\/modules\/([^/]+)\/handlers\.js$/.test(x.f)
+    && x.importers.length === 1 && x.importers[0] === "src/app/App.jsx";
   const metadataOnly = new Set(addedInfo.filter((x) => !x.importers.length).map((x) => x.f));
   const A = [], B = [], cA = [], cB = [];
-  for (const f of baseFiles) { const r = linesOf(f, readBase(f), readBase); A.push(...r.code); cA.push(...r.comments); }
-  for (const f of headFiles.filter((x) => !metadataOnly.has(x))) { const r = linesOf(f, readHead(f), readHead); B.push(...r.code); cB.push(...r.comments); }
+  for (const f of baseFiles) { const r = linesOf(f, readBase(f), readBase, "base"); A.push(...r.code); cA.push(...r.comments); }
+  for (const f of headFiles.filter((x) => !metadataOnly.has(x))) { const r = linesOf(f, readHead(f), readHead, "head"); B.push(...r.code); cB.push(...r.comments); }
   const d = diff(multiset(A), multiset(B));
   const dc = diff(multiset(cA), multiset(cB));
   let good = !d.missing.length && !d.extra.length;
@@ -113,7 +182,9 @@ function moveMode(baseSha) {
   say2(`## B. New code files (must not be imported by anything in src)`);
   say2();
   if (!added.length) say2(`- none`);
-  for (const { f, importers } of addedInfo) {
+  for (const x of addedInfo) {
+    const { f, importers } = x;
+    if (ownHandlersFile(x)) { say2(`- ${f}: Phase C handlers file, imported only by src/app/App.jsx (its lines ARE counted in A)`); continue; }
     if (importers.length) good = false;
     say2(`- ${f}: ${importers.length ? `IMPORTED by ${importers.join(", ")}` : "not imported by any src file (metadata only; its lines are not counted in A)"}`);
   }
@@ -128,6 +199,13 @@ function moveMode(baseSha) {
     if (bad.length) good = false;
     say2(`- ${f}: ${bad.length ? "LOGIC FOUND: " + bad[0] : "re-exports only"}`);
   }
+  say2();
+  say2(`## D. Phase C wiring lines (shell object, createXxxHandlers(shell), handlers.js frame)`);
+  say2();
+  if (wiringBad.length) good = false;
+  for (const b of wiringBad) say2(`- BAD: ${b}`);
+  say2(`- ${wiringLines.length} wiring line(s) in the working tree, all in the allowed shapes (identifier lists only; not counted in A on either side)`);
+  for (const l of wiringLines.filter((x) => !/^\S+: [A-Za-z_$][\w$]*(\s*,\s*[A-Za-z_$][\w$]*)*\s*,?$/.test(x))) say2(`  - \`${l.slice(0, 160)}\``);
   say2();
   say2(`**Result: ${good ? "PURE MOVE — every code line accounted for" : "FAILED — see above"}**`);
   if (WRITE) fs.writeFileSync(path.join(ROOT, "docs/MOVE-ACCOUNTING.md"), report.join("\n") + "\n");

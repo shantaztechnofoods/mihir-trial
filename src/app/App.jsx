@@ -4206,6 +4206,17 @@ export default function App() {
   const lowStockN     = allItemsFlat.filter((i) => i?.status === "critical" || i?.status === "warning").length;
   const pipelineBadge = lowStockN + safePos.filter((p) => !["received","rejected"].includes(p?.status)).length;
 
+  // Folder-replace Phase C (docs/FOLDER-REPLACE.md §7, docs/SHELL-CONTEXT.md):
+  // the ONE object every src/modules/<m>/handlers.js receives. Shorthand keys
+  // only — the current render's state, setters, refs and shell API under
+  // their App names, nothing computed here. Module handler factories are
+  // called right below it, every render (no memo), so their closures see
+  // the same values the in-App handlers saw before the move.
+  const shell = {
+    logAudit, canDo, currentUser, settings, goToPage, flashSaveError, flashStockError,
+    handleUpdateStock, handleRegisterSignature, handleSaveSettings, inFlightRef, rackSlotReservationRef,
+  };
+
   // One set of props for BOM Outward, used by the Outward page and by the BOM
   // section embedded at the top of Machine Tracker — so both issue through
   // the same component, data and handlers, never a second copy.
