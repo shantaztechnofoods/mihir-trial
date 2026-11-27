@@ -160,3 +160,15 @@ html.wu-lite .wu-confetti { display: none !important; }
   .ck-prog-glow { animation: ck-glow 400ms ease 1; }
   .wu-timer.is-bad::after { animation: none; }
 }
+
+/* perf (2026-11-27): admin machine cards far below the fold skip style,
+   layout and paint until they scroll near the screen (content-visibility).
+   `auto` remembers each card's real height once drawn, so the scrollbar stays
+   steady. Print always draws every card in full. */
+.mt-premium .mt-list-card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 260px;
+}
+@media print {
+  .mt-premium .mt-list-card { content-visibility: visible; contain-intrinsic-size: none; }
+}
