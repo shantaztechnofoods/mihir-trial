@@ -195,7 +195,8 @@ export function DashboardPage({ items = {}, pos = [], vendorList = [], machineLo
               className={`dash-tile group${big ? " dash-tile--lg" : ""}`} style={{ cursor: canOpen(kpi.nav) ? undefined : "default" }}>
               <div className="dash-tile-head">
                 <kpi.Icon size={big ? 18 : 16} strokeWidth={2} aria-hidden="true" className="dash-tile-icon" />
-                {"alert" in kpi && (
+                {/* Display only: a count of 0 shows no status word (nothing to be on track about) */}
+                {"alert" in kpi && (kpi.alert || Number(String(kpi.value).replace(/[^\d.]/g, "")) !== 0) && (
                   <span className={`dash-tile-status${kpi.alert ? " is-bad" : ""}`}>{kpi.alert ? "Action" : "On track"}</span>
                 )}
               </div>

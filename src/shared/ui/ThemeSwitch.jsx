@@ -30,7 +30,7 @@ export function ThemeSwitch({ withLabels = false, className = "" }) {
                   // On a phone header only the current mode shows (CSS); tapping it moves to the next one.
                   onClick={() => setThemeMode(on && !withLabels && isPhone() ? THEME_MODES[(THEME_MODES.indexOf(id) + 1) % THEME_MODES.length] : id)}>
             <Icon size={withLabels ? 16 : 15} strokeWidth={1.9} aria-hidden="true" />
-            {withLabels && <span>{label}</span>}
+            {withLabels ? <span>{label}</span> : <span className="theme-switch-word" aria-hidden="true">{label}</span>}
           </button>
         );
       })}
