@@ -6,25 +6,26 @@
 // are fetched in the background once the app is idle (and on hover / focus of
 // their sidebar button), so a page switch normally finds its code already there.
 // Pure loading change: the components, props and behaviour are exactly the same.
-// (Dynamic import() may point inside a module folder — scripts/health-check.mjs.)
+// Every import goes through the module's index.js (folder-replace rule, tests/moduleManifest.test.mjs);
+// pages of one module (e.g. inventory's four) therefore share one chunk.
 import { lazy } from "react";
 import { importWithReload } from "../utils/lazyImport.js";
 
 const loaders = {
-  dashboard: () => import("../modules/dashboard/DashboardPage.jsx"),
-  inventory: () => import("../modules/inventory/InventoryPage.jsx"),
-  inward:    () => import("../modules/inventory/InwardPage.jsx"),
-  outward:   () => import("../modules/inventory/OutwardPage.jsx"),
-  pending:   () => import("../modules/inventory/PendingPage.jsx"),
-  pipeline:  () => import("../modules/purchase/OrderPipelinePage.jsx"),
-  machines:  () => import("../modules/machine-tracker/MachinePage.jsx"),
-  vendors:   () => import("../modules/purchase/VendorsPage.jsx"),
-  analytics: () => import("../modules/analytics/AnalyticsPage.jsx"),
-  ai:        () => import("../modules/ai-assistant/AIPage.jsx"),
-  whatsapp:  () => import("../modules/whatsapp/WhatsAppPage.jsx"),
-  history:   () => import("../modules/reports/HistoryPage.jsx"),
-  reports:   () => import("../modules/reports/ReportCenterPage.jsx"),
-  settings:  () => import("../modules/settings/SettingsPage.jsx"),
+  dashboard: () => import("../modules/dashboard/index.js"),
+  inventory: () => import("../modules/inventory/index.js"),
+  inward:    () => import("../modules/inventory/index.js"),
+  outward:   () => import("../modules/inventory/index.js"),
+  pending:   () => import("../modules/inventory/index.js"),
+  pipeline:  () => import("../modules/purchase/index.js"),
+  machines:  () => import("../modules/machine-tracker/index.js"),
+  vendors:   () => import("../modules/purchase/index.js"),
+  analytics: () => import("../modules/analytics/index.js"),
+  ai:        () => import("../modules/ai-assistant/index.js"),
+  whatsapp:  () => import("../modules/whatsapp/index.js"),
+  history:   () => import("../modules/reports/index.js"),
+  reports:   () => import("../modules/reports/index.js"),
+  settings:  () => import("../modules/settings/index.js"),
 };
 
 // One in-flight promise per page, shared by prefetch and React.lazy.
@@ -51,8 +52,9 @@ export const ReportCenterPage  = page("reports", "ReportCenterPage");
 export const SettingsPage      = page("settings", "SettingsPage");
 // The "machines ready" popup lives in the Machine Tracker folder; importing it
 // statically through that folder's index.js kept the whole Machine Tracker
-// screen inside the App chunk, so it loads on demand too (overlay, fallback null).
-export const ReadyMachinesPopup = lazy(() => importWithReload(() => import("../modules/machine-tracker/ReadyMachinesPopup.jsx")).then((m) => ({ default: m.ReadyMachinesPopup })));
+// screen inside the App chunk, so it loads on demand too (overlay, fallback null),
+// through the same index.js chunk as the Machine Tracker page.
+export const ReadyMachinesPopup = lazy(() => importWithReload(() => import("../modules/machine-tracker/index.js")).then((m) => ({ default: m.ReadyMachinesPopup })));
 
 /** Start downloading a page's code (no-op if unknown or already started). Never throws. */
 export function prefetchPage(id) {
