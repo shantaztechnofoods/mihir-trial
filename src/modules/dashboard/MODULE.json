@@ -20,6 +20,7 @@
     "shared/components/LeadIcon.jsx",
     "shared/format.js",
     "shared/motion/firstShow.js",
+    "shared/motion/useTabIndicator.js",
     "shared/settingsDefaults.js",
     "shared/ui/Count.jsx",
     "shared/ui/Topbar.jsx",

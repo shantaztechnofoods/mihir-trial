@@ -1,6 +1,7 @@
 // src/modules/inventory/InventoryPage.jsx — moved verbatim from the former single-file src/App.jsx
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
 import React, { useState, useEffect, useRef, useMemo, useDeferredValue, startTransition } from "react";
+import { useRowMotion } from "../../shared/motion/useRowMotion.js";
 import { LeadIcon, Glyph } from "../../shared/components/LeadIcon.jsx";
 import { useProgressiveCount } from "../../shared/components/useProgressiveCount.js";
 import MoreRowsNote from "../../shared/components/MoreRowsNote.jsx";
@@ -524,6 +525,10 @@ export function InventoryPage({ items, setItems, handleUpdateStock, pos = [], in
   const listCat    = useDeferredValue(catFilter);
   const listSortCol = useDeferredValue(sortCol);
   const listSortDir = useDeferredValue(sortDir);
+  // motion3: rows fade in / out when the (deferred) search or a filter changes
+  // — keyed on the values the rows are rendered from, so it lands with them.
+  const rowsRef = useRef(null);
+  useRowMotion(rowsRef, `${deferredSearch}|${listStatus}|${listCat}`);
   const filtered = useMemo(() => {
     const q = deferredSearch.trim().toLowerCase();
     return allItems.filter((i) => {
@@ -843,7 +848,7 @@ export function InventoryPage({ items, setItems, handleUpdateStock, pos = [], in
                   ))}
                 </tr>
               </thead>
-              <tbody>
+              <tbody ref={rowsRef}>
                 {sorted.length === 0 ? (
                   <tr>
                     <td colSpan={11} className="px-4 py-12 text-center text-xs text-slate-600">

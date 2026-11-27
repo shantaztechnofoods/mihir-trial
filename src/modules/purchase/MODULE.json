@@ -44,6 +44,7 @@
     "shared/components/SearchableSelect.jsx",
     "shared/format.js",
     "shared/loadXlsx.js",
+    "shared/motion/useRowMotion.js",
     "shared/ui/Topbar.jsx",
     "shared/ui/primitives.jsx"
   ],
