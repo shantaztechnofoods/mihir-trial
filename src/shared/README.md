@@ -19,3 +19,5 @@ A change here affects every module — run the full `scripts/ship.sh check`.
 | `ui/DataTable.jsx` | UI P0 skeleton: TanStack Table v9 + Virtual — admin pages only, via `LazyDataTable` (`ui/lazyUi.js`); not used yet |
 | `voice/VoiceNote.jsx` | mic recorder / player (voice → text) |
 | `components/` | BrandLogo (original logo only), LeadIcon, error boundaries, OfflineBanner, PageHeader, search selects, UserProfileMenu, AccessDeniedPage, LazyCharts, MoreRowsNote, useProgressiveCount |
+
+`coreVersion.js` — `CORE_VERSION` / `CORE_PATHS`: the version of "core" (this folder + `src/stores` + `src/utils` + `src/app/layout` + global CSS + npm dependencies) that module folders need (`requiresCore` in their MODULE.json). Read only by scripts and tests, never imported by the app — see `docs/FOLDER-REPLACE.md`.
