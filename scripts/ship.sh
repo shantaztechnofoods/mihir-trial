@@ -2,7 +2,8 @@
 # SHANTAZ ERP — fast, safe ship script.   Usage: scripts/ship.sh <command> [args]
 #   check                 preflight + guards + npm test + build + the browser suites RELATED TO YOUR CHANGE
 #                         (scripts/e2e-pick.py maps changed files -> suites). The FULL e2e suite runs in GitHub
-#                         Actions on every push (job "e2e", 8 shards) and is part of the merge gate.
+#                         Actions (check "e2e", 8 shards) on main/batch/modules/ci pushes and "[full e2e]" commits, and is
+#                         part of the merge gate; other feature branches get only their related suites (check "e2e (affected)").
 #                         E2E_ONLY=<name-part> → only matching suites; SHIP_E2E=all → every suite locally (rarely needed).
 #   bump <tag>            set APP_BUILD (src/shared/buildInfo.js) and APP_BUILD_TAG (src/main.jsx) to the same tag
 #   pr "<title>" <body-file>   commit everything, push, open the PR (body file = markdown; attribution is appended)
@@ -248,8 +249,9 @@ cmd_wait(){
   while :; do
     r=$(checks "$sha" 2>/dev/null || true)
     case "$r" in *failure*|*cancelled*|*timed_out*|*action_required*) die "CI failed: $r";; esac
-    # green only once "ci" (unit + build) AND "e2e" (full browser suite, all shards) passed and nothing is still running
-    if [[ ",$r" == *",ci=completed:success"* ]] && [[ ",$r" == *",e2e=completed:success"* ]] && [[ "$r" != *queued* ]] && [[ "$r" != *in_progress* ]] && [[ "$r" != *pending* ]]; then
+    # green only once "ci" (unit + build) AND "e2e" (full browser suite) or "e2e (affected)" (the suites related to
+    # this feature branch) passed and nothing is still running. merge below still requires the FULL "e2e".
+    if [[ ",$r" == *",ci=completed:success"* ]] && { [[ ",$r" == *",e2e=completed:success"* ]] || [[ ",$r" == *",e2e (affected)=completed:success"* ]]; } && [[ "$r" != *queued* ]] && [[ "$r" != *in_progress* ]] && [[ "$r" != *pending* ]]; then
       say "${c_ok}✓ CI green ($(el))${c_off}"; return 0; fi
     [ $(( $(date +%s) - start )) -ge "$max" ] && die "CI still running after ${max}s: $r"
     sleep "$d"; d=$(( d < 10 ? d + 2 : 10 ))   # 3,5,7,9,10,10… s
@@ -275,7 +277,7 @@ cmd_merge(){
   r=$(checks "$sha")
   case "$r" in ""|*queued*|*in_progress*|*failure*|*cancelled*) die "CI is not green: $r";; esac
   [[ ",$r" == *",ci=completed:success"* ]] || die "CI job 'ci' has not passed on ${sha:0:7}: $r"
-  [[ ",$r" == *",e2e=completed:success"* ]] || die "CI job 'e2e' (full browser suite) has not passed on ${sha:0:7} — merge origin/main if your branch predates it: $r"
+  [[ ",$r" == *",e2e=completed:success"* ]] || die "CI job 'e2e' (full browser suite) has not passed on ${sha:0:7} — a feature branch runs only its related suites ('e2e (affected)'): ship it in a batch/ PR, or push a commit with [full e2e] in its message; merge origin/main if your branch predates the workflow: $r"
   [ "$(gh api -X PUT "repos/$REPO/pulls/$n/merge" -f merge_method=merge --jq .merged)" = true ] && say "${c_ok}✓ merged #$n — Vercel is deploying main${c_off}" || die "merge refused"
   say "next: verify the live site (new build tag + the changed screen) from a browser tab"
 }
