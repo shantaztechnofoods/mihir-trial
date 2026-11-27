@@ -111,7 +111,7 @@ export function ItemDetailModal({ item, category, onClose, onDelete, onUpdateSto
               </div>
             </div>
             <div className="h-1.5 bg-slate-50 rounded-full overflow-hidden">
-              <div className="h-full rounded-full transition-all duration-700"
+              <div className="h-full rounded-full"
                    style={{ width: `${Math.min(stockPct, 100)}%`, background: barGrad }} />
             </div>
             <div className="flex justify-between mt-1.5">

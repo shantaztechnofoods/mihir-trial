@@ -202,7 +202,7 @@ export function InwardPage({ items, handleUpdateStock, vendorList, onInwardCompl
                       {newS} <span className="text-xs text-slate-500">{selectedItem.unit}</span>
                     </div>
                     <div className="mt-2 h-1 bg-slate-50 rounded-full overflow-hidden">
-                      <div className="h-full rounded-full transition-all duration-500" style={{ width: `${fillPctNew}%`, background: newCfg.dot || "#2E50D6" }} />
+                      <div className="h-full rounded-full" style={{ width: `${fillPctNew}%`, background: newCfg.dot || "#2E50D6" }} />
                     </div>
                     <div className="text-[9px] text-slate-600 mt-1">{fillPctNew}% of min level</div>
                   </div>

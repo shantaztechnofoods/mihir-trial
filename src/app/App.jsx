@@ -161,8 +161,8 @@ export default function App() {
         }
         const l = active.offsetLeft, w = active.offsetWidth;
         if (w > 0) {
-          pill.style.left = l + "px";
-          pill.style.width = w + "px";
+          // motion v2: transform only (composited); CSS pins left:0 / width:100px
+          pill.style.transform = `translateX(${l}px) scaleX(${w / 100})`;
           bar.classList.add("has-pill");
         }
       } catch { /* leave bar as-is */ }
