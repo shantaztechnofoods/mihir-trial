@@ -46,7 +46,10 @@ const bodyBg = (p) => p.evaluate(() => getComputedStyle(document.body).backgroun
   ok("Light → data-theme light", await theme(p) === "light");
   ok("Light → old light background (pre-Petrol)", await bodyBg(p) === "rgb(244, 246, 250)", await bodyBg(p));
   ok("swap class is removed after the swap", !(await p.evaluate(() => document.documentElement.classList.contains("theme-xf"))));
-  ok("light: the dark-only inline-colour sheet is off", await p.evaluate(() => document.querySelector("style[data-theme-inline-dark]")?.media) === "not all");
+  // (kept on while the pointer is on the switch, ready for the next tap; off once it leaves)
+  await p.mouse.move(700, 650);
+  await p.waitForFunction(() => document.querySelector("style[data-theme-inline-dark]")?.media === "not all", null, { timeout: 2000 }).catch(() => {});
+  ok("light: the dark-only inline-colour sheet is off once the pointer leaves the switch", await p.evaluate(() => document.querySelector("style[data-theme-inline-dark]")?.media) === "not all");
   ok("switching moved nothing (same boxes)", await rects() === before);
   ok("choice saved in this browser", await p.evaluate(() => localStorage.getItem("erp_theme_mode")) === "light");
   ok("light: primary button is the old blue", await p.evaluate(() => { const e = document.querySelector(".btn-primary-brand"); return !e || getComputedStyle(e).backgroundColor === "rgb(47, 91, 234)"; }));

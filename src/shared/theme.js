@@ -82,7 +82,7 @@ function apply(fade) {
   idleId = onIdle(() => {
     idleId = null;
     root.classList.remove("theme-xf");
-    setInlineDark(root.getAttribute("data-theme") === "dark");
+    setInlineDark(warm || root.getAttribute("data-theme") === "dark");
   });
 }
 
@@ -98,6 +98,25 @@ function onIdle(fn) {
   return h;
 }
 function cancelIdle() { if (idleId) { idleId.cancel(); idleId = null; } }
+
+// Pointer / focus on the switch (ThemeSwitch): in light mode, switch the dark-only
+// sheet on ahead of the tap (its rules match nothing in light, so nothing changes
+// on screen) — the light → dark tap then only flips the tokens. When the pointer /
+// focus leaves without a switch, it goes off again at idle time.
+let coolId = null;
+let warm = false;
+export function warmThemeSwitch() {
+  if (typeof document === "undefined") return;
+  warm = true;
+  if (coolId) { coolId.cancel(); coolId = null; }
+  setInlineDark(true);
+}
+export function coolThemeSwitch() {
+  if (typeof document === "undefined") return;
+  warm = false;
+  if (coolId) coolId.cancel();
+  coolId = onIdle(() => { coolId = null; if (!idleId && !warm) setInlineDark(document.documentElement.getAttribute("data-theme") === "dark"); });
+}
 
 export function getThemeMode() { return mode; }
 

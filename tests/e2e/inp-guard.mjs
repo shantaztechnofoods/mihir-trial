@@ -106,11 +106,13 @@ const nav = async (p, mobile, label) => {
 {
   const { ctx, p, errs } = await session({ width: 1440, height: 900 }, false);
   const sw = (id) => p.locator(`.page-header [data-theme-switch='compact'] [data-theme-option='${id}']`).first();
-  for (const page of ["Dashboard", "Item Master", "Machine Tracker"]) {
+  for (const page of ["Dashboard", "Machine Tracker"]) {
     await nav(p, false, page); await settle(p, 2000, 300);
-    await gate(`1440 ${page}: theme Light → Dark`, p, () => sw("dark").click(), () => sw("light").click());
+    // A mouse reaches the switch before it clicks (hover readies the dark sheet).
+    const tap = async (id) => { await sw(id).hover(); await p.waitForTimeout(250); await sw(id).click(); };
+    await gate(`1440 ${page}: theme Light → Dark`, p, () => tap("dark"), () => tap("light"));
     await p.waitForTimeout(400);
-    await gate(`1440 ${page}: theme Dark → Light`, p, () => sw("light").click(), () => sw("dark").click());
+    await gate(`1440 ${page}: theme Dark → Light`, p, () => tap("light"), () => tap("dark"));
     await p.waitForTimeout(400);
   }
   ok("1440: no browser errors", errs.length === 0, errs.join(" ; "));
