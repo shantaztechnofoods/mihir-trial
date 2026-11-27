@@ -563,7 +563,11 @@ export function InventoryPage({ items, setItems, handleUpdateStock, pos = [], in
   // perf (2026-11-27): smaller slices (60 first, 80 per scroll step, was 150/300)
   // so each batch's style recalculation and paint stays short. Same rows, same
   // order; Show all and Print still draw every row.
-  const masterRows = useProgressiveCount(sorted.length, `${deferredSearch}|${listStatus}|${listCat}|${listSortCol}|${listSortDir}`, { initial: 60, step: 80 });
+  // perf/inp-item-master: 30 first, 40 per step, next slice drawn 600 px before it
+  // scrolls into view (was 1200 px). A row is 41 elements; every tap that restyles
+  // the page (theme switch, sort, chips) paid for ~60 rows, now ~30 — about a
+  // screen and a half. Still every row on scroll / Show all / Print.
+  const masterRows = useProgressiveCount(sorted.length, `${deferredSearch}|${listStatus}|${listCat}|${listSortCol}|${listSortDir}`, { initial: 30, step: 40, margin: "600px 0px" });
   const filteredVal = useMemo(() => sorted.reduce((s, i) => s + (i.stock * (i.lastPurchaseRate || 0)), 0), [sorted]);
   const filtersActive = search || statusFilter !== "all" || catFilter !== "all";
   const clearFilters  = () => { setSearch(""); setStatusFilter("all"); setCatFilter("all"); };

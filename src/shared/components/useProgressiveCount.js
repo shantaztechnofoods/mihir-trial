@@ -12,7 +12,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 
-export function useProgressiveCount(total, resetKey, { initial = 150, step = 300 } = {}) {
+// `margin` (perf/inp-item-master, 2026-11-27): how far below the screen the next
+// slice starts drawing (IntersectionObserver rootMargin). Default unchanged.
+export function useProgressiveCount(total, resetKey, { initial = 150, step = 300, margin = "1200px 0px" } = {}) {
   const [state, setState] = useState({ key: resetKey, n: initial });
   const n = state.key === resetKey ? state.n : initial;
   const shown = Math.min(n, total);
@@ -25,9 +27,9 @@ export function useProgressiveCount(total, resetKey, { initial = 150, step = 300
     if (typeof IntersectionObserver === "undefined") { setState({ key: resetKey, n: Infinity }); return; }
     obs.current = new IntersectionObserver((entries) => {
       if (entries.some((e) => e.isIntersecting)) setState((prev) => ({ key: resetKey, n: (prev.key === resetKey ? prev.n : initial) + step }));
-    }, { rootMargin: "1200px 0px" });
+    }, { rootMargin: margin });
     obs.current.observe(node);
-  }, [resetKey, initial, step, shown]);
+  }, [resetKey, initial, step, shown, margin]);
 
   const showAll = useCallback(() => setState({ key: resetKey, n: Infinity }), [resetKey]);
 

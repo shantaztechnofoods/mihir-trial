@@ -115,6 +115,17 @@ const nav = async (p, mobile, label) => {
     await gate(`1440 ${page}: theme Dark → Light`, p, () => tap("light"), () => tap("dark"));
     await p.waitForTimeout(400);
   }
+  // Item Master (400 items): sort headers, status chip and Category select answer
+  // in the next frame; the rows follow (perf/inp-item-master).
+  await nav(p, false, "Item Master"); await settle(p, 2000, 300);
+  const th = (t) => p.locator("th").filter({ hasText: t }).first();
+  await gate("1440 Item Master: sort by Stock", p, () => th("Stock").click(), () => th("Stock").click());
+  await gate("1440 Item Master: sort by Code", p, () => th("Code").click(), () => th("Code").click());
+  const chip = (t) => p.locator("button").filter({ hasText: new RegExp(`^${t} \\(`) }).first();
+  await gate("1440 Item Master: Low chip", p, () => chip("Low").click(), () => chip("All").click());
+  await chip("All").click(); await p.waitForTimeout(400);
+  const cat = p.locator("select[aria-label=Category]");
+  await gate("1440 Item Master: Category select", p, async () => { await cat.focus(); await p.keyboard.press("ArrowDown"); }, async () => { await cat.focus(); await p.keyboard.press("ArrowUp"); });
   ok("1440: no browser errors", errs.length === 0, errs.join(" ; "));
   await ctx.close();
 }
