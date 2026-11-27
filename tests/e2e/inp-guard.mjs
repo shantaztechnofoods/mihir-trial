@@ -118,6 +118,13 @@ const nav = async (p, mobile, label) => {
   // Item Master (400 items): sort headers, status chip and Category select answer
   // in the next frame; the rows follow (perf/inp-item-master).
   await nav(p, false, "Item Master"); await settle(p, 2000, 300);
+  {
+    const tap = async (id) => { await sw(id).hover(); await p.waitForTimeout(250); await sw(id).click(); };
+    await gate("1440 Item Master: theme Light → Dark", p, () => tap("dark"), () => tap("light"));
+    await p.waitForTimeout(400);
+    await gate("1440 Item Master: theme Dark → Light", p, () => tap("light"), () => tap("dark"));
+    await p.waitForTimeout(400);
+  }
   const th = (t) => p.locator("th").filter({ hasText: t }).first();
   await gate("1440 Item Master: sort by Stock", p, () => th("Stock").click(), () => th("Stock").click());
   await gate("1440 Item Master: sort by Code", p, () => th("Code").click(), () => th("Code").click());
