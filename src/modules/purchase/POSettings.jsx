@@ -189,7 +189,7 @@ export default function POSettings({ value, onChange, onPersist, isSuperAdmin = 
           <div className="rounded-xl overflow-hidden bg-white" style={{ border: "1px solid rgba(26,31,46,0.1)" }}>
             <iframe title="PO preview" srcDoc={previewHtml} className="w-full" style={{ height: 560, border: "0", background: "#fff" }} />
           </div>
-          <div className="text-[10px] text-slate-600 mt-1.5">Click <span className="text-slate-400 font-semibold">Save Changes</span> in the topbar to store these settings in Supabase.</div>
+          <div className="text-[10px] text-slate-600 mt-1.5">Click <span className="text-slate-400 font-semibold">Save Changes</span> in the topbar to save these settings for everyone.</div>
         </div>
       </div>
     );
@@ -312,7 +312,7 @@ export default function POSettings({ value, onChange, onPersist, isSuperAdmin = 
         ))}
 
         <div className="text-[10px] text-slate-600">
-          Click <span className="text-slate-400 font-semibold">💾 Save Changes</span> in the topbar to store all companies in Supabase.
+          Click <span className="text-slate-400 font-semibold">💾 Save Changes</span> in the topbar to save all companies for everyone.
           Edit Terms / Declaration / Template style under the <span className="text-slate-400 font-semibold">🧾 Purchase Order</span> tab.
         </div>
       </div>

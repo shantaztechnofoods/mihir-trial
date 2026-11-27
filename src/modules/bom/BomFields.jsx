@@ -56,11 +56,13 @@ export function BomPhotoField({ value, onChange }) {
 }
 
 // Small rounded machine photo; falls back to `fallback` when the BOM has none.
-export function BomPhotoThumb({ url, size = 64, fallback = null, className = "" }) {
+// perf (2026-11-27): lazy + async decode with real width/height (no layout
+// shift). Pass `eager` in print/report contexts so a PDF never shows a blank.
+export function BomPhotoThumb({ url, size = 64, fallback = null, className = "", eager = false }) {
   const [broken, setBroken] = useState(false);
   if (!url || broken) return fallback;
   return (
-    <img data-bom-photo src={url} alt="" loading="lazy" onError={() => setBroken(true)}
+    <img data-bom-photo src={url} alt="" width={size} height={size} loading={eager ? "eager" : "lazy"} decoding={eager ? "sync" : "async"} onError={() => setBroken(true)}
          className={`rounded-xl object-contain flex-shrink-0 ${className}`}
          style={{ width: size, height: size, padding: 3, border: "1px solid var(--border-rim)", background: "#ffffff" }} />
   );

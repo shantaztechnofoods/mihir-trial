@@ -526,7 +526,7 @@ test("App: Machine Tracker — Ready is the final stage, filters clear, cards ar
   assert.match(app, /const MT_FILTER_LABELS = \{[\s\S]*?hold: "On HOLD"/);
 
   // 4 — one card, no repeated actions; the working ones are all still there
-  assert.match(app, /className=\{`mt-card overflow-hidden\$\{isComplete \? " mt-card-ready" : ""\}`\}/);
+  assert.match(app, /className=\{`mt-card mt-list-card overflow-hidden\$\{isComplete \? " mt-card-ready" : ""\}`\}/);
   assert.doesNotMatch(app, /jobs? owed\n/, "the owed badge no longer repeats the Pending Jobs button");
   assert.match(app, /\{!isComplete && machine\.trialCertificate && canFinishTransfer\(canDo\) && onUpdateTrialCertificate && \(/);
   for (const action of ["Report Issue", "Finish & Transfer →", "✓ Accept Machine", "data-card-jobs", "data-card-accept", '{isExpanded ? "Hide" : "History"}'])
