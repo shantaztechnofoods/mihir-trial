@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import {
   listModules, derivedManifest, readManifest, scanModuleFolder, parseImports, parseExports,
-  directEdgeCalls, edgeCallsViaImports, DERIVED_KEYS, DECLARED_KEYS,
+  directEdgeCalls, edgeCallsViaImports, DERIVED_KEYS, DECLARED_KEYS, walk, classify, resolveRel,
 } from "../scripts/lib/module-scan.mjs";
 
 const ROOT = ".";
@@ -94,4 +94,34 @@ test("modules[].frozen matches the FROZEN marker in each README", () => {
     const man = readManifest(ROOT, mod);
     assert.equal(man.frozen, /FROZEN/.test(readme), `${mod}: frozen in MODULE.json disagrees with its README`);
   }
+});
+
+// ── Phase B: versioned core + shell imports only through index.js ───────────
+test("every module's requiresCore is <= CORE_VERSION (src/shared/coreVersion.js)", async () => {
+  const { CORE_VERSION, CORE_PATHS } = await import("../src/shared/coreVersion.js");
+  assert.ok(Number.isInteger(CORE_VERSION) && CORE_VERSION >= 1, "CORE_VERSION must be a whole number >= 1");
+  for (const p of CORE_PATHS) {
+    const file = p.replace(/#.*$/, "");
+    if (!file.includes("*")) assert.ok(fs.existsSync(file), `CORE_PATHS entry ${p} does not exist`);
+  }
+  for (const mod of MODULES) {
+    const man = readManifest(ROOT, mod);
+    assert.ok(man.requiresCore <= CORE_VERSION, `${mod} requires core v${man.requiresCore} but CORE_VERSION is ${CORE_VERSION}`);
+  }
+});
+
+test("src/app and core import module folders only through their index.js", () => {
+  const dirs = ["src/app", "src/shared", "src/stores", "src/utils", "src/auth", "src/config", "src/realtime", "src/supabase"];
+  const bad = [];
+  for (const d of dirs) {
+    for (const f of walk(ROOT, d).filter((x) => /\.(m?js|jsx)$/.test(x))) {
+      for (const imp of parseImports(fs.readFileSync(f, "utf8"))) {
+        if (!imp.spec.startsWith(".")) continue;
+        const c = classify(resolveRel(ROOT, f, imp.spec));
+        if (c.kind === "module" && c.file !== "index.js") bad.push(`${f} -> ${imp.spec}`);
+        if (c.kind === "module" && !d.startsWith("src/app")) bad.push(`${f} (core) imports a module: ${imp.spec}`);
+      }
+    }
+  }
+  assert.deepEqual(bad, []);
 });
