@@ -33,7 +33,7 @@ src/
                            search selects, UserProfileMenu, AccessDeniedPage
   modules/                 one folder per business module (README.md in each)
     dashboard/  item-master/  inward/  inventory/  bom/  pending-jobs/  machine-tracker/  trial-certificate/
-    purchase/   reports/    settings/  analytics/  ai-assistant/  whatsapp/
+    order-pipeline/  vendors/  reports/  settings/  analytics/  ai-assistant/  whatsapp/
     audit-trail/  users-roles/
   stores/                  Supabase-aware data access (+ localStorage fallback) — unchanged
   utils/                   pure logic (gst, rackSlots, handoverLogic, …) — unchanged
@@ -61,7 +61,7 @@ main.jsx → app/ → modules/* → shared/ → stores/ utils/ auth/ config/ sup
 * There are **no import cycles**, neither between files nor between module folders.
   Current module-to-module arrows:
   `inventory → bom`, `bom → pending-jobs`, `machine-tracker → bom, pending-jobs, reports, trial-certificate, whatsapp`,
-  `reports → pending-jobs, trial-certificate`, `settings → purchase, reports`.
+  `reports → pending-jobs, trial-certificate`, `settings → order-pipeline, reports`.
   (Trial certificate is its own folder, and `JobHistory` lives in pending-jobs,
   precisely so reports and Machine Tracker do not import each other.)
 

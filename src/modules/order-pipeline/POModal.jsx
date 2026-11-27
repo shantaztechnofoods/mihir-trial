@@ -1,11 +1,11 @@
-// src/modules/purchase/POModal.jsx — moved verbatim from the former single-file src/App.jsx
+// src/modules/order-pipeline/POModal.jsx — moved verbatim from the former single-file src/App.jsx
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
 import React, { useState, useEffect, useRef } from "react";
 import { LeadIcon } from "../../shared/components/LeadIcon.jsx";
 import ItemSearchSelect from "../../shared/components/ItemSearchSelect.jsx";
 import { parseDisplayDate } from "../../utils/parseDate.js";
 import { isoToDisplayDate } from "../../utils/parseDate.js";
-import SearchableSelect from "../../shared/components/SearchableSelect.jsx";
+import SearchableSelect from "./SearchableSelect.jsx";
 import { PURCHASE_TYPES, DEFAULT_PURCHASE_TYPE_KEY, getPurchaseType, calculateGSTBreakdown, filterPurchaseTypes, todayIso } from "../../utils/gst.js";
 import { normalizePOSettings, PO_TEMPLATE_OPTIONS } from "../../utils/poTemplate.js";
 import { Btn } from "../../shared/ui/primitives.jsx";

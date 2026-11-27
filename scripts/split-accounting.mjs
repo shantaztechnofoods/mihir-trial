@@ -64,7 +64,10 @@ const HEADER = "moved verbatim from the former single-file src/App.jsx";
 //     file whose non-import code lines equal those of a removed file with the same file
 //     name (git mv into another folder; only its import lines may differ) — and a new
 //     src/modules/<m>/index.js that holds only re-exports (checked in C). Both may be
-//     imported; their lines are counted in A like every other file.
+//     imported; their lines are counted in A like every other file (a moved file even when
+//     nothing imports it, e.g. a dead page). modules/fold-*: also a module-local file — a new
+//     file in src/modules/<m>/ imported only by files of that folder (a slice moved out of a
+//     store/util file); counted in A.
 //  C. Every module index.js still holds only re-exports.
 //  D. Phase C wiring lines are the only lines allowed to be new, and only in
 //     these exact shapes (the block interiors may hold only identifier lists,
@@ -200,7 +203,18 @@ function moveMode(baseSha) {
   // Phase C: src/modules/<m>/handlers.js imported only by src/app/App.jsx is a moved-code file (counted in A).
   const ownHandlersFile = (x) => /^src\/modules\/([^/]+)\/(handlers|hooks)\.js$/.test(x.f)
     && x.importers.length === 1 && x.importers[0] === "src/app/App.jsx";
-  const metadataOnly = new Set(addedInfo.filter((x) => !x.importers.length).map((x) => x.f));
+  // Phase D: whole-file moves (same file name, identical non-import code) and new module index.js files.
+  // Comment-only lines are left out of the identity check, as in A (a moved file may update its header path).
+  const removedFiles = baseFiles.filter((f) => !headFiles.includes(f));
+  const codeOnly = (code) => (code == null ? null : JSON.stringify(nonImportLines(code).map((l) => l.trimEnd()).filter((l) => l.trim() && !/^\s*(\/\/|\/\*|\*)/.test(l))));
+  const movedFrom = (f) => removedFiles.find((r) => path.posix.basename(r) === path.posix.basename(f) && codeOnly(readBase(r)) === codeOnly(readHead(f)));
+  const reexportOnly = (f) => /^src\/modules\/[^/]+\/index\.js$/.test(f) && readHead(f).split("\n")
+    .every((l) => !l.trim() || l.startsWith("//") || /^export \{[^}]+\} from "\.\/[^"]+";$/.test(l));
+  // modules/fold-*: a slice moved out of a core store/util file into ONE module folder — a new file in
+  // src/modules/<m>/ imported only by files of that same folder (counted in A, so every line must come from base).
+  const moduleLocal = (x) => { const m = x.f.match(/^src\/modules\/([^/]+)\//); return !!m && x.importers.length > 0 && x.importers.every((g) => g.startsWith(`src/modules/${m[1]}/`)); };
+  // a moved file is code, not metadata, even when nothing imports it (e.g. a dead page) — counted in A
+  const metadataOnly = new Set(addedInfo.filter((x) => !x.importers.length && !movedFrom(x.f)).map((x) => x.f));
   // src/app/shellVersion.js: read only by scripts/tests (SHELL_API, SHELL_CALLS) — metadata on both sides while nothing imports it
   const SV = "src/app/shellVersion.js";
   const svMeta = headFiles.includes(SV) && !importersOf(SV).length;
@@ -240,17 +254,12 @@ function moveMode(baseSha) {
   say2(`## B. New code files (must not be imported by anything in src)`);
   say2();
   if (!added.length) say2(`- none`);
-  // Phase D: whole-file moves (same file name, identical non-import code) and new module index.js files.
-  const removedFiles = baseFiles.filter((f) => !headFiles.includes(f));
-  const codeOnly = (code) => (code == null ? null : JSON.stringify(nonImportLines(code).map((l) => l.trimEnd()).filter((l) => l.trim())));
-  const movedFrom = (f) => removedFiles.find((r) => path.posix.basename(r) === path.posix.basename(f) && codeOnly(readBase(r)) === codeOnly(readHead(f)));
-  const reexportOnly = (f) => /^src\/modules\/[^/]+\/index\.js$/.test(f) && readHead(f).split("\n")
-    .every((l) => !l.trim() || l.startsWith("//") || /^export \{[^}]+\} from "\.\/[^"]+";$/.test(l));
   for (const x of addedInfo) {
     const { f, importers } = x;
     const from = movedFrom(f);
     if (from) { say2(`- ${f}: whole-file move from ${from} (identical apart from imports; counted in A)`); continue; }
     if (reexportOnly(f)) { say2(`- ${f}: new module index.js, re-exports only (counted in A)`); continue; }
+    if (moduleLocal(x)) { say2(`- ${f}: module-local file (code moved in from a core file), imported only inside its folder by ${importers.join(", ")} (counted in A)`); continue; }
     if (x.f === SC) { if (!scOk) good = false; say2(`- ${SC}: shell.call helper — ${scOk ? "imported only by src/app/App.jsx, code lines equal the allowed text (listed in D)" : "NOT the allowed text or imported by something other than App.jsx"}`); continue; }
     if (ownHandlersFile(x)) { say2(`- ${f}: Phase C ${f.endsWith("/hooks.js") ? "hooks" : "handlers"} file, imported only by src/app/App.jsx (its lines ARE counted in A)`); continue; }
     if (importers.length) good = false;

@@ -55,7 +55,8 @@ import { Sidebar } from "./layout/Sidebar.jsx";
 import { AIPage, AnalyticsPage, DashboardPage, InventoryPage, InwardPage, OutwardPage, PendingPage, MachinePage, OrderPipelinePage, VendorsPage, HistoryPage, ReportCenterPage, SettingsPage, WhatsAppPage, ReadyMachinesPopup, prefetchPage, prefetchPagesWhenIdle } from "./lazyPages.js";
 import { waDispatch, waReadSeen, waUnreadCount } from "../modules/whatsapp/index.js";
 import { createSettingsHandlers } from "../modules/settings/handlers.js";
-import { createPurchaseHandlers } from "../modules/purchase/handlers.js";
+import { createOrderPipelineHandlers } from "../modules/order-pipeline/handlers.js";
+import { createVendorsHandlers } from "../modules/vendors/handlers.js";
 import { createInventoryHandlers } from "../modules/inventory/handlers.js";
 import { createInwardHandlers } from "../modules/inward/handlers.js";
 import { createItemMasterHandlers } from "../modules/item-master/handlers.js";
@@ -1105,7 +1106,8 @@ export default function App() {
     attachments, releaseBusyRef, rtMach, setBomOpenRequest, stuckRepairDoneRef, transferringRef,
   };
   const { handleSaveModules, handleAdminCleanupDone, handleCreateChecklistTemplate, handleUpdateChecklistTemplate, handleDeleteChecklistTemplate, handleSaveUserDepartments } = createSettingsHandlers(shell);
-  const { handleCreatePO, handleUpdatePO, handleReceivePO, handleDeletePO, handleReverseReceive, handleConfirmOrder, handleFollowUpDone, handleAddVendor, handleEditVendor, handleDeleteVendor, handleRestoreVendor, handleBulkAddVendors } = createPurchaseHandlers(shell);
+  const { handleCreatePO, handleUpdatePO, handleReceivePO, handleDeletePO, handleReverseReceive, handleConfirmOrder, handleFollowUpDone } = createOrderPipelineHandlers(shell);
+  const { handleAddVendor, handleEditVendor, handleDeleteVendor, handleRestoreVendor, handleBulkAddVendors } = createVendorsHandlers(shell);
   const { handleClearPending, handleFulfillPending, handleFulfillGroup, handleAddOutward, raiseNotIssuedJobs, handleCreateMachine, handleAbortMachineCreate, handleRemoveRackMachine } = createInventoryHandlers(shell);
   const { handleInwardComplete } = createInwardHandlers(shell);
   const { handleCreateItemRow, handleUpdateItemRow, handleDeleteItemRow, handleRestoreItemRow, handleSetItemDefaultRate, handleBulkAddItems, handleInventoryCorrection } = createItemMasterHandlers(shell);

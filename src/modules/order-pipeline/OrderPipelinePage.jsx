@@ -1,4 +1,4 @@
-// src/modules/purchase/OrderPipelinePage.jsx — moved verbatim from the former single-file src/App.jsx
+// src/modules/order-pipeline/OrderPipelinePage.jsx — moved verbatim from the former single-file src/App.jsx
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
 import React, { useState, useEffect } from "react";
 import { LeadIcon, LeadLabel, Glyph } from "../../shared/components/LeadIcon.jsx";

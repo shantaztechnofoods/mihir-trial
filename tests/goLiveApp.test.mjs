@@ -15,7 +15,7 @@ const fn  = (name, until) => app.slice(app.indexOf(name), app.indexOf(until, app
 
 test("H: no user-supplied SVG is injected as markup — signatures render through an <img> data URI", () => {
   assert.doesNotMatch(app, /dangerouslySetInnerHTML/, "no dangerouslySetInnerHTML anywhere in App.jsx");
-  // 2026-11-04 module split: src/components moved to src/shared/components (POSettings to modules/purchase)
+  // 2026-11-04 module split: src/components moved to src/shared/components (POSettings to modules/purchase, now modules/order-pipeline)
   for (const f of ["src/shared/components", "src/utils", "src/stores"]) {
     const dir = path.join(root, f);
     for (const file of fs.readdirSync(dir)) {
@@ -23,7 +23,10 @@ test("H: no user-supplied SVG is injected as markup — signatures render throug
       assert.doesNotMatch(fs.readFileSync(path.join(dir, file), "utf8"), /dangerouslySetInnerHTML|\.innerHTML\s*=/, `${f}/${file}`);
     }
   }
-  assert.doesNotMatch(readSrc("src/modules/purchase/POSettings.jsx"), /dangerouslySetInnerHTML|\.innerHTML\s*=/, "POSettings.jsx");
+  // modules/fold-purchase (2026-11-27): POSettings, and the module-only files that left src/shared/components and src/utils, keep the same check
+  for (const f of ["src/modules/order-pipeline/POSettings.jsx", "src/modules/order-pipeline/SearchableSelect.jsx", "src/modules/vendors/vendorImport.js"]) {
+    assert.doesNotMatch(readSrc(f), /dangerouslySetInnerHTML|\.innerHTML\s*=/, f);
+  }
   assert.match(app, /const svgDataUri = \(svg\) => `data:image\/svg\+xml;charset=utf-8,\$\{encodeURIComponent\(String\(svg \|\| ""\)\)\}`;/);
   // 2026-11-04 — every signature prints once, in the signature register, as an <img> data URI.
   assert.match(app, /src: svgDataUri\(h\.mainEmployeeSignatureSvg\)/);
