@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { PageHeader } from "../../shared/components/PageHeader.jsx";
+import "./usersRoles.css";
 import { useAuth } from "../../auth/AuthContext.jsx";
 import { hashPassword, getRoleLabel, getRoleColor, fetchAllUsers, updateUserDepartments } from "../../auth/authStore.js";
 import { DEPARTMENT_SEQUENCE } from "../../utils/handoverLogic.js";
@@ -313,7 +314,7 @@ export default function UserManagementPage({ canDo }) {
   const inputStyle = { background: "#ffffff", border: "1px solid rgba(26,31,46,0.14)", color: "#111827" };
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="um-page flex-1 flex flex-col overflow-hidden">
       {/* Toast */}
       {toast && (
         <div className="fixed bottom-6 right-6 z-[60] flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl"
@@ -331,11 +332,11 @@ export default function UserManagementPage({ canDo }) {
       {/* Header */}
       <PageHeader title="User Management" subtitle={`${users.length} user${users.length !== 1 ? "s" : ""} in the system`}>
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search users…"
-            className="px-3 py-1.5 rounded-lg text-xs placeholder-slate-400 outline-none w-full sm:w-44"
+            className="um-search px-3 py-1.5 rounded-lg text-xs placeholder-slate-400 outline-none w-full sm:w-44"
             style={inputStyle} />
           {(isSuperAdmin || canDo?.("users", "create")) && (
             <button onClick={openAdd}
-              className="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all"
+              className="um-act px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all"
               style={{ background: "#2640B0", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
               + Add User
             </button>
@@ -345,7 +346,7 @@ export default function UserManagementPage({ canDo }) {
       {/* Table */}
       <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
         <div className="rounded-xl overflow-x-auto" style={{ border: "1px solid rgba(26,31,46,0.07)" }}>
-          <table className="w-full text-xs" style={{ minWidth: 720 }}>
+          <table className="w-full text-xs um-table" style={{ minWidth: 720 }}>
             <thead>
               <tr style={{ background: "rgba(26,31,46,0.04)", borderBottom: "1px solid rgba(26,31,46,0.07)" }}>
                 <th className="px-4 py-3 text-left font-semibold text-slate-600">Username</th>
@@ -366,7 +367,7 @@ export default function UserManagementPage({ canDo }) {
                   <tr key={user.id} style={{ borderBottom: "1px solid rgba(26,31,46,0.05)" }}
                       onMouseEnter={(e) => e.currentTarget.style.background = "rgba(26,31,46,0.04)"}
                       onMouseLeave={(e) => e.currentTarget.style.background = ""}>
-                    <td className="px-4 py-3">
+                    <td data-label="User" className="px-4 py-3">
                       <div className="flex items-center gap-2.5">
                         <div className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black text-slate-900 flex-shrink-0"
                              style={{ background: `linear-gradient(135deg,${rColor}80,${rColor}40)` }}>
@@ -375,29 +376,29 @@ export default function UserManagementPage({ canDo }) {
                         <div className="font-mono font-semibold" style={{ color: "var(--text-strong)" }}>{user.username}</div>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-slate-600">{user.mobile || "—"}</td>
-                    <td className="px-4 py-3">
+                    <td data-label="Mobile" className="px-4 py-3 text-slate-600">{user.mobile || "—"}</td>
+                    <td data-label="Role" className="px-4 py-3">
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold" style={{ background: rColor + "22", color: rColor }}>{rLabel}</span>
                     </td>
-                    <td className="px-4 py-3">
+                    <td data-label="Status" className="px-4 py-3">
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${user.status === "active" ? "text-emerald-400" : "text-slate-500"}`}
                             style={{ background: user.status === "active" ? "rgba(52,211,153,0.12)" : "rgba(148,163,184,0.12)" }}>
                         {user.status === "active" ? "Active" : "Disabled"}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-slate-500">{fmtDate(user.lastLogin)}</td>
-                    <td className="px-4 py-3">
+                    <td data-label="Last Login" className="px-4 py-3 text-slate-500">{fmtDate(user.lastLogin)}</td>
+                    <td data-label="Actions" className="um-actions px-4 py-3">
                       <div className="flex items-center gap-1.5 justify-end">
                         {(isSuperAdmin || canDo?.("users", "edit")) && (
                           <button onClick={() => openEdit(user)}
-                            className="px-2.5 py-1 rounded-lg text-[10px] font-medium text-slate-600 hover:text-slate-900 transition-all"
+                            className="um-act px-2.5 py-1 rounded-lg text-[10px] font-medium text-slate-600 hover:text-slate-900 transition-all"
                             style={{ background: "rgba(26,31,46,0.06)", border: "1px solid rgba(26,31,46,0.1)" }}>
                             Edit
                           </button>
                         )}
                         {(isSuperAdmin || canDo?.("users", "edit")) && (
                           <button onClick={() => openReset(user)}
-                            className="px-2.5 py-1 rounded-lg text-[10px] font-medium text-blue-700 hover:text-blue-900 transition-all"
+                            className="um-act px-2.5 py-1 rounded-lg text-[10px] font-medium text-blue-700 hover:text-blue-900 transition-all"
                             style={{ background: "rgba(46, 80, 214,0.08)", border: "1px solid rgba(46, 80, 214,0.2)" }}>
                             Reset PW
                           </button>
@@ -405,7 +406,7 @@ export default function UserManagementPage({ canDo }) {
                         {!isSelf && !isSA && (isSuperAdmin || canDo?.("users", "edit")) && (
                           <button onClick={() => handleToggleStatus(user)}
                             disabled={statusBusyId === user.id}
-                            className={`px-2.5 py-1 rounded-lg text-[10px] font-medium transition-all ${user.status === "active" ? "text-amber-700 hover:text-amber-900" : "text-emerald-700 hover:text-emerald-900"}`}
+                            className={`um-act px-2.5 py-1 rounded-lg text-[10px] font-medium transition-all ${user.status === "active" ? "text-amber-700 hover:text-amber-900" : "text-emerald-700 hover:text-emerald-900"}`}
                             style={{
                               background: user.status === "active" ? "rgba(251,191,36,0.08)" : "rgba(52,211,153,0.08)",
                               border: `1px solid ${user.status === "active" ? "rgba(251,191,36,0.2)" : "rgba(52,211,153,0.2)"}`,
@@ -418,7 +419,7 @@ export default function UserManagementPage({ canDo }) {
                         )}
                         {!isSelf && !isSA && (isSuperAdmin || canDo?.("users", "delete")) && (
                           <button onClick={() => setDeleteConfirm(user)}
-                            className="px-2.5 py-1 rounded-lg text-[10px] font-medium text-red-700 hover:text-red-900 transition-all"
+                            className="um-act px-2.5 py-1 rounded-lg text-[10px] font-medium text-red-700 hover:text-red-900 transition-all"
                             style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)" }}>
                             Delete
                           </button>
@@ -429,7 +430,7 @@ export default function UserManagementPage({ canDo }) {
                 );
               })}
               {filtered.length === 0 && (
-                <tr><td colSpan={6} className="px-4 py-10 text-center text-slate-600 text-xs">No users found</td></tr>
+                <tr className="um-empty"><td colSpan={6} className="px-4 py-10 text-center text-slate-600 text-xs">No users found</td></tr>
               )}
             </tbody>
           </table>
