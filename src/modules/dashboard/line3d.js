@@ -14,6 +14,10 @@
 // Loaded ONLY via dynamic import() when "3D view" is tapped. Renders on demand
 // (idle = 0 frames). stop() disposes every geometry, material, texture and the
 // WebGL context.
+// Phone (2026-11-27, `lite`): the same scene on a wide, swipeable stage (the
+// panel scrolls it natively, one department per snap). Budget: pixel ratio
+// capped at 1.5, no shadow map (the soft blob shadows stay), no intro motion,
+// no dolly on tap, touch never "hovers" — so a swipe draws zero WebGL frames.
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
@@ -74,14 +78,15 @@ export function zoneGrid(ids, w = BOX_W, widths = null) {
  *   machines: [{ id, z, state, share, family, photo: { image, aspect } | null }]
  *   ready:    [{ id, photo }] ready-today machines (shown on the Ready bay)
  */
-export function mountLine(host, { zones, machines, ready = [], rackCount = 0, dark = false, reduce = false, onPick, onHover } = {}) {
+export const PHONE_DPR = 1.5;
+export function mountLine(host, { zones, machines, ready = [], rackCount = 0, dark = false, reduce = false, lite = false, onSpan, onPick, onHover } = {}) {
   const N = zones.length;
-  const r = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
-  r.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  const r = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: lite ? "default" : "high-performance" });
+  r.setPixelRatio(Math.min(window.devicePixelRatio || 1, lite ? PHONE_DPR : 2));
   r.setClearColor(0x000000, 0);
   r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = dark ? 1.05 : 1.12;
   r.outputColorSpace = THREE.SRGBColorSpace;
-  r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFSoftShadowMap; r.shadowMap.autoUpdate = false; r.shadowMap.needsUpdate = true; // static floor: re-draw shadows only when a machine moves
+  r.shadowMap.enabled = !lite; r.shadowMap.type = THREE.PCFSoftShadowMap; r.shadowMap.autoUpdate = false; r.shadowMap.needsUpdate = true; // static floor: re-draw shadows only when a machine moves
   host.appendChild(r.domElement);
   const maxAniso = r.capabilities.getMaxAnisotropy ? r.capabilities.getMaxAnisotropy() : 4;
   const sc = new THREE.Scene();
@@ -92,7 +97,7 @@ export function mountLine(host, { zones, machines, ready = [], rackCount = 0, da
   const baseCam = new THREE.PerspectiveCamera(8, 6, 1, 2000); // never zooms: zone chips stay put
   sc.add(new THREE.HemisphereLight(0xffffff, dark ? 0x0d2224 : 0xdfe5ee, dark ? 0.55 : 0.75));
   const key = new THREE.DirectionalLight(0xffffff, dark ? 1.5 : 1.9);
-  key.castShadow = true; sc.add(key, key.target);
+  key.castShadow = !lite; sc.add(key, key.target);
 
   const textures = [envTex];
   const tex = (w, h, draw, srgb = true) => {
@@ -240,6 +245,9 @@ export function mountLine(host, { zones, machines, ready = [], rackCount = 0, da
   const ZW = zones.map((_, i) => widthOf(i));
   const GUT = 0.16, TOT = ZW.reduce((a, b) => a + b, 0) + GUT * (N - 1), ZC = [];
   { let acc = -TOT / 2; ZW.forEach((w) => { ZC.push(acc + w / 2); acc += w + GUT; }); }
+  // Phone: the panel sizes its swipeable stage from the line's length before any
+  // sign is drawn (the signs read the host width to pick their text size).
+  if (onSpan) onSpan(TOT);
 
   // ---- workcell bays ----
   const padH = 0.56, padY = padH; // raised workcell plinth; its front face carries the bay sign
@@ -439,9 +447,10 @@ export function mountLine(host, { zones, machines, ready = [], rackCount = 0, da
     if (o === hovered) return; hovered = o; r.domElement.style.cursor = o ? "pointer" : "";
     focusOn(); if (onHover) onHover(o ? o.userData.sn : null); kick();
   };
-  const onMove = (e) => setHover(hitAt(e)), onLeave = () => setHover(null);
+  // A finger never hovers: a swipe must not start fades or the conveyor (0 frames while scrolling).
+  const onMove = (e) => { if (e.pointerType !== "touch") setHover(hitAt(e)); }, onLeave = () => setHover(null);
   const onClick = (e) => { const o = hitAt(e); if (o) pick(o.userData.sn); else if (picked) { pick(null); if (onPick) onPick(null); } };
-  const onEnter = () => { inside = true; kick(); }, onExit = () => { inside = false; };
+  const onEnter = (e) => { if (e.pointerType === "touch") return; inside = true; kick(); }, onExit = () => { inside = false; };
   r.domElement.addEventListener("pointermove", onMove);
   r.domElement.addEventListener("pointerleave", onLeave);
   r.domElement.addEventListener("click", onClick);
@@ -449,13 +458,13 @@ export function mountLine(host, { zones, machines, ready = [], rackCount = 0, da
   const pick = (sn) => {
     const o = sn == null ? null : units.get(String(sn)) || null;
     picked = o; focusOn();
-    if (o) { zLook.set(o.position.x + 0.95 * o.scale.x, padY + o.userData.h * o.scale.y * 0.5, o.position.z); zoomTarget = 1; } else zoomTarget = 0;
+    if (o && !lite) { zLook.set(o.position.x + 0.95 * o.scale.x, padY + o.userData.h * o.scale.y * 0.5, o.position.z); zoomTarget = 1; } else zoomTarget = 0; // phone: no dolly (the stage is wider than the screen)
     kick(); if (o && onPick) onPick(String(sn));
   };
 
   // ---- data changes: a dept change glides; the conveyor runs ~3 s ----
   const glides = new Map(); const DUR = 1.4;
-  let beltUntil = performance.now() + INTRO * 1000;
+  let beltUntil = lite ? 0 : performance.now() + INTRO * 1000; // phone: idle right after the first frame
   function update(next) {
     if (!run) return false;
     const nextIds = next.map((m) => String(m.id));
@@ -514,10 +523,10 @@ export function mountLine(host, { zones, machines, ready = [], rackCount = 0, da
   resize();
 
   const api = {
-    update, zoneScreen, machineScreen, kick, pick, onFrame: null, frames: 0,
+    update, zoneScreen, machineScreen, kick, pick, onFrame: null, frames: 0, span: TOT, lite,
     setHover: (sn) => setHover(sn ? units.get(String(sn)) || null : null),
     isZoomed: () => zoomTarget === 1,
-    info: () => ({ calls: r.info.render.calls, triangles: r.info.render.triangles, geometries: r.info.memory.geometries, textures: r.info.memory.textures, dpr: r.getPixelRatio() }),
+    info: () => ({ calls: r.info.render.calls, triangles: r.info.render.triangles, geometries: r.info.memory.geometries, textures: r.info.memory.textures, dpr: r.getPixelRatio(), shadows: r.shadowMap.enabled }),
     stop() {
       if (!run) return;
       run = false; cancelAnimationFrame(raf); raf = 0;

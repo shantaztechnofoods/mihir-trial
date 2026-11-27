@@ -56,6 +56,8 @@ const bodyBg = (p) => p.evaluate(() => getComputedStyle(document.body).backgroun
   ok("Settings → Appearance shows the switch with words", await full.isVisible() && /Light/.test(await full.innerText()) && /Dark/.test(await full.innerText()) && /Auto/.test(await full.innerText()));
   await full.locator("[data-theme-option='dark']").click(); await p.waitForTimeout(300);
   ok("Settings → Dark sets dark", await theme(p) === "dark" && await p.evaluate(() => localStorage.getItem("erp_theme_mode")) === "dark");
+  ok("Settings shows one theme switch only (Appearance, not the header too)", await p.locator("[data-theme-switch]:visible").count() === 1);
+  await p.locator("aside button.sb-item").filter({ hasText: "Dashboard" }).first().click(); await settle(p, 1200);
   ok("header switch follows (Dark selected)", await p.locator(".page-header [data-theme-option='dark']").first().getAttribute("aria-checked") === "true");
   ok("no browser errors", errs.length === 0, errs.join(" ; "));
   await ctx.close();

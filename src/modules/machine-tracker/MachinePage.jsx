@@ -1,10 +1,13 @@
 // src/modules/machine-tracker/MachinePage.jsx — moved verbatim from the former single-file src/App.jsx
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
 import React, { useState, useEffect, useRef, useMemo, useDeferredValue } from "react";
+import { flushSync } from "react-dom";
 import { Wrench, User, Boxes, AlertOctagon, Trash2, Bell, History } from "lucide-react";
 import { celebrate } from "../../utils/worldMotion.js";
 import { LeadIcon, LeadLabel, Glyph } from "../../shared/components/LeadIcon.jsx";
 import SafeBoundary from "../../shared/components/SafeBoundary.jsx";
+import { useProgressiveCount } from "../../shared/components/useProgressiveCount.js";
+import MoreRowsNote from "../../shared/components/MoreRowsNote.jsx";
 import { DEPARTMENT_SEQUENCE, readDeptWorkflowSettings, isClosedDay, nextDepartment, computeElapsedMinutes, computeOverrun, isHoldOverdue, heldMinutes, isRackReleaseHop, formatDuration, canAcceptHandover, canFinishTransfer, canStartAssembly, canConfigureDept, workerIdsOf } from "../../utils/handoverLogic.js";
 import { pendingItemIsPart, pendingItemIsDone, pendingItemIsOpen, pendingItemStage, pendingItemRemaining } from "../../stores/pendingItemsStore.js";
 import { formatRatingBadge, summarizeMachineRatings } from "../../utils/ratingLogic.js";
@@ -77,6 +80,32 @@ function releaseSheetFocus() {
 function afterPaint(fn) {
   const run = () => { try { fn(); } catch { /* decoration must never break an action */ } };
   try { requestAnimationFrame(() => setTimeout(run, 0)); } catch { setTimeout(run, 0); }
+}
+
+// 2026-11-27 (perf/machine-tracker) — first paint shows the header, filters and
+// the machine cards; secondary panels (Production Rack View, Delay reasons,
+// My work) join on the first idle moment (at most ~250 ms later). Display only:
+// the same panels, data and buttons render, one beat later. A browser Print
+// draws them at once (beforeprint), so a PDF never misses a panel.
+function useIdleReady() {
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    if (ready) return undefined;
+    let id = null; let t = null;
+    const go = () => setReady(true);
+    try {
+      if (typeof window !== "undefined" && typeof window.requestIdleCallback === "function") id = window.requestIdleCallback(go, { timeout: 250 });
+      else t = setTimeout(go, 60);
+    } catch { go(); }
+    const before = () => flushSync(go);
+    window.addEventListener("beforeprint", before);
+    return () => {
+      window.removeEventListener("beforeprint", before);
+      try { if (id != null) window.cancelIdleCallback(id); } catch { /* ignore */ }
+      if (t) clearTimeout(t);
+    };
+  }, [ready]);
+  return ready;
 }
 
 const sameList = (a, b) => a === b || (Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((x, i) => Object.is(x, b[i])));
@@ -1082,6 +1111,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
     : [];
   const dismissNear = (keys) => setNearDismissed((prev) => { let st = null; try { st = window.localStorage; } catch { st = null; } return writeDismissed(st, currentUser?.id, prev, keys); });
   const openOwnCard = (m) => {
+    try { if (!document.querySelector(`[data-mt-mid="${m.id}"]`)) flushSync(() => cardRows.showAll()); } catch { /* ignore */ }
     try {
       const el = document.querySelector(`[data-mywork-card="${m.id}"]`) || document.querySelector(`[data-staff-timer="${m.id}"]`) || document.querySelector(`[data-mt-mid="${m.id}"]`);
       if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -1523,6 +1553,13 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
     setStageMap((p) => ({ ...p, [machine.id]: "" }));
   };
 
+  // perf (2026-11-27): the admin card list is computed once per render and
+  // drawn in slices (first 24 at once, more as the user scrolls; Print and
+  // "Show all" draw every card). Search/filters/counts still use the full list.
+  const tabList = staffMode ? [] : listForTab();
+  const cardRows = useProgressiveCount(tabList.length, `${mtTab}|${filter}|${searchText}`, { initial: 24, step: 48 });
+  const idleReady = useIdleReady();
+
   return (
     /* mt-premium (2026-10-31): cream/ivory surfaces and gold hairlines scoped
        to this page only — the rest of the ERP keeps its standard white. */
@@ -1626,7 +1663,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
           <TodayLine counts={todayStats} className={myWorkShown ? "mtx-today-wide" : ""} />
         )}
         <NearLimitStrip rows={nearRows} onDismiss={dismissNear} onOpen={openOwnCard} />
-        {(isDeptHead || ownRows.length > 0) && (
+        {idleReady && (isDeptHead || ownRows.length > 0) && (
           <MyWorkPanel today={<TodayLine counts={todayStats} omit={todayOmit} merged />}
                        rows={ownRows} isHead={isDeptHead} depts={myDepartments} summary={ownSummary} sentToday={sentToday}
                        phoneOnly={!isDeptHead} showToggle={isDeptHead && !staffMode && showScopeSwitch}
@@ -2623,7 +2660,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
         })()}
 
         {/* 2026-11-03 — admin-only, read-only: why machines got delayed. */}
-        {isAdminUser && !staffMode && (
+        {isAdminUser && !staffMode && idleReady && (
           <DelayReasonsCard machines={machineLog} handovers={handovers} pendingItems={pendingHandoverItems} lateNow={onHold.length} />
         )}
 
@@ -2632,7 +2669,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
             first working department's job, so a floor login elsewhere in the
             line has no use for this and it is hidden from them. Staff see it
             as Production Head or as the Assembly floor login (2026-11-04). */}
-        {(staffMode ? (isProdHead || isAssemblyFloor) : mtTab === "production") && (
+        {idleReady && (staffMode ? (isProdHead || isAssemblyFloor) : mtTab === "production") && (
         <div>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2.5">
@@ -3203,7 +3240,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
         })()}
 
         {/* ── Empty state ── */}
-        {!staffMode && mtTab !== "pending" && listForTab().length === 0 && (
+        {!staffMode && mtTab !== "pending" && tabList.length === 0 && (
           <div className="bg-white border border-slate-200 rounded-xl py-20 text-center">
             <div className="text-5xl mb-4">🔧</div>
             <div className="text-sm font-bold text-slate-900 mb-2">No Machines Tracked</div>
@@ -3230,9 +3267,9 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
             stage <select>, expand / stage-edit toggles — are passed as
             `urgent`, so changing them re-renders the list at once and the
             select never shows a stale value. */}
-        {!staffMode && <DeferredBoard stamp={boardStamp} urgent={[stageMap, expanded, stageEditFor]} render={() => (
+        {!staffMode && <DeferredBoard stamp={boardStamp} urgent={[stageMap, expanded, stageEditFor, cardRows.shown]} render={() => (
         <div className="space-y-4">
-          {listForTab().map((machine) => <SafeBoundary key={machine.id} name="machine-card" label="this machine card" render={() => {
+          {tabList.slice(0, cardRows.shown).map((machine) => <SafeBoundary key={machine.id} name="machine-card" label="this machine card" render={() => {
             const curIdx   = stageIdx(machine.stage);
             const isComplete = machine.status === "completed";
             const isExpanded = expanded === machine.id;
@@ -3264,7 +3301,7 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
             );
 
             return (
-              <div key={machine.id} data-mt-mid={machine.id} className={`mt-card overflow-hidden${isComplete ? " mt-card-ready" : ""}`}>
+              <div key={machine.id} data-mt-mid={machine.id} className={`mt-card mt-list-card overflow-hidden${isComplete ? " mt-card-ready" : ""}`}>
 
                 {/* ── Card header ── */}
                 <div className="px-5 py-4">
@@ -4000,6 +4037,11 @@ export function MachinePage({ machineLog, outwardLog = [], onIssuePendingPart = 
               </div>
             );
           }} />)}
+          {cardRows.more > 0 && (
+            <div ref={cardRows.sentinelRef} data-more-rows={cardRows.more} className="text-center text-[12px] py-3" style={{ color: "var(--text-dim)" }}>
+              <MoreRowsNote rows={cardRows} />
+            </div>
+          )}
         </div>
         )} />}
 

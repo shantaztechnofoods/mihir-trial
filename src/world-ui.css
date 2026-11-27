@@ -74,7 +74,7 @@
   /* motion-a (2026-11-06): 220 ms, opacity + 6 px rise, ease-out. Plain CSS on purpose, not a View
      Transition: a VT freezes taps while it snapshots and needs flushSync (a heavy page would render
      synchronously inside the tap), so the nav tap would get slower. */
-  .app-shell > .flex-1, .app-shell > main, .app-shell > div.flex-1 { animation: wu-page 220ms var(--ease-enter) backwards; }
+  .app-shell > .flex-1, .app-shell > main > .flex-1, .app-shell > main > div.flex-1, .app-shell > div.flex-1 { animation: wu-page 220ms var(--ease-enter) backwards; }
   @keyframes wu-page { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
   [data-staff-section] .mt-card, .wu-stagger > * { animation: wu-rise 420ms var(--ease-enter) backwards; }
   [data-staff-section] .mt-card:nth-child(2), .wu-stagger > :nth-child(2) { animation-delay: 40ms; }
@@ -653,7 +653,7 @@
 
 /* ═══ Reduced motion: no entrances, no loops, no celebration motion ═══════ */
 @media (prefers-reduced-motion: reduce) {
-  .app-shell > .flex-1, .app-shell > main, [data-staff-section] .mt-card, .wu-stagger > *, .modal-backdrop > div, .toast, .wu-seal,
+  .app-shell > .flex-1, .app-shell > main > .flex-1, .app-shell > main > div.flex-1, [data-staff-section] .mt-card, .wu-stagger > *, .modal-backdrop > div, .toast, .wu-seal,
   [data-my-dashboard] > div { animation: wu-fade 160ms ease backwards !important; }
   .skeleton::after, .wu-sk::after { display: none; }
   .progress-bar, [data-wu-fill], .skeleton, .wu-sk, .rack-crate, .rp-seal svg, .wu-seal svg, .arrival-banner, .mobile-tabbar svg { animation: none !important; }
@@ -812,6 +812,7 @@
   .dash-line-views > button { min-height: 32px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: var(--ink-3); font: 600 13px/1 var(--font-ui); cursor: pointer; }
   .dash-line-views > button[aria-pressed="true"] { background: var(--paper); color: var(--ink); box-shadow: var(--e1); }
   .dash-line-views > button:focus-visible { outline: 2px solid var(--action); outline-offset: 1px; }
+  @media (max-width: 599px) { .dash-line-views > button { min-height: 44px; padding: 0 14px; } } /* phone: 3D toggle shown too (2026-11-27) */
   .dash-line-note, .dash-line-3d-loading { margin: 0 0 8px; font-size: 13px; font-weight: 500; color: var(--ink-3); }
   .dash-line-3d-loading { display: flex; align-items: center; justify-content: center; height: 190px; border-radius: 16px; background: var(--sunk); }
   .f3-ring { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; padding: 2px 12px 2px 2px; border-radius: 999px; background: var(--sunk); border: 1px solid var(--line); }
@@ -1706,7 +1707,7 @@
 /* ── MOTION v2 batch 2 (2026-11-27): page · menus · tabs · fold · save · numbers ── */
 @media screen {
   /* Page enter: 220 ms / 6 px → 200 ms / 4 px */
-  .app-shell > .flex-1, .app-shell > main, .app-shell > div.flex-1 { animation: wu-page2 var(--m-small) var(--m-ease-out) backwards; }
+  .app-shell > .flex-1, .app-shell > main > .flex-1, .app-shell > main > div.flex-1, .app-shell > div.flex-1 { animation: wu-page2 var(--m-small) var(--m-ease-out) backwards; }
   @keyframes wu-page2 { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
   .page-scroll > div { animation: none; }   /* duplicate 280 ms page slide on Report Center (shell already enters) */
 
@@ -1743,7 +1744,7 @@
   .btn-primary-brand::after { transition-duration: var(--m-micro) !important; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .app-shell > .flex-1, .app-shell > main, .app-shell > div.flex-1 { animation: wu-fade var(--m-micro-out) linear backwards; }
+  .app-shell > .flex-1, .app-shell > main > .flex-1, .app-shell > main > div.flex-1, .app-shell > div.flex-1 { animation: wu-fade var(--m-micro-out) linear backwards; }
   .app-shell [role="listbox"]:not(.mt-premium *), .app-shell .user-menu-anim { animation: none !important; }
   .slide-pill, .dash-line-arrow, .wu-reveal.wu-in { transition: none !important; }
   .wu-sm-tick, .wu-sm-word, .mobile-tabbar > button[aria-current="page"] svg, .kpi-value, .progress-bar { animation: none !important; }
