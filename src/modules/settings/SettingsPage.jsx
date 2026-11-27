@@ -185,7 +185,7 @@ export function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, on
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <Topbar title={pageTitle} subtitle={`${activeTab.desc} · Build ${APP_BUILD}`}>
+      <Topbar title={pageTitle} subtitle={`${activeTab.desc} · Build ${APP_BUILD}`} themeSwitch={false}>
         {isDirty && !saved && (
           <span className="text-[10px] font-bold px-2.5 py-1 rounded-full"
                 style={{ background: "rgba(217, 119, 6,0.15)", color: "#B45309", border: "1px solid rgba(217, 119, 6,0.35)" }}>

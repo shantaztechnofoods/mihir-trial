@@ -30,7 +30,7 @@ const TopbarClock = React.memo(function TopbarClock() {
   return CLOCK_FMT ? CLOCK_FMT.format(time) : time.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 });
 
-export function Topbar({ title, subtitle, children }) {
+export function Topbar({ title, subtitle, children, themeSwitch = true }) {
   const onMenu = React.useContext(MobileNavContext);
 
   return (
@@ -49,8 +49,10 @@ export function Topbar({ title, subtitle, children }) {
         <h1 className="text-[17px] font-extrabold tracking-[-0.02em] leading-tight" style={{ color: "var(--text-strong)" }}>{title}</h1>
         {subtitle && <p className="text-[11.5px] mt-1 leading-snug font-normal" style={{ color: "var(--text-dim)" }}>{subtitle}</p>}
       </div>
-      {/* Light / Dark / Auto — each person's choice, remembered in this browser */}
-      <ThemeSwitch className="flex-shrink-0" />
+      {/* Light / Dark / Auto — each person's choice, remembered in this browser.
+          Settings turns it off: its Appearance card already holds the same
+          switch with words, and two switches on one screen read as a glitch. */}
+      {themeSwitch && <ThemeSwitch className="flex-shrink-0" />}
       <div className="text-[11px] tabular-nums hidden sm:flex items-center gap-1.5 flex-shrink-0 px-3 py-1.5 rounded-lg"
            style={{ fontFamily: "'Inter',system-ui,sans-serif", color: "var(--text-dim)", background: "var(--surface-raised)", border: "1px solid var(--border-subtle)" }}>
         <TopbarClock />
