@@ -1,0 +1,44 @@
+/* src/modules/settings/settings.css — moved verbatim from src/index.css (modules/fold-settings-css, 2026-11-27).
+   Rules only the Settings page uses (.settings-tabs, .st-save / .st-x / [data-save-modules], .dept-head-*,
+   [data-report-master] .rm-tick); imported by SettingsPage.jsx. The .org-group* rules stay in index.css:
+   BOM Edit (machine-tracker / bom) uses them too. */
+
+/* Settings tabs: no clipping on narrow screens — they wrap into pills */
+.settings-tabs { flex-wrap: wrap; overflow-x: visible !important; row-gap: 2px; }
+@media (max-width: 767px) {
+  .settings-tabs { border-bottom: 0; gap: 6px; }
+  .settings-tabs > button { margin-bottom: 0 !important; white-space: normal; text-align: left; border: 1px solid var(--v2-edge); border-radius: 10px; padding: 8px 12px; line-height: 1.25; }
+}
+
+.settings-tabs > button { min-height: 44px; }
+/* 2026-11-27 view round 2 — Settings on touch screens (phone + tablet):
+   Save buttons and the small × / ↑ / ↓ chips get a 44px tap area. The chip
+   remove buttons use negative margins so the chips keep their height.
+   Mouse (fine pointer) unchanged. */
+@media (pointer: coarse) {
+  .st-save, [data-save-modules] { min-height: 44px !important; }
+  .st-x { min-width: 32px; min-height: 44px; margin-top: -12px; margin-bottom: -12px; display: inline-flex; align-items: center; justify-content: center; }
+}
+
+/* Settings → Department heads (2026-11-05). Laptop: dept | picker | status in
+   one row. Phone: stacked, full-width 44px controls, no sideways scroll. */
+.dept-head-list { display: flex; flex-direction: column; border: 1px solid rgba(17,24,39,0.10); border-radius: 10px; }
+.dept-head-row { display: grid; grid-template-columns: 140px minmax(0, 1fr) 88px; align-items: center; gap: 8px 16px; padding: 12px 16px; }
+.dept-head-row + .dept-head-row { border-top: 1px solid rgba(17,24,39,0.08); }
+.dept-head-row > :nth-child(2):last-child { grid-column: 2 / -1; }
+.dept-head-ctl { min-width: 0; max-width: 480px; }
+.dept-head-typed { display: flex; gap: 8px; margin-top: 8px; align-items: flex-end; }
+@media (max-width: 639px) {
+  .dept-head-row { grid-template-columns: minmax(0, 1fr); gap: 4px; padding: 12px; }
+  .dept-head-row > :nth-child(2):last-child { grid-column: auto; }
+  .dept-head-ctl { max-width: none; }
+  .dept-head-msg:empty { display: none; }
+}
+
+/* 2026-11-27 view round 2 — Report Master ticks on touch screens: the 16px
+   checkbox gets a 44px tap area (the label around it), checkbox drawn at 22px.
+   Desktop mouse (fine pointer) unchanged. */
+@media (pointer: coarse) {
+  [data-report-master] .rm-tick { min-width: 44px; min-height: 44px; justify-content: center; }
+  [data-report-master] .rm-tick input[type="checkbox"] { width: 22px; height: 22px; }
+}

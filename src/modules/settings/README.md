@@ -20,6 +20,7 @@ Company and app settings, report language, PO template (from modules/purchase), 
 | `handlers.js` | 140 |
 | `index.js` | 4 |
 | `settingsUi.jsx` | 42 |
+| `settings.css` | 44 — Settings-only styles (`.settings-tabs`, `.st-save` / `.st-x` / `[data-save-modules]` touch sizes, `.dept-head-*`, `[data-report-master] .rm-tick`), moved verbatim from `src/index.css` (modules/fold-settings-css, 2026-11-27); imported by `SettingsPage.jsx`. The `.org-group*` rules stay in index.css (BOM Edit uses them too), and so does world-ui.css's Petrol `--st-save*` theme tokens. |
 
 `index.js` is the public surface — the app shell and other modules import only from it:
 `SettingsPage`
