@@ -75,7 +75,7 @@ export function SignaturePad({ onSave, onCancel, initialSvg = "", light = false 
         onMouseDown={start} onMouseMove={move} onMouseUp={end} onMouseLeave={end}
         onTouchStart={start} onTouchMove={move} onTouchEnd={end}
       />
-      <div className="flex items-center gap-2 mt-3">
+      <div className="sig-pad-btns flex items-center gap-2 mt-3">
         <button type="button" onClick={clear}
                 className={light ? "text-[11px] font-bold px-3 py-1.5 rounded-lg text-slate-600 border border-slate-300 bg-white hover:bg-slate-50 transition-all" : "text-[11px] font-bold px-3 py-1.5 rounded-lg text-slate-400 border border-slate-200 bg-slate-50 hover:bg-slate-100 hover:text-slate-900 transition-all"}>
           Clear

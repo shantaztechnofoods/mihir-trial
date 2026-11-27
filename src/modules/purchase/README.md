@@ -24,6 +24,7 @@ Vendors (list, add/edit, Excel import, WhatsApp link), the Order Pipeline (creat
 | `VendorImportModal.jsx` | 214 |
 | `VendorModal.jsx` | 154 |
 | `VendorsPage.jsx` | 523 |
+| `handlers.js` | 502 |
 | `index.js` | 6 |
 
 `index.js` is the public surface — the app shell and other modules import only from it:
@@ -49,6 +50,15 @@ The screens here are presentational: state and every write (handler) still live 
 | `<VendorsPage>` | `onEditVendor` | `handleEditVendor` |
 | `<VendorsPage>` | `onDeleteVendor` | `handleDeleteVendor` |
 | `<VendorsPage>` | `onBulkAddVendors` | `handleBulkAddVendors` |
+
+**Phase C (docs/SHELL-CONTEXT.md):** the PO, follow-up and vendor writes — `handleCreatePO`,
+`handleUpdatePO`, `handleReceivePO`, `handleDeletePO`, `handleReverseReceive`, `handleConfirmOrder`,
+`handleFollowUpDone`, `handleAddVendor`, `handleEditVendor`, `handleDeleteVendor`,
+`handleRestoreVendor`, `handleBulkAddVendors` — now live in this folder's `handlers.js`
+(`createPurchaseHandlers(shell)`, moved verbatim; App.jsx calls it and wires the results as before,
+incl. the `guarded.deleteVendor` / `guarded.restoreVendor` double-tap wrappers).
+`handleUpdateStock` (shell), `handleFulfillPending` and `handleSetItemDefaultRate` (inventory) stay
+in App.jsx. Needs `SHELL_API` ≥ 3 (`requiresShell` in MODULE.json).
 
 Depends on other modules (imported through their `index.js`): _none_
 Shared code used: `src/shared/components/DebouncedSearchInput.jsx`, `src/shared/components/ItemSearchSelect.jsx`, `src/shared/components/LeadIcon.jsx`, `src/shared/components/SearchableSelect.jsx`, `src/shared/format.js`, `src/shared/loadXlsx.js`, `src/shared/ui/Topbar.jsx`, `src/shared/ui/primitives.jsx`
@@ -105,6 +115,6 @@ Automated: `npm test && npm run build`, then `E2E_ONLY=<suite> scripts/ship.sh c
 See `docs/MODULE-PROMOTION.md`. In short:
 1. Copy this whole folder from the Trial ERP over `src/modules/purchase/` in Live (replace, do not merge by hand).
 2. Diff `index.js`: every name other modules import must still be exported (`npm run build` fails if not).
-3. If the Trial change also touched the handlers listed above, copy those handler changes in `src/app/App.jsx` too (handlers are not inside the folder yet).
+3. The handlers in `handlers.js` travel with the folder. Run `node scripts/module-check.mjs purchase --against <live>`: section 5b lists shell keys / the `createPurchaseHandlers(shell)` line Live's App.jsx still needs (one-time App.jsx step). Changes to `handleUpdateStock`, `handleFulfillPending` or `handleSetItemDefaultRate` still need the App.jsx step.
 4. Apply any NEW migration the change needs (additive, in number order, BEFORE merging) and redeploy any Edge Function listed above that changed.
 5. `npm test`, `npm run build`, the browser suites listed above, then merge; Vercel deploys `main`.
