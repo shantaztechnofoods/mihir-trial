@@ -266,7 +266,7 @@ export default function AuditHistoryPage() {
       </PageHeader>
 
       {/* Filters */}
-      <div className="px-6 py-3 flex flex-wrap items-center gap-2" style={{ background: "rgba(26,31,46,0.04)", borderBottom: "1px solid rgba(26,31,46,0.05)" }}>
+      <div className="filter-bar px-6 py-3 flex flex-wrap items-center gap-2" style={{ background: "rgba(26,31,46,0.04)", borderBottom: "1px solid rgba(26,31,46,0.05)" }}>
         <div className="relative">
           <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs">🔍</span>
           <input value={search} onChange={(e) => { setSearch(e.target.value); setPage(0); }}

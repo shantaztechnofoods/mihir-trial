@@ -285,9 +285,9 @@ export default function RoleManagementPage({ canDo }) {
                   <input value={editForm.badge} onChange={(e) => setEditForm((f) => ({ ...f, badge: e.target.value }))}
                     placeholder="e.g. Full Access" className={inputCls} style={inputStyle} />
                 </div>
-                <div>
+                <div className="role-icon-field">
                   <label className="block text-[10px] font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Icon</label>
-                  <div className="flex gap-1.5 flex-wrap">
+                  <div className="role-icon-pick flex gap-1.5 flex-wrap">
                     {ICONS.map((ic) => (
                       <button key={ic} onClick={() => setEditForm((f) => ({ ...f, icon: ic }))}
                         className="w-8 h-8 rounded-lg flex items-center justify-center text-base transition-all"
