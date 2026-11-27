@@ -242,9 +242,9 @@ export function AddItemModal({ machines, onSave, onClose, initialValues = null, 
     return recomputeStatus(s, m);
   })();
 
-  const Label = ({ text, req }) => (
-    <div className="text-[11px] font-medium tracking-tight mb-1.5" style={{ color: "#2640B0" }}>
-      {text}{req && <span className="text-red-400 ml-0.5">*</span>}
+  const Label = ({ text, req, id }) => (
+    <div id={id} className="text-[11px] font-medium tracking-tight mb-1.5" style={{ color: "#2640B0" }}>
+      {text}{req && <span className="text-red-400 ml-0.5" aria-hidden="true">*</span>}
     </div>
   );
 
@@ -283,15 +283,15 @@ export function AddItemModal({ machines, onSave, onClose, initialValues = null, 
           {/* Row 1 — Name + Code */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label text="Item Name" req />
-              <input ref={nameRef} value={form.name} onChange={(e) => set("name", e.target.value)}
+              <Label id="item-item-name" text="Item Name" req />
+              <input aria-labelledby="item-item-name" ref={nameRef} value={form.name} onChange={(e) => set("name", e.target.value)}
                      onKeyDown={onEnter(codeRef)}
                      placeholder="e.g. Hydraulic Oil ISO 46" className={inp(errors.name)} />
               {errors.name && <div className="text-[10px] text-red-600 mt-1.5">{errors.name}</div>}
             </div>
             <div>
-              <Label text="Item Code" req />
-              <input ref={codeRef} value={form.code} onChange={(e) => set("code", e.target.value)}
+              <Label id="item-item-code" text="Item Code" req />
+              <input aria-labelledby="item-item-code" ref={codeRef} value={form.code} onChange={(e) => set("code", e.target.value)}
                      onKeyDown={onEnter(stockRef)}
                      placeholder="e.g. OIL-HYD46" className={inp(errors.code)} />
               {errors.code && <div className="text-[10px] text-red-600 mt-1.5">{errors.code}</div>}
@@ -301,8 +301,8 @@ export function AddItemModal({ machines, onSave, onClose, initialValues = null, 
           {/* Row 2 — Quantity + Unit */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label text={isEdit ? "Current Stock" : "Opening Stock"} req={!isEdit} />
-              <input ref={stockRef} type="number" min="0" value={form.stock}
+              <Label id="item-stock" text={isEdit ? "Current Stock" : "Opening Stock"} req={!isEdit} />
+              <input aria-labelledby="item-stock" ref={stockRef} type="number" min="0" value={form.stock}
                      onChange={(e) => set("stock", e.target.value)}
                      onKeyDown={onEnter(minRef)} disabled={isEdit} readOnly={isEdit}
                      placeholder="0" className={inp(errors.stock)}
@@ -312,8 +312,8 @@ export function AddItemModal({ machines, onSave, onClose, initialValues = null, 
                 : errors.stock && <div className="text-[10px] text-red-600 mt-1.5">{errors.stock}</div>}
             </div>
             <div>
-              <Label text="Unit of Measure" req />
-              <select value={form.unit} onChange={(e) => set("unit", e.target.value)} className={inp(false)} style={selectStyle}>
+              <Label id="item-unit-of-measure" text="Unit of Measure" req />
+              <select aria-labelledby="item-unit-of-measure" value={form.unit} onChange={(e) => set("unit", e.target.value)} className={inp(false)} style={selectStyle}>
                 {["Nos","Pcs","Kg","Meter","Ltrs","Mtrs","Set","Box","Roll","Pair"].map((u) => <option key={u}>{u}</option>)}
               </select>
             </div>
@@ -322,14 +322,14 @@ export function AddItemModal({ machines, onSave, onClose, initialValues = null, 
           {/* Row 2b — Category + Location */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label text="Category" req />
-              <select value={form.machine} onChange={(e) => set("machine", e.target.value)} className={inp(false)} style={selectStyle}>
+              <Label id="item-category" text="Category" req />
+              <select aria-labelledby="item-category" value={form.machine} onChange={(e) => set("machine", e.target.value)} className={inp(false)} style={selectStyle}>
                 {["Mechanical","Electrical","In-House","Hardware"].map((m) => <option key={m}>{m}</option>)}
               </select>
             </div>
             <div>
-              <Label text="Storage Location" />
-              <input value={form.location} onChange={(e) => set("location", e.target.value)}
+              <Label id="item-storage-location" text="Storage Location" />
+              <input aria-labelledby="item-storage-location" value={form.location} onChange={(e) => set("location", e.target.value)}
                      placeholder="e.g. Rack M-2, Bin 4" className={inp(false)} />
             </div>
           </div>
@@ -340,8 +340,8 @@ export function AddItemModal({ machines, onSave, onClose, initialValues = null, 
               issuing. Non-critical items keep the existing issue flow. */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label text="Critical Item" />
-              <select value={form.isCritical ? "yes" : "no"}
+              <Label id="item-critical-item" text="Critical Item" />
+              <select aria-labelledby="item-critical-item" value={form.isCritical ? "yes" : "no"}
                       onChange={(e) => set("isCritical", e.target.value === "yes")}
                       className={inp(false)} style={selectStyle}>
                 <option value="no">No</option>
@@ -353,8 +353,8 @@ export function AddItemModal({ machines, onSave, onClose, initialValues = null, 
             </div>
             {form.isCritical && (
               <div>
-                <Label text="Outward Input Type" req />
-                <select value={form.outwardInputType}
+                <Label id="item-outward-input-type" text="Outward Input Type" req />
+                <select aria-labelledby="item-outward-input-type" value={form.outwardInputType}
                         onChange={(e) => set("outwardInputType", e.target.value)}
                         className={inp(false)} style={selectStyle}>
                   <option value="checkbox">Checkbox Confirmation</option>
@@ -369,8 +369,8 @@ export function AddItemModal({ machines, onSave, onClose, initialValues = null, 
 
           {/* Row 3 — Min Stock */}
           <div>
-            <Label text="Minimum Stock Alert Level" req />
-            <input ref={minRef} type="number" min="0" value={form.min} onChange={(e) => set("min", e.target.value)}
+            <Label id="item-min-stock" text="Minimum Stock Alert Level" req />
+            <input aria-labelledby="item-min-stock" ref={minRef} type="number" min="0" value={form.min} onChange={(e) => set("min", e.target.value)}
                    onKeyDown={onEnter(rateRef)}
                    placeholder="Alert triggered when stock falls below this level" className={inp(errors.min)} />
             {errors.min && <div className="text-[10px] text-red-600 mt-1.5">{errors.min}</div>}
@@ -401,7 +401,7 @@ export function AddItemModal({ machines, onSave, onClose, initialValues = null, 
               a BOM the line inherits a copy, which that BOM can then edit on its
               own without touching this list. */}
           <div>
-            <Label text={`Check Points${checkPoints.length ? ` (${checkPoints.length})` : ""}`} />
+            <Label id="item-check-points" text={`Check Points${checkPoints.length ? ` (${checkPoints.length})` : ""}`} />
             <div className="text-[10px] text-slate-500 mb-2">
               The store operator sees these points in a popup at Outward. e.g. "Handle with care", "Check shaft diameter".
             </div>
@@ -421,7 +421,7 @@ export function AddItemModal({ machines, onSave, onClose, initialValues = null, 
             )}
 
             <div className="flex gap-2">
-              <input value={cpDraft} onChange={(e) => setCpDraft(e.target.value)}
+              <input aria-labelledby="item-check-points" value={cpDraft} onChange={(e) => setCpDraft(e.target.value)}
                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCheckPoint(); } }}
                      placeholder="e.g. Handle with care — rubber item"
                      className={inp(false)} />
@@ -445,16 +445,16 @@ export function AddItemModal({ machines, onSave, onClose, initialValues = null, 
           {/* GST Rate (migration 018) + Default Purchase Rate (020) */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label text="GST Rate" />
-              <select value={form.gstRate} onChange={(e) => set("gstRate", e.target.value)} className={inp(false)} style={selectStyle}>
+              <Label id="item-gst-rate" text="GST Rate" />
+              <select aria-labelledby="item-gst-rate" value={form.gstRate} onChange={(e) => set("gstRate", e.target.value)} className={inp(false)} style={selectStyle}>
                 <option value="">— Not set —</option>
                 {ITEM_GST_RATES.map((r) => <option key={r} value={r}>{r}%</option>)}
               </select>
               <div className="text-[10px] text-slate-500 mt-1">Used by auto GST calculation in PO modal (multi-rate / itemwise purchases).</div>
             </div>
             <div>
-              <Label text="Default Purchase Rate (₹)" />
-              <input type="number" min="0" step="0.01" value={form.defaultPurchaseRate}
+              <Label id="item-default-purchase-rate" text="Default Purchase Rate (₹)" />
+              <input aria-labelledby="item-default-purchase-rate" type="number" min="0" step="0.01" value={form.defaultPurchaseRate}
                      onChange={(e) => set("defaultPurchaseRate", e.target.value)}
                      placeholder="e.g. 150"
                      className={inp(false)}
