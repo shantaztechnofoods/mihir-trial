@@ -21,7 +21,7 @@ Stock: Item Master (items, quick stock change, item detail with history, add/edi
 | `ItemImportModal.jsx` | 208 |
 | `OutwardPage.jsx` | 1135 |
 | `PendingPage.jsx` | 686 |
-| `handlers.js` | 473 |
+| `handlers.js` | 938 |
 | `index.js` | 7 |
 
 `index.js` is the public surface — the app shell and other modules import only from it:
@@ -59,8 +59,12 @@ incl. `guarded.fulfillPending` / `deleteItemRow` / `restoreItemRow` and the Orde
 `onFulfillPending` / `onSetItemDefaultRate`). The inline `onAddInward` arrow stays in App.jsx
 (turning it into a named handler would not be a pure move). The **frozen** Outward BOM-issue writes
 (`handleAddOutward`, `raiseNotIssuedJobs`, `handleCreateMachine`, `handleAbortMachineCreate`,
-`handleRemoveRackMachine`) and the BOM handlers stay in App.jsx until the owner says yes.
-`handleUpdateStock` is shell API. Needs `SHELL_API` ≥ 4 (`requiresShell` in MODULE.json).
+`handleRemoveRackMachine`) moved into the same `handlers.js` too (modules/c-bom-issue, owner/handler
+yes for Trial, 27 Nov 2026) — still owner-locked: change them only with the owner's yes
+(skill `shantaz-erp-frozen-modules`). `handleRemoveRackMachine` is also registered as
+`shell.call("inventory.removeRackMachine")` for bom's `handleDeleteBOM`. The BOM handlers live in
+`modules/bom/handlers.js`. `handleUpdateStock` and `saveFailed` are shell API. Needs `SHELL_API` ≥ 6
+(`requiresShell` in MODULE.json).
 
 Depends on other modules (imported through their `index.js`): `modules/bom`
 Shared code used: `src/shared/components/ItemSearchSelect.jsx`, `src/shared/components/LeadIcon.jsx`, `src/shared/components/MoreRowsNote.jsx`, `src/shared/components/VendorSearchSelect.jsx`, `src/shared/components/useProgressiveCount.js`, `src/shared/format.js`, `src/shared/loadXlsx.js`, `src/shared/machineStages.js`, `src/shared/ui/Topbar.jsx`, `src/shared/ui/primitives.jsx`
@@ -123,6 +127,6 @@ Automated: `npm test && npm run build`, then `E2E_ONLY=<suite> scripts/ship.sh c
 See `docs/MODULE-PROMOTION.md`. In short:
 1. Copy this whole folder from the Trial ERP over `src/modules/inventory/` in Live (replace, do not merge by hand).
 2. Diff `index.js`: every name other modules import must still be exported (`npm run build` fails if not).
-3. The handlers in `handlers.js` travel with the folder. Run `node scripts/module-check.mjs inventory --against <live>`: section 5b lists shell keys / the `createInventoryHandlers(shell)` line Live's App.jsx still needs (one-time App.jsx step). Changes to the handlers still in App.jsx (frozen BOM issue, `handleUpdateStock`) still need the App.jsx step.
+3. The handlers in `handlers.js` travel with the folder. Run `node scripts/module-check.mjs inventory --against <live>`: section 5b lists shell keys / the `createInventoryHandlers(shell)` line Live's App.jsx still needs (one-time App.jsx step). Changes to `handleUpdateStock` (shell API, still in App.jsx) still need the App.jsx step. The BOM-issue handlers are owner-locked; Machine Tracker in ERP LIVE is LOCKED, so promoting them needs the owner's "haan".
 4. Apply any NEW migration the change needs (additive, in number order, BEFORE merging) and redeploy any Edge Function listed above that changed.
 5. `npm test`, `npm run build`, the browser suites listed above, then merge; Vercel deploys `main`.

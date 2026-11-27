@@ -10,7 +10,7 @@
 // destructures a key the shell object does not have. scripts/module-check.mjs
 // compares the keys by name against a Live checkout.
 // Read only by scripts/tests; the app does not import it.
-export const SHELL_API = 5;
+export const SHELL_API = 6;
 
 // shell.call names (docs/SHELL-CONTEXT.md "Cross-module calls"): the ONLY names a
 // handlers.js may pass to call("…"). name → the handler App.jsx registers under it,
