@@ -237,6 +237,12 @@
   .page-header .page-header-actions { flex-wrap: nowrap !important; flex: 0 0 auto !important; width: auto !important; }
   .page-header .page-header-actions button, .page-header .page-header-actions > a { min-height: 40px; white-space: nowrap; }
   .page-header .page-header-actions button[aria-label^="Departments called"] { min-width: 40px; }
+  /* Touch phones: header actions (Export, Import, + Add Item, + New PO…) get the
+     44px tap target the rest of the app uses on touch; mouse layouts keep 40px. */
+  @media (pointer: coarse) {
+    .page-header .page-header-actions button, .page-header .page-header-actions > a { min-height: 44px; }
+    .page-header .page-header-actions button[aria-label^="Departments called"] { min-width: 44px; }
+  }
   /* Three or more actions (Machine Tracker): they take their own row below the title */
   .page-header:has(.page-header-actions > :nth-child(3)) { flex-wrap: wrap !important; }
   .page-header:has(.page-header-actions > :nth-child(3)) .page-header-actions { flex: 1 0 100% !important; width: 100% !important; }
