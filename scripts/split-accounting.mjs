@@ -70,6 +70,26 @@ const HEADER = "moved verbatim from the former single-file src/App.jsx";
 //                              `export function createXxxHandlers(shell) {`
 //                              `  const { a, b } = shell;` (one or more lines)
 //                              `  return { a, b };` (one or more lines) and the closing `}`
+//     shell.call (docs/SHELL-CONTEXT.md "Cross-module calls", SHELL_API 5):
+//       src/app/App.jsx        `  const shellRegistry = {};`, `  const call = makeShellCall(shellRegistry);`,
+//                              `  Object.assign(shellRegistry, { "m.name": handleX, … });` (one line, or a
+//                              block whose interior lines are only `"m.name": handleX,` pairs)
+//       src/modules/*/handlers.js (inside the factory)
+//                              `  const handleX = (...args) => call("m.name", ...args);` (adapter)
+//       src/app/shellCall.js   new file imported only by App.jsx whose code lines equal SHELL_CALL_SRC below
+//     src/app/shellVersion.js is metadata (nothing in src imports it; scripts/tests read
+//     SHELL_API / SHELL_CALLS): left out of A on both sides while that holds.
+const SHELL_CALL_SRC = [
+  "export function makeShellCall(registry) {",
+  "  return (name, ...args) => {",
+  "    const fn = registry[name];",
+  "    if (typeof fn !== \"function\") throw new Error(`shell.call: unknown \"${name}\"`);",
+  "    return fn(...args);",
+  "  };",
+  "}",
+];
+const CALL_PAIRS = /^"[a-z][\w-]*\.[A-Za-z][\w$]*"\s*:\s*[A-Za-z_$][\w$]*(\s*,\s*"[a-z][\w-]*\.[A-Za-z][\w$]*"\s*:\s*[A-Za-z_$][\w$]*)*\s*,?$/;
+const CALL_PAIR_LINE = /^\s*"[a-z][\w-]*\.[A-Za-z][\w$]*"\s*:\s*[A-Za-z_$][\w$]*\s*,?\s*$/;
 const IDS_LINE = /^\s*[A-Za-z_$][\w$]*(\s*,\s*[A-Za-z_$][\w$]*)*\s*,?\s*$/;
 const IDS_INLINE = /^[A-Za-z_$][\w$]*(\s*,\s*[A-Za-z_$][\w$]*)*\s*,?$/;
 // Returns { keep: lines still counted, wiring: lines taken out (allowed shapes), bad: problems }.
@@ -96,6 +116,14 @@ function phaseCWiring(file, lines) {
       if (b.end < 0) { bad.push(`${file}: ${b.why}`); keep.push(l); continue; }
       wiring.push(...lines.slice(i, b.end + 1).filter(code)); i = b.end; continue;
     }
+    if (isApp && (/^ {2}const shellRegistry = \{\};\s*$/.test(l) || /^ {2}const call = makeShellCall\(shellRegistry\);\s*$/.test(l))) { wiring.push(l); continue; }
+    if (isApp && (m = l.match(/^ {2}Object\.assign\(shellRegistry, \{\s*(.*?)\s*\}\);\s*$/)) && CALL_PAIRS.test(m[1])) { wiring.push(l); continue; }
+    if (isApp && /^ {2}Object\.assign\(shellRegistry, \{\s*$/.test(l)) {
+      let j = i + 1;
+      while (j < lines.length && !/^ {2}\}\);\s*$/.test(lines[j])) { if (code(lines[j]) && !CALL_PAIR_LINE.test(lines[j])) break; j++; }
+      if (j < lines.length && /^ {2}\}\);\s*$/.test(lines[j])) { wiring.push(...lines.slice(i, j + 1).filter(code)); i = j; continue; }
+      bad.push(`${file}: shellRegistry block holds something other than "m.name": handlerName pairs`); keep.push(l); continue;
+    }
     if (isApp && (m = l.match(/^ {2}const \{\s*(.*?)\s*\} = create[A-Z][\w$]*Handlers\(shell\);\s*$/)) && IDS_INLINE.test(m[1])) { wiring.push(l); continue; }
     if (isApp && /^ {2}const \{\s*$/.test(l)) {
       const b = block(i, /^ {2}\} = create[A-Z][\w$]*Handlers\(shell\);\s*$/);
@@ -105,6 +133,7 @@ function phaseCWiring(file, lines) {
     if (isHandlers && factoryOpen) {
       if ((m = l.match(/^ {2}const \{\s*(.*?)\s*\} = shell;\s*$/)) && IDS_INLINE.test(m[1])) { wiring.push(l); continue; }
       if ((m = l.match(/^ {2}return \{\s*(.*?)\s*\};\s*$/)) && IDS_INLINE.test(m[1])) { wiring.push(l); continue; }
+      if (/^ {2}const [A-Za-z_$][\w$]* = \(\.\.\.args\) => call\("[a-z][\w-]*\.[A-Za-z][\w$]*", \.\.\.args\);\s*$/.test(l)) { wiring.push(l); continue; }
       if (/^ {2}(const|return) \{\s*$/.test(l)) {
         const b = block(i, /^ {2}(\} = shell;|\};)\s*$/);
         if (b.end < 0) { bad.push(`${file}: ${b.why}`); keep.push(l); continue; }
@@ -158,8 +187,22 @@ function moveMode(baseSha) {
   const ownHandlersFile = (x) => /^src\/modules\/([^/]+)\/handlers\.js$/.test(x.f)
     && x.importers.length === 1 && x.importers[0] === "src/app/App.jsx";
   const metadataOnly = new Set(addedInfo.filter((x) => !x.importers.length).map((x) => x.f));
+  // src/app/shellVersion.js: read only by scripts/tests (SHELL_API, SHELL_CALLS) — metadata on both sides while nothing imports it
+  const SV = "src/app/shellVersion.js";
+  const svMeta = headFiles.includes(SV) && !importersOf(SV).length;
+  if (svMeta) metadataOnly.add(SV);
+  // src/app/shellCall.js: the shell.call helper, imported only by App.jsx, fixed text (SHELL_CALL_SRC)
+  const SC = "src/app/shellCall.js";
+  const scInfo = addedInfo.find((x) => x.f === SC);
+  let scOk = null;
+  if (scInfo) {
+    const codeL = nonImportLines(readHead(SC)).filter((l) => l.trim() && !isComment(l)).map((l) => l.trimEnd());
+    scOk = scInfo.importers.length === 1 && scInfo.importers[0] === "src/app/App.jsx" && JSON.stringify(codeL) === JSON.stringify(SHELL_CALL_SRC);
+    metadataOnly.add(SC);
+    if (scOk) wiringLines.push(...codeL.map((l) => `${SC}: ${l.trim()}`));
+  }
   const A = [], B = [], cA = [], cB = [];
-  for (const f of baseFiles) { const r = linesOf(f, readBase(f), readBase, "base"); A.push(...r.code); cA.push(...r.comments); }
+  for (const f of baseFiles.filter((x) => !(svMeta && x === SV))) { const r = linesOf(f, readBase(f), readBase, "base"); A.push(...r.code); cA.push(...r.comments); }
   for (const f of headFiles.filter((x) => !metadataOnly.has(x))) { const r = linesOf(f, readHead(f), readHead, "head"); B.push(...r.code); cB.push(...r.comments); }
   const d = diff(multiset(A), multiset(B));
   const dc = diff(multiset(cA), multiset(cB));
@@ -185,11 +228,13 @@ function moveMode(baseSha) {
   if (!added.length) say2(`- none`);
   for (const x of addedInfo) {
     const { f, importers } = x;
+    if (x.f === SC) { if (!scOk) good = false; say2(`- ${SC}: shell.call helper — ${scOk ? "imported only by src/app/App.jsx, code lines equal the allowed text (listed in D)" : "NOT the allowed text or imported by something other than App.jsx"}`); continue; }
     if (ownHandlersFile(x)) { say2(`- ${f}: Phase C handlers file, imported only by src/app/App.jsx (its lines ARE counted in A)`); continue; }
     if (importers.length) good = false;
     say2(`- ${f}: ${importers.length ? `IMPORTED by ${importers.join(", ")}` : "not imported by any src file (metadata only; its lines are not counted in A)"}`);
   }
   const removed = baseFiles.filter((f) => !headFiles.includes(f));
+  if (svMeta) say2(`- ${SV}: metadata (not imported by any src file; SHELL_API / SHELL_CALLS read by scripts/tests) — left out of A on both sides`);
   if (removed.length) say2(`- removed/moved away: ${removed.join(", ")} (their lines are counted in A)`);
   say2();
   say2(`## C. Module index.js files hold only re-exports`);

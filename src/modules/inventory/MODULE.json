@@ -26,20 +26,12 @@
     ]
   },
   "handlers": [
-    "computeBOMDeletionInfo",
     "flashSaveError",
     "goToPage",
     "handleAbortMachineCreate",
     "handleAddOutward",
-    "handleCreateBOM",
     "handleCreateMachine",
-    "handleDeleteBOM",
-    "handleDuplicateBOM",
     "handleRemoveRackMachine",
-    "handleRenameBOM",
-    "handleRestoreBOM",
-    "handleSaveBomChecklist",
-    "handleUpdateBOM",
     "handleUpdateStock",
     "logAudit",
     "raiseNotIssuedJobs"

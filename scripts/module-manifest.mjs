@@ -24,7 +24,7 @@ const DEFAULTS = (name) => ({
   name, version: "1.0.0", frozen: false, liveLock: false, requiresCore: 1,
   migrations: [], edgeFunctions: [], serverless: [], notes: [],
 });
-const ORDER = ["name", "version", "frozen", "liveLock", "requiresCore", "requiresShell", "exports", "dependsOn", "handlers", "ownHandlers",
+const ORDER = ["name", "version", "frozen", "liveLock", "requiresCore", "requiresShell", "exports", "dependsOn", "handlers", "ownHandlers", "calls",
   "stores", "shared", "core", "npm", "migrations", "edgeFunctions", "serverless", "notes"];
 const DERIVED = [...DERIVED_KEYS, ...OPTIONAL_DERIVED_KEYS];
 
