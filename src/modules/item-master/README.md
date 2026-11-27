@@ -18,9 +18,12 @@ Item Master: the item list, quick stock change, item detail with history, add / 
 | `handlers.js` | 293 |
 | `index.js` | 3 |
 | `itemImport.js` | 230 |
+| `item-master.css` | 18 |
 
 `index.js` is the public surface — the app shell imports only from it: `InventoryPage`.
 `itemImport.js` (Excel parsing / item-code generation) moved here from `src/utils/` — only Item Master uses it.
+`item-master.css` holds the Item Master table styles (moved from `src/world-ui.css`, modules/item-master-css; imported by
+`InventoryPage.jsx`, so it loads with this folder's chunk). `.wu-status` stays in `world-ui.css` — it is the shared `StatusBadge`.
 
 ## How it plugs into the app
 Moved here from `src/modules/inventory/` as a pure move (modules/item-master, owner/handler yes 27 Nov 2026, 17:43;

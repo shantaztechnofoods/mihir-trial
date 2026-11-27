@@ -23,6 +23,18 @@ export const turnoverData = [
   { month: "Mar", rate: 5.8 }, { month: "Apr", rate: 6.2 },
 ];
 
+// No purchase orders yet: the chart draws with no data (no sample months) and
+// says why, inside its own SVG, so nothing is layered over the chart box.
+function ChartEmptyNote({ width, height }) {
+  const cx = (width || 0) / 2, cy = (height || 0) / 2;
+  return (
+    <g data-chart-empty>
+      <text x={cx} y={cy - 4} textAnchor="middle" style={{ fill: "var(--text-strong)", fontSize: 12.5, fontWeight: 600 }}>No purchase orders yet</text>
+      <text x={cx} y={cy + 16} textAnchor="middle" style={{ fill: "var(--text-muted)", fontSize: 12 }}>This chart fills in from your first PO</text>
+    </g>
+  );
+}
+
 // ─── ANALYTICS PAGE ───────────────────────────────────────────────────────────
 
 export function AnalyticsPage({ items, pos, vendorList, settings = SETTINGS_DEFAULTS }) {
@@ -102,23 +114,24 @@ export function AnalyticsPage({ items, pos, vendorList, settings = SETTINGS_DEFA
 
       <div className="p-6 space-y-6">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <MetricCard label="Total PO Spend"  value={fmtVal(totalSpend)}   delta="Live from POs"   deltaUp />
-          <MetricCard label="Avg PO Value"    value={fmtVal(avgPOValue)}   delta={`${pos.length} POs`} deltaUp />
-          <MetricCard label="Inventory Value" value={fmtVal(totalInvValue)} delta="Live stock × rate" deltaUp />
-          <MetricCard label="Active SKUs"     value={totalItems.toString()} delta={critCount > 0 ? `${critCount} critical` : "All healthy"} deltaUp={critCount === 0} />
+          <MetricCard label="Total PO Spend"  value={fmtVal(totalSpend)}   delta="Live from POs" />
+          <MetricCard label="Avg PO Value"    value={fmtVal(avgPOValue)}   delta={`${pos.length} POs`} />
+          <MetricCard label="Inventory Value" value={fmtVal(totalInvValue)} delta="Live stock × rate" />
+          <MetricCard label="Active SKUs"     value={totalItems.toString()} delta={critCount > 0 ? `${critCount} critical` : "All healthy"} />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="section-card p-5">
             <SectionHeader><LeadIcon e="📊" />PO Value by Month (₹K)</SectionHeader>
-            <ChartSlot height={220} drawIn="analytics">{({ ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip }) => (
+            <ChartSlot height={220} drawIn="analytics">{({ ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Customized }) => (
             <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={monthlyPOTrend.length > 0 ? monthlyPOTrend : monthlyPOData} barSize={28}>
+              <BarChart data={monthlyPOTrend} barSize={28}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(17,24,39,0.08)" />
                 <XAxis dataKey="month" tick={{ fill: "#475569", fontSize: 11 }} />
                 <YAxis tick={{ fill: "#475569", fontSize: 11 }} />
                 <Tooltip content={<CustomTooltip />} />
                 <Bar isAnimationActive={false} dataKey="value" name="PO Value (₹K)" fill="#2E50D620" stroke="#2E50D6" strokeWidth={1.5} radius={[3, 3, 0, 0]} />
+                {pos.length === 0 && <Customized component={ChartEmptyNote} />}
               </BarChart>
             </ResponsiveContainer>
             )}</ChartSlot>
@@ -126,9 +139,9 @@ export function AnalyticsPage({ items, pos, vendorList, settings = SETTINGS_DEFA
 
           <div className="section-card p-5">
             <SectionHeader><LeadIcon e="📈" />Inventory Turnover Rate</SectionHeader>
-            <ChartSlot height={220} drawIn="analytics">{({ ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip }) => (
+            <ChartSlot height={220} drawIn="analytics">{({ ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Customized }) => (
             <ResponsiveContainer width="100%" height={220}>
-              <AreaChart data={turnoverData}>
+              <AreaChart data={pos.length === 0 ? [] : turnoverData}>
                 <defs>
                   <linearGradient id="tGrad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#a78bfa" stopOpacity={0.2} />
@@ -137,9 +150,10 @@ export function AnalyticsPage({ items, pos, vendorList, settings = SETTINGS_DEFA
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(17,24,39,0.08)" />
                 <XAxis dataKey="month" tick={{ fill: "#475569", fontSize: 11 }} />
-                <YAxis tick={{ fill: "#475569", fontSize: 11 }} domain={[3.5, 7]} />
+                <YAxis hide={pos.length === 0} tick={{ fill: "#475569", fontSize: 11 }} domain={[3.5, 7]} />
                 <Tooltip content={<CustomTooltip />} />
                 <Area isAnimationActive={false} type="monotone" dataKey="rate" name="Turnover" stroke="#a78bfa" fill="url(#tGrad)" strokeWidth={2} dot={{ fill: "#a78bfa", r: 4 }} />
+                {pos.length === 0 && <Customized component={ChartEmptyNote} />}
               </AreaChart>
             </ResponsiveContainer>
             )}</ChartSlot>
