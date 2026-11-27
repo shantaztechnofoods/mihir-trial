@@ -4017,7 +4017,6 @@ button.rack-btn:disabled { background: #e5e7eb !important; color: #6b7280 !impor
 @media (pointer: coarse) {
   .sig-pad-btns > button,
   [data-accept-signature] .sig-pad-btns > button { min-height: 44px !important; }
-  .modal-backdrop [data-voice-record][data-voice-record] { min-width: 44px !important; min-height: 44px !important; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
