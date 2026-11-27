@@ -20,7 +20,7 @@ import { OrgGroup } from "../../shared/ui/OrgLayout.jsx";
 import { SignaturePad } from "../../shared/ui/SignaturePad.jsx";
 import { Topbar } from "../../shared/ui/Topbar.jsx";
 import { ThemeSwitch } from "../../shared/ui/ThemeSwitch.jsx";
-import SaveMorph from "../../shared/ui/SaveMorph.jsx";
+import SaveMorph from "./SaveMorph.jsx";
 import { readHapticPref, writeHapticPref, tapHaptic } from "../../utils/haptics.js";
 
 export function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, onSave, isSuperAdmin = false, canDo = () => true, onRegisterSignature, currentUser = null,

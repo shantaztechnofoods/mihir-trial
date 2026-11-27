@@ -53,7 +53,7 @@ that the props App.jsx passes did not change.
    the `guarded = { … }` double-click guards, nav items in
    `src/app/layout/navItems.js`.
 4. **Shared code moves with features.** Recent Trial work added
-   `shared/ui/Count.jsx`, `shared/ui/toast.js`, `shared/ui/SaveMorph.jsx`,
+   `shared/ui/Count.jsx`, `shared/ui/toast.js`, `shared/ui/SaveMorph.jsx` (now `modules/settings/SaveMorph.jsx`),
    `shared/ui/ThemeSwitch.jsx`, `utils/departmentHeads.js`, `utils/haptics.js`
    — Machine Tracker, Settings and Dashboard folders import them, so copying
    those folders alone into a target without them fails the build.
@@ -259,7 +259,7 @@ These are not owned by any one module and would be versioned together as
 * Folder: `src/modules/settings/` — 11 files, 1981 lines: `AdminCleanupPanel.jsx`, `ChecklistAdminPanel.jsx`, `DepartmentHeadsPanel.jsx`, `DriveBackupPanel.jsx`, `EmployeeMembersPanel.jsx`, `ModulesPanel.jsx`, `README.md`, `ReportMasterPanel.jsx`, `SettingsPage.jsx`, `index.js`, `settingsUi.jsx`
 * Mounted by `src/app/App.jsx`: `<SettingsPage>`
 * Other modules it imports: `modules/reports`, `modules/purchase`
-* shared/ (imported by the folder): `shared/buildInfo.js`, `shared/components/LeadIcon.jsx`, `shared/settingsDefaults.js`, `shared/ui/OrgLayout.jsx`, `shared/ui/SaveMorph.jsx`, `shared/ui/SignaturePad.jsx`, `shared/ui/ThemeSwitch.jsx`, `shared/ui/Topbar.jsx`
+* shared/ (imported by the folder): `shared/buildInfo.js`, `shared/components/LeadIcon.jsx`, `shared/settingsDefaults.js`, `shared/ui/OrgLayout.jsx`, `shared/ui/SignaturePad.jsx`, `shared/ui/ThemeSwitch.jsx`, `shared/ui/Topbar.jsx`
 * stores/ (imported by the folder): `stores/adminApi.js`
 * utils/ (imported by the folder): `utils/departmentHeads.js`, `utils/handoverLogic.js`, `utils/haptics.js`, `utils/modules.js`
 * auth/ (imported by the folder): `auth/AuthContext.jsx`

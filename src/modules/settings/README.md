@@ -14,8 +14,11 @@ Company and app settings, report language, PO template (from modules/purchase), 
 | `AdminCleanupPanel.jsx` | 26 |
 | `ChecklistAdminPanel.jsx` | 191 |
 | `DepartmentHeadsPanel.jsx` | 120 |
+| `DriveBackupPanel.jsx` | 168 |
 | `EmployeeMembersPanel.jsx` | 280 |
 | `ModulesPanel.jsx` | 70 |
+| `ReportMasterPanel.jsx` | 116 |
+| `SaveMorph.jsx` | 50 — Save-button morph (busy → tick → word); moved in from `src/shared/ui/` (modules/fold-settings, 2026-11-27): only Settings used it. Its `.wu-sm*` styles stay in `src/world-ui.css` (shared sheet; moving them would change cascade order). |
 | `SettingsPage.jsx` | 789 |
 | `handlers.js` | 140 |
 | `index.js` | 4 |
@@ -48,7 +51,8 @@ through `outwardPageProps`). `handleSaveSettings`, `handleRegisterSignature` and
 shell API and stay in App.jsx. Needs `SHELL_API` ≥ 2 (`requiresShell` in MODULE.json).
 
 Depends on other modules (imported through their `index.js`): `modules/purchase`, `modules/reports`
-Shared code used: `src/shared/buildInfo.js`, `src/shared/components/LeadIcon.jsx`, `src/shared/settingsDefaults.js`, `src/shared/ui/OrgLayout.jsx`, `src/shared/ui/SignaturePad.jsx`, `src/shared/ui/Topbar.jsx`
+Module-only code kept in this folder: `SaveMorph.jsx` (was `src/shared/ui/SaveMorph.jsx`).
+Shared code used (stays shared — also used by other modules or the shell): `src/utils/modules.js` (App.jsx), `src/utils/departmentHeads.js` (dashboard, machine-tracker), `src/utils/haptics.js`, `src/utils/handoverLogic.js`, `src/stores/adminApi.js` (users-roles, whatsapp), `src/shared/ui/ThemeSwitch.jsx`, `src/shared/buildInfo.js`, `src/shared/components/LeadIcon.jsx`, `src/shared/settingsDefaults.js`, `src/shared/ui/OrgLayout.jsx`, `src/shared/ui/SignaturePad.jsx`, `src/shared/ui/Topbar.jsx`
 Lower layers used: `src/config/`, `src/utils/`
 Used by: `app/App.jsx (shell)`
 

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { ENABLED_MODULES_ENV } from "../../config/env.js";
 import { MODULES, ALWAYS_ON_MODULES, effectiveEnabledModules, isModuleOn, envLockedModules } from "../../utils/modules.js";
 import { Section, Toggle } from "./settingsUi.jsx";
-import SaveMorph from "../../shared/ui/SaveMorph.jsx";
+import SaveMorph from "./SaveMorph.jsx";
 import { LeadLabel } from "../../shared/components/LeadIcon.jsx";
 
 // Go-live 2026-11-04 — Settings → Modules (super admin only). One switch per
