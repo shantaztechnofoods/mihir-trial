@@ -2,6 +2,7 @@
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
 import React, { useRef, useState } from "react";
 import { useRowMotion } from "../../shared/motion/useRowMotion.js";
+import EmptyArt from "../../shared/ui/EmptyArt.jsx";
 import { LeadIcon } from "../../shared/components/LeadIcon.jsx";
 import { PODetailModal } from "./PODetailModal.jsx";
 import { POModal } from "./POModal.jsx";
@@ -139,7 +140,7 @@ export function PurchasePage({ pos, vendorList, items, onCreatePO, onUpdatePO, o
               <tbody ref={rowsRef}>
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={9} className="px-4 py-12 text-center text-xs text-slate-600">No purchase orders found.</td>
+                    <td colSpan={9} className="px-4 py-12 text-center text-xs text-slate-600"><EmptyArt />No purchase orders found.</td>
                   </tr>
                 )}
                 {filtered.map((po) => (

@@ -16,6 +16,7 @@ import ArchivedSection from "../../shared/components/ArchivedSection.jsx";
 import { ERP_INSTANCE } from "../../config/env.js";
 import { archiveConfirmTitle } from "../../utils/archive.js";
 import SuccessTick from "../../shared/ui/SuccessTick.jsx";
+import EmptyArt from "../../shared/ui/EmptyArt.jsx";
 
 // ─── QUICK STOCK MODAL ───────────────────────────────────────────────────────
 
@@ -852,6 +853,7 @@ export function InventoryPage({ items, setItems, handleUpdateStock, pos = [], in
                 {sorted.length === 0 ? (
                   <tr>
                     <td colSpan={11} className="px-4 py-12 text-center text-xs text-slate-600">
+                      <EmptyArt />
                       No items match your filters.
                       {filtersActive && <button onClick={clearFilters} className="text-blue-600 font-bold ml-1 hover:underline">Clear filters</button>}
                     </td>

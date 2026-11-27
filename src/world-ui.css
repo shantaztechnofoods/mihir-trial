@@ -1703,8 +1703,9 @@
 /* ── MOTION v2 batch 2 (2026-11-27): page · menus · tabs · fold · save · numbers ── */
 @media screen {
   /* Page enter: 220 ms / 6 px → 200 ms / 4 px */
-  .app-shell > .flex-1, .app-shell > main > .flex-1, .app-shell > main > div.flex-1, .app-shell > div.flex-1 { animation: wu-page2 var(--m-small) var(--m-ease-out) backwards; }
-  @keyframes wu-page2 { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  /* motion3 E (owner approved 2026-11-27): 240 ms / 8 px (was 200 ms / 4 px) */
+  .app-shell > .flex-1, .app-shell > main > .flex-1, .app-shell > main > div.flex-1, .app-shell > div.flex-1 { animation: wu-page2 240ms var(--m-ease-out) backwards; }
+  @keyframes wu-page2 { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
   .page-scroll > div { animation: none; }   /* duplicate 280 ms page slide on Report Center (shell already enters) */
 
   /* Dropdowns / pickers were snapping open: 140 ms ease-out from the top edge */
