@@ -140,6 +140,12 @@ const nav = async (p, mobile, label) => {
     await gate(`1440 Sidebar: ${from} → ${to}`, p, () => nav(p, false, to), async () => { await nav(p, false, from); await settle(p, 1500, 300); });
     await settle(p, 1500, 300);
   }
+  // A popup rendered at the top of a page no longer restyles the whole page
+  // (perf/inp-modal-order: space-y / divide selectors without `~`).
+  await nav(p, false, "Item Master"); await settle(p, 1500, 300);
+  const addItem = p.locator("button").filter({ hasText: "+ Add Item" }).first();
+  await gate("1440 Item Master: + Add Item opens", p, () => addItem.click(), async () => { await p.keyboard.press("Escape"); await p.waitForTimeout(400); });
+  await p.keyboard.press("Escape"); await p.waitForTimeout(400);
   ok("1440: no browser errors", errs.length === 0, errs.join(" ; "));
   await ctx.close();
 }
@@ -151,6 +157,8 @@ const nav = async (p, mobile, label) => {
   await gate("390 Dashboard: theme switch (tap)", p, () => btn().click(), () => btn().click());
   await p.waitForTimeout(400);
   await gate("390 Dashboard: theme switch back (tap)", p, () => btn().click(), () => btn().click());
+  const menu = p.locator('[aria-label="All pages"]').first();
+  await gate("390 Dashboard: ☰ All pages opens", p, () => menu.click(), async () => { await p.keyboard.press("Escape"); await p.locator(".nav-backdrop").click({ timeout: 1000 }).catch(() => {}); await p.waitForTimeout(400); });
   ok("390: no browser errors", errs.length === 0, errs.join(" ; "));
   await ctx.close();
 }
