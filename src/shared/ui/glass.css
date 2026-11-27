@@ -710,3 +710,29 @@
   html body .modal-backdrop > div:not(.tc-form) { background-color: #fff !important; }
   html[data-theme="dark"] body .modal-backdrop > div:not(.tc-form) { background-color: #1a272f !important; }
 }
+
+/* ═══ PR 3 — Machine Tracker, Reports, Settings ═══════════════════════════ */
+@media screen {
+  /* Machine Tracker: "Today" filter chips + the delay-period switch as glossy capsules */
+  html body .app-shell [data-mt-today-chip] {
+    background: var(--g-gloss), rgba(255, 255, 255, .72) !important; border-color: rgba(20, 40, 50, .1) !important;
+    box-shadow: inset 0 1px 0 #fff, 0 1px 2px rgba(40, 60, 70, .05), 0 6px 14px -8px rgba(40, 60, 75, .22) !important;
+  }
+  html body .app-shell [data-mt-today-chip][aria-pressed="true"] { border-color: var(--action) !important; box-shadow: inset 0 1px 0 #fff, 0 0 0 3px var(--action-ring) !important; }
+  html[data-theme="dark"] body .app-shell [data-mt-today-chip] { background: var(--g-gloss), rgba(255, 255, 255, .06) !important; border-color: rgba(255, 255, 255, .12) !important; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12), 0 6px 14px -8px rgba(0, 0, 0, .5) !important; }
+  html body .app-shell .delay-card [role="group"][aria-label="Period"] { background: var(--g-lens), var(--g-well) !important; border-radius: 999px; box-shadow: inset 0 1px 2px rgba(20, 40, 50, .08), 0 0 0 1px var(--g-edge); }
+  html body .app-shell .delay-card [data-delay-period] { border-radius: 999px !important; }
+  html body .app-shell .delay-card [data-delay-period][aria-pressed="true"] { background: var(--g-gloss), var(--g-chip-hi) !important; box-shadow: var(--g-chip-shadow) !important; }
+  html body .app-shell .rack-set { background: var(--g-sheen), rgba(255, 255, 255, .6) !important; border-color: rgba(20, 40, 50, .07) !important; border-radius: 20px !important; box-shadow: inset 0 1px 0 #fff, 0 10px 24px -16px rgba(40, 60, 75, .25); }
+  html[data-theme="dark"] body .app-shell .rack-set { background: var(--g-sheen), rgba(255, 255, 255, .04) !important; border-color: rgba(255, 255, 255, .07) !important; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1); }
+
+  /* Settings: the Appearance card is a calm glass card; tabs keep their underline */
+  html body .app-shell [data-settings-appearance] {
+    background: var(--g-sheen), var(--g-card) !important; border-color: rgba(20, 40, 50, .07) !important; border-radius: 20px !important;
+    box-shadow: inset 0 1px 0 #fff, 0 1px 2px rgba(40, 60, 70, .05), 0 12px 28px -16px rgba(40, 60, 75, .18) !important;
+  }
+  html[data-theme="dark"] body .app-shell [data-settings-appearance] { border-color: rgba(255, 255, 255, .07) !important; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12), 0 12px 28px -16px rgba(0, 0, 0, .5) !important; }
+
+  /* Reports: export buttons (CSV / Excel / PDF) as small glossy capsules */
+  html body .app-shell :is(button, a):is([data-export], [aria-label^="Download"], [aria-label^="Export"]) { border-radius: 999px !important; }
+}
