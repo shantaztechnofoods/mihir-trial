@@ -22,7 +22,7 @@ Storage).
 * `src/app/` — the app shell: `App.jsx` (all state, every `handle*`
   handler, `logAudit`, `canDo`, routing), `LoginPage.jsx`, `layout/`
   (Sidebar, GlobalSearch, NotificationPanel, navItems).
-* `src/modules/<module>/` — one folder per module (dashboard, inventory,
+* `src/modules/<module>/` — one folder per module (dashboard, item-master, inventory,
   bom, order-pipeline, vendors, machine-tracker, pending-jobs, trial-certificate,
   reports, settings, whatsapp, analytics, ai-assistant, audit-trail,
   users-roles). Each has a `README.md` and an `index.js` that holds only

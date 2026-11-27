@@ -263,7 +263,7 @@ export function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdateP
           ].map(({ k, label }) => (
             <button key={k} onClick={() => setViewMode(k)}
                     className={`px-2.5 py-1 rounded-md text-[10.5px] font-bold transition-all ${viewMode === k ? "bg-blue-500/20 text-blue-300 border border-blue-500/40" : "text-slate-600 hover:text-slate-900"}`}>
-              {label}
+              <LeadLabel text={label} />
             </button>
           ))}
         </div>
@@ -305,7 +305,7 @@ export function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdateP
             <div className="flex-1 overflow-y-auto pr-1 pb-2 space-y-2.5">
               {lowStock.length === 0 && (
                 <div className="text-center py-10 text-[11px] text-slate-600">
-                  <div className="text-3xl mb-2">✅</div>All stock levels healthy
+                  <div className="empty-glyph-sm mb-2"><Glyph e="✅" size={20} /></div>All stock levels healthy
                 </div>
               )}
               {/* Collapse to first 10 items by default — a 400-item low-stock
@@ -403,7 +403,7 @@ export function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdateP
           <div className="flex-1 flex flex-col min-w-[210px] max-w-[270px]">
             <ColHdr icon="⏳" title="PO Approval" count={approvalPOs.length} color="#D97706" />
             <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 pb-2">
-              {approvalPOs.length === 0 && <div className="text-center py-10 text-[11px] text-slate-600"><div className="text-3xl mb-2">✅</div>No POs awaiting approval</div>}
+              {approvalPOs.length === 0 && <div className="text-center py-10 text-[11px] text-slate-600"><div className="empty-glyph-sm mb-2"><Glyph e="✅" size={20} /></div>No POs awaiting approval</div>}
               {approvalPOs.map(po => (
                 <div key={po.id} className={`${card} border-amber-500/20`} style={{ background: "var(--surface-elevated)" }}>
                   <div className="flex items-center justify-between gap-2 mb-1.5">
@@ -435,7 +435,7 @@ export function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdateP
           <div className="flex-1 flex flex-col min-w-[210px] max-w-[270px]">
             <ColHdr icon="📦" title="Make Order" count={makeOrderPOs.length} color="#2E50D6" />
             <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 pb-2">
-              {makeOrderPOs.length === 0 && <div className="text-center py-10 text-[11px] text-slate-600"><div className="text-3xl mb-2">📋</div>No approved POs to order</div>}
+              {makeOrderPOs.length === 0 && <div className="text-center py-10 text-[11px] text-slate-600"><div className="empty-glyph-sm mb-2"><Glyph e="📋" size={20} /></div>No approved POs to order</div>}
               {makeOrderPOs.map(po => {
                 const v = vendorList.find(x => x.name === po.vendor);
                 return (
@@ -468,7 +468,7 @@ export function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdateP
           <div className="flex-1 flex flex-col min-w-[210px] max-w-[270px]">
             <ColHdr icon="🔔" title="Follow Up" count={enrichedFU.length} color="#a78bfa" />
             <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 pb-2">
-              {enrichedFU.length === 0 && <div className="text-center py-10 text-[11px] text-slate-600"><div className="text-3xl mb-2">📭</div>No active follow-ups</div>}
+              {enrichedFU.length === 0 && <div className="text-center py-10 text-[11px] text-slate-600"><div className="empty-glyph-sm mb-2"><Glyph e="📭" size={20} /></div>No active follow-ups</div>}
               {enrichedFU.map(f => {
                 const po = pos.find(p => p.id === f.poId);
                 const v  = vendorList.find(x => x.name === f.vendor);
@@ -533,7 +533,7 @@ export function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdateP
             <ColHdr icon="✅" title="Received" count={receivedPOs.length} color="#22c55e" />
             <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 pb-2">
               {receivedPOs.length === 0 && (
-                <div className="text-center py-10 text-[11px] text-slate-600"><div className="text-3xl mb-2">📭</div>No received orders yet</div>
+                <div className="text-center py-10 text-[11px] text-slate-600"><div className="empty-glyph-sm mb-2"><Glyph e="📭" size={20} /></div>No received orders yet</div>
               )}
               {receivedPOs.slice(0, 12).map(po => (
                 <div key={po.id} className={`${card} border-green-500/20`} style={{ background: "var(--surface-elevated)" }}>
@@ -610,7 +610,7 @@ export function OrderPipelinePage({ items, pos, vendorList, followUps, onUpdateP
             </div>
             {vendorsWithPreferredLowStock.length === 0 ? (
               <div className="py-6 text-center">
-                <div className="text-3xl mb-2">✅</div>
+                <div className="empty-glyph-sm mb-2"><Glyph e="✅" size={20} /></div>
                 <div className="text-sm font-bold text-slate-900 mb-1">No low-stock items with a preferred vendor</div>
                 <div className="text-[11px] text-slate-500">Either everything is in safe stock, or low-stock items don't have a Preferred vendor link yet.</div>
               </div>

@@ -58,6 +58,7 @@ import { createSettingsHandlers } from "../modules/settings/handlers.js";
 import { createOrderPipelineHandlers } from "../modules/order-pipeline/handlers.js";
 import { createVendorsHandlers } from "../modules/vendors/handlers.js";
 import { createInventoryHandlers } from "../modules/inventory/handlers.js";
+import { createItemMasterHandlers } from "../modules/item-master/handlers.js";
 import { createBomHandlers } from "../modules/bom/handlers.js";
 import { createPendingJobsHandlers } from "../modules/pending-jobs/handlers.js";
 import { createTrialCertificateHandlers } from "../modules/trial-certificate/handlers.js";
@@ -1106,7 +1107,8 @@ export default function App() {
   const { handleSaveModules, handleAdminCleanupDone, handleCreateChecklistTemplate, handleUpdateChecklistTemplate, handleDeleteChecklistTemplate, handleSaveUserDepartments } = createSettingsHandlers(shell);
   const { handleCreatePO, handleUpdatePO, handleReceivePO, handleDeletePO, handleReverseReceive, handleConfirmOrder, handleFollowUpDone } = createOrderPipelineHandlers(shell);
   const { handleAddVendor, handleEditVendor, handleDeleteVendor, handleRestoreVendor, handleBulkAddVendors } = createVendorsHandlers(shell);
-  const { handleInwardComplete, handleCreateItemRow, handleUpdateItemRow, handleDeleteItemRow, handleRestoreItemRow, handleSetItemDefaultRate, handleBulkAddItems, handleClearPending, handleFulfillPending, handleFulfillGroup, handleAddOutward, raiseNotIssuedJobs, handleCreateMachine, handleAbortMachineCreate, handleRemoveRackMachine, handleInventoryCorrection } = createInventoryHandlers(shell);
+  const { handleInwardComplete, handleClearPending, handleFulfillPending, handleFulfillGroup, handleAddOutward, raiseNotIssuedJobs, handleCreateMachine, handleAbortMachineCreate, handleRemoveRackMachine } = createInventoryHandlers(shell);
+  const { handleCreateItemRow, handleUpdateItemRow, handleDeleteItemRow, handleRestoreItemRow, handleSetItemDefaultRate, handleBulkAddItems, handleInventoryCorrection } = createItemMasterHandlers(shell);
   const { handleUpdateBOM, handleCreateBOM, handleDuplicateBOM, computeBOMDeletionInfo, handleDeleteBOM, handleRestoreBOM, handleRenameBOM, handleSaveBomChecklist } = createBomHandlers(shell);
   const { handleRaisePendingItem, handleResolvePendingItem, handleReceivePendingItem, handleIssuePendingPart } = createPendingJobsHandlers(shell);
   const { handleUpdateTrialCertificate } = createTrialCertificateHandlers(shell);
