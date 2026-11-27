@@ -120,7 +120,7 @@ export function installScrollReveal() {
   const flush = () => {
     flushT = 0;
     batch.sort((a, b) => a.top - b.top)
-      .forEach(({ el }, i) => { el.style.transitionDelay = `${Math.min(i, 8) * 40}ms`; el.classList.add("wu-in"); });
+      .forEach(({ el }, i) => { el.style.transitionDelay = el.closest(".mt-premium") ? `${Math.min(i, 8) * 40}ms` : `${Math.min(i, 3) * 30}ms`; /* motion v2: ≤90 ms stagger outside MT */ el.classList.add("wu-in"); });
     batch = [];
   };
   const io = new IntersectionObserver((entries) => {
