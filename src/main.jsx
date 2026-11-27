@@ -1,6 +1,7 @@
 import React, { Suspense, lazy, useEffect, useState } from 'react'
 import ReactDOM from 'react-dom/client'
 import './index.css'
+import './shared/ui/rack-dark.css'
 import './world-ui.css'
 import './shared/ui/glass.css'
 import './shared/ui/touch.css'
