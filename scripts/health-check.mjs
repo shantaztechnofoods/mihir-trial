@@ -10,7 +10,7 @@
 //   imports  every import resolves (file / package), no cycles (files or module
 //            folders), layer rules (shared ↛ app/modules, modules ↛ app, lower
 //            layers ↛ screen code), other folders import a module only through
-//            its index.js, every module folder has index.js + README.md
+//            its index.js (Phase C: App.jsx may import <m>/handlers.js), every module folder has index.js + README.md
 //   wiring   every named import is really exported by its target (incl. the
 //            `const { x } = await import(…)` form), every handleXxx a screen file
 //            uses is declared/imported there (esbuild does NOT catch a missing
@@ -207,7 +207,9 @@ if (ONLY.includes("imports")) {
     if (a.layer === "lower" && ["app", "module", "shared"].includes(b.layer)) layerProblems.push(`${a.dir}/ imports ${b.layer}: ${where}`);
     if (b.layer === "module" && a.module !== b.module && e.kind !== "dynamic") {
       const isIndex = rel(e.to) === `src/modules/${b.module}/index.js`;
-      if (!isIndex) throughIndex.push(where);
+      // Phase C (docs/SHELL-CONTEXT.md): App.jsx imports a module's handlers.js directly.
+      const isShellHandlers = rel(e.from) === "src/app/App.jsx" && rel(e.to) === `src/modules/${b.module}/handlers.js`;
+      if (!isIndex && !isShellHandlers) throughIndex.push(where);
     }
   }
   report("imports", "layer rules (shared ↛ app/modules, modules ↛ app, stores/utils/… ↛ screen code)", layerProblems);
