@@ -55,16 +55,11 @@ import { GlobalSearch } from "./layout/GlobalSearch.jsx";
 import { navItems } from "./layout/navItems.js";
 import { NotificationPanel } from "./layout/NotificationPanel.jsx";
 import { Sidebar } from "./layout/Sidebar.jsx";
-import { AIPage } from "../modules/ai-assistant/index.js";
-import { AnalyticsPage } from "../modules/analytics/index.js";
-import { DashboardPage } from "../modules/dashboard/index.js";
-import { InventoryPage, InwardPage, OutwardPage, PendingPage } from "../modules/inventory/index.js";
-import { MachinePage, ReadyMachinesPopup } from "../modules/machine-tracker/index.js";
+// perf/lazy-pages (2026-11-27) — every page screen is its own on-demand chunk (src/app/lazyPages.js).
+import { AIPage, AnalyticsPage, DashboardPage, InventoryPage, InwardPage, OutwardPage, PendingPage, MachinePage, OrderPipelinePage, VendorsPage, HistoryPage, ReportCenterPage, SettingsPage, WhatsAppPage, prefetchPage, prefetchPagesWhenIdle } from "./lazyPages.js";
+import { ReadyMachinesPopup } from "../modules/machine-tracker/index.js";
 import { cleanPendingJobs } from "../modules/pending-jobs/index.js";
-import { OrderPipelinePage, VendorsPage } from "../modules/purchase/index.js";
-import { HistoryPage, ReportCenterPage } from "../modules/reports/index.js";
-import { SettingsPage } from "../modules/settings/index.js";
-import { WhatsAppPage, waAlertTime, waDispatch, waReadSeen, waUnreadCount } from "../modules/whatsapp/index.js";
+import { waAlertTime, waDispatch, waReadSeen, waUnreadCount } from "../modules/whatsapp/index.js";
 import { APP_BUILD } from "../shared/buildInfo.js";
 import { fmtDate, recomputeStatus, roundQty } from "../shared/format.js";
 import { SETTINGS_DEFAULTS } from "../shared/settingsDefaults.js";
@@ -265,6 +260,23 @@ export default function App() {
   // Jumps from inside pages / search / notifications: a switched-OFF module is
   // a no-op (with every module ON this is exactly setActivePage).
   const goToPage    = useCallback((id) => { if (moduleOn(id)) setActivePage(id); }, [moduleOn]);
+  // perf/lazy-pages — signed in: warm the other pages' code in the background
+  // (idle time, one at a time), and start a page's download as soon as the
+  // pointer / keyboard focus reaches its sidebar button. Loading only.
+  useEffect(() => {
+    if (!currentUser) return undefined;
+    prefetchPagesWhenIdle(["machines", "dashboard", "reports", "inventory", "inward", "outward", "pending", "pipeline", "settings", "history", "vendors", "analytics", "whatsapp", "ai"]);
+    const warm = (e) => {
+      const btn = e.target && e.target.closest && e.target.closest(".app-sidebar button");
+      if (!btn) return;
+      const label = (btn.innerText || "").trim();
+      const hit = navItems.find((n) => label.startsWith(n.label));
+      if (hit) prefetchPage(hit.id);
+    };
+    document.addEventListener("pointerover", warm, { passive: true });
+    document.addEventListener("focusin", warm);
+    return () => { document.removeEventListener("pointerover", warm); document.removeEventListener("focusin", warm); };
+  }, [currentUser]);
   useEffect(() => {
     if (authLoading || !currentUser || typeof canView !== "function") return;
     if (canOpenPage(activePage)) return;
