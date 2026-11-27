@@ -511,22 +511,31 @@ export function InventoryPage({ items, setItems, handleUpdateStock, pos = [], in
   // 2026-11-04 (fix/perf-1) — the box shows every key at once; the table
   // follows a moment later (useDeferredValue) so typing never waits for it.
   const deferredSearch = useDeferredValue(search);
+  // perf/inp-item-master (2026-11-27): the same for the status chips, the
+  // Category select and the sort headers — the chip / select / arrow show the
+  // new choice in the very next frame, the rows re-order a moment later
+  // (React renders them in the background, so the tap never waits for them).
+  // Same filter, same sort, same rows.
+  const listStatus = useDeferredValue(statusFilter);
+  const listCat    = useDeferredValue(catFilter);
+  const listSortCol = useDeferredValue(sortCol);
+  const listSortDir = useDeferredValue(sortDir);
   const filtered = useMemo(() => {
     const q = deferredSearch.trim().toLowerCase();
     return allItems.filter((i) => {
-      if (statusFilter !== "all" && i.status !== statusFilter) return false;
-      if (catFilter !== "all" && i.category !== catFilter)    return false;
+      if (listStatus !== "all" && i.status !== listStatus) return false;
+      if (listCat !== "all" && i.category !== listCat)    return false;
       if (q && !i.name.toLowerCase().includes(q) && !i.code.toLowerCase().includes(q) &&
                !(i.vendor   || "").toLowerCase().includes(q) &&
                !(i.location || "").toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [allItems, deferredSearch, statusFilter, catFilter]);
+  }, [allItems, deferredSearch, listStatus, listCat]);
 
   const sorted = useMemo(() => {
     return [...filtered].sort((a, b) => {
       let av, bv;
-      switch (sortCol) {
+      switch (listSortCol) {
         case "code":     av = a.code;     bv = b.code;     break;
         case "category": av = a.category; bv = b.category; break;
         case "unit":     av = a.unit;     bv = b.unit;     break;
@@ -537,10 +546,10 @@ export function InventoryPage({ items, setItems, handleUpdateStock, pos = [], in
         case "vendor":   av = a.vendor || ""; bv = b.vendor || ""; break;
         default:         av = a.name;    bv = b.name;
       }
-      if (typeof av === "number") return sortDir === "asc" ? av - bv : bv - av;
-      return sortDir === "asc" ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
+      if (typeof av === "number") return listSortDir === "asc" ? av - bv : bv - av;
+      return listSortDir === "asc" ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
     });
-  }, [filtered, sortCol, sortDir]);
+  }, [filtered, listSortCol, listSortDir]);
 
   const toggleSort = (col) => {
     if (sortCol === col) setSortDir((d) => d === "asc" ? "desc" : "asc");
@@ -554,7 +563,7 @@ export function InventoryPage({ items, setItems, handleUpdateStock, pos = [], in
   // perf (2026-11-27): smaller slices (60 first, 80 per scroll step, was 150/300)
   // so each batch's style recalculation and paint stays short. Same rows, same
   // order; Show all and Print still draw every row.
-  const masterRows = useProgressiveCount(sorted.length, `${deferredSearch}|${statusFilter}|${catFilter}|${sortCol}|${sortDir}`, { initial: 60, step: 80 });
+  const masterRows = useProgressiveCount(sorted.length, `${deferredSearch}|${listStatus}|${listCat}|${listSortCol}|${listSortDir}`, { initial: 60, step: 80 });
   const filteredVal = useMemo(() => sorted.reduce((s, i) => s + (i.stock * (i.lastPurchaseRate || 0)), 0), [sorted]);
   const filtersActive = search || statusFilter !== "all" || catFilter !== "all";
   const clearFilters  = () => { setSearch(""); setStatusFilter("all"); setCatFilter("all"); };
