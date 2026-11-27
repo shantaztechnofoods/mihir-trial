@@ -1,27 +1,25 @@
-# Inventory (Inward, Outward, Pending Stock) — `src/modules/inventory/`
+# Inventory (Outward, Pending Stock) — `src/modules/inventory/`
 
-> **Partly frozen:** partly — the Outward BOM issue (rack / direct production) is part of the frozen production flow; Inward and Pending Stock are not frozen.
-> Item Master moved to `src/modules/item-master/` (modules/item-master, pure move).
+> **Partly frozen:** partly — the Outward BOM issue (rack / direct production) is part of the frozen production flow; Pending Stock is not frozen.
+> Item Master moved to `src/modules/item-master/` and Inward to `src/modules/inward/` (pure moves).
 
 ## What it does
-Stock movements: Inward (receive stock), Outward (manual issue and BOM issue to a rack or straight to production) and Pending Stock (shortfalls waiting for material).
+Stock movements: Outward (manual issue and BOM issue to a rack or straight to production) and Pending Stock (shortfalls waiting for material).
 
 ## Screens
-- Inward (nav `inward`)
 - Outward (nav `outward`, also embedded at the top of Machine Tracker)
 - Pending Stock (nav `pending`)
 
 ## Files
 | file | lines |
 |---|---|
-| `InwardPage.jsx` | 277 |
 | `OutwardPage.jsx` | 1135 |
 | `PendingPage.jsx` | 686 |
-| `handlers.js` | 690 |
+| `handlers.js` | 620 |
 | `index.js` | 5 |
 
 `index.js` is the public surface — the app shell and other modules import only from it:
-`InwardPage`, `OutwardPage`, `PendingPage`
+`OutwardPage`, `PendingPage`
 
 ## How it plugs into the app
 The screens here are presentational: state and every write (handler) still live in the app shell
@@ -29,16 +27,6 @@ The screens here are presentational: state and every write (handler) still live 
 
 | component | prop | App.jsx handler(s) |
 |---|---|---|
-| `<InventoryPage>` | `handleUpdateStock` | `handleUpdateStock` |
-| `<InventoryPage>` | `onLogAudit` | `logAudit` |
-| `<InventoryPage>` | `onCreateItem` | `handleCreateItemRow` |
-| `<InventoryPage>` | `onUpdateItem` | `handleUpdateItemRow` |
-| `<InventoryPage>` | `onDeleteItem` | `handleDeleteItemRow` |
-| `<InventoryPage>` | `onDeleteBOM` | `handleDeleteBOM` |
-| `<InventoryPage>` | `onBulkAddItems` | `handleBulkAddItems` |
-| `<InwardPage>` | `handleUpdateStock` | `handleUpdateStock` |
-| `<InwardPage>` | `onInwardComplete` | `handleInwardComplete` |
-| `<InwardPage>` | `onAddInward` | `logAudit` |
 | `<OutwardPage>` | `...spread` | `handleUpdateStock`, `handleSetItemDefaultRate`, `handleUpdateBOM`, `handleCreateBOM`, `handleRenameBOM`, `handleAddOutward`, `raiseNotIssuedJobs`, `handleClearPending`, `handleCreateMachine`, `handleAbortMachineCreate`, `handleRemoveRackMachine`, `handleDuplicateBOM`, `handleDeleteBOM`, `computeBOMDeletionInfo`, `handleCreateChecklistTemplate`, `handleUpdateChecklistTemplate`, `handleDeleteChecklistTemplate`, `handleSaveBomChecklist`, `flashSaveError` |
 | `<PendingPage>` | `onFulfillPending` | `handleFulfillPending` |
 | `<PendingPage>` | `onFulfillGroup` | `handleFulfillGroup` |
@@ -61,7 +49,8 @@ yes for Trial, 27 Nov 2026) — still owner-locked: change them only with the ow
 `shell.call("inventory.removeRackMachine")` for bom's `handleDeleteBOM`. The BOM handlers live in
 `modules/bom/handlers.js`. The Item Master writes (`handleCreateItemRow`, `handleUpdateItemRow`,
 `handleDeleteItemRow`, `handleRestoreItemRow`, `handleSetItemDefaultRate`, `handleBulkAddItems`,
-`handleInventoryCorrection`) moved on to `modules/item-master/handlers.js` (modules/item-master). `handleUpdateStock` and `saveFailed` are shell API. Needs `SHELL_API` ≥ 6
+`handleInventoryCorrection`) moved on to `modules/item-master/handlers.js` (modules/item-master); `handleInwardComplete` to
+`modules/inward/handlers.js` (modules/inward). `handleUpdateStock` and `saveFailed` are shell API. Needs `SHELL_API` ≥ 6
 (`requiresShell` in MODULE.json).
 
 Depends on other modules (imported through their `index.js`): `modules/bom`
