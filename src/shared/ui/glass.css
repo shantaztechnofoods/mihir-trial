@@ -514,11 +514,12 @@
   html body .app-shell .page-header { background: transparent !important; border-bottom-color: transparent !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; isolation: isolate; }
   html body .app-shell .page-header::before {
     content: ""; position: absolute; inset: 8px 8px 0 4px; z-index: -1; border-radius: 24px; pointer-events: none;
-    background: linear-gradient(180deg, rgba(255, 255, 255, .66), rgba(255, 255, 255, .46));
-    -webkit-backdrop-filter: var(--g-blur); backdrop-filter: var(--g-blur);
+    /* no backdrop blur: content scrolls under the header, and a blur there is
+       re-rendered every scroll frame (frame-budget); a denser glass instead */
+    background: linear-gradient(180deg, rgba(255, 255, 255, .88), rgba(255, 255, 255, .78));
     box-shadow: inset 0 1px 0 var(--g-rim), 0 0 0 1px var(--g-edge), 0 10px 28px -18px rgba(40, 60, 75, .35);
   }
-  html[data-theme="dark"] body .app-shell .page-header::before { background: linear-gradient(180deg, rgba(30, 44, 52, .72), rgba(24, 36, 43, .58)); }
+  html[data-theme="dark"] body .app-shell .page-header::before { background: linear-gradient(180deg, rgba(30, 44, 52, .92), rgba(24, 36, 43, .86)); }
   html body .app-shell .page-header.is-compact { box-shadow: none; }
 
   /* 8 · KPI: tighter number → label */
@@ -532,3 +533,92 @@
   html body .app-shell .page-header::before { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--g-solid); }
 }
 @media screen { html body .app-shell .dash-line-stage > .dash-line-sub { display: block; line-height: 26px; text-overflow: ellipsis; box-sizing: border-box; max-width: calc(100% - 12px); } }
+
+/* ── Preview 3: more glass, more gloss ("iPhone-like premium touch") ───────
+   Desktop (fine pointer, ≥1024px): content cards turn translucent (white 80 %)
+   with a 20px blur, a specular top edge, a 1px rim that fades from white 90 %
+   to 20 %, and a sheen over the top 40 %. Phones / touch: no blur — the same
+   gloss is drawn with gradients over the solid surface. */
+@media screen {
+  :root:not([data-theme="dark"]) {
+    --g-sheen: linear-gradient(180deg, rgba(255, 255, 255, .35) 0%, rgba(255, 255, 255, 0) 40%);
+    --g-card-t: rgba(255, 255, 255, .80);
+    --g-rimgrad: linear-gradient(180deg, rgba(255, 255, 255, .9) 0%, rgba(255, 255, 255, .2) 100%);
+    --g-lens: linear-gradient(135deg, rgba(255, 255, 255, .55) 0%, rgba(255, 255, 255, 0) 32%, rgba(255, 255, 255, 0) 68%, rgba(200, 225, 255, .28) 100%);
+    --g-gloss: linear-gradient(180deg, rgba(255, 255, 255, .7) 0%, rgba(255, 255, 255, .12) 55%, rgba(255, 255, 255, 0) 100%);
+    --g-env:
+      radial-gradient(42% 36% at 22% 8%, rgba(255, 255, 255, .95) 0%, rgba(255, 255, 255, 0) 70%),
+      radial-gradient(40% 36% at 84% 6%, rgba(10, 132, 255, .10) 0%, rgba(10, 132, 255, 0) 70%),
+      radial-gradient(48% 42% at 64% 78%, rgba(10, 132, 255, .08) 0%, rgba(10, 132, 255, 0) 70%),
+      radial-gradient(40% 36% at 10% 92%, rgba(255, 255, 255, .8) 0%, rgba(255, 255, 255, 0) 70%),
+      linear-gradient(180deg, #f6f8fa 0%, #edf2f6 60%, #e6ecf1 100%);
+  }
+  :root[data-theme="dark"] {
+    --g-sheen: linear-gradient(180deg, rgba(255, 255, 255, .07) 0%, rgba(255, 255, 255, 0) 40%);
+    --g-card-t: rgba(26, 39, 47, .78);
+    --g-rimgrad: linear-gradient(180deg, rgba(255, 255, 255, .28) 0%, rgba(255, 255, 255, .05) 100%);
+    --g-lens: linear-gradient(135deg, rgba(255, 255, 255, .10) 0%, rgba(255, 255, 255, 0) 32%, rgba(255, 255, 255, 0) 68%, rgba(120, 220, 220, .08) 100%);
+    --g-gloss: linear-gradient(180deg, rgba(255, 255, 255, .22) 0%, rgba(255, 255, 255, .04) 55%, rgba(255, 255, 255, 0) 100%);
+    --g-env:
+      radial-gradient(44% 34% at 24% 6%, rgba(64, 200, 200, .12) 0%, rgba(64, 200, 200, 0) 70%),
+      radial-gradient(40% 32% at 86% 12%, rgba(169, 212, 255, .09) 0%, rgba(169, 212, 255, 0) 70%),
+      radial-gradient(50% 40% at 60% 82%, rgba(64, 200, 200, .09) 0%, rgba(64, 200, 200, 0) 70%),
+      radial-gradient(80% 50% at 50% 0%, #13222b 0%, rgba(19, 34, 43, 0) 70%),
+      linear-gradient(180deg, #0d1820 0%, #09121a 58%, #070d12 100%);
+  }
+
+  /* every content card: sheen + specular edge (gradient-only, works everywhere) */
+  html body .app-shell :is(.section-card, .kpi-tile, .hero-tile, .premium-card, .dash-tile) {
+    background: var(--g-sheen), var(--g-card) !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 1), inset 0 0 0 1px rgba(255, 255, 255, .45), var(--g-card-shadow) !important;
+  }
+  html[data-theme="dark"] body .app-shell :is(.section-card, .kpi-tile, .hero-tile, .premium-card, .dash-tile) {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .16), inset 0 0 0 1px rgba(255, 255, 255, .05), var(--g-card-shadow) !important;
+  }
+  /* section cards own a 1px border: paint the fading rim in it */
+  html body .app-shell .section-card {
+    border-color: transparent !important;
+    background: var(--g-sheen) padding-box, var(--g-card) padding-box, var(--g-rimgrad) border-box !important;
+  }
+
+  /* pods: glossy, with a beveled photo tile and a tinted glow when late / near */
+  html body .app-shell .dash-line-stage { background: var(--g-sheen), var(--g-card-2) !important; }
+  html body .app-shell .dash-line-stage[data-tone="late"] { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), 0 0 0 1px color-mix(in srgb, var(--bad) 30%, transparent), 0 12px 30px -12px color-mix(in srgb, var(--bad) 38%, transparent); }
+  html body .app-shell .dash-line-stage[data-tone="near"] { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), 0 0 0 1px color-mix(in srgb, var(--wait) 30%, transparent), 0 12px 30px -12px color-mix(in srgb, var(--wait) 38%, transparent); }
+  html body .app-shell .dash-line-stage[data-tone="ok"] { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), 0 0 0 1px color-mix(in srgb, var(--ok) 18%, transparent), 0 12px 30px -14px color-mix(in srgb, var(--ok) 26%, transparent); }
+  html body .app-shell .dash-line-stage :is(.dash-line-photo) { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .95), inset 0 0 0 1px rgba(0, 0, 0, .05), inset 0 -12px 18px -10px rgba(20, 40, 50, .22), 0 1px 2px rgba(20, 40, 50, .08); }
+  html body .app-shell .dash-line-thumb { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .95), inset 0 0 0 1px rgba(0, 0, 0, .05), inset 0 -8px 12px -8px rgba(20, 40, 50, .22); }
+
+  /* sidebar + header: lensing — brighter rim, slight refraction gradient */
+  html body .app-shell .app-sidebar.sidebar-slate::before {
+    background: var(--g-lens), var(--g-glass), var(--g-tint);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 1), inset 0 0 0 1px rgba(255, 255, 255, .7), inset 1px 0 0 rgba(255, 255, 255, .6), var(--g-drop), 0 0 0 1px var(--g-edge);
+  }
+  html body .app-shell .page-header::before {
+    background: var(--g-lens), linear-gradient(180deg, rgba(255, 255, 255, .86), rgba(255, 255, 255, .74));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 1), inset 0 0 0 1px rgba(255, 255, 255, .7), 0 0 0 1px var(--g-edge), 0 10px 28px -18px rgba(40, 60, 75, .35);
+  }
+  html[data-theme="dark"] body .app-shell .app-sidebar.sidebar-slate::before { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .22), inset 0 0 0 1px rgba(255, 255, 255, .08), var(--g-drop), 0 0 0 1px var(--g-edge); }
+  html[data-theme="dark"] body .app-shell .page-header::before { background: var(--g-lens), linear-gradient(180deg, rgba(30, 44, 52, .92), rgba(24, 36, 43, .86)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .2), inset 0 0 0 1px rgba(255, 255, 255, .07), 0 0 0 1px var(--g-edge); }
+
+  /* glossy capsules: segmented controls + primary action */
+  html body :is(.theme-switch button[aria-checked="true"], .app-shell .dash-line-views > button[aria-pressed="true"], .app-shell .app-sidebar .sb-item.is-active) {
+    background: var(--g-gloss), var(--g-chip-hi) !important;
+  }
+  html body :is(.page-header .page-header-actions, #root, body) .btn-primary-brand:where(:not(:disabled)) {
+    background: linear-gradient(180deg, rgba(255, 255, 255, .26) 0%, rgba(255, 255, 255, 0) 52%), var(--g-cta) !important;
+  }
+  html body :is(.theme-switch, .app-shell .dash-line-views) { background: var(--g-lens), var(--g-well) !important; box-shadow: inset 0 1px 2px rgba(20, 40, 50, .08), inset 0 0 0 1px rgba(255, 255, 255, .5), 0 0 0 1px var(--g-edge); }
+  html[data-theme="dark"] body :is(.theme-switch, .app-shell .dash-line-views) { box-shadow: inset 0 1px 2px rgba(0, 0, 0, .3), inset 0 0 0 1px rgba(255, 255, 255, .06); }
+}
+/* desktop only: real translucency + 20px blur on the content cards */
+@media screen and (min-width: 1024px) and (hover: hover) and (pointer: fine) and (prefers-reduced-transparency: no-preference) {
+  html body .app-shell :is(.section-card, .kpi-tile, .hero-tile, .premium-card, .dash-tile) {
+    background: var(--g-sheen), var(--g-card-t) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(160%); backdrop-filter: blur(20px) saturate(160%);
+  }
+  html body .app-shell .section-card { background: var(--g-sheen) padding-box, var(--g-card-t) padding-box, var(--g-rimgrad) border-box !important; }
+}
+/* status words over the translucent glass (blue pools show through): one step deeper in light */
+@media screen { :root:not([data-theme="dark"]) { --ok: #0e6b3d; --bad: #b01e24; --wait: #9a4a07; } }
+@media screen { html:not([data-theme="dark"]) body .app-shell .dash-line-rows { background: rgba(255, 255, 255, .62); box-shadow: inset 0 1px 2px rgba(20, 40, 50, .06), inset 0 0 0 1px rgba(20, 40, 50, .05); } }
