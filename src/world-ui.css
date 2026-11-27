@@ -702,20 +702,9 @@
 
 /* ═══ Item Master: a calm table — colour only where stock is short ═══════ */
 @media screen {
-  .wu-imrow > td:first-child { color: var(--ink) !important; font-weight: 600 !important; }
-  .wu-imrow.bg-red-500\/\[0\.025\] { background: transparent; }
-  .wu-cat { background: transparent !important; border: 1px solid var(--line) !important; color: var(--ink-2) !important; font-weight: 500 !important; font-size: 11.5px !important; border-radius: 999px !important; }
   .wu-status { background: transparent !important; border: 0 !important; box-shadow: none !important; padding-left: 0 !important; font-size: 12px !important; font-weight: 500 !important; letter-spacing: 0 !important; text-transform: capitalize; color: var(--ink-2) !important; }
   .wu-status[data-status="critical"] { color: var(--bad) !important; font-weight: 600 !important; }
   .wu-status[data-status="warning"] { color: var(--wait) !important; }
-  .wu-rowbtn { width: 30px !important; height: 30px !important; border-radius: 8px !important; background: var(--paper) !important; border: 1px solid var(--line-strong) !important; color: var(--ink-2) !important; }
-  @media (hover: hover) and (pointer: fine) { .wu-rowbtn:hover { border-color: var(--action) !important; color: var(--action) !important; } }
-  .wu-rowflag { display: none !important; }
-  /* Touch screens: row + / − / Edit are 44 x 44 (were 30 x 36 on phones). */
-  @media (pointer: coarse) { .wu-rowbtn { width: 44px !important; height: 44px !important; min-width: 44px !important; min-height: 44px !important; } }
-  .wu-attn { background: var(--paper) !important; border: 0 !important; box-shadow: var(--e1); }
-  .wu-attn-chip { background: var(--sunk) !important; border: 0 !important; color: var(--ink-2) !important; font-family: var(--font-ui) !important; font-weight: 500 !important; font-size: 11.5px !important; border-radius: 999px !important; }
-  .wu-attn-chip[data-status="critical"] { color: var(--bad) !important; }
 }
 
 /* ═══ ADMIN DASHBOARD — one tile anatomy (KPI, production alerts, stages) ═══ */

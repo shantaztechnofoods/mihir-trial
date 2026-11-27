@@ -14,6 +14,7 @@ import { Topbar } from "../../shared/ui/Topbar.jsx";
 import ArchivedSection from "../../shared/components/ArchivedSection.jsx";
 import { ERP_INSTANCE } from "../../config/env.js";
 import { archiveConfirmTitle } from "../../utils/archive.js";
+import "./item-master.css";
 
 // ─── QUICK STOCK MODAL ───────────────────────────────────────────────────────
 
