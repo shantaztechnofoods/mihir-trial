@@ -748,3 +748,57 @@
   html[data-theme="dark"] body .app-shell .app-sidebar .sb-item.is-active > span[class*="rounded-full"]:last-child { color: #ffffff !important; background: rgba(255, 255, 255, .14) !important; }
 }
 @media screen { html:not([data-theme="dark"]) body .app-shell :is(.text-emerald-300, .text-emerald-400, .text-green-700) { color: #0b5e35 !important; } }
+
+/* ═══ Detail pass (handler 14:47: "har jagah sahi colour, detail pe kaam") ═══
+   Gloss without blur cost, one focus ring, even radii, calm empty states. */
+@media screen {
+  /* 1 · more gloss on navigation + controls: a stronger top highlight and a soft sheen */
+  html body .app-shell .app-sidebar.sidebar-slate::before {
+    background: linear-gradient(180deg, rgba(255, 255, 255, .55) 0%, rgba(255, 255, 255, 0) 22%), var(--g-lens), var(--g-glass), var(--g-tint);
+    box-shadow: inset 0 1.5px 0 rgba(255, 255, 255, 1), inset 0 0 0 1px rgba(255, 255, 255, .75), inset 1px 0 0 rgba(255, 255, 255, .6), var(--g-drop), 0 0 0 1px var(--g-edge);
+  }
+  html body .app-shell .page-header::before {
+    background: linear-gradient(180deg, rgba(255, 255, 255, .6) 0%, rgba(255, 255, 255, 0) 55%), var(--g-lens), linear-gradient(180deg, rgba(255, 255, 255, .86), rgba(255, 255, 255, .74));
+    box-shadow: inset 0 1.5px 0 rgba(255, 255, 255, 1), inset 0 0 0 1px rgba(255, 255, 255, .75), 0 0 0 1px var(--g-edge), 0 10px 28px -18px rgba(40, 60, 75, .35);
+  }
+  html[data-theme="dark"] body .app-shell .app-sidebar.sidebar-slate::before {
+    background: linear-gradient(180deg, rgba(255, 255, 255, .08) 0%, rgba(255, 255, 255, 0) 22%), var(--g-lens), var(--g-glass), var(--g-tint);
+    box-shadow: inset 0 1.5px 0 rgba(255, 255, 255, .26), inset 0 0 0 1px rgba(255, 255, 255, .08), var(--g-drop), 0 0 0 1px var(--g-edge);
+  }
+  html[data-theme="dark"] body .app-shell .page-header::before {
+    background: linear-gradient(180deg, rgba(255, 255, 255, .07) 0%, rgba(255, 255, 255, 0) 55%), var(--g-lens), linear-gradient(180deg, rgba(30, 44, 52, .92), rgba(24, 36, 43, .86));
+    box-shadow: inset 0 1.5px 0 rgba(255, 255, 255, .24), inset 0 0 0 1px rgba(255, 255, 255, .07), 0 0 0 1px var(--g-edge);
+  }
+  html body .app-shell .app-sidebar :is(.sb-search, .sb-iconbtn, .sb-user-trigger) { background: linear-gradient(180deg, rgba(255, 255, 255, .5), rgba(255, 255, 255, 0) 70%), var(--g-well) !important; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .8), inset 0 0 0 1px rgba(20, 40, 50, .05) !important; }
+  html[data-theme="dark"] body .app-shell .app-sidebar :is(.sb-search, .sb-iconbtn, .sb-user-trigger) { background: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, 0) 70%), var(--g-well) !important; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1), inset 0 0 0 1px rgba(255, 255, 255, .05) !important; }
+  @media (hover: hover) and (pointer: fine) {
+    html body .app-shell .app-sidebar .sb-item:not(.is-active):hover { background: var(--g-gloss), var(--g-chip) !important; }
+  }
+  html body .theme-switch button[aria-checked="true"], html body .app-shell .dash-line-views > button[aria-pressed="true"] { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 1), 0 1px 2px rgba(40, 60, 70, .1), 0 4px 12px -6px rgba(40, 60, 70, .3) !important; }
+  html[data-theme="dark"] body .theme-switch button[aria-checked="true"], html[data-theme="dark"] body .app-shell .dash-line-views > button[aria-pressed="true"] { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .25), 0 4px 12px -6px rgba(0, 0, 0, .5) !important; }
+
+  /* 2 · one focus ring for every control (keyboard only), never clipped by a radius */
+  html body :is(.app-shell, .modal-backdrop) :is(button, a, [role="button"], [role="tab"], [role="radio"], summary):focus-visible {
+    outline: 2px solid var(--action) !important; outline-offset: 2px !important;
+  }
+  html[data-theme="dark"] body :is(.app-shell, .modal-backdrop) :is(button, a, [role="button"], [role="tab"], [role="radio"], summary):focus-visible { outline-color: var(--p-ring) !important; }
+
+  /* 3 · even radii: controls 12, chips/pills full, cards 20 (sheets 26) */
+  html body .app-shell :is(button, a).rounded-lg:not(.sb-item):not(.dash-line-row) { border-radius: 12px; }
+  html body .app-shell span.rounded-full, html body .app-shell [class*="rounded-full"]:is(span, button) { border-radius: 999px; }
+
+  /* 4 · empty states: a calm glass well with the icon in a soft disc */
+  html body .app-shell .empty-state { border-radius: 20px; background: var(--g-sheen), rgba(255, 255, 255, .5); box-shadow: inset 0 1px 0 #fff, inset 0 0 0 1px rgba(20, 40, 50, .05); }
+  html[data-theme="dark"] body .app-shell .empty-state { background: var(--g-sheen), rgba(255, 255, 255, .03); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08), inset 0 0 0 1px rgba(255, 255, 255, .05); }
+  html body .app-shell .empty-state-title { color: var(--ink) !important; font-weight: 600; }
+  html body .app-shell .empty-state-desc { color: var(--ink-3) !important; }
+  html body .app-shell :is(.dash-line-empty, [data-delay-empty]) { border-radius: 16px !important; }
+
+  /* 5 · semantic colours, one family each: green ok · amber near · red late/hold · blue primary */
+  html body .app-shell :is(.dash-line-legend > span[data-tone="near"] > svg, .dash-line-flag[data-tone="near"]) { color: var(--wait) !important; }
+  html body .app-shell :is(.dash-line-legend > span[data-tone="ok"] > svg, .dash-line-flag[data-tone="ok"], .dash-line-ready) { color: var(--ok) !important; }
+  html body .app-shell :is(.dash-line-legend > span[data-tone="late"] > svg, .dash-line-flag[data-tone="late"]) { color: var(--bad) !important; }
+  html body .app-shell :is(.dash-line-link, .dash-line-more) { color: var(--action) !important; }
+  html[data-theme="dark"] body .app-shell :is(.dash-line-link, .dash-line-more) { color: var(--p-priTx) !important; }
+}
+@media screen and (prefers-reduced-motion: reduce) { html body .app-shell .app-sidebar .sb-item { transition: none !important; } }
