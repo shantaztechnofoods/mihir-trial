@@ -4369,3 +4369,15 @@ button.rack-btn:disabled { background: #e5e7eb !important; color: #6b7280 !impor
 :root[data-theme="dark"] .gs-voice-err{color:#fca5a5;background:rgba(248,113,113,.10)}
 @media (max-width:767px){.gs-esc{display:none}}
 @media (prefers-reduced-motion:reduce){.gs-mic-on::after,.gs-voice-dot{animation:none}.gs-mic-on::after{box-shadow:0 0 0 4px rgba(var(--brand-rgb),.25)}.gs-mic{transition:none}}
+
+/* 2026-11-27 (view sweep, shell) — touch-only tap targets: 44x44 for the
+   header colour switch, the sidebar bell/search/collapse buttons and the
+   Dashboard Line / 3D view toggle. Mouse/trackpad layouts are untouched
+   (pointer: coarse only). Measured before: theme 32x44 (tablet) / 40x40
+   (phone), sidebar bell 36x44, Line 50x32, 3D view 74x32. */
+@media (pointer: coarse) {
+  .theme-switch:not(.theme-switch-full) button { min-width: 44px; min-height: 44px; }
+  .page-header .theme-switch:not(.theme-switch-full) button[aria-checked="true"] { width: 44px; height: 44px; }
+  .app-sidebar .sb-iconbtn { min-width: 44px; min-height: 44px; }
+  .dash-line-views[data-line-views] > button { min-height: 44px; }
+}
