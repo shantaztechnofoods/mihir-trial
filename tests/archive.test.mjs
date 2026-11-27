@@ -9,6 +9,7 @@ import {
   archivedBomEntries, archiveBomDef, restoreBomDef, archiveItemRow, restoreItemRow,
   archivedItemsFromGrouped, withoutArchivedItems, archiveConfirmTitle, restoreConfirmTitle,
 } from "../src/utils/archive.js";
+import { appHandlersSource } from "./helpers/source.mjs";
 
 const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
 const code = (s) => s.split("\n").filter((l) => !/^\s*(\/\/|\*)/.test(l)).join("\n");
@@ -116,7 +117,8 @@ test("screens say Archive, list Archived (N) and offer Restore", () => {
 });
 
 test("App handlers archive + restore with audit events", () => {
-  const app = read("src/app/App.jsx");
+  // App.jsx + the module handlers.js files its handlers moved to (Phase C)
+  const app = appHandlersSource();
   for (const t of ["bom_archived", "bom_restored", "item_archived", "item_restored", "vendor_archived", "vendor_restored", "checklist_template_archived", "checklist_template_restored"])
     assert.ok(app.includes(`"${t}"`), t);
   for (const h of ["handleRestoreBOM", "handleRestoreItemRow", "handleRestoreVendor"]) assert.ok(app.includes(`const ${h} = async`), h);
