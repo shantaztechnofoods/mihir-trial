@@ -804,3 +804,50 @@
   html[data-theme="dark"] body .app-shell :is(.dash-line-link, .dash-line-more) { color: var(--p-priTx) !important; }
 }
 @media screen and (prefers-reduced-motion: reduce) { html body .app-shell .app-sidebar .sb-item { transition: none !important; } }
+
+/* ═══ Premium desk · chrome (2026-11-27, desktop audit FINDINGS.md D1-D4) ═══
+   Surfaces only — no box changes except the header-control height floor. */
+@media screen {
+  /* D1 · coloured header actions (Order Pipeline "+ New PO" / "Create Vendor PO",
+     Users "+ Add User", Roles "+ New Role") were painted as white secondary
+     capsules while their text stayed white: 1.0:1, the buttons looked blank.
+     They keep their own colour now, as the glass primary capsule. Toggles
+     (aria-pressed / tabs) keep their own look. */
+  html body :is(.page-header .page-header-actions, #root, .modal-backdrop) button:is([style*="background: rgb(38, 64, 176)"], [style*="background-color: rgb(38, 64, 176)"]):not([aria-pressed], [aria-checked], [aria-selected], [role="tab"], [role="radio"]):where(:not(:disabled)) {
+    background: linear-gradient(180deg, rgba(255, 255, 255, .26) 0%, rgba(255, 255, 255, 0) 52%), var(--g-cta) !important;
+    color: #fff !important; border-color: transparent !important; border-radius: 999px !important; box-shadow: var(--g-cta-shadow) !important;
+  }
+  html body :is(#root) .page-header .page-header-actions button[style*="background: rgb(21, 128, 61)"]:where(:not(:disabled)) {
+    background: linear-gradient(180deg, rgba(255, 255, 255, .18) 0%, rgba(255, 255, 255, 0) 52%), linear-gradient(180deg, #178a48 0%, #0f6e35 100%) !important;
+    color: #fff !important; border-color: transparent !important; border-radius: 999px !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), inset 0 -1px 0 rgba(0, 0, 0, .16), 0 8px 22px -10px rgba(19, 122, 60, .6) !important;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    html body :is(.page-header .page-header-actions, #root, .modal-backdrop) button:is([style*="background: rgb(38, 64, 176)"], [style*="background: rgb(21, 128, 61)"]):not([aria-pressed], [aria-checked], [aria-selected], [role="tab"], [role="radio"]):where(:not(:disabled)):hover { filter: brightness(1.06); }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    html body :is(.page-header .page-header-actions, #root, .modal-backdrop) button:is([style*="background: rgb(38, 64, 176)"], [style*="background: rgb(21, 128, 61)"]):not([aria-pressed], [aria-checked], [aria-selected], [role="tab"], [role="radio"]):where(:not(:disabled)):active { transform: scale(.97); }
+  }
+}
+/* D2 · header controls share one height on desktop (were 28 / 30 / 32 / 35 / 36 px
+   next to the 44 px Light-Dark switch) and the round bell matches the capsules */
+@media screen and (min-width: 1024px) {
+  html body .app-shell .page-header .page-header-actions > :is(button, a),
+  html body .app-shell .page-header .page-header-actions > div:not(.theme-switch) > button { min-height: 36px; }
+  html body .app-shell .page-header .page-header-actions > :is(input, select), html body .app-shell .page-header .page-header-actions > div > input { min-height: 36px; border-radius: 999px !important; padding-left: 14px; }
+  html body .app-shell .page-header .page-header-actions button[aria-label^="Departments called"] { border-radius: 999px !important; }
+}
+@media screen {
+  /* D3 · the active sidebar pill: its fill was clipped to the padding box but
+     its rim (inset shadow) drew round the 4 px transparent border, so a second,
+     wider ring ran into the glass panel edge (plain in dark). The item now keeps
+     its inset as margin, so fill and rim are one pill, 8 px clear of the panel
+     on both sides; the text stays exactly where it was (8 + 2 = 4 + 6). */
+  html body .app-shell .app-sidebar .sb-item { width: calc(100% - 16px) !important; margin-left: 8px !important; margin-right: 8px !important; border-left-width: 0 !important; border-right-width: 0 !important; padding-left: 2px !important; padding-right: 2px !important; }
+  html body .app-shell .app-sidebar.w-16 .sb-item { width: calc(100% - 8px) !important; margin-left: 4px !important; margin-right: 4px !important; padding-left: 6px !important; padding-right: 6px !important; }
+  /* D4 · subtitles: one size and colour under every page title (12 px on Users,
+     Roles and Audit Trail, 15 px elsewhere) */
+  @media (min-width: 1024px) {
+    html body .app-shell .page-header h1 + :is(p, div) { font-size: 15px !important; color: var(--ink-2) !important; margin-top: 6px !important; text-wrap: pretty; }
+  }
+}
