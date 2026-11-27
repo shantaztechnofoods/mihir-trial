@@ -26,6 +26,9 @@ The screens here are presentational: state and every write (handler) still live 
 |---|---|---|
 | `<WhatsAppPage>` | `onSave` | `handleSaveSettings` |
 
+Phase C (docs/SHELL-CONTEXT.md): nothing to move — `handleSaveSettings` is shell API and stays in App.jsx,
+so this folder has no `handlers.js`.
+
 Depends on other modules (imported through their `index.js`): _none_
 Shared code used: `src/shared/components/PageHeader.jsx`
 Lower layers used: _none_
