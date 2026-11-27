@@ -196,11 +196,16 @@ export default function Line3DView({ line, bomDefs = {}, onOpenMachine, onFail }
     ro.observe(el); return () => ro.disconnect();
   }, []);
   // Follow the light / petrol-dark switch while the 3D view is open.
+  // perf/inp-theme-toggle: the scene is rebuilt AFTER the new page colours are on
+  // screen (next frame + a task), so the switch paints at once; the 3D scene
+  // follows a moment later. Several quick switches rebuild it once.
   useEffect(() => {
     if (typeof MutationObserver === "undefined") return undefined;
-    const mo = new MutationObserver(() => setMountN((n) => n + 1));
+    let raf = 0, t = 0;
+    const later = () => { cancelAnimationFrame(raf); clearTimeout(t); raf = requestAnimationFrame(() => { t = setTimeout(() => setMountN((n) => n + 1), 0); }); };
+    const mo = new MutationObserver(later);
     mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-    return () => mo.disconnect();
+    return () => { mo.disconnect(); cancelAnimationFrame(raf); clearTimeout(t); };
   }, []);
 
   // 1. Photos: cut out once per URL (cached), then mount.
