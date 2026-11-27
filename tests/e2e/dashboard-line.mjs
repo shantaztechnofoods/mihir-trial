@@ -53,6 +53,9 @@ const openDashboard = async (p) => { await p.locator("button, a").filter({ hasTe
   const { b, p, errs } = await launch(`(${seed})();`, { width: 1440, height: 900 });
   const reqs = []; p.on("request", (r) => reqs.push(r.url()));
   const lazy3d = () => reqs.filter((u) => /three\.module|Line3DView/.test(u));
+  // 2026-11-27: the 3D chunks are never in the first download (login screen) …
+  const loginJs = await p.evaluate(() => performance.getEntriesByType("resource").map((r) => r.name).filter((n) => /\.js(\?|$)/.test(n)));
+  ok("3d: the 3D view chunks are not in the first download (login screen)", !loginJs.some((u) => /Line3DView|\/line3d-/.test(u)), loginJs.filter((u) => /Line3DView|line3d/.test(u)).join(" "));
   await loginAdmin(p); await openDashboard(p);
   const panel = p.locator("[data-production-line]");
   ok("admin: panel shows on the Dashboard", await panel.count() === 1);
@@ -81,19 +84,24 @@ const openDashboard = async (p) => { await p.locator("button, a").filter({ hasTe
   // ── 3D view (2026-11-06): Line by default, three.js only after the tap ──
   ok("3d: opens on Line (Line pressed, strip shown, no 3D scene)", await p.locator('[data-line-views] [data-view="line"]').getAttribute("aria-pressed") === "true"
     && await p.locator("[data-production-line] [data-stage]").count() === 6 && await p.locator("[data-floor-3d]").count() === 0);
-  ok("3d: three.js / 3D chunk NOT downloaded before the tap", lazy3d().length === 0, lazy3d().join(" "));
+  // … and are fetched on browser idle once the Dashboard has settled, so the tap only builds the scene.
+  const pre = await p.waitForFunction(() => { const n = performance.getEntriesByType("resource").map((r) => r.name); return n.some((u) => /Line3DView-.*\.js/.test(u)) && n.some((u) => /\/line3d-.*\.js/.test(u)); }, null, { timeout: 20000 }).then(() => true, () => false);
+  ok("3d: the 3D chunks are preloaded on idle after the Dashboard shows", pre, lazy3d().join(" "));
+  ok("3d: preloading built no scene (no canvas, no WebGL until the tap)", await p.locator("[data-floor-3d], .f3-gl canvas").count() === 0 && await p.evaluate(() => !window.__dash3d));
   const jsBefore = new Set(reqs.filter((u) => /\.js(\?|$)/.test(u)));
-  await p.locator('[data-line-views] [data-view="3d"]').click();
-  await p.waitForFunction(() => document.querySelector("[data-floor-3d] canvas") || document.querySelector("[data-line-3d-note]"), null, { timeout: 15000 }).catch(() => {});
+  const posterMs = await p.evaluate(() => new Promise((res) => { const t0 = performance.now(); document.querySelector('[data-line-views] [data-view="3d"]').click();
+    const tick = () => { if (document.querySelector("[data-3d-poster], [data-floor-3d] canvas")) res(Math.round(performance.now() - t0)); else if (performance.now() - t0 > 5000) res(-1); else requestAnimationFrame(tick); }; tick(); }));
+  ok("3d: something useful on screen right after the tap (CSS poster of the line, <= 300 ms)", posterMs >= 0 && posterMs <= 300, `${posterMs} ms`);
+  await p.waitForFunction(() => (window.__dash3d && window.__dash3d.frames > 0) || document.querySelector("[data-line-3d-note]"), null, { timeout: 30000 }).catch(() => {});
   await settle(p, 800);
-  // The 3D view's own chunk arrives only now. three.js itself may already be in the browser from the
-  // login logo (shared lazy chunk; never in the first download — health "bundle" check guards that).
   const jsAfter = reqs.filter((u) => /\.js(\?|$)/.test(u) && !jsBefore.has(u));
-  ok("3d: tap downloads the lazy 3D view chunk", jsAfter.some((u) => /Line3DView/.test(u)) && ![...jsBefore].some((u) => /Line3DView/.test(u)), jsAfter.join(" "));
+  ok("3d: the tap needs no new 3D chunk download (already preloaded)", !jsAfter.some((u) => /Line3DView|\/line3d-/.test(u)), jsAfter.join(" "));
   const hasGl = await p.locator("[data-floor-3d] canvas").count() === 1;
   if (hasGl) {
     ok("3d: the three.js scene is running after the tap", await p.evaluate(() => !!(window.__dash3d && window.__dash3d.info().calls >= 0)));
     ok("3d: Line strip hidden, scene shown", await p.locator("[data-production-line] [data-stage]").count() === 0);
+    await p.waitForTimeout(400);
+    ok("3d: the poster is gone once the real 3D frame is drawn", await p.locator("[data-3d-poster]").count() === 0);
     const tags = await p.locator("[data-floor-3d] .f3-tag").evaluateAll((els) => els.map((e) => e.innerText.replace(/\s+/g, " ")));
     ok("3d: one tag per machine in a work department (5)", tags.length === 5, tags.join(" | "));
     ok("3d: hold tag says why, in words", tags.some((t) => /SN-106.*On hold – Heater awaited/.test(t)), tags.join(" | "));
