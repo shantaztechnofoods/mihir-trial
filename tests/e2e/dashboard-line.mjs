@@ -204,7 +204,7 @@ const openDashboard = async (p) => { await p.locator("button, a").filter({ hasTe
       const f1 = await p.evaluate(() => window.__dash3d.frames);
       await p.locator("[data-3d-pager] button").last().click(); await p.waitForTimeout(900);
       ok(`phone 3d ${w}: swiping to the next department draws 0 WebGL frames`, await p.evaluate(() => window.__dash3d.frames) === f1);
-      ok(`phone 3d ${w}: pager says the next department`, /Assembly · 2 \/ 6/.test(await p.locator("[data-3d-pager]").innerText()), await p.locator("[data-3d-pager]").innerText());
+      ok(`phone 3d ${w}: pager says the next department`, /Assembly · 2 \/ 6/.test(await p.locator("[data-3d-dept]").innerText()), await p.locator("[data-3d-dept]").innerText());
       const fs = await p.locator("[data-floor-3d] .f3-tag:not([data-hidden]) b, [data-floor-3d] .f3-tt, [data-floor-3d] .f3-kl, [data-floor-3d] .f3-cs").evaluateAll((els) => Math.min(...els.map((e) => parseFloat(getComputedStyle(e).fontSize))));
       ok(`phone 3d ${w}: tag / chip / number words are >= 12px`, fs >= 12, String(fs));
       const over = await p.locator("[data-floor-3d] .f3-tag:not([data-hidden])").evaluateAll((els) => { const r = els.map((e) => e.getBoundingClientRect()); for (let i = 0; i < r.length; i++) for (let j = i + 1; j < r.length; j++) { const a = r[i], c = r[j]; if (a.left < c.right - 1 && c.left < a.right - 1 && a.top < c.bottom - 1 && c.top < a.bottom - 1) return true; } return false; });

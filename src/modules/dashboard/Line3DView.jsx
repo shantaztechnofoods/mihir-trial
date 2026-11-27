@@ -134,11 +134,36 @@ function Odo({ n }) {
   );
 }
 
+// Phone pager: which department is in the middle of the screen (an
+// IntersectionObserver, no scroll handler). Its own component so a swipe never
+// re-renders the 3D view (that would draw a WebGL frame).
+function Pager({ stages, scrollRef, snapsRef, ready }) {
+  const [dept, setDept] = useState(0);
+  useEffect(() => {
+    if (!scrollRef.current || !snapsRef.current || typeof IntersectionObserver === "undefined") return undefined;
+    const io = new IntersectionObserver((es) => { for (const e of es) if (e.isIntersecting) setDept(Number(e.target.dataset.snap)); },
+      { root: scrollRef.current, rootMargin: "0px -50% 0px -50%", threshold: 0 });
+    [...snapsRef.current.children].forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  }, [ready, scrollRef, snapsRef]);
+  const go = (i) => {
+    const sc = scrollRef.current, el = snapsRef.current?.children[i]; if (!sc || !el) return;
+    sc.scrollTo({ left: el.offsetLeft + el.offsetWidth / 2 - sc.clientWidth / 2, behavior: reduceMotion() ? "auto" : "smooth" });
+  };
+  const st = stages[dept] || stages[0];
+  return (
+    <div className="f3-pager" data-3d-pager>
+      <button type="button" onClick={() => go(Math.max(0, dept - 1))} disabled={dept === 0} aria-label="Previous department">‹</button>
+      <span className="f3-pager-l" aria-live="polite" data-3d-dept><b>{st.label}</b> · {dept + 1} / {stages.length}</span>
+      <button type="button" onClick={() => go(Math.min(stages.length - 1, dept + 1))} disabled={dept === stages.length - 1} aria-label="Next department">›</button>
+    </div>
+  );
+}
+
 export default function Line3DView({ line, bomDefs = {}, onOpenMachine, onFail }) {
   const glRef = useRef(null), tagsRef = useRef(null), chipsRef = useRef(null), stageRef = useRef(null), popRef = useRef(null);
   const wrapRef = useRef(null), scrollRef = useRef(null), trackRef = useRef(null), snapsRef = useRef(null);
   const [phone, setPhone] = useState(() => typeof window !== "undefined" && window.innerWidth < PHONE_MAX);
-  const [dept, setDept] = useState(0);
   const apiRef = useRef(null);
   const [cap, setCap] = useState(6);
   const all = line.onLine || [];
@@ -244,18 +269,6 @@ export default function Line3DView({ line, bomDefs = {}, onOpenMachine, onFail }
     return () => { if (tro) tro.disconnect(); api.stop(); if (apiRef.current === api) apiRef.current = null; if (window.__dash3d === api) window.__dash3d = null; if (trackRef.current) trackRef.current.style.width = ""; };
   }, [photos, mountN, wb, phone]);
 
-  // Phone pager: which department is in the middle of the screen (no scroll handler).
-  useEffect(() => {
-    if (!phone || !scrollRef.current || !snapsRef.current || typeof IntersectionObserver === "undefined") return undefined;
-    const io = new IntersectionObserver((es) => { for (const e of es) if (e.isIntersecting) setDept(Number(e.target.dataset.snap)); },
-      { root: scrollRef.current, rootMargin: "0px -50% 0px -50%", threshold: 0 });
-    [...snapsRef.current.children].forEach((el) => io.observe(el));
-    return () => io.disconnect();
-  }, [phone, photos]);
-  const goDept = (i) => {
-    const sc = scrollRef.current, el = snapsRef.current?.children[i]; if (!sc || !el) return;
-    sc.scrollTo({ left: el.offsetLeft + el.offsetWidth / 2 - sc.clientWidth / 2, behavior: reduceMotion() ? "auto" : "smooth" });
-  };
 
   // 3. Live data: a dept change glides; anything structural remounts.
   const live = machines.map((m) => `${m.id}:${m.z}:${m.state}:${m.share == null ? "-" : Math.round(m.share * 72)}`).join("|");
@@ -383,7 +396,6 @@ export default function Line3DView({ line, bomDefs = {}, onOpenMachine, onFail }
     );
   }
   // Phone: numbers on top, the swipeable line, then the department pager.
-  const st = line.stages[dept] || line.stages[0];
   return (
     <div className="f3-wrap" data-floor-3d data-phone ref={wrapRef}>
       {kpisEl}
@@ -397,12 +409,7 @@ export default function Line3DView({ line, bomDefs = {}, onOpenMachine, onFail }
           </div>
         </div>
       </div>
-      <div className="f3-pager" data-3d-pager>
-        <button type="button" onClick={() => goDept(Math.max(0, dept - 1))} disabled={dept === 0} aria-label="Previous department">‹</button>
-        <span className="f3-pager-l" aria-live="polite"><b>{st.label}</b> · {dept + 1} / {line.stages.length}</span>
-        <span className="f3-dots" aria-hidden="true">{line.stages.map((s2, i) => <i key={s2.key} data-on={i === dept ? "" : undefined} />)}</span>
-        <button type="button" onClick={() => goDept(Math.min(line.stages.length - 1, dept + 1))} disabled={dept === line.stages.length - 1} aria-label="Next department">›</button>
-      </div>
+      <Pager stages={line.stages} scrollRef={scrollRef} snapsRef={snapsRef} ready={!!photos} />
       {popEl}
     </div>
   );
