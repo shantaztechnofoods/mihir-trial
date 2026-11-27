@@ -14,6 +14,7 @@ Shared pieces for pending jobs / issues (kinds fault and owed): the editable row
 |---|---|
 | `JobHistory.jsx` | 53 |
 | `PendingJobRows.jsx` | 286 |
+| `handlers.js` | 246 |
 | `index.js` | 6 |
 | `pendingJobs.js` | 81 |
 
@@ -25,6 +26,14 @@ The screens here are presentational: state and every write (handler) still live 
 `src/app/App.jsx` and come in as props. Handlers wired into this module's components:
 
 _No App.jsx handlers are passed in (read-only screens, or the module calls its stores / Edge Function directly)._
+
+**Phase C (docs/SHELL-CONTEXT.md):** the pending-item writes used by Machine Tracker —
+`handleRaisePendingItem`, `handleResolvePendingItem`, `handleReceivePendingItem`,
+`handleIssuePendingPart` — live in this folder's `handlers.js` (moved verbatim,
+`createPendingJobsHandlers(shell)`, `requiresShell` 7; owner/handler yes for Trial, 27 Nov 2026).
+App.jsx passes them to the Machine Tracker pages exactly as before. `handleIssuePendingPart`
+writes the outward record through inventory's `handleAddOutward`, reached as
+`shell.call("inventory.addOutward", …)` (one adapter line).
 
 Depends on other modules (imported through their `index.js`): _none_
 Shared code used: `src/shared/format.js`, `src/shared/printFormat.js`
@@ -61,6 +70,6 @@ Automated: `npm test && npm run build`, then `E2E_ONLY=<suite> scripts/ship.sh c
 See `docs/MODULE-PROMOTION.md`. In short:
 1. Copy this whole folder from the Trial ERP over `src/modules/pending-jobs/` in Live (replace, do not merge by hand).
 2. Diff `index.js`: every name other modules import must still be exported (`npm run build` fails if not).
-3. If the Trial change also touched the handlers listed above, copy those handler changes in `src/app/App.jsx` too (handlers are not inside the folder yet).
+3. The handlers in `handlers.js` travel with the folder. Run `node scripts/module-check.mjs pending-jobs --against <live>`: section 5b lists shell keys, the `createPendingJobsHandlers(shell)` line and the `shell.call` registry entries Live's App.jsx still needs (one-time App.jsx step). These writes serve Machine Tracker, which is LOCKED in ERP LIVE: promotion needs the owner's "haan".
 4. Apply any NEW migration the change needs (additive, in number order, BEFORE merging) and redeploy any Edge Function listed above that changed.
 5. `npm test`, `npm run build`, the browser suites listed above, then merge; Vercel deploys `main`.

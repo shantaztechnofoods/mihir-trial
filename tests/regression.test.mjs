@@ -94,7 +94,7 @@ test("regression: the former App.jsx code is not pathologically small on disk (>
 const FOLDER_FLOORS = {
   "src/app": 2500,
   "src/shared": 1500,
-  "src/modules/machine-tracker": 3000,
+  "src/modules/machine-tracker": 4000,   // +1000: Phase C moved ~1,120 lines of Machine Tracker writes here from App.jsx
   "src/modules/trial-certificate": 400,
   "src/modules/inventory": 2000,
   "src/modules/bom": 1200,
@@ -116,9 +116,13 @@ for (const [dir, floor] of Object.entries(FOLDER_FLOORS)) {
   });
 }
 
-test("regression: src/app/App.jsx (state wiring + handlers) is substantially populated (>= 2,000 lines)", () => {
+// Phase C (docs/SHELL-CONTEXT.md) moves the module writes out of App.jsx into
+// src/modules/<m>/handlers.js (pure moves, proven by scripts/split-accounting.mjs):
+// 3,652 lines before Phase C, 1,615 after the Machine Tracker move. The floor
+// moved with the code (machine-tracker folder floor raised by 1,000 above).
+test("regression: src/app/App.jsx (state wiring + handlers) is substantially populated (>= 1,200 lines)", () => {
   const lines = read(APP_JSX).split("\n").length;
-  assert.ok(lines >= 2000, `src/app/App.jsx shrank to ${lines} lines — expected >= 2,000.`);
+  assert.ok(lines >= 1200, `src/app/App.jsx shrank to ${lines} lines — expected >= 1,200.`);
 });
 
 test("regression: every module folder has index.js (public exports) and README.md", () => {

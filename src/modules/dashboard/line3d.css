@@ -150,3 +150,5 @@
 .f3-wrap[data-phone] .f3-pop-go { min-height: 44px; font-size: 14px; }
 .f3-wrap[data-phone] .f3-pop-x { width: 44px; height: 44px; top: 0; right: 0; }
 .f3-wrap[data-phone] .f3-empty { position: static; padding: 8px 0; }
+/* Phone: the CSS poster covers the swipeable line until the first 3D frame */
+.f3-view { position: relative; }

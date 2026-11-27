@@ -32,7 +32,9 @@ test("H: no user-supplied SVG is injected as markup — signatures render throug
 });
 
 test("K: Remove From Rack goes through rack_remove_machine in Supabase mode, audits after success, local path intact", () => {
-  const body = fn("const handleRemoveRackMachine = async (machineId) => {", "// Adds a \"materials fully issued\" note");
+  // 2026-11-27 Phase C (modules/c-bom-issue): the body moved to src/modules/inventory/handlers.js,
+  // where it is the last handler before the factory's return line.
+  const body = fn("const handleRemoveRackMachine = async (machineId) => {", "  return { handleInwardComplete, ");
   assert.match(body, /if \(!authCanDo\("outward", "delete"\)\)/, "permission check kept");
   assert.match(body, /c\.rpc\("rack_remove_machine", \{ p_machine_id: Number\(machineId\) \}\)/);
   const rpcAt = body.indexOf('rpc("rack_remove_machine"');
@@ -66,7 +68,8 @@ test("J + B: BOM issue creates the machine row first (awaited), audits only afte
   assert.match(drawer, /if \(createdMachine && onAbortMachine\) \{/);
   assert.match(drawer, /machineId: createdMachine \? createdMachine\.id : null/);
   assert.match(app, /if \(data\.serialNo && onCreateMachine && data\.machineId == null && !\(data\.rackSet && data\.rackSet\.mode === "crate"\)\)/, "handleBOMIssue does not create it twice");
-  const abort = fn("const handleAbortMachineCreate = async (", "// 2026-11-01 — issues and pending jobs are TRACKING");
+  // Phase C: next to it in src/modules/inventory/handlers.js is the Remove From Rack handler's comment
+  const abort = fn("const handleAbortMachineCreate = async (", "// Feature 3: remove a machine from the rack.");
   assert.match(abort, /type: "machine_issue_aborted"/);
   assert.ok(!abort.includes("handleUpdateStock("), "abort never touches stock");
 });
@@ -86,7 +89,9 @@ test("C + B: admin stage override refuses an open hand-over, is gated in the UI,
 });
 
 test("D: Accept finds the machine (refetching once) BEFORE the handover is flipped", () => {
-  const body = fn("const handleAcceptHandover = async ({", "const handleRegisterSignature = async");
+  // Phase C (modules/c-machine-tracker): in src/modules/machine-tracker/handlers.js the
+  // During-Work checklist handler's comment follows the Accept handler.
+  const body = fn("const handleAcceptHandover = async ({", "// Migration 028 — During-Work checklist submission.");
   const lookup = body.indexOf("let machine = machineLog.find((m) => String(m.id) === String(handover.machineId));");
   const refetch = body.indexOf("const fresh = await fetchMachines();");
   const refuse = body.indexOf("was not found — refresh the page and try again. The handover has not been accepted.");
@@ -100,7 +105,7 @@ test("A: Machine-module writes that used to fail silently now reach flashSaveErr
   for (const [name, until] of [
     ["const raiseNotIssuedJobs = (", "const handleCreateMachine = async ("],
     ["const handleFinishTransfer = async ({", "// Accept flow: verify password"],
-    ["const handleAcceptHandover = async ({", "const handleRegisterSignature = async"],
+    ["const handleAcceptHandover = async ({", "// Migration 028 — During-Work checklist submission."],
   ]) {
     const body = fn(name, until);
     // every console.warn about a failed save is followed by a visible error within a few lines
