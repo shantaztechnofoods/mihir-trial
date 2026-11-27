@@ -1,0 +1,81 @@
+{
+  "name": "settings",
+  "version": "1.0.0",
+  "frozen": false,
+  "liveLock": false,
+  "requiresCore": 1,
+  "exports": [
+    "SettingsPage"
+  ],
+  "dependsOn": {
+    "purchase": [
+      "POSettings"
+    ],
+    "reports": [
+      "REPORT_KINDS",
+      "REPORT_LANGS",
+      "REPORT_SECTIONS",
+      "SECTION_REPORTS",
+      "canEditReportMaster",
+      "resolveReportMaster",
+      "serializeReportMaster"
+    ]
+  },
+  "handlers": [
+    "handleAdminCleanupDone",
+    "handleCreateChecklistTemplate",
+    "handleDeleteChecklistTemplate",
+    "handleRegisterSignature",
+    "handleSaveModules",
+    "handleSaveSettings",
+    "handleSaveUserDepartments",
+    "handleUpdateChecklistTemplate",
+    "moduleOn"
+  ],
+  "stores": [
+    "stores/adminApi.js"
+  ],
+  "shared": [
+    "shared/buildInfo.js",
+    "shared/components/LeadIcon.jsx",
+    "shared/settingsDefaults.js",
+    "shared/ui/OrgLayout.jsx",
+    "shared/ui/SaveMorph.jsx",
+    "shared/ui/SignaturePad.jsx",
+    "shared/ui/ThemeSwitch.jsx",
+    "shared/ui/Topbar.jsx"
+  ],
+  "core": {
+    "auth": [
+      "auth/AuthContext.jsx"
+    ],
+    "config": [
+      "config/env.js"
+    ],
+    "utils": [
+      "utils/departmentHeads.js",
+      "utils/handoverLogic.js",
+      "utils/haptics.js",
+      "utils/modules.js"
+    ]
+  },
+  "npm": [
+    "react"
+  ],
+  "migrations": [
+    "002_master",
+    "022_dept_checklists",
+    "029_dept_employees",
+    "051_admin_cleanup",
+    "071_drive_backup"
+  ],
+  "edgeFunctions": [
+    "drive-backup"
+  ],
+  "serverless": [],
+  "notes": [
+    "002_master: settings table",
+    "022_dept_checklists: checklist templates",
+    "071_drive_backup + drive-backup: Settings → Drive backup panel (docs/DRIVE-BACKUP.md)"
+  ]
+}

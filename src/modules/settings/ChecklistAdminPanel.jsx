@@ -149,7 +149,7 @@ export function ChecklistAdminPanel({ templates = [], canConfig = false, onCreat
                 <div className="text-[10px] text-slate-500 italic">No questions yet. Click "+ Add Question" to start.</div>
               )}
               {editing.items.map((it, i) => (
-                <div key={it.id || i} className="flex items-center gap-2">
+                <div key={it.id || i} className="wu-li-in flex items-center gap-2">
                   <span className="text-[10px] text-slate-500 font-mono w-5 text-right">{i + 1}.</span>
                   <input type="text" value={it.label || ""}
                          onChange={(e) => patchItem(i, { label: e.target.value })}

@@ -208,7 +208,7 @@ export function ListSkeleton({ rows = 5 }) {
 
 export function EmptyState({ icon = "📭", title = "Nothing here yet", desc = "", action = null }) {
   return (
-    <div className="flex flex-col items-center justify-center py-16 px-6 text-center select-none">
+    <div className="wu-empty-in flex flex-col items-center justify-center py-16 px-6 text-center select-none">
       <div className="text-5xl mb-4" style={{ opacity: 0.45 }}><Glyph e={icon} size={34} /></div>
       <div className="text-sm font-semibold mb-1.5" style={{ color: "var(--text-strong)" }}>{title}</div>
       {desc && <div className="text-xs max-w-xs leading-relaxed" style={{ color: "var(--text-dim)" }}>{desc}</div>}

@@ -6,7 +6,7 @@ import { openVendorWhatsApp, waErrorToast } from "../../utils/whatsapp.js";
 import DebouncedSearchInput from "../../shared/components/DebouncedSearchInput.jsx";
 import { VendorImportModal } from "./VendorImportModal.jsx";
 import { VendorModal } from "./VendorModal.jsx";
-import { Btn, MetricCard, StatusBadge } from "../../shared/ui/primitives.jsx";
+import { Btn, EmptyState, MetricCard, StatusBadge } from "../../shared/ui/primitives.jsx";
 import { Topbar } from "../../shared/ui/Topbar.jsx";
 import ArchivedSection from "../../shared/components/ArchivedSection.jsx";
 import { archiveConfirmTitle } from "../../utils/archive.js";
@@ -185,14 +185,14 @@ export function VendorsPage({ vendorList, pos, items, onAddVendor, onEditVendor,
 
       <Topbar title="Vendor Management" subtitle={`${activeVendors.length} suppliers · ${activeVendors.filter((v) => v.status === "preferred").length} preferred`}>
         <DebouncedSearchInput ref={searchRef} value={search} onChange={setSearch}
-               placeholder="Search vendors..." className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 outline-none w-44 focus:border-[#2E50D6]/40 focus:outline-none transition-colors" />
+               placeholder="Search vendors..." className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 outline-none min-w-0 flex-1 w-auto md:flex-none md:w-44 focus:border-[#2E50D6]/40 focus:outline-none transition-colors" />
         {canDo("vendors","add") && (
           <button onClick={() => setShowImport(true)}
-                  className="text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-900 hover:border-slate-300 transition-all flex items-center gap-1.5">
+                  className="!flex-none text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-900 hover:border-slate-300 transition-all flex items-center gap-1.5">
             <LeadIcon e="⬆" />Import
           </button>
         )}
-        {canDo("vendors","add") && <Btn variant="primary" size="sm" onClick={() => { setEditingVendor(null); setShowModal(true); }}>+ Add Vendor</Btn>}
+        {canDo("vendors","add") && <Btn variant="primary" size="sm" className="!flex-none" onClick={() => { setEditingVendor(null); setShowModal(true); }}>+ Add Vendor</Btn>}
       </Topbar>
 
       <div className="p-6 space-y-6">
@@ -275,8 +275,15 @@ export function VendorsPage({ vendorList, pos, items, onAddVendor, onEditVendor,
                 </div>
               </div>
             ))}
-            {filtered.length === 0 && (
+            {filtered.length === 0 && activeVendors.length > 0 && (
               <div className="col-span-3 py-16 text-center text-slate-600 text-sm">No vendors match your search.</div>
+            )}
+            {activeVendors.length === 0 && (
+              <div className="col-span-full">
+                <EmptyState icon="🏢" title="No vendors yet"
+                            desc="Add your first supplier to start raising purchase orders."
+                            action={canDo("vendors","add") ? <Btn variant="primary" size="sm" onClick={() => { setEditingVendor(null); setShowModal(true); }}>+ Add Vendor</Btn> : null} />
+              </div>
             )}
             {/* 2026-11-05 — archived vendors (never deleted): collapsed, Restore
                 guarded by the same permission as Archive. */}
