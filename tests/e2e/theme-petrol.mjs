@@ -32,18 +32,23 @@ const bodyBg = (p) => p.evaluate(() => getComputedStyle(document.body).backgroun
   ok("Light is the selected option by default", await sw.locator("[data-theme-option='light']").getAttribute("aria-checked") === "true");
   ok("nothing saved until the person picks", await p.evaluate(() => localStorage.getItem("erp_theme_mode")) === null);
   await sw.locator("[data-theme-option='dark']").click(); await p.waitForTimeout(400);
+  // the recolour can land a few frames later on a loaded machine: wait for it (max 2 s), the colour is still checked exactly
+  await p.waitForFunction(() => getComputedStyle(document.body).backgroundColor !== "rgb(244, 246, 250)", null, { timeout: 2000 }).catch(() => {});
   ok("Dark → data-theme dark", await theme(p) === "dark");
-  ok("Dark: page is the petrol dark background", await bodyBg(p) === "rgb(8, 19, 21)", await bodyBg(p));
+  ok("Dark: page is the petrol/navy glass background (spatial glass, 2026-11-27)", await bodyBg(p) === "rgb(11, 20, 27)", await bodyBg(p));
   ok("dark: the dark-only inline-colour sheet is on", await p.evaluate(() => document.querySelector("style[data-theme-inline-dark]")?.media) === "screen");
 
   const rects = () => p.evaluate(() => [...document.querySelectorAll(".page-header, aside, main, .page-header h1, .page-header-actions")].map((e) => { const r = e.getBoundingClientRect(); return [r.x, r.y, r.width, r.height].map(Math.round).join(","); }).join("|"));
   const before = await rects();
   await p.evaluate(() => { window.__xf = false; new MutationObserver(() => { if (document.documentElement.classList.contains("theme-xf")) window.__xf = true; }).observe(document.documentElement, { attributes: true, attributeFilter: ["class"] }); });
   await sw.locator("[data-theme-option='light']").click();
+  // the switch paints first; the page recolours in the next frames, with no fade
+  await p.waitForFunction(() => getComputedStyle(document.body).backgroundColor === "rgb(244, 246, 250)", null, { timeout: 1000 }).catch(() => {});
   ok("swap class (transitions off) is on while switching", await p.evaluate(() => window.__xf));
-  ok("new colours are on at once (no fade wait)", await bodyBg(p) === "rgb(244, 246, 250)", await bodyBg(p));
+  ok("new colours are on right after the tap (no fade wait)", await bodyBg(p) === "rgb(244, 246, 250)", await bodyBg(p));
   await p.waitForFunction(() => !document.documentElement.classList.contains("theme-xf"), null, { timeout: 2000 }).catch(() => {});
   ok("Light → data-theme light", await theme(p) === "light");
+  await p.waitForTimeout(300);
   ok("Light → old light background (pre-Petrol)", await bodyBg(p) === "rgb(244, 246, 250)", await bodyBg(p));
   ok("swap class is removed after the swap", !(await p.evaluate(() => document.documentElement.classList.contains("theme-xf"))));
   // (kept on while the pointer is on the switch, ready for the next tap; off once it leaves)
@@ -52,8 +57,10 @@ const bodyBg = (p) => p.evaluate(() => getComputedStyle(document.body).backgroun
   ok("light: the dark-only inline-colour sheet is off once the pointer leaves the switch", await p.evaluate(() => document.querySelector("style[data-theme-inline-dark]")?.media) === "not all");
   ok("switching moved nothing (same boxes)", await rects() === before);
   ok("choice saved in this browser", await p.evaluate(() => localStorage.getItem("erp_theme_mode")) === "light");
-  ok("light: primary button is the old blue", await p.evaluate(() => { const e = document.querySelector(".btn-primary-brand"); return !e || getComputedStyle(e).backgroundColor === "rgb(47, 91, 234)"; }));
-  ok("light: sidebar is the old dark slate", await p.evaluate(() => getComputedStyle(document.querySelector("aside")).backgroundColor) === "rgb(13, 17, 24)");
+  // Spatial glass (2026-11-27, handler's chosen look): the primary action is a cobalt glass pill
+  // (same cobalt family as before), the sidebar is a frosted light-glass rail.
+  ok("light: primary button is the cobalt glass pill", await p.evaluate(() => { const e = document.querySelector(".btn-primary-brand"); if (!e) return true; const s = getComputedStyle(e); return /rgb\(75, 116, 242\).*rgb\(42, 79, 214\)/.test(s.backgroundImage) && s.borderRadius === "999px"; }));
+  ok("light: sidebar is the floating frosted light-glass panel", await p.evaluate(() => { const a = document.querySelector("aside"); const s = getComputedStyle(a), pn = getComputedStyle(a, "::before"); return s.backgroundColor === "rgba(0, 0, 0, 0)" && pn.borderRadius === "24px" && /linear-gradient/.test(pn.backgroundImage) && pn.top === "8px"; }));
 
   await p.reload({ waitUntil: "networkidle" }); await settle(p, 1500);
   ok("after reload: still Light (device is dark)", await theme(p) === "light");

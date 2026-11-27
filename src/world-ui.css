@@ -1086,7 +1086,9 @@
   html:where([data-theme="dark"]) body .sp-pill-slate { background: var(--p-s3); color: var(--p-tx2); }
 
   /* Mode switch: transitions OFF while the colours swap */
-  html.theme-xf *, html.theme-xf *::before, html.theme-xf *::after { transition: none !important; }
+  /* :not(#_) lifts this above every class-based "transition … !important" (glass.css
+     buttons, tiles, sidebar items), so NOTHING animates its colour during the swap */
+  html.theme-xf:not(#_) *, html.theme-xf:not(#_) *::before, html.theme-xf:not(#_) *::after { transition: none !important; }
 
   html:where([data-theme="dark"]), :where(html[data-theme="dark"]) body, :where(html[data-theme="dark"]) #root, :where(html[data-theme="dark"]) .app-shell { background-color: var(--p-bg); }
   :where(html[data-theme="dark"]) body { color: var(--p-tx1); }
