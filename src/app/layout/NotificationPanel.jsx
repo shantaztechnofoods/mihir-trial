@@ -19,7 +19,7 @@ export function NotificationPanel({ notifications, dismissed, onClose, onNavigat
 
   return (
     <div className="fixed inset-0 z-[90]" onClick={onClose}>
-      <div className="absolute right-4 top-16 w-[360px] overflow-hidden"
+      <div className="wu-notif-in absolute right-4 top-16 w-[360px] overflow-hidden"
            style={{ background: "#ffffff", border: "1px solid rgba(17,24,39,0.10)", borderRadius: 14, boxShadow: "0 24px 64px rgba(17,24,39,0.18)" }}
            onClick={(e) => e.stopPropagation()}>
 
