@@ -46,6 +46,10 @@ Each module folder has:
 * `README.md` — what it does, screens, files, the App.jsx handlers wired into
   it, stores / tables / RPCs, `canDo` keys, audit event types, migrations, Edge
   Functions, tests, how to verify, how to promote it.
+* `MODULE.json` — machine-readable manifest (exports, other modules, App.jsx
+  handlers, core files, npm, migrations, Edge Functions, `requiresCore`) for
+  folder-replace releases; kept in step with the code by
+  `tests/moduleManifest.test.mjs` — see `docs/FOLDER-REPLACE.md`.
 
 ## Dependency rules (checked when the split was made)
 

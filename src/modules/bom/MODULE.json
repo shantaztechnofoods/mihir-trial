@@ -1,0 +1,64 @@
+{
+  "name": "bom",
+  "version": "1.0.0",
+  "frozen": true,
+  "liveLock": false,
+  "requiresCore": 1,
+  "exports": [
+    "BOMDrawer",
+    "BOMPasteLines",
+    "BomChecklistSlots",
+    "BomChecklistsPanel",
+    "BomLineCheckPointsModal",
+    "BomPhotoField",
+    "BomPhotoThumb",
+    "DeptDurationFields",
+    "RackStatusNote",
+    "durationsFormFrom",
+    "durationsStoreFrom",
+    "validateDurationsForm"
+  ],
+  "dependsOn": {
+    "pending-jobs": [
+      "PendingJobRows",
+      "cleanPendingJobs",
+      "emptyPendingJob",
+      "normalizePendingJob"
+    ]
+  },
+  "handlers": [],
+  "stores": [],
+  "shared": [
+    "shared/components/ItemSearchSelect.jsx",
+    "shared/components/LeadIcon.jsx",
+    "shared/format.js",
+    "shared/ui/OrgLayout.jsx",
+    "shared/ui/primitives.jsx"
+  ],
+  "core": {
+    "utils": [
+      "utils/bomCost.js",
+      "utils/bomPaste.js",
+      "utils/checklistLogic.js",
+      "utils/handoverLogic.js",
+      "utils/rackSlots.js",
+      "utils/storage.js"
+    ]
+  },
+  "npm": [
+    "lucide-react",
+    "react"
+  ],
+  "migrations": [
+    "028_bom_checklist_scope",
+    "037_item_check_points",
+    "041_bom_dept_durations",
+    "046_bom_retired",
+    "061_bom_photo"
+  ],
+  "edgeFunctions": [],
+  "serverless": [],
+  "notes": [
+    "2026-11-02_demo_cleanup_and_empty_boms (ops, one-off)"
+  ]
+}
