@@ -3355,6 +3355,14 @@ input:focus, select:focus, textarea:focus { box-shadow: 0 0 0 3px rgba(46,80,214
    Layout only, inside the existing card look. Right-sized controls:
    min touch 44px, primary 48px, control text 15px, nothing stretched. */
 .settings-tabs > button { min-height: 44px; }
+/* 2026-11-27 view round 2 — Settings on touch screens (phone + tablet):
+   Save buttons and the small × / ↑ / ↓ chips get a 44px tap area. The chip
+   remove buttons use negative margins so the chips keep their height.
+   Mouse (fine pointer) unchanged. */
+@media (pointer: coarse) {
+  .st-save, [data-save-modules] { min-height: 44px !important; }
+  .st-x { min-width: 32px; min-height: 44px; margin-top: -12px; margin-bottom: -12px; display: inline-flex; align-items: center; justify-content: center; }
+}
 .org-groups { display: flex; flex-direction: column; gap: 12px; }
 .org-group { border: 1px solid var(--border-rim, rgba(17,24,39,0.12)); border-radius: 12px; background: var(--surface-card, #fff); overflow: hidden; }
 .org-group-head { width: 100%; min-height: 52px; display: flex; align-items: center; gap: 10px; padding: 10px 16px; text-align: left; background: rgba(17,24,39,0.03); }

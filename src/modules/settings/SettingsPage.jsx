@@ -193,7 +193,7 @@ export function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, on
           </span>
         )}
         <button onClick={() => handleSave()}
-                className="inline-flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-xl transition-all duration-200"
+                className="st-save inline-flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-xl transition-all duration-200"
                 style={{ background: saved ? "var(--st-okBg, rgba(22,163,74,0.12))" : "var(--st-saveBg, #2640B0)", color: saved ? "var(--st-okTx, #15803d)" : "var(--st-saveTx, #fff)", border: saved ? "var(--st-okBorder, 1px solid rgba(22,163,74,0.35))" : "var(--st-saveBorder, 1px solid rgba(38, 64, 176,0.45))", boxShadow: saved ? "none" : "var(--st-saveShadow, 0 0 12px rgba(46, 80, 214,0.3))" }}>
           <SaveMorph saved={saved} hold={2500}><LeadLabel text="💾 Save Changes" /></SaveMorph>
         </button>
@@ -600,7 +600,7 @@ export function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, on
                           {hol.map((h) => (
                             <span key={h.date} className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full border bg-white" style={{ borderColor: "rgba(99,102,241,0.35)", color: "#3730a3" }}>
                               {h.date}{h.name ? ` · ${h.name}` : ""}
-                              {canConfig && <button type="button" onClick={() => commitWorkflow({ holidays: hol.filter((x) => x.date !== h.date) })} className="text-slate-400 hover:text-red-500" aria-label={`Remove holiday ${h.date}`}>×</button>}
+                              {canConfig && <button type="button" onClick={() => commitWorkflow({ holidays: hol.filter((x) => x.date !== h.date) })} className="st-x text-slate-400 hover:text-red-500" aria-label={`Remove holiday ${h.date}`}>×</button>}
                             </span>
                           ))}
                         </div>

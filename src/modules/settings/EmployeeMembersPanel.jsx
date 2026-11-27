@@ -54,7 +54,7 @@ export function DeptEmployeesRow({ dept, assigned, notAssigned, canConfig, onSav
               {canConfig && (
                 <button onClick={() => removeWorker(u)} disabled={busy}
                         title="Remove from this department"
-                        className="ml-0.5 text-slate-400 hover:text-red-300 disabled:opacity-40">×</button>
+                        className="st-x ml-0.5 text-slate-400 hover:text-red-300 disabled:opacity-40">×</button>
               )}
             </span>
           ))}
