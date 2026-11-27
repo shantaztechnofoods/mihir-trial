@@ -23,14 +23,15 @@ export const turnoverData = [
   { month: "Mar", rate: 5.8 }, { month: "Apr", rate: 6.2 },
 ];
 
-// No purchase orders yet: the chart draws empty axes (no sample months) and says why.
-function ChartEmpty({ e }) {
+// No purchase orders yet: the chart draws with no data (no sample months) and
+// says why, inside its own SVG, so nothing is layered over the chart box.
+function ChartEmptyNote({ width, height }) {
+  const cx = (width || 0) / 2, cy = (height || 0) / 2;
   return (
-    <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-center pointer-events-none" data-chart-empty>
-      <div className="text-2xl" style={{ opacity: 0.45 }}><Glyph e={e} size={22} /></div>
-      <div className="text-xs font-semibold" style={{ color: "var(--text-muted)" }}>No purchase orders yet</div>
-      <div className="text-[11px]" style={{ color: "var(--text-muted)" }}>This chart fills in from your first PO</div>
-    </div>
+    <g data-chart-empty>
+      <text x={cx} y={cy - 4} textAnchor="middle" style={{ fill: "var(--text-strong)", fontSize: 12.5, fontWeight: 600 }}>No purchase orders yet</text>
+      <text x={cx} y={cy + 16} textAnchor="middle" style={{ fill: "var(--text-muted)", fontSize: 12 }}>This chart fills in from your first PO</text>
+    </g>
   );
 }
 
@@ -122,8 +123,7 @@ export function AnalyticsPage({ items, pos, vendorList, settings = SETTINGS_DEFA
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="section-card p-5">
             <SectionHeader><LeadIcon e="📊" />PO Value by Month (₹K)</SectionHeader>
-            <div className="relative">
-            <ChartSlot height={220}>{({ ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip }) => (
+            <ChartSlot height={220}>{({ ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Customized }) => (
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={monthlyPOTrend} barSize={28}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(17,24,39,0.08)" />
@@ -131,17 +131,15 @@ export function AnalyticsPage({ items, pos, vendorList, settings = SETTINGS_DEFA
                 <YAxis tick={{ fill: "#475569", fontSize: 11 }} />
                 <Tooltip content={<CustomTooltip />} />
                 <Bar isAnimationActive={false} dataKey="value" name="PO Value (₹K)" fill="#2E50D620" stroke="#2E50D6" strokeWidth={1.5} radius={[3, 3, 0, 0]} />
+                {pos.length === 0 && <Customized component={ChartEmptyNote} />}
               </BarChart>
             </ResponsiveContainer>
             )}</ChartSlot>
-            {pos.length === 0 && <ChartEmpty e="📊" />}
-            </div>
           </div>
 
           <div className="section-card p-5">
             <SectionHeader><LeadIcon e="📈" />Inventory Turnover Rate</SectionHeader>
-            <div className="relative">
-            <ChartSlot height={220}>{({ ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip }) => (
+            <ChartSlot height={220}>{({ ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Customized }) => (
             <ResponsiveContainer width="100%" height={220}>
               <AreaChart data={pos.length === 0 ? [] : turnoverData}>
                 <defs>
@@ -155,11 +153,10 @@ export function AnalyticsPage({ items, pos, vendorList, settings = SETTINGS_DEFA
                 <YAxis hide={pos.length === 0} tick={{ fill: "#475569", fontSize: 11 }} domain={[3.5, 7]} />
                 <Tooltip content={<CustomTooltip />} />
                 <Area isAnimationActive={false} type="monotone" dataKey="rate" name="Turnover" stroke="#a78bfa" fill="url(#tGrad)" strokeWidth={2} dot={{ fill: "#a78bfa", r: 4 }} />
+                {pos.length === 0 && <Customized component={ChartEmptyNote} />}
               </AreaChart>
             </ResponsiveContainer>
             )}</ChartSlot>
-            {pos.length === 0 && <ChartEmpty e="📈" />}
-            </div>
           </div>
         </div>
 
