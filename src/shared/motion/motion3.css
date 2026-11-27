@@ -1,0 +1,69 @@
+/* ═══ MOTION 3 (2026-11-27) — numbers · charts ═══════════════════════════════
+   Same Motion v2 timing system (world-ui.css --m-*): enter = --m-ease-out,
+   transform / opacity only for anything that moves, nothing over 300 ms.
+   Plays once per page load (shared/motion/firstShow.js), never on re-render.
+   Reduced motion: none of it.                                                 */
+
+/* ── Count-up (shared/motion/countIntro.js) ─────────────────────────────────
+   The real number stays in the DOM and keeps the box at its final width; its
+   glyphs are made transparent and the counting digits are painted on top from
+   data-cu. Alt text "" keeps screen readers on the real number only. */
+.wu-cu { position: relative; -webkit-text-fill-color: transparent; }
+.wu-cu::after {
+  content: attr(data-cu);
+  content: attr(data-cu) / "";
+  position: absolute; inset: 0;
+  -webkit-text-fill-color: currentColor;
+  white-space: nowrap; text-align: inherit; pointer-events: none;
+  font-variant-numeric: tabular-nums;
+}
+@media (prefers-reduced-motion: reduce) {
+  .wu-cu { -webkit-text-fill-color: currentColor; }
+  .wu-cu::after { content: none; }
+}
+
+/* ── Charts draw in on first show (.wu-chart-in on the chart's wrapper) ──────
+   Recharts' own JS animation stays OFF (isAnimationActive={false}: it
+   re-renders React every frame). Instead the finished SVG shapes grow in with
+   CSS: bars rise from their base, horizontal bars grow from the left, areas
+   and lines rise, pies turn in. 300 ms (the KPI-bar value from Motion v2),
+   bars staggered 20 ms, capped at 8 steps (≤140 ms). Small SVGs only. */
+@media screen {
+  .wu-chart-in .recharts-bar-rectangle,
+  .wu-chart-in .recharts-area,
+  .wu-chart-in .recharts-line,
+  .wu-chart-in .recharts-pie {
+    transform-box: fill-box;
+    animation: wu-chart-rise 300ms var(--m-ease-out) backwards;
+  }
+  .wu-chart-in .recharts-bar-rectangle { transform-origin: 50% 100%; animation-name: wu-chart-bar; }
+  .wu-chart-in.wu-chart-h .recharts-bar-rectangle { transform-origin: 0 50%; animation-name: wu-chart-barh; }
+  .wu-chart-in .recharts-area, .wu-chart-in .recharts-line { transform-origin: 50% 100%; }
+  .wu-chart-in .recharts-pie { transform-origin: 50% 50%; animation-name: wu-chart-pie; }
+  .wu-chart-in .recharts-bar-rectangle:nth-child(2) { animation-delay: 20ms; }
+  .wu-chart-in .recharts-bar-rectangle:nth-child(3) { animation-delay: 40ms; }
+  .wu-chart-in .recharts-bar-rectangle:nth-child(4) { animation-delay: 60ms; }
+  .wu-chart-in .recharts-bar-rectangle:nth-child(5) { animation-delay: 80ms; }
+  .wu-chart-in .recharts-bar-rectangle:nth-child(6) { animation-delay: 100ms; }
+  .wu-chart-in .recharts-bar-rectangle:nth-child(7) { animation-delay: 120ms; }
+  .wu-chart-in .recharts-bar-rectangle:nth-child(n+8) { animation-delay: 140ms; }
+  @keyframes wu-chart-bar  { from { transform: scaleY(0); } to { transform: none; } }
+  @keyframes wu-chart-barh { from { transform: scaleX(0); } to { transform: none; } }
+  @keyframes wu-chart-rise { from { opacity: 0; transform: scaleY(.4); } to { opacity: 1; transform: none; } }
+  @keyframes wu-chart-pie  { from { opacity: 0; transform: rotate(-24deg) scale(.94); } to { opacity: 1; transform: none; } }
+
+  /* Dashboard "Production line today": the stage cards rise in left → right,
+     4 px, 200 ms, 30 ms apart (7 stages → 180 ms), once per page load. */
+  .wu-line-in .dash-line-stage { animation: wu-line-stage var(--m-small) var(--m-ease-out) backwards; }
+  .wu-line-in .dash-line-stage:nth-child(2) { animation-delay: 30ms; }
+  .wu-line-in .dash-line-stage:nth-child(3) { animation-delay: 60ms; }
+  .wu-line-in .dash-line-stage:nth-child(4) { animation-delay: 90ms; }
+  .wu-line-in .dash-line-stage:nth-child(5) { animation-delay: 120ms; }
+  .wu-line-in .dash-line-stage:nth-child(6) { animation-delay: 150ms; }
+  .wu-line-in .dash-line-stage:nth-child(n+7) { animation-delay: 180ms; }
+  @keyframes wu-line-stage { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wu-chart-in .recharts-bar-rectangle, .wu-chart-in .recharts-area, .wu-chart-in .recharts-line,
+  .wu-chart-in .recharts-pie, .wu-line-in .dash-line-stage { animation: none; }
+}

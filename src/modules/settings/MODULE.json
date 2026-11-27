@@ -49,6 +49,7 @@
   "shared": [
     "shared/buildInfo.js",
     "shared/components/LeadIcon.jsx",
+    "shared/motion/useTabIndicator.js",
     "shared/settingsDefaults.js",
     "shared/ui/OrgLayout.jsx",
     "shared/ui/SaveMorph.jsx",

@@ -261,7 +261,7 @@ button, [role="button"] {
   transition: background-color 0.14s ease, border-color 0.14s ease,
               box-shadow 0.14s ease;
 }
-button:active:not(:disabled) { transform: scale(0.975); }
+button:active:not(:disabled) { transform: scale(var(--m-press-scale, .97)); }   /* motion3: one press token */
 
 /* ── Glass surface utilities ──────────────────────────────────────────────────── */
 .glass {
@@ -1162,7 +1162,7 @@ kbd.erp-kbd {
   transition: background-color 0.14s ease, border-color 0.14s ease,
               box-shadow 0.14s ease, transform 0.10s ease;
 }
-.spring-tap:active:not(:disabled) { transform: scale(0.975); }
+.spring-tap:active:not(:disabled) { transform: scale(var(--m-press-scale, .97)); }   /* motion3: press token */
 
 /* ── Hover lift — card hover (no vertical movement, just shadow) ─────────────── */
 .hover-lift {
@@ -1385,7 +1385,7 @@ tr:hover .row-actions,
   box-shadow: var(--shadow-lg);
   font-size: var(--type-body);
   color: var(--text);
-  animation: toastSlideIn 0.28s var(--ease-swift) both;
+  animation: toastSlideIn var(--m-small, 200ms) var(--m-ease-out, var(--ease-swift)) both;   /* motion3: 280 → 200 ms */
   max-width: 380px;
   min-width: 280px;
 }
@@ -1654,7 +1654,7 @@ aside nav button {
    a physical key; on a tablet, where there is no hover state to confirm the
    target, it is the only feedback before the action happens. */
 button:not(:disabled):active {
-  transform: translateY(1px);
+  transform: scale(var(--m-press-scale, .97));   /* motion3: one press token (was translateY(1px)) */
   filter: brightness(0.96);
 }
 button { transition: transform 0.08s ease, filter 0.08s ease, background-color 0.14s ease, border-color 0.14s ease, color 0.14s ease; }
@@ -1728,7 +1728,7 @@ tbody tr:hover {
      at exactly the rate the drawer arrives. Previously the dim finished in
      180ms while the panel was still travelling, which is what made the open
      read as two separate events. */
-  animation: navBackdropIn 0.26s var(--ease-smooth) both;
+  animation: navBackdropIn var(--m-small, 200ms) var(--ease-smooth) both;   /* motion3: 260 → 200 ms (Motion v2 small) */
   will-change: opacity;
 }
 @media (min-width: 768px) {
@@ -1956,7 +1956,7 @@ tbody tr:hover {
 
   /* There is no hover on a touch screen, so the only confirmation a tap landed
      is the press state. Make it slightly more pronounced than the mouse one. */
-  button:not(:disabled):active { transform: translateY(1px) scale(0.985); }
+  button:not(:disabled):active { transform: scale(var(--m-press-scale, .97)); }   /* motion3: one press token (was translateY(1px) scale(.985)) */
 
   /* A 2px focus ring read as a hairline on a glossy tablet at arm's length. */
   *:focus-visible { outline-width: 3px; outline-offset: 3px; }
@@ -2035,7 +2035,7 @@ tbody tr:hover {
   to   { opacity: 1; transform: translateY(0); }
 }
 .page-scroll > div {
-  animation: pageSlideIn 0.28s var(--ease-swift) both;
+  animation: pageSlideIn var(--m-small, 200ms) var(--m-ease-out, var(--ease-swift)) both;   /* motion3: 280 → 200 ms */
 }
 
 /* ── Card entrance — staggered fade-in for card grids ────────────────────── */
@@ -2203,7 +2203,7 @@ input, textarea, select {
               box-shadow 0.18s ease,
               transform 0.1s ease;
 }
-.filter-tab:active { transform: scale(0.96); }
+.filter-tab:active { transform: scale(var(--m-press-scale, .97)); }   /* motion3: press token */
 .filter-tab.active {
   transition-duration: 0.22s;
 }
@@ -3143,7 +3143,7 @@ table tbody tr:hover { background: rgba(46, 80, 214, 0.045); }
 
 /* Buttons & fields: tactile press, visible keyboard focus */
 button { transition: transform .12s var(--v2-ease), box-shadow .18s, background-color .18s, border-color .18s, color .18s; }
-button:not(:disabled):active { transform: translateY(1px) scale(.992); }
+button:not(:disabled):active { transform: scale(var(--m-press-scale, .97)); }   /* motion3: one press token (was translateY(1px) scale(.992)) */
 :focus-visible { outline: 2px solid #5A78EA; outline-offset: 2px; border-radius: 6px; }
 input:focus, select:focus, textarea:focus { box-shadow: 0 0 0 3px rgba(46,80,214,.16); }
 
@@ -3580,7 +3580,7 @@ html.erp-offline [data-needs-net]::after {
   font-size: 16px; font-weight: 800; line-height: 1.25; color: #fff; background: rgba(255,255,255,0.10);
   transition: transform .12s ease;
 }
-.arrival-banner-main:active { transform: scale(0.97); }
+.arrival-banner-main:active { transform: scale(var(--m-press-scale, .97)); }
 .arrival-banner-close {
   flex: 0 0 44px; min-height: 44px; border-radius: 14px; font-size: 18px; font-weight: 900;
   color: #fff; background: rgba(0,0,0,0.14);
@@ -3622,7 +3622,7 @@ html.erp-offline [data-needs-net]::after {
 .rp-when { color: #15803d; font-weight: 700; }
 .rp-foot { display: flex; gap: 10px; justify-content: flex-end; padding: 14px 18px 18px; border-top: 1px solid rgba(15, 23, 42, 0.06); background: #fbfcfd; }
 .rp-btn { min-height: 48px; padding: 0 20px; border-radius: 12px; font-size: 14.5px; font-weight: 700; transition: transform .12s ease, background-color .15s ease, box-shadow .15s ease; }
-.rp-btn:active { transform: scale(.97); }
+.rp-btn:active { transform: scale(var(--m-press-scale, .97)); }
 .rp-btn:focus-visible { outline: 3px solid rgba(46, 80, 214, 0.45); outline-offset: 2px; }
 .rp-btn-primary { min-width: 112px; color: #fff; background: #15803d; box-shadow: 0 6px 16px -6px rgba(21, 128, 61, 0.6); }
 .rp-btn-primary:hover { background: #166534; }
@@ -3691,6 +3691,10 @@ body:has(.mt-report-modal) #erp-build-badge { display: none !important; }
     content: ""; position: absolute; left: 0; right: 0; top: -18px; height: 18px; pointer-events: none;
     background: linear-gradient(to bottom, rgba(255,255,255,0), #fff);
   }
+  /* glitch-guard 2026-11-27: in DARK the pinned row stayed white — a white strip under a
+     dark sheet, its grey Cancel at 1.1:1. It takes the dark sheet's colour (glass.css). */
+  html[data-theme="dark"] .modal-backdrop > div:not(.flex-col):not([class*="flex-col"]) > div:last-child:has(> button) { background: #1a272f; }
+  html[data-theme="dark"] .modal-backdrop > div:not(.flex-col):not([class*="flex-col"]) > div:last-child:has(> button)::before { background: linear-gradient(to bottom, rgba(26,39,47,0), #1a272f); }
 }
 
 /* 2026-11-03 — Machine Tracker polish (part 2). */

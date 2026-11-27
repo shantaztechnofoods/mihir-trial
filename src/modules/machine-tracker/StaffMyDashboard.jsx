@@ -2,6 +2,7 @@
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
 import React, { useEffect } from "react";
 import { LeadIcon } from "../../shared/components/LeadIcon.jsx";
+import { useSwap } from "../../shared/ui/useSwap.js";
 import { formatDuration } from "../../utils/handoverLogic.js";
 
 // ── Staff "My Dashboard" (2026-11-03, owner approved) ────────────────────────
@@ -94,9 +95,7 @@ export function StaffMyDashboard({ departments = [], handovers = [], deptRatings
                         <LeadIcon e="⏱" />{formatDuration(actual)}{target ? <span className="font-bold" style={{ color: "var(--text-dim)" }}> / {formatDuration(target)}</span> : null}
                       </div>
                     </div>
-                    <span data-my-dash-badge={late ? "late" : "ontime"} className={`wu-md-pill flex-shrink-0 ${late ? "is-bad" : "is-ok"}`}>
-                      {late ? "✗ Late" : "✓ On time"}
-                    </span>
+                    <LatePill late={late} />
                   </div>
                 );
               })}
@@ -105,5 +104,15 @@ export function StaffMyDashboard({ departments = [], handovers = [], deptRatings
         </div>
       </div>
     </div>
+  );
+}
+
+// motion3 (2026-11-27, visual only): "✓ On time" → "✗ Late" cross-fades.
+function LatePill({ late }) {
+  const swap = useSwap(late);
+  return (
+    <span key={String(late)} data-my-dash-badge={late ? "late" : "ontime"} className={`wu-md-pill flex-shrink-0 ${late ? "is-bad" : "is-ok"} ${swap}`.trim()}>
+      {late ? "✗ Late" : "✓ On time"}
+    </span>
   );
 }

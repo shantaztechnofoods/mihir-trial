@@ -19,10 +19,13 @@
   "shared": [
     "shared/components/LeadIcon.jsx",
     "shared/format.js",
+    "shared/motion/firstShow.js",
+    "shared/motion/useTabIndicator.js",
     "shared/settingsDefaults.js",
     "shared/ui/Count.jsx",
     "shared/ui/Topbar.jsx",
-    "shared/ui/primitives.jsx"
+    "shared/ui/primitives.jsx",
+    "shared/ui/useSwap.js"
   ],
   "core": {
     "utils": [
