@@ -635,6 +635,7 @@
   /* K4 · role accents as text on dark glass: pink 3.08:1, teal 3.40:1 → ≥ 6:1 */
   html[data-theme="dark"] body #root :is([style^="color: rgb(190, 24, 93)"], [style*="; color: rgb(190, 24, 93)"]) { color: #f9a8d4 !important; }
   html[data-theme="dark"] body #root :is([style^="color: rgb(15, 118, 110)"], [style*="; color: rgb(15, 118, 110)"]) { color: #5eead4 !important; }
+  html[data-theme="dark"] body .app-shell .text-pink-300 { color: #f9a8d4 !important; }
 }
 
 /* Desktop cards: the translucent 80 % glass is kept, but WITHOUT backdrop
