@@ -3151,13 +3151,6 @@ input:focus, select:focus, textarea:focus { box-shadow: 0 0 0 3px rgba(46,80,214
 .modal-panel { box-shadow: 0 30px 80px -20px rgba(11,18,32,.45), 0 0 0 1px rgba(15,23,42,.06); animation: v2-pop .22s var(--v2-ease); }
 @keyframes v2-pop { from { opacity: 0; transform: translateY(8px) scale(.985); } to { opacity: 1; transform: none; } }
 
-/* Settings tabs: no clipping on narrow screens — they wrap into pills */
-.settings-tabs { flex-wrap: wrap; overflow-x: visible !important; row-gap: 2px; }
-@media (max-width: 767px) {
-  .settings-tabs { border-bottom: 0; gap: 6px; }
-  .settings-tabs > button { margin-bottom: 0 !important; white-space: normal; text-align: left; border: 1px solid var(--v2-edge); border-radius: 10px; padding: 8px 12px; line-height: 1.25; }
-}
-
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
   .sidebar-slate .sb-item:hover, .hero-tile:hover { transform: none; }
@@ -3354,15 +3347,6 @@ input:focus, select:focus, textarea:focus { box-shadow: 0 0 0 3px rgba(46,80,214
 /* ── 2026-11-03 Organise: Machine Tracker settings groups + BOM Edit steps ──
    Layout only, inside the existing card look. Right-sized controls:
    min touch 44px, primary 48px, control text 15px, nothing stretched. */
-.settings-tabs > button { min-height: 44px; }
-/* 2026-11-27 view round 2 — Settings on touch screens (phone + tablet):
-   Save buttons and the small × / ↑ / ↓ chips get a 44px tap area. The chip
-   remove buttons use negative margins so the chips keep their height.
-   Mouse (fine pointer) unchanged. */
-@media (pointer: coarse) {
-  .st-save, [data-save-modules] { min-height: 44px !important; }
-  .st-x { min-width: 32px; min-height: 44px; margin-top: -12px; margin-bottom: -12px; display: inline-flex; align-items: center; justify-content: center; }
-}
 .org-groups { display: flex; flex-direction: column; gap: 12px; }
 .org-group { border: 1px solid var(--border-rim, rgba(17,24,39,0.12)); border-radius: 12px; background: var(--surface-card, #fff); overflow: hidden; }
 .org-group-head { width: 100%; min-height: 52px; display: flex; align-items: center; gap: 10px; padding: 10px 16px; text-align: left; background: rgba(17,24,39,0.03); }
@@ -4369,21 +4353,6 @@ button.rack-btn:disabled { background: #e5e7eb !important; color: #6b7280 !impor
   .bcl-copy-actions .bcl-btn { flex: 1; }
 }
 
-/* Settings → Department heads (2026-11-05). Laptop: dept | picker | status in
-   one row. Phone: stacked, full-width 44px controls, no sideways scroll. */
-.dept-head-list { display: flex; flex-direction: column; border: 1px solid rgba(17,24,39,0.10); border-radius: 10px; }
-.dept-head-row { display: grid; grid-template-columns: 140px minmax(0, 1fr) 88px; align-items: center; gap: 8px 16px; padding: 12px 16px; }
-.dept-head-row + .dept-head-row { border-top: 1px solid rgba(17,24,39,0.08); }
-.dept-head-row > :nth-child(2):last-child { grid-column: 2 / -1; }
-.dept-head-ctl { min-width: 0; max-width: 480px; }
-.dept-head-typed { display: flex; gap: 8px; margin-top: 8px; align-items: flex-end; }
-@media (max-width: 639px) {
-  .dept-head-row { grid-template-columns: minmax(0, 1fr); gap: 4px; padding: 12px; }
-  .dept-head-row > :nth-child(2):last-child { grid-column: auto; }
-  .dept-head-ctl { max-width: none; }
-  .dept-head-msg:empty { display: none; }
-}
-
 /* ── Voice search mic in the global search (2026-11-06) ─────────────────────
    44px target, brand-coloured; listening = filled + a calm breathing ring.
    Colours come from the theme tokens, so light and dark both work. */
@@ -4416,14 +4385,6 @@ button.rack-btn:disabled { background: #e5e7eb !important; color: #6b7280 !impor
   .page-header .theme-switch:not(.theme-switch-full) button[aria-checked="true"] { width: 44px; height: 44px; }
   .app-sidebar .sb-iconbtn { min-width: 44px; min-height: 44px; }
   .dash-line-views[data-line-views] > button { min-height: 44px; }
-}
-
-/* 2026-11-27 view round 2 — Report Master ticks on touch screens: the 16px
-   checkbox gets a 44px tap area (the label around it), checkbox drawn at 22px.
-   Desktop mouse (fine pointer) unchanged. */
-@media (pointer: coarse) {
-  [data-report-master] .rm-tick { min-width: 44px; min-height: 44px; justify-content: center; }
-  [data-report-master] .rm-tick input[type="checkbox"] { width: 22px; height: 22px; }
 }
 
 /* Glitch sweep 2026-11-27: no page text under 11 px. Captions, chips and table

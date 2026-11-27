@@ -22,6 +22,7 @@ import { Topbar } from "../../shared/ui/Topbar.jsx";
 import { ThemeSwitch } from "../../shared/ui/ThemeSwitch.jsx";
 import SaveMorph from "../../shared/ui/SaveMorph.jsx";
 import { readHapticPref, writeHapticPref, tapHaptic } from "../../utils/haptics.js";
+import "./settings.css";
 
 export function SettingsPage({ settings: initialSettings = SETTINGS_DEFAULTS, onSave, isSuperAdmin = false, canDo = () => true, onRegisterSignature, currentUser = null,
   // Phase B — checklist admin props (optional)
