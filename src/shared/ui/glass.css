@@ -611,14 +611,29 @@
   html body :is(.theme-switch, .app-shell .dash-line-views) { background: var(--g-lens), var(--g-well) !important; box-shadow: inset 0 1px 2px rgba(20, 40, 50, .08), inset 0 0 0 1px rgba(255, 255, 255, .5), 0 0 0 1px var(--g-edge); }
   html[data-theme="dark"] body :is(.theme-switch, .app-shell .dash-line-views) { box-shadow: inset 0 1px 2px rgba(0, 0, 0, .3), inset 0 0 0 1px rgba(255, 255, 255, .06); }
 }
-/* desktop only: real translucency + 20px blur on the content cards */
+/* Desktop cards: the translucent 80 % glass is kept, but WITHOUT backdrop
+   blur — the blur on every card cost 26/37 vs main's 34/37 in the 4x-CPU
+   frame-budget suite (page entrances re-render each blurred card). Behind the
+   cards is only the soft, static field, so the gloss reads the same. */
 @media screen and (min-width: 1024px) and (hover: hover) and (pointer: fine) and (prefers-reduced-transparency: no-preference) {
   html body .app-shell :is(.section-card, .kpi-tile, .hero-tile, .premium-card, .dash-tile) {
     background: var(--g-sheen), var(--g-card-t) !important;
-    -webkit-backdrop-filter: blur(20px) saturate(160%); backdrop-filter: blur(20px) saturate(160%);
   }
   html body .app-shell .section-card { background: var(--g-sheen) padding-box, var(--g-card-t) padding-box, var(--g-rimgrad) border-box !important; }
 }
 /* status words over the translucent glass (blue pools show through): one step deeper in light */
 @media screen { :root:not([data-theme="dark"]) { --ok: #0e6b3d; --bad: #b01e24; --wait: #9a4a07; } }
 @media screen { html:not([data-theme="dark"]) body .app-shell .dash-line-rows { background: rgba(255, 255, 255, .62); box-shadow: inset 0 1px 2px rgba(20, 40, 50, .06), inset 0 0 0 1px rgba(20, 40, 50, .05); } }
+
+/* ── Premium refinements (handler 14:08) — type, press, hover, numbers ──── */
+@media screen {
+  html body .app-shell :is(.dash-line-title, .dash-line-attn-title) { letter-spacing: -0.02em; }
+  html body .app-shell .dash-line-title { font-weight: 650; }
+  html body .app-shell :is(.dash-tile-value, .dash-line-num, .dash-line-count, .dash-line-ready b) { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1, "cv11" 1; }
+  html body .app-shell :is(button.dash-tile, .dash-line-stage, .dash-line-row, .sb-item, .dash-line-views > button) { transition-duration: 150ms !important; transition-timing-function: var(--g-ease) !important; }
+  html body .theme-switch button { transition-duration: 150ms; }
+}
+@media screen and (prefers-reduced-motion: no-preference) {
+  html body .app-shell :is(button.dash-tile, .dash-line-stage):active { transform: scale(.98) !important; transition-duration: 100ms !important; }
+  html body .app-shell :is(.dash-line-row, .sb-item, .dash-line-views > button, .theme-switch button):active { transform: scale(.98); }
+}

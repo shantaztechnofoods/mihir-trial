@@ -32,6 +32,8 @@ const bodyBg = (p) => p.evaluate(() => getComputedStyle(document.body).backgroun
   ok("Light is the selected option by default", await sw.locator("[data-theme-option='light']").getAttribute("aria-checked") === "true");
   ok("nothing saved until the person picks", await p.evaluate(() => localStorage.getItem("erp_theme_mode")) === null);
   await sw.locator("[data-theme-option='dark']").click(); await p.waitForTimeout(400);
+  // the recolour can land a few frames later on a loaded machine: wait for it (max 2 s), the colour is still checked exactly
+  await p.waitForFunction(() => getComputedStyle(document.body).backgroundColor !== "rgb(244, 246, 250)", null, { timeout: 2000 }).catch(() => {});
   ok("Dark → data-theme dark", await theme(p) === "dark");
   ok("Dark: page is the petrol/navy glass background (spatial glass, 2026-11-27)", await bodyBg(p) === "rgb(11, 20, 27)", await bodyBg(p));
 
@@ -50,7 +52,7 @@ const bodyBg = (p) => p.evaluate(() => getComputedStyle(document.body).backgroun
   // Spatial glass (2026-11-27, handler's chosen look): the primary action is a cobalt glass pill
   // (same cobalt family as before), the sidebar is a frosted light-glass rail.
   ok("light: primary button is the cobalt glass pill", await p.evaluate(() => { const e = document.querySelector(".btn-primary-brand"); if (!e) return true; const s = getComputedStyle(e); return /rgb\(75, 116, 242\).*rgb\(42, 79, 214\)/.test(s.backgroundImage) && s.borderRadius === "999px"; }));
-  ok("light: sidebar is the frosted light-glass rail", await p.evaluate(() => { const s = getComputedStyle(document.querySelector("aside")); return s.backgroundColor === "rgba(255, 255, 255, 0.3)" && /linear-gradient/.test(s.backgroundImage); }));
+  ok("light: sidebar is the floating frosted light-glass panel", await p.evaluate(() => { const a = document.querySelector("aside"); const s = getComputedStyle(a), pn = getComputedStyle(a, "::before"); return s.backgroundColor === "rgba(0, 0, 0, 0)" && pn.borderRadius === "24px" && /linear-gradient/.test(pn.backgroundImage) && pn.top === "8px"; }));
 
   await p.reload({ waitUntil: "networkidle" }); await settle(p, 1500);
   ok("after reload: still Light (device is dark)", await theme(p) === "light");
