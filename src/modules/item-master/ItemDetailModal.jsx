@@ -82,8 +82,8 @@ export function ItemDetailModal({ item, category, onClose, onDelete, onUpdateSto
               </div>
             </div>
           </div>
-          <button onClick={onClose}
-                  className="w-8 h-8 rounded-lg bg-slate-50 hover:bg-red-500/20 hover:text-red-400 text-slate-500 transition-all duration-200 flex items-center justify-center text-sm font-bold flex-shrink-0">
+          <button onClick={onClose} aria-label="Close"
+                  className="modal-x w-8 h-8 rounded-lg bg-slate-50 hover:bg-red-500/20 hover:text-red-400 text-slate-500 transition-all duration-200 flex items-center justify-center text-sm font-bold flex-shrink-0">
             ✕
           </button>
         </div>
