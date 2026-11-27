@@ -92,6 +92,7 @@
     "shared/ui/SignaturePad.jsx",
     "shared/ui/Topbar.jsx",
     "shared/ui/toast.js",
+    "shared/ui/useSwap.js",
     "shared/voice/VoiceNote.jsx"
   ],
   "core": {

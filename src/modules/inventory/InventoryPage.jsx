@@ -10,6 +10,7 @@ import { ItemImportModal } from "./ItemImportModal.jsx";
 import { fmtDate, parseStoreQty, recomputeStatus, roundQty } from "../../shared/format.js";
 import { loadXLSX } from "../../shared/loadXlsx.js";
 import { Btn, MetricCard, StatusBadge, statusConfig } from "../../shared/ui/primitives.jsx";
+import SuccessTick from "../../shared/ui/SuccessTick.jsx";
 import { Topbar } from "../../shared/ui/Topbar.jsx";
 import ArchivedSection from "../../shared/components/ArchivedSection.jsx";
 import { ERP_INSTANCE } from "../../config/env.js";
@@ -828,7 +829,7 @@ export function InventoryPage({ items, setItems, handleUpdateStock, pos = [], in
             <LeadIcon e="🧹" />Clear Demo Data
           </button>
         )}
-        {canDo("inventory","add") && <Btn variant="primary" size="sm" onClick={() => setShowModal(true)}>+ Add Item</Btn>}
+        {canDo("inventory","add") && <Btn variant="primary" size="sm" onClick={() => setShowModal(true)}>+ Add Item<SuccessTick on={toast} /></Btn>}
       </Topbar>
 
       <div className="p-6 space-y-4">

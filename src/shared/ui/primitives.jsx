@@ -3,6 +3,7 @@
 import React from "react";
 import { Glyph } from "../components/LeadIcon.jsx";
 import Count from "./Count.jsx";
+import { useSwap } from "./useSwap.js";
 
 export const statusConfig = {
   critical: { label: "CRITICAL",  bg: "", text: "", border: "", dot: "#dc2626",   style: { background: "rgba(220,38,38,0.08)",   color: "#dc2626", border: "1px solid rgba(220,38,38,0.22)" } },
@@ -27,8 +28,9 @@ export const statusConfig = {
 
 export const StatusBadge = ({ status }) => {
   const cfg = statusConfig[status] || statusConfig.safe;
+  const swap = useSwap(status);   // motion3: cross-fades when the status changes
   return (
-    <span className="wu-status inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold" data-status={status}
+    <span key={status} className={`wu-status ${swap} inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold`} data-status={status}
           style={{ letterSpacing: "0.05em", ...cfg.style }}>
       {cfg.dot && <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: cfg.dot }} />}
       {cfg.label}

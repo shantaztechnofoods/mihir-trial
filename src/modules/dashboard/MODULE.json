@@ -22,7 +22,8 @@
     "shared/settingsDefaults.js",
     "shared/ui/Count.jsx",
     "shared/ui/Topbar.jsx",
-    "shared/ui/primitives.jsx"
+    "shared/ui/primitives.jsx",
+    "shared/ui/useSwap.js"
   ],
   "core": {
     "utils": [
