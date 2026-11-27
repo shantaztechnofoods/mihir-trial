@@ -1,7 +1,7 @@
 // src/app/layout/Sidebar.jsx — moved verbatim from the former single-file src/App.jsx
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
 import React from "react";
-import { Search, Bell } from "lucide-react";
+import { Search, Bell, ChevronsLeft, ChevronsRight } from "lucide-react";
 import ShantazLogoSVG from "../../shared/components/ShantazLogoSVG.jsx";
 import BrandLogo from "../../shared/components/BrandLogo.jsx";
 import UserProfileMenu from "../../shared/components/UserProfileMenu.jsx";
@@ -124,9 +124,9 @@ export function Sidebar({ activePage, setActivePage, collapsed, setCollapsed, ba
       {/* ── User Profile Menu ── */}
       <div className="px-3 pb-3 pt-2 relative sb-divider-top">
         <UserProfileMenu collapsed={collapsed} />
-        <button onClick={() => setCollapsed(!collapsed)}
+        <button onClick={() => setCollapsed(!collapsed)} aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"} aria-expanded={!collapsed}
           className="sb-collapse mt-1 w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg transition-all text-[9px] font-bold tracking-[0.08em] uppercase">
-          {collapsed ? "▶" : <><span>◀</span><span>Collapse</span></>}
+          {collapsed ? <ChevronsRight size={14} aria-hidden="true" /> : <><ChevronsLeft size={13} aria-hidden="true" /><span>Collapse</span></>}
         </button>
       </div>
     </aside>

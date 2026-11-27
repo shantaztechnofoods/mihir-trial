@@ -915,7 +915,7 @@ export function InventoryPage({ items, setItems, handleUpdateStock, pos = [], in
             ))}
           </div>
 
-          <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)}
+          <select aria-label="Category" value={catFilter} onChange={(e) => setCatFilter(e.target.value)}
                   className="border border-slate-200 rounded-lg px-3 py-1.5 text-xs outline-none"
                   style={{ background: "#ffffff", color: "#111827" }}>
             <option value="all">All Categories</option>
@@ -925,7 +925,7 @@ export function InventoryPage({ items, setItems, handleUpdateStock, pos = [], in
           <div className="relative ml-auto">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 text-[11px] pointer-events-none"><Glyph e="🔍" size={13} /></span>
             <input ref={searchRef} value={search} onChange={(e) => setSearch(e.target.value)}
-                   placeholder="Search code, name, vendor, location..."
+                   aria-label="Search items" placeholder="Search code, name, vendor, location..."
                    className="bg-slate-50 border border-slate-200 rounded-lg pl-7 pr-3 py-1.5 text-xs placeholder-slate-400 outline-none focus:border-blue-500/40 w-72 transition-all"
                    style={{ color: "var(--text-strong)" }} />
           </div>

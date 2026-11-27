@@ -331,7 +331,7 @@ export default function UserManagementPage({ canDo }) {
 
       {/* Header */}
       <PageHeader title="User Management" subtitle={`${users.length} user${users.length !== 1 ? "s" : ""} in the system`}>
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search users…"
+          <input value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search users" placeholder="Search users…"
             className="um-search px-3 py-1.5 rounded-lg text-xs placeholder-slate-400 outline-none w-full sm:w-44"
             style={inputStyle} />
           {(isSuperAdmin || canDo?.("users", "create")) && (

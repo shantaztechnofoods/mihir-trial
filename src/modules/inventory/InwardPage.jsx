@@ -108,7 +108,7 @@ export function InwardPage({ items, handleUpdateStock, vendorList, onInwardCompl
             {/* Vendor */}
             <div>
               <ILabel text="Vendor" />
-              <VendorSearchSelect
+              <VendorSearchSelect ariaLabel="Vendor"
                 vendors={vendorList}
                 value={vendor}
                 onChange={(name) => setVendor(name)}
@@ -119,7 +119,7 @@ export function InwardPage({ items, handleUpdateStock, vendorList, onInwardCompl
             {/* Item */}
             <div>
               <ILabel text="Select Item" req />
-              <ItemSearchSelect
+              <ItemSearchSelect ariaLabel="Item"
                 items={allFlatItems}
                 value={selectedCode}
                 onChange={setSelectedCode}
@@ -133,7 +133,7 @@ export function InwardPage({ items, handleUpdateStock, vendorList, onInwardCompl
               <ILabel text="Quantity" req />
               <input type="number" min="0" step="any" value={qty} onChange={(e) => setQty(e.target.value)}
                      onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-                     placeholder="Enter quantity" className={inpCls(errors.qty)}
+                     aria-label="Quantity" placeholder="Enter quantity" className={inpCls(errors.qty)}
                      style={{ fontVariantNumeric: "tabular-nums", fontFamily: "'Inter',system-ui,sans-serif" }} />
               {errors.qty && <div className="text-[10px] text-red-600 mt-1">{errors.qty}</div>}
             </div>
@@ -142,7 +142,7 @@ export function InwardPage({ items, handleUpdateStock, vendorList, onInwardCompl
             <div>
               <ILabel text="Notes / Invoice No." />
               <input value={notes} onChange={(e) => setNotes(e.target.value)}
-                     placeholder="e.g. INV-2026-0421" className={inpCls(false)} />
+                     aria-label="Notes or invoice number" placeholder="e.g. INV-2026-0421" className={inpCls(false)} />
             </div>
           </div>
 
