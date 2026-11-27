@@ -106,16 +106,61 @@ jobs:
       - name: npm run health
         run: node scripts/health-check.mjs --only imports,wiring,db,env
 
-  # ── Full browser e2e (every tests/e2e/*.mjs suite) against the local-mode
-  # production build, split over 8 parallel runners (balanced by the CI-measured
-  # tests/e2e/timings.txt). Runs on every push (feature branches + main);
-  # the pull_request copy of this workflow skips it so it never runs twice.
+  # ── Browser e2e against the local-mode production build, split over parallel
+  # runners (balanced by the CI-measured tests/e2e/timings.txt). Runs on every
+  # push; the pull_request copy of this workflow skips it so it never runs twice.
+  #   * FULL suite (every tests/e2e/*.mjs, 8 shards, gate check "e2e") on main,
+  #     batch/**, modules/**, ci/**, any push whose head commit message holds
+  #     "[full e2e]", and whenever the related suites are most of the suite time.
+  #   * Other feature branches: only the suites scripts/e2e-pick.py relates to the
+  #     branch's changes since main (1-8 shards, gate check "e2e (affected)").
+  #     scripts/ship.sh merge still requires the FULL "e2e" check, so a feature
+  #     PR reaches main through a batch/ PR (full run) or a "[full e2e]" push.
   # e2e-build builds the bundle ONCE; every shard downloads it instead of
   # rebuilding. Shards start at once and do their own setup (node_modules,
   # Playwright) while the build runs, then wait for the build job before
   # downloading it (fails fast if the build failed). ci and health run in
   # parallel with all of this (no needs).
   # The "e2e" job below is the single check scripts/ship.sh waits for.
+  e2e-plan:
+    name: e2e plan
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      mode: ${{ steps.plan.outputs.mode }}
+      suites: ${{ steps.plan.outputs.suites }}
+      count: ${{ steps.plan.outputs.count }}
+      shards: ${{ steps.plan.outputs.shards }}
+    steps:
+      - name: Full run? (main, batch/**, modules/**, ci/**, or "[full e2e]" in the commit message)
+        id: full
+        env:
+          REF: ${{ github.ref_name }}
+          MSG: ${{ github.event.head_commit.message }}
+        run: |
+          case "$REF" in main|batch/*|modules/*|ci/*) full=1 ;; *) full=0 ;; esac
+          case "$MSG" in *"[full e2e]"*) full=1 ;; esac
+          echo "full=$full" >>"$GITHUB_OUTPUT"; echo "branch $REF -> full=$full"
+
+      - name: Checkout (with history, to diff against main)
+        if: steps.full.outputs.full == '0'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Plan the suites
+        id: plan
+        env:
+          FULL: ${{ steps.full.outputs.full }}
+        run: |
+          full(){ printf 'mode=full\nsuites=\ncount=all\nshards=[1,2,3,4,5,6,7,8]\n' | tee -a "$GITHUB_OUTPUT"; exit 0; }
+          if [ "$FULL" = 1 ]; then full; fi
+          base=$(git merge-base HEAD origin/main) || { echo "::warning::no merge-base with main: full run"; full; }
+          # reasons (file -> suites) go to stderr, i.e. into this log
+          python3 scripts/e2e-pick.py --plan "$base" >plan.txt
+          cat plan.txt; cat plan.txt >>"$GITHUB_OUTPUT"
+
   e2e-build:
     name: e2e build
     if: github.event_name == 'push'
@@ -156,8 +201,9 @@ jobs:
           if-no-files-found: error
 
   e2e-shard:
-    name: e2e shard ${{ matrix.shard }}/8
-    if: github.event_name == 'push'
+    name: e2e shard ${{ matrix.shard }}/${{ strategy.job-total }}
+    needs: e2e-plan
+    if: github.event_name == 'push' && needs.e2e-plan.outputs.shards != '[]'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -166,7 +212,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+        shard: ${{ fromJSON(needs.e2e-plan.outputs.shards) }}
     env:
       TZ: Asia/Calcutta          # same zone as the dev box the suites were written on
       E2E_PAR: "2"
@@ -256,7 +302,9 @@ jobs:
           path: ${{ runner.temp }}/dist-e2e
 
       - name: Run this shard's suites
-        run: bash scripts/e2e-ci.sh ${{ matrix.shard }} 8 "$RUNNER_TEMP/dist-e2e"
+        env:
+          E2E_SUITES: ${{ needs.e2e-plan.outputs.suites }}   # empty on a full run = every suite
+        run: bash scripts/e2e-ci.sh ${{ matrix.shard }} ${{ strategy.job-total }} "$RUNNER_TEMP/dist-e2e"
 
       - name: Upload logs
         if: always()
@@ -267,15 +315,27 @@ jobs:
           retention-days: 7
 
   e2e:
-    name: e2e
+    # "e2e" = the FULL suite passed (what scripts/ship.sh merge requires);
+    # "e2e (affected)" = only the suites related to this branch passed.
+    name: ${{ needs.e2e-plan.outputs.mode == 'pick' && 'e2e (affected)' || 'e2e' }}
     if: always() && github.event_name == 'push'
-    needs: [e2e-build, e2e-shard]
+    needs: [e2e-plan, e2e-build, e2e-shard]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: All e2e shards passed
-        # e2e-shard is a matrix: its result is success only when all 8 shards succeeded.
+        # e2e-shard is a matrix: its result is success only when all its shards succeeded.
+        env:
+          PLAN: ${{ needs.e2e-plan.result }}
+          MODE: ${{ needs.e2e-plan.outputs.mode }}
+          SHARDS: ${{ needs.e2e-plan.outputs.shards }}
+          SUITES: ${{ needs.e2e-plan.outputs.suites }}
+          BUILD: ${{ needs.e2e-build.result }}
+          SHARD_RESULT: ${{ needs.e2e-shard.result }}
         run: |
-          echo "build: ${{ needs.e2e-build.result }}  shards: ${{ needs.e2e-shard.result }}"
-          [ "${{ needs.e2e-build.result }}" = success ] || { echo "::error::e2e build: ${{ needs.e2e-build.result }}"; exit 1; }
-          [ "${{ needs.e2e-shard.result }}" = success ] || { echo "::error::e2e shards: ${{ needs.e2e-shard.result }}"; exit 1; }
+          echo "plan: $PLAN ($MODE, shards $SHARDS)  build: $BUILD  shards: $SHARD_RESULT"
+          if [ "$MODE" = pick ]; then echo "affected suites: ${SUITES:-none}"; fi
+          [ "$PLAN" = success ] || { echo "::error::e2e plan: $PLAN"; exit 1; }
+          [ "$BUILD" = success ] || { echo "::error::e2e build: $BUILD"; exit 1; }
+          if [ "$MODE" = pick ] && [ "$SHARDS" = "[]" ]; then echo "no browser suite is related to this change"; exit 0; fi
+          [ "$SHARD_RESULT" = success ] || { echo "::error::e2e shards: $SHARD_RESULT"; exit 1; }
