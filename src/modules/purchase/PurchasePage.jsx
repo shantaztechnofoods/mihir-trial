@@ -1,6 +1,8 @@
 // src/modules/purchase/PurchasePage.jsx — moved verbatim from the former single-file src/App.jsx
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
+import { useRowMotion } from "../../shared/motion/useRowMotion.js";
+import EmptyArt from "../../shared/ui/EmptyArt.jsx";
 import { LeadIcon } from "../../shared/components/LeadIcon.jsx";
 import { PODetailModal } from "./PODetailModal.jsx";
 import { POModal } from "./POModal.jsx";
@@ -21,6 +23,10 @@ export function PurchasePage({ pos, vendorList, items, onCreatePO, onUpdatePO, o
     setToast({ msg, sub });
     setTimeout(() => setToast(null), 3500);
   };
+
+  // motion3: rows fade in / out when the search or status filter changes
+  const rowsRef = useRef(null);
+  useRowMotion(rowsRef, `${search}|${filter}`);
 
   const filtered = pos.filter((po) => {
     const q = search.toLowerCase();
@@ -131,10 +137,10 @@ export function PurchasePage({ pos, vendorList, items, onCreatePO, onUpdatePO, o
                   ))}
                 </tr>
               </thead>
-              <tbody>
+              <tbody ref={rowsRef}>
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={9} className="px-4 py-12 text-center text-xs text-slate-600">No purchase orders found.</td>
+                    <td colSpan={9} className="px-4 py-12 text-center text-xs text-slate-600"><EmptyArt />No purchase orders found.</td>
                   </tr>
                 )}
                 {filtered.map((po) => (

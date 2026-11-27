@@ -12,6 +12,7 @@ import { Btn, SectionHeader, statusConfig } from "../../shared/ui/primitives.jsx
 import { Topbar } from "../../shared/ui/Topbar.jsx";
 import ArchivedSection from "../../shared/components/ArchivedSection.jsx";
 import { archivedBomEntries } from "../../utils/archive.js";
+import SuccessTick from "../../shared/ui/SuccessTick.jsx";
 
 // Last "Fill Rack" request the embedded Outward section has acted on.
 export let __lastFillRequestN = 0;
@@ -1126,9 +1127,11 @@ export function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, on
             <Btn variant="ghost" size="sm" onClick={() => { setManualCode(""); setManualQty(""); setManualDept(""); setManualNotes(""); setManualError(""); }}>Clear</Btn>
             {canDo("outward","manual") && (
               <button onClick={handleManualSubmit} disabled={manualBusy}
-                      className="inline-flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-bold text-white border transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="relative inline-flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-bold text-white border transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                       style={{ background: "#B45309", borderColor: "rgba(217, 119, 6,0.5)", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
-                {manualBusy ? "⏳ Issuing…" : "📤 Issue Stock"}
+                {manualBusy ? <><LeadIcon e="⏳" />Issuing…</> : <><LeadIcon e="📤" />Issue Stock</>}
+                {/* motion3: ✓ after a manual issue (its "Issued: …" toast) */}
+                <SuccessTick on={toast && /^Issued: /.test(toast.text) ? toast : null} />
               </button>
             )}
           </div>

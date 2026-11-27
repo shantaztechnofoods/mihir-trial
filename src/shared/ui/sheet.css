@@ -1,0 +1,9 @@
+/* Phone pop-up sheets (2026-11-27, gap audit #5). Visual only.
+   The sheet was 96 % opaque and its fields 78 %, so the table behind (e.g. the
+   "GBX Gearbox" rows) showed through the form. On phones the sheet is now solid;
+   the inner scroller no longer hands a finished scroll on to the page behind. */
+@media screen and (max-width: 767.98px) {
+  html body .modal-backdrop.modal-backdrop > div:not(.tc-form) { background-color: #ffffff !important; }
+  html[data-theme="dark"] body .modal-backdrop.modal-backdrop > div:not(.tc-form) { background-color: #1a272f !important; }
+  html body .modal-backdrop :is(.overflow-y-auto, .overflow-auto) { overscroll-behavior: contain; }
+}

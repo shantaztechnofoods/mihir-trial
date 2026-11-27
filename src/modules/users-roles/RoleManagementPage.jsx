@@ -285,11 +285,12 @@ export default function RoleManagementPage({ canDo }) {
                   <input value={editForm.badge} onChange={(e) => setEditForm((f) => ({ ...f, badge: e.target.value }))}
                     placeholder="e.g. Full Access" className={inputCls} style={inputStyle} />
                 </div>
-                <div>
+                <div className="role-icon-field">
                   <label className="block text-[10px] font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Icon</label>
-                  <div className="flex gap-1.5 flex-wrap">
+                  <div className="role-icon-pick flex gap-1.5 flex-wrap">
                     {ICONS.map((ic) => (
                       <button key={ic} onClick={() => setEditForm((f) => ({ ...f, icon: ic }))}
+                        aria-label={`Icon ${ic}`} aria-pressed={editForm.icon === ic}
                         className="w-8 h-8 rounded-lg flex items-center justify-center text-base transition-all"
                         style={{ background: editForm.icon === ic ? "rgba(38, 64, 176,0.3)" : "rgba(26,31,46,0.05)", border: editForm.icon === ic ? "1px solid rgba(38, 64, 176,0.6)" : "1px solid rgba(26,31,46,0.08)" }}>
                         {ic}
@@ -302,6 +303,7 @@ export default function RoleManagementPage({ canDo }) {
                   <div className="flex gap-1.5">
                     {COLORS.map((c) => (
                       <button key={c} onClick={() => setEditForm((f) => ({ ...f, color: c }))}
+                        aria-label={`Colour ${c}`} aria-pressed={editForm.color === c}
                         className="w-7 h-7 rounded-full transition-all"
                         style={{ background: c, boxShadow: editForm.color === c ? `0 0 0 3px ${c}40, 0 0 0 2px ${c}` : "none" }} />
                     ))}
@@ -314,7 +316,7 @@ export default function RoleManagementPage({ canDo }) {
                 {["pages", "actions"].map((tab) => (
                   <button key={tab} onClick={() => setActiveTab(tab)}
                     className="flex-1 py-1.5 rounded-md text-xs font-semibold transition-all capitalize"
-                    style={{ background: activeTab === tab ? "rgba(26,31,46,0.1)" : "transparent", color: activeTab === tab ? "#0f141c" : "#64748b" }}>
+                    style={{ background: activeTab === tab ? "rgba(26,31,46,0.1)" : "transparent", color: activeTab === tab ? "var(--text-strong)" : "var(--text-muted)" }}>
                     {tab === "pages" ? "Page Access" : "Action Permissions"}
                   </button>
                 ))}

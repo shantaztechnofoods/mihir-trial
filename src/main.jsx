@@ -1,8 +1,10 @@
 import React, { Suspense, lazy, useEffect, useState } from 'react'
 import ReactDOM from 'react-dom/client'
 import './index.css'
+import './shared/ui/rack-dark.css'
 import './world-ui.css'
 import './shared/ui/glass.css'
+import './shared/ui/touch.css'
 import { installTheme } from './shared/theme.js'
 import { installSheetGestures, installScrollReveal, installHeaderCompact, installLiteMode } from './utils/worldMotion.js'
 import { AuthProvider, useAuth } from './auth/AuthContext.jsx'
@@ -13,6 +15,7 @@ import RootErrorBoundary from './shared/components/RootErrorBoundary.jsx'
 import OfflineBanner from './shared/components/OfflineBanner.jsx'
 import AppErrorBoundary from './shared/components/AppErrorBoundary.jsx'
 import { startSentry, setSentryUser } from './shared/sentry.js'
+import './shared/ui/sheet.css'
 
 // ── Boot build marker ──────────────────────────────────────────────────────────
 // Page-independent proof of which bundle is live. Shows a small green badge in the
