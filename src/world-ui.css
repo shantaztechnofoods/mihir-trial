@@ -1741,3 +1741,66 @@
   .wu-sm-tick, .wu-sm-word, .mobile-tabbar > button[aria-current="page"] svg, .kpi-value, .progress-bar { animation: none !important; }
   .skeleton::after, .wu-sk::after { animation: none !important; }
 }
+
+/* ── MOTION v2 batch 3 (2026-11-27): list add · empty states ──────────────────
+   A new line (PO line, checklist question) fades + rises 4 px in 200 ms, once,
+   when React mounts it — rows already on screen never move again (no layout
+   animation). Remove stays instant: an exit would hold a dead row on screen.
+   Empty states settle in 200 ms (text first, icon 40 ms later). Bounded lists
+   only — big tables (Item Master, reports) are not animated (frame budget). */
+@media screen {
+  .wu-li-in:not(.mt-premium *) { animation: wu-li var(--m-small) var(--m-ease-out) backwards; }
+  @keyframes wu-li { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  .wu-empty-in:not(.mt-premium *), .app-shell .empty-state:not(.mt-premium *) {
+    animation: wu-li var(--m-small) var(--m-ease-out) backwards;
+  }
+  .wu-empty-in:not(.mt-premium *) > :first-child, .app-shell .empty-state:not(.mt-premium *) > .empty-state-icon {
+    animation: wu-empty-ic var(--m-small) 40ms var(--m-ease-out) backwards;
+  }
+  @keyframes wu-empty-ic { from { opacity: 0; transform: scale(.96); } to { transform: none; } }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wu-li-in:not(.mt-premium *), .wu-empty-in:not(.mt-premium *), .app-shell .empty-state:not(.mt-premium *) { animation: wu-fade var(--m-micro-out) linear backwards !important; }
+  .wu-empty-in:not(.mt-premium *) > :first-child, .app-shell .empty-state:not(.mt-premium *) > .empty-state-icon { animation: none !important; }
+}
+
+/* ── MOTION v2 batch 4 (2026-11-27): skeleton · Line↔3D toggle · panels/drawers ──
+   Skeleton: the band sweeps in 1.1 s then rests 0.4 s (calmer than a non-stop
+   sweep); skeletons still wait 300 ms before showing (no flash on fast loads),
+   then fade in 140 ms. Line↔3D: the white thumb fades + scales in 140 ms on the
+   chosen side (opacity/transform on a pseudo-element; was an instant swap of
+   background + shadow). Notifications / search open like menus from their
+   anchor (200 ms in); on phones the notification panel drops in as a top
+   drawer (260 ms, drawer curve). Search dim layer is left still: it carries a
+   backdrop blur, and fading it re-blurs every frame. Machine Tracker (frozen) untouched. */
+@media screen {
+  .skeleton::after, .wu-sk::after { animation: wu-shimmer2 1.5s cubic-bezier(.45, 0, .55, 1) infinite; }
+  @keyframes wu-shimmer2 { 0% { transform: translateX(-100%); } 73% { transform: translateX(100%); } 100% { transform: translateX(100%); } }
+  .wu-page-sk, .wu-list-sk { animation: wu-fade var(--m-micro) 300ms var(--m-ease-out) backwards; }
+
+  .dash-line-views > button { position: relative; isolation: isolate; }
+  .dash-line-views > button[aria-pressed="true"] { background: transparent; box-shadow: none; }
+  .dash-line-views > button::before {
+    content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none;
+    background: var(--paper); box-shadow: var(--e1); opacity: 0; transform: scale(.94);
+    transition: opacity var(--m-micro-out) var(--m-ease-in), transform var(--m-micro-out) var(--m-ease-in);
+  }
+  .dash-line-views > button[aria-pressed="true"]::before {
+    opacity: 1; transform: none;
+    transition: opacity var(--m-micro) var(--m-ease-out), transform var(--m-micro) var(--m-ease-out);
+  }
+  .dash-line-3d-loading { animation: wu-fade var(--m-micro) 300ms var(--m-ease-out) backwards; }
+
+  .wu-notif-in { transform-origin: top right; animation: wu-menu var(--m-small) var(--m-ease-out) backwards; }
+  .wu-search-in { transform-origin: top center; animation: wu-menu var(--m-small) var(--m-ease-out) backwards; }
+}
+@media screen and (max-width: 767.98px) {
+  .wu-notif-in { animation: wu-notif-drop var(--m-medium) var(--m-ease-drawer) backwards; }
+  @keyframes wu-notif-drop { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: none; } }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after, .wu-sk::after { animation: none !important; }
+  .wu-page-sk, .wu-list-sk, .dash-line-3d-loading { animation: wu-fade var(--m-micro-out) 300ms linear backwards; }
+  .dash-line-views > button::before, .dash-line-views > button[aria-pressed="true"]::before { transform: none; transition: none; }
+  .wu-notif-in, .wu-search-in { animation: wu-fade var(--m-micro-out) linear backwards !important; }
+}
