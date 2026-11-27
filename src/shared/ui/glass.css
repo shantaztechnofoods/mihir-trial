@@ -329,6 +329,33 @@
   html body .app-shell .section-card { border-radius: 20px !important; }
 }
 
+/* ═══ Premium desk · tables (2026-11-27, FINDINGS.md B5 + B6, coordinator yes) ═══ */
+@media screen {
+  /* B5 · Audit Trail: the log table ran edge to edge with no card (History &
+     Reports sits in one). Same scroll box, now a glass card with page margins */
+  html body .app-shell div.flex-1.overflow-y-auto:has(> table.w-full.text-xs > thead[style*="background: rgb(250, 248, 245)"]) {
+    margin: 16px 24px; border-radius: 20px; background: var(--g-sheen), rgba(255, 255, 255, .78);
+    box-shadow: inset 0 1px 0 #fff, 0 0 0 1px rgba(20, 40, 50, .06), 0 1px 2px rgba(40, 60, 70, .05), 0 12px 28px -16px rgba(40, 60, 75, .18);
+  }
+  html body .app-shell thead[style*="background: rgb(250, 248, 245)"] { background: rgb(248, 250, 251) !important; box-shadow: inset 0 -1px 0 rgba(20, 40, 50, .08); }
+  html[data-theme="dark"] body .app-shell div.flex-1.overflow-y-auto:has(> table.w-full.text-xs > thead[style*="background: rgb(250, 248, 245)"]) {
+    background: rgba(255, 255, 255, .035); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1), 0 0 0 1px rgba(255, 255, 255, .06), 0 12px 28px -16px rgba(0, 0, 0, .5);
+  }
+  html[data-theme="dark"] body .app-shell thead[style*="background: rgb(250, 248, 245)"] { background: #17242b !important; box-shadow: inset 0 -1px 0 rgba(255, 255, 255, .08); }
+}
+/* B6 · Item Master on a 1024-1279 laptop: the 11-column table scrolls sideways
+   and the + / − / edit buttons were off screen. The Actions column stays pinned
+   to the right edge of the card, on an opaque cell with a soft edge shadow. */
+@media screen and (max-width: 1279.98px) {
+  html body .app-shell .overflow-x-auto > table.w-full:has(> thead > tr > th:nth-child(11):last-child):has(> tbody > tr > td:last-child button) > :is(thead, tbody) > tr > :last-child {
+    position: sticky; right: 0; z-index: 1;
+    background: rgb(250, 251, 252) !important; box-shadow: -12px 0 16px -12px rgba(40, 60, 75, .35);
+  }
+  html[data-theme="dark"] body .app-shell .overflow-x-auto > table.w-full:has(> thead > tr > th:nth-child(11):last-child):has(> tbody > tr > td:last-child button) > :is(thead, tbody) > tr > :last-child {
+    background: #1a2830 !important; box-shadow: -12px 0 16px -12px rgba(0, 0, 0, .6);
+  }
+}
+
 /* ── Accessibility fallbacks ────────────────────────────────────────────── */
 @media screen and (prefers-reduced-transparency: reduce) {
   html body .app-shell .app-sidebar.sidebar-slate, html body .app-shell .page-header, html body .mobile-tabbar {
