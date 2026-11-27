@@ -23,6 +23,17 @@ export const turnoverData = [
   { month: "Mar", rate: 5.8 }, { month: "Apr", rate: 6.2 },
 ];
 
+// No purchase orders yet: an honest empty chart instead of sample months.
+function ChartEmpty({ e }) {
+  return (
+    <div className="h-[220px] flex flex-col items-center justify-center gap-1 text-center" data-chart-empty>
+      <div className="text-2xl" style={{ opacity: 0.45 }}><Glyph e={e} size={22} /></div>
+      <div className="text-xs font-semibold" style={{ color: "var(--text-muted)" }}>No purchase orders yet</div>
+      <div className="text-[11px]" style={{ color: "var(--text-muted)" }}>This chart fills in from your first PO</div>
+    </div>
+  );
+}
+
 // ─── ANALYTICS PAGE ───────────────────────────────────────────────────────────
 
 export function AnalyticsPage({ items, pos, vendorList, settings = SETTINGS_DEFAULTS }) {
@@ -102,18 +113,19 @@ export function AnalyticsPage({ items, pos, vendorList, settings = SETTINGS_DEFA
 
       <div className="p-6 space-y-6">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <MetricCard label="Total PO Spend"  value={fmtVal(totalSpend)}   delta="Live from POs"   deltaUp />
-          <MetricCard label="Avg PO Value"    value={fmtVal(avgPOValue)}   delta={`${pos.length} POs`} deltaUp />
-          <MetricCard label="Inventory Value" value={fmtVal(totalInvValue)} delta="Live stock × rate" deltaUp />
-          <MetricCard label="Active SKUs"     value={totalItems.toString()} delta={critCount > 0 ? `${critCount} critical` : "All healthy"} deltaUp={critCount === 0} />
+          <MetricCard label="Total PO Spend"  value={fmtVal(totalSpend)}   delta="Live from POs" />
+          <MetricCard label="Avg PO Value"    value={fmtVal(avgPOValue)}   delta={`${pos.length} POs`} />
+          <MetricCard label="Inventory Value" value={fmtVal(totalInvValue)} delta="Live stock × rate" />
+          <MetricCard label="Active SKUs"     value={totalItems.toString()} delta={critCount > 0 ? `${critCount} critical` : "All healthy"} />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="section-card p-5">
             <SectionHeader><LeadIcon e="📊" />PO Value by Month (₹K)</SectionHeader>
+            {pos.length === 0 ? <ChartEmpty e="📊" /> : (
             <ChartSlot height={220}>{({ ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip }) => (
             <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={monthlyPOTrend.length > 0 ? monthlyPOTrend : monthlyPOData} barSize={28}>
+              <BarChart data={monthlyPOTrend} barSize={28}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(17,24,39,0.08)" />
                 <XAxis dataKey="month" tick={{ fill: "#475569", fontSize: 11 }} />
                 <YAxis tick={{ fill: "#475569", fontSize: 11 }} />
@@ -122,10 +134,12 @@ export function AnalyticsPage({ items, pos, vendorList, settings = SETTINGS_DEFA
               </BarChart>
             </ResponsiveContainer>
             )}</ChartSlot>
+            )}
           </div>
 
           <div className="section-card p-5">
             <SectionHeader><LeadIcon e="📈" />Inventory Turnover Rate</SectionHeader>
+            {pos.length === 0 ? <ChartEmpty e="📈" /> : (
             <ChartSlot height={220}>{({ ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip }) => (
             <ResponsiveContainer width="100%" height={220}>
               <AreaChart data={turnoverData}>
@@ -143,6 +157,7 @@ export function AnalyticsPage({ items, pos, vendorList, settings = SETTINGS_DEFA
               </AreaChart>
             </ResponsiveContainer>
             )}</ChartSlot>
+            )}
           </div>
         </div>
 
