@@ -68,9 +68,9 @@ import { LazyAppToaster } from "../shared/ui/lazyUi.js";
 import { setSentryPage } from "../shared/sentry.js";
 
 // 2026-11-04 (fix/perf-1) — admin-only pages load on first open (smaller first bundle).
-export const UserManagementPage = React.lazy(() => importWithReload(() => import("../modules/users-roles/UserManagementPage.jsx")));
+export const UserManagementPage = React.lazy(() => importWithReload(() => import("../modules/users-roles/index.js").then((m) => ({ default: m.UserManagementPage }))));
 
-export const RoleManagementPage = React.lazy(() => importWithReload(() => import("../modules/users-roles/RoleManagementPage.jsx")));
+export const RoleManagementPage = React.lazy(() => importWithReload(() => import("../modules/users-roles/index.js").then((m) => ({ default: m.RoleManagementPage }))));
 
 // 2026-11-04 (fix/harden-2) — sentinels: "no usable local cache" for the
 // local-mode useState initialisers below (corrupt JSON / wrong shape).
@@ -78,7 +78,7 @@ export const NO_LOCAL_LIST = Object.freeze([]);
 
 export const NO_LOCAL_MAP = Object.freeze({});
 
-export const AuditHistoryPage = React.lazy(() => importWithReload(() => import("../modules/audit-trail/AuditHistoryPage.jsx")));
+export const AuditHistoryPage = React.lazy(() => importWithReload(() => import("../modules/audit-trail/index.js").then((m) => ({ default: m.AuditHistoryPage }))));
 
 // A save that did not reach the server: log it AND tell the user in plain words.
 export const saveFailed = (where, err) => {
@@ -155,8 +155,8 @@ export default function App() {
         }
         const l = active.offsetLeft, w = active.offsetWidth;
         if (w > 0) {
-          pill.style.left = l + "px";
-          pill.style.width = w + "px";
+          // motion v2: transform only (composited); CSS pins left:0 / width:100px
+          pill.style.transform = `translateX(${l}px) scaleX(${w / 100})`;
           bar.classList.add("has-pill");
         }
       } catch { /* leave bar as-is */ }

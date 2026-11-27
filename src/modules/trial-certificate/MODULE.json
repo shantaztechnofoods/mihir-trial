@@ -1,0 +1,39 @@
+{
+  "name": "trial-certificate",
+  "version": "1.0.0",
+  "frozen": true,
+  "liveLock": false,
+  "requiresCore": 1,
+  "exports": [
+    "TC_SHEET_CSS",
+    "TrialCertificateModal",
+    "TrialCertificatePrintModal",
+    "TrialCertificateSheet",
+    "tcSigSrc"
+  ],
+  "dependsOn": {},
+  "handlers": [],
+  "stores": [],
+  "shared": [
+    "shared/components/LeadIcon.jsx",
+    "shared/printFormat.js",
+    "shared/ui/SignaturePad.jsx"
+  ],
+  "core": {
+    "utils": [
+      "utils/brandLogo.js",
+      "utils/handoverLogic.js"
+    ]
+  },
+  "npm": [
+    "react",
+    "react-dom"
+  ],
+  "migrations": [
+    "032_trial_certificate",
+    "057_accept_signature"
+  ],
+  "edgeFunctions": [],
+  "serverless": [],
+  "notes": []
+}

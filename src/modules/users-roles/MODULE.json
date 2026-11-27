@@ -1,0 +1,53 @@
+{
+  "name": "users-roles",
+  "version": "1.0.0",
+  "frozen": false,
+  "liveLock": false,
+  "requiresCore": 1,
+  "exports": [
+    "RoleManagementPage",
+    "UserManagementPage"
+  ],
+  "dependsOn": {},
+  "handlers": [],
+  "stores": [
+    "stores/adminApi.js"
+  ],
+  "shared": [
+    "shared/components/PageHeader.jsx"
+  ],
+  "core": {
+    "auth": [
+      "auth/AuthContext.jsx",
+      "auth/auditStore.js",
+      "auth/authStore.js"
+    ],
+    "config": [
+      "config/env.js"
+    ],
+    "utils": [
+      "utils/handoverLogic.js"
+    ]
+  },
+  "npm": [
+    "react"
+  ],
+  "migrations": [
+    "001_schema",
+    "006_rls",
+    "009_fix_user_trigger",
+    "035_role_machine_permissions",
+    "053_go_live_security",
+    "059_service_caller_and_dept_staff"
+  ],
+  "edgeFunctions": [
+    "admin-create-user",
+    "admin-deactivate-user",
+    "admin-delete-user",
+    "admin-reset-password"
+  ],
+  "serverless": [],
+  "notes": [
+    "admin-create-user, admin-reset-password, admin-deactivate-user, admin-delete-user (secrets SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY)"
+  ]
+}

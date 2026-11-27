@@ -15,7 +15,7 @@ export function Sidebar({ activePage, setActivePage, collapsed, setCollapsed, ba
 
   return (
     <aside
-      className={`${collapsed ? "w-16" : "w-60"} app-sidebar sidebar-slate${mobileOpen ? " is-open" : ""} no-print flex flex-col flex-shrink-0 transition-all duration-300 overflow-hidden relative`}
+      className={`${collapsed ? "w-16" : "w-60"} app-sidebar sidebar-slate${mobileOpen ? " is-open" : ""} no-print flex flex-col flex-shrink-0 transition-transform duration-200 overflow-hidden relative`}
     >
       {/* ── Logo + Search/Notif ── */}
       <div className="px-3 pt-4 pb-3 flex-shrink-0 sb-divider">

@@ -1,0 +1,107 @@
+{
+  "name": "inventory",
+  "version": "1.0.0",
+  "frozen": false,
+  "liveLock": false,
+  "requiresCore": 1,
+  "exports": [
+    "InventoryPage",
+    "InwardPage",
+    "OutwardPage",
+    "PendingPage"
+  ],
+  "dependsOn": {
+    "bom": [
+      "BOMDrawer",
+      "BOMPasteLines",
+      "BomChecklistSlots",
+      "BomLineCheckPointsModal",
+      "BomPhotoField",
+      "DeptDurationFields",
+      "RackStatusNote",
+      "durationsFormFrom",
+      "durationsStoreFrom",
+      "validateDurationsForm"
+    ]
+  },
+  "handlers": [
+    "computeBOMDeletionInfo",
+    "flashSaveError",
+    "goToPage",
+    "handleAbortMachineCreate",
+    "handleAddOutward",
+    "handleBulkAddItems",
+    "handleClearPending",
+    "handleCreateBOM",
+    "handleCreateChecklistTemplate",
+    "handleCreateItemRow",
+    "handleCreateMachine",
+    "handleDeleteBOM",
+    "handleDeleteChecklistTemplate",
+    "handleDeleteItemRow",
+    "handleDuplicateBOM",
+    "handleFulfillGroup",
+    "handleFulfillPending",
+    "handleInwardComplete",
+    "handleRemoveRackMachine",
+    "handleRenameBOM",
+    "handleRestoreBOM",
+    "handleRestoreItemRow",
+    "handleSaveBomChecklist",
+    "handleSetItemDefaultRate",
+    "handleUpdateBOM",
+    "handleUpdateChecklistTemplate",
+    "handleUpdateItemRow",
+    "handleUpdateStock",
+    "logAudit",
+    "raiseNotIssuedJobs"
+  ],
+  "stores": [],
+  "shared": [
+    "shared/components/ArchivedSection.jsx",
+    "shared/components/ItemSearchSelect.jsx",
+    "shared/components/LeadIcon.jsx",
+    "shared/components/MoreRowsNote.jsx",
+    "shared/components/VendorSearchSelect.jsx",
+    "shared/components/useProgressiveCount.js",
+    "shared/format.js",
+    "shared/loadXlsx.js",
+    "shared/machineStages.js",
+    "shared/ui/Topbar.jsx",
+    "shared/ui/primitives.jsx"
+  ],
+  "core": {
+    "config": [
+      "config/env.js"
+    ],
+    "utils": [
+      "utils/archive.js",
+      "utils/gst.js",
+      "utils/itemImport.js",
+      "utils/parseDate.js",
+      "utils/rackSlots.js",
+      "utils/storage.js"
+    ]
+  },
+  "npm": [
+    "react"
+  ],
+  "migrations": [
+    "002_master",
+    "003_transactional",
+    "011_inventory_engine_items",
+    "012_stock_movements",
+    "013_record_stock_movement",
+    "014_repair_item_history",
+    "016_item_media",
+    "017_storage_buckets",
+    "018_po_gst_and_item_gst_rate",
+    "020_items_default_purchase_rate",
+    "026_items_critical",
+    "052_pending_item_outward",
+    "062_harden_load_indexes"
+  ],
+  "edgeFunctions": [],
+  "serverless": [],
+  "notes": []
+}

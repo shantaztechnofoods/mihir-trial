@@ -253,12 +253,12 @@ export default function AuditHistoryPage() {
         {sorted.length !== logs.length && <span className="text-amber-700 ml-1">· filtered</span>}
       </>}>
           <button onClick={() => exportCSV(sorted)}
-            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition-all"
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition-all max-sm:!min-h-[44px]"
             style={{ background: "rgba(26,31,46,0.05)", border: "1px solid rgba(26,31,46,0.1)" }}>
             📥 CSV
           </button>
           <button onClick={() => exportExcel(sorted)}
-            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-emerald-700 hover:text-emerald-900 transition-all"
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-emerald-700 hover:text-emerald-900 transition-all max-sm:!min-h-[44px]"
             style={{ background: "rgba(52,211,153,0.08)", border: "1px solid rgba(52,211,153,0.25)" }}>
             📊 Excel
           </button>
@@ -311,7 +311,7 @@ export default function AuditHistoryPage() {
 
         {(search || dateFrom || dateTo || userFilter || moduleFilter || typeFilter || poFilter || vendorFilter) && (
           <button onClick={resetFilters}
-            className="text-[10px] font-bold text-slate-500 hover:text-slate-700 px-2 py-1.5 rounded-lg border border-slate-200 hover:border-slate-300 transition-all">
+            className="text-[10px] font-bold text-slate-500 hover:text-slate-700 px-2 py-1.5 rounded-lg border border-slate-200 hover:border-slate-300 transition-all max-sm:!min-h-[44px]">
             ✕ Reset
           </button>
         )}
