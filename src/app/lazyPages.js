@@ -14,7 +14,7 @@ import { importWithReload } from "../utils/lazyImport.js";
 const loaders = {
   dashboard: () => import("../modules/dashboard/index.js"),
   inventory: () => import("../modules/item-master/index.js"),
-  inward:    () => import("../modules/inventory/index.js"),
+  inward:    () => import("../modules/inward/index.js"),
   outward:   () => import("../modules/inventory/index.js"),
   pending:   () => import("../modules/inventory/index.js"),
   pipeline:  () => import("../modules/purchase/index.js"),
