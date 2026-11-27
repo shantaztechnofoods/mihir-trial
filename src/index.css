@@ -4395,3 +4395,13 @@ button.rack-btn:disabled { background: #e5e7eb !important; color: #6b7280 !impor
   [data-report-master] .rm-tick { min-width: 44px; min-height: 44px; justify-content: center; }
   [data-report-master] .rm-tick input[type="checkbox"] { width: 22px; height: 22px; }
 }
+
+/* Glitch sweep 2026-11-27: no page text under 11 px. Captions, chips and table
+   meta were 9-10.5 px on 12 of 16 pages (hard to read at arm's length on a
+   phone). Raised to 11 px in the page area only. Left alone: the sidebar and
+   bottom bar, Machine Tracker (frozen, its own type scale) and popups (owned by
+   the popup layout work). Size only — no colour, weight or spacing change. */
+.app-shell > .flex-1:not(.mt-premium) :is(.text-\[9px\], .text-\[9\.5px\], .text-\[10px\], .text-\[10\.5px\]):not(.modal-backdrop *):not([role="dialog"] *),
+.app-shell > main > .flex-1:not(.mt-premium) :is(.text-\[9px\], .text-\[9\.5px\], .text-\[10px\], .text-\[10\.5px\]):not(.modal-backdrop *):not([role="dialog"] *) {
+  font-size: 11px !important; /* beats the older 9-10.5 px !important phone/tile rules */
+}
