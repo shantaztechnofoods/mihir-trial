@@ -2,7 +2,7 @@
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
 import React, { useState, useEffect } from "react";
 import { Menu } from "lucide-react";
-import { MobileNavContext } from "../components/PageHeader.jsx";
+import { MobileNavContext, plainText } from "../components/PageHeader.jsx";
 import { ThemeSwitch } from "./ThemeSwitch.jsx";
 
 // ─── TOPBAR ──────────────────────────────────────────────────────────────────
@@ -46,8 +46,8 @@ export function Topbar({ title, subtitle, children, themeSwitch = true }) {
         </button>
       )}
       <div className="flex-1 min-w-[150px]">
-        <h1 className="text-[17px] font-extrabold tracking-[-0.02em] leading-tight" style={{ color: "var(--text-strong)" }}>{title}</h1>
-        {subtitle && <p className="text-[11.5px] mt-1 leading-snug font-normal" style={{ color: "var(--text-dim)" }}>{subtitle}</p>}
+        <h1 className="text-[17px] font-extrabold tracking-[-0.02em] leading-tight" style={{ color: "var(--text-strong)" }} title={plainText(title).trim() || undefined}>{title}</h1>
+        {subtitle && <p className="text-[11.5px] mt-1 leading-snug font-normal" style={{ color: "var(--text-dim)" }} title={plainText(subtitle).trim() || undefined}>{subtitle}</p>}
       </div>
       {/* Light / Dark / Auto — each person's choice, remembered in this browser.
           Settings turns it off: its Appearance card already holds the same
