@@ -3691,6 +3691,10 @@ body:has(.mt-report-modal) #erp-build-badge { display: none !important; }
     content: ""; position: absolute; left: 0; right: 0; top: -18px; height: 18px; pointer-events: none;
     background: linear-gradient(to bottom, rgba(255,255,255,0), #fff);
   }
+  /* glitch-guard 2026-11-27: in DARK the pinned row stayed white — a white strip under a
+     dark sheet, its grey Cancel at 1.1:1. It takes the dark sheet's colour (glass.css). */
+  html[data-theme="dark"] .modal-backdrop > div:not(.flex-col):not([class*="flex-col"]) > div:last-child:has(> button) { background: #1a272f; }
+  html[data-theme="dark"] .modal-backdrop > div:not(.flex-col):not([class*="flex-col"]) > div:last-child:has(> button)::before { background: linear-gradient(to bottom, rgba(26,39,47,0), #1a272f); }
 }
 
 /* 2026-11-03 — Machine Tracker polish (part 2). */
