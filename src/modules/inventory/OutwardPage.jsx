@@ -1,6 +1,6 @@
 // src/modules/inventory/OutwardPage.jsx — moved verbatim from the former single-file src/App.jsx
 // (module-folder split, 2026-11-04). Behaviour is unchanged; see this folder's README.md.
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { LeadIcon, Glyph } from "../../shared/components/LeadIcon.jsx";
 import ItemSearchSelect from "../../shared/components/ItemSearchSelect.jsx";
 import { useProgressiveCount } from "../../shared/components/useProgressiveCount.js";
@@ -243,6 +243,40 @@ export function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, on
     setOpenBOM(null);
     setSerialModal(bomOpenRequest.key); setPendingSerial(""); setSerialErr("");
   }, [bomOpenRequest && bomOpenRequest.n]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // New BOM popup: Esc closes it (only when it is the top popup), Tab stays inside,
+  // and focus goes back to the "+ New BOM" button when it closes.
+  const createDialogRef = useRef(null);
+  const createOpenerRef = useRef(null);
+  useEffect(() => {
+    if (!showCreate) return undefined;
+    const dlg = createDialogRef.current;
+    const focusables = () => dlg ? Array.from(dlg.querySelectorAll(
+      'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'
+    )).filter((el) => el.offsetParent !== null) : [];
+    const first = focusables().find((el) => el.tagName === "INPUT") || focusables()[0];
+    if (first) first.focus();
+    const isTop = () => {
+      const all = document.querySelectorAll('[role="dialog"][aria-modal="true"],[role="alertdialog"][aria-modal="true"]');
+      return all.length > 0 && all[all.length - 1] === dlg;
+    };
+    const onKey = (e) => {
+      if (!isTop()) return;
+      if (e.key === "Escape") { e.preventDefault(); setShowCreate(false); return; }
+      if (e.key !== "Tab") return;
+      const list = focusables();
+      if (!list.length) return;
+      const a = list[0], b = list[list.length - 1];
+      if (e.shiftKey && document.activeElement === a) { e.preventDefault(); b.focus(); }
+      else if (!e.shiftKey && document.activeElement === b) { e.preventDefault(); a.focus(); }
+    };
+    window.addEventListener("keydown", onKey);
+    const opener = createOpenerRef.current;
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      if (opener && document.contains(opener)) opener.focus();
+    };
+  }, [showCreate]);
 
   // ── Create BOM helpers ──
   const openCreateBOM = () => {
@@ -609,7 +643,8 @@ export function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, on
         <div className="modal-backdrop fixed inset-0 z-[75] flex items-center justify-center p-4"
              style={{ background: "rgba(17,24,39,0.45)", backdropFilter: "blur(10px)" }}
              onClick={(e) => e.target === e.currentTarget && setShowCreate(false)}>
-          <div className="bg-white rounded-2xl w-full max-w-2xl overflow-hidden flex flex-col"
+          <div ref={createDialogRef} role="dialog" aria-modal="true" aria-label="Create new BOM" data-create-bom-dialog
+               className="bg-white rounded-2xl w-full max-w-2xl overflow-hidden flex flex-col"
                style={{ border: "1px solid var(--border-rim)", boxShadow: "0 32px 80px rgba(17,24,39,0.18)", maxHeight: "90vh", animation: "slideUp 0.25s ease both" }}>
             <div className="px-6 py-4 flex items-center justify-between flex-shrink-0" style={{ borderBottom: "1px solid rgba(17,24,39,0.08)" }}>
               <div className="flex items-center gap-3">
@@ -619,7 +654,7 @@ export function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, on
                   <div className="text-[10px] text-slate-500 mt-0.5">Define a new machine model with components and rack capacity</div>
                 </div>
               </div>
-              <button onClick={() => setShowCreate(false)} className="text-slate-500 hover:text-slate-900 text-lg leading-none">✕</button>
+              <button onClick={() => setShowCreate(false)} aria-label="Close" className="text-slate-500 hover:text-slate-900 text-lg leading-none">✕</button>
             </div>
 
             <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
@@ -627,13 +662,13 @@ export function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, on
                 <div>
                   <OLabel text="BOM Key" req />
                   <input value={createForm.key} onChange={(e) => { setCreateForm((f) => ({ ...f, key: e.target.value.toUpperCase() })); setCreateErr(""); }}
-                    placeholder="e.g. MIX-100" className={inpCls + " font-mono"} />
+                    aria-label="BOM Key" placeholder="e.g. MIX-100" className={inpCls + " font-mono"} />
                   <div className="text-[10px] text-slate-600 mt-1">Unique short code. Used as machine prefix.</div>
                 </div>
                 <div>
                   <OLabel text="Machine Model Name" req />
                   <input value={createForm.label} onChange={(e) => { setCreateForm((f) => ({ ...f, label: e.target.value })); setCreateErr(""); }}
-                    placeholder="e.g. Industrial Mixer 100kg" className={inpCls} />
+                    aria-label="Machine Model Name" placeholder="e.g. Industrial Mixer 100kg" className={inpCls} />
                 </div>
                 <div className="col-span-2">
                   <OLabel text="Production Rack" />
@@ -810,7 +845,7 @@ export function OutwardPage({ items, handleUpdateStock, bomDefs, onUpdateBOM, on
             <span className="text-[10px] font-bold text-amber-700 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full">{boms.length} BOMs</span>
             <div className="flex-1" />
             {canDo("outward","editBOM") && onCreateBOM && (
-              <button onClick={openCreateBOM}
+              <button ref={createOpenerRef} onClick={openCreateBOM}
                 className="text-[11px] font-bold px-3 py-1.5 rounded-lg text-white transition-all"
                 style={{ background: "#2640B0", boxShadow: "0 1px 2px rgba(17,24,39,0.14)", color: "#ffffff" }}>
                 + New BOM
