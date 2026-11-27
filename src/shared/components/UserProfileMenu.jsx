@@ -518,7 +518,7 @@ function ChangePasswordModal({ user, onClose, onLocalSave, onSupabaseSaved }) {
                 {newPw && (
                   <div className="mt-2 flex items-center gap-2">
                     <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ background: "rgba(15,20,28,0.08)" }}>
-                      <div className="h-full transition-all duration-300"
+                      <div className="h-full"
                            style={{ width: `${(strength.score / 3) * 100}%`, background: strength.color }} />
                     </div>
                     <span className="text-[10px] font-semibold" style={{ color: strength.color }}>{strength.label}</span>
