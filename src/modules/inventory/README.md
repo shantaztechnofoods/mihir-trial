@@ -1,12 +1,12 @@
-# Inventory (Item Master, Inward, Outward, Pending Stock) — `src/modules/inventory/`
+# Inventory (Inward, Outward, Pending Stock) — `src/modules/inventory/`
 
-> **Partly frozen:** partly — the Outward BOM issue (rack / direct production) is part of the frozen production flow; Item Master, Inward and Pending Stock are not frozen.
+> **Partly frozen:** partly — the Outward BOM issue (rack / direct production) is part of the frozen production flow; Inward and Pending Stock are not frozen.
+> Item Master moved to `src/modules/item-master/` (modules/item-master, pure move).
 
 ## What it does
-Stock: Item Master (items, quick stock change, item detail with history, add/edit item, Excel import, clear demo data), Inward (receive stock), Outward (manual issue and BOM issue to a rack or straight to production) and Pending Stock (shortfalls waiting for material).
+Stock movements: Inward (receive stock), Outward (manual issue and BOM issue to a rack or straight to production) and Pending Stock (shortfalls waiting for material).
 
 ## Screens
-- Item Master (nav `inventory`)
 - Inward (nav `inward`)
 - Outward (nav `outward`, also embedded at the top of Machine Tracker)
 - Pending Stock (nav `pending`)
@@ -14,18 +14,14 @@ Stock: Item Master (items, quick stock change, item detail with history, add/edi
 ## Files
 | file | lines |
 |---|---|
-| `AddItemModal.jsx` | 733 |
-| `InventoryPage.jsx` | 975 |
 | `InwardPage.jsx` | 277 |
-| `ItemDetailModal.jsx` | 685 |
-| `ItemImportModal.jsx` | 208 |
 | `OutwardPage.jsx` | 1135 |
 | `PendingPage.jsx` | 686 |
-| `handlers.js` | 971 |
-| `index.js` | 7 |
+| `handlers.js` | 690 |
+| `index.js` | 5 |
 
 `index.js` is the public surface — the app shell and other modules import only from it:
-`InventoryPage`, `InwardPage`, `OutwardPage`, `PendingPage`
+`InwardPage`, `OutwardPage`, `PendingPage`
 
 ## How it plugs into the app
 The screens here are presentational: state and every write (handler) still live in the app shell
@@ -63,9 +59,9 @@ incl. `guarded.fulfillPending` / `deleteItemRow` / `restoreItemRow` and the Orde
 yes for Trial, 27 Nov 2026) — still owner-locked: change them only with the owner's yes
 (skill `shantaz-erp-frozen-modules`). `handleRemoveRackMachine` is also registered as
 `shell.call("inventory.removeRackMachine")` for bom's `handleDeleteBOM`. The BOM handlers live in
-`modules/bom/handlers.js`. `handleInventoryCorrection` (Super Admin stock correction; defined but not
-wired to any page today) moved here as well (modules/c-inventory-correction) — removing it is a
-separate decision for the owner, never part of a move. `handleUpdateStock` and `saveFailed` are shell API. Needs `SHELL_API` ≥ 6
+`modules/bom/handlers.js`. The Item Master writes (`handleCreateItemRow`, `handleUpdateItemRow`,
+`handleDeleteItemRow`, `handleRestoreItemRow`, `handleSetItemDefaultRate`, `handleBulkAddItems`,
+`handleInventoryCorrection`) moved on to `modules/item-master/handlers.js` (modules/item-master). `handleUpdateStock` and `saveFailed` are shell API. Needs `SHELL_API` ≥ 6
 (`requiresShell` in MODULE.json).
 
 Depends on other modules (imported through their `index.js`): `modules/bom`
