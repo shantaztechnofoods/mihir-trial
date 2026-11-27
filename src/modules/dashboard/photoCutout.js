@@ -63,7 +63,7 @@ function loadImage(src, cors) {
   });
 }
 
-async function build(src) {
+async function build(src, maxSide = MAX_SIDE) {
   const local = /^(data|blob):/i.test(src);
   let im;
   try { im = await loadImage(src, !local); } catch {
@@ -71,7 +71,7 @@ async function build(src) {
     try { const plain = await loadImage(src, false); return { image: plain, aspect: plain.naturalWidth / plain.naturalHeight || 1.4, cut: false }; } catch { return null; }
   }
   const nw = im.naturalWidth || 1, nh = im.naturalHeight || 1;
-  const s = Math.min(1, MAX_SIDE / Math.max(nw, nh));
+  const s = Math.min(1, maxSide / Math.max(nw, nh));
   const w = Math.max(1, Math.round(nw * s)), h = Math.max(1, Math.round(nh * s));
   const c = document.createElement("canvas"); c.width = w; c.height = h;
   const g = c.getContext("2d", { willReadFrequently: true });
@@ -93,10 +93,12 @@ async function build(src) {
   return { image: t, aspect: b.w / b.h, cut: true };
 }
 
-// → Promise<{ image, aspect, cut } | null>
-export function cutoutPhoto(src) {
+// → Promise<{ image, aspect, cut } | null>. `maxSide` (2026-11-27): the 3D view first
+// asks for a small cut-out (fast, the first frame) and swaps in the bigger one on idle.
+export function cutoutPhoto(src, maxSide = MAX_SIDE) {
   const url = typeof src === "string" ? src.trim() : "";
   if (!url) return Promise.resolve(null);
-  if (!cache.has(url)) cache.set(url, build(url).catch(() => null));
-  return cache.get(url);
+  const key = maxSide === MAX_SIDE ? url : `${maxSide}|${url}`;
+  if (!cache.has(key)) cache.set(key, build(url, maxSide).catch(() => null));
+  return cache.get(key);
 }

@@ -100,15 +100,29 @@ export async function run4x(ok) {
   await loginAdmin(p);
   if (await p.locator("[data-production-line]").count() === 0) await openDashboard(p);
   await p.locator("[data-production-line]").scrollIntoViewIfNeeded();
+  // The Dashboard preloads the 3D chunks on idle (2026-11-27) — wait for that, as a person would have.
+  const pre = await p.waitForFunction(() => { const n = performance.getEntriesByType("resource").map((r) => r.name); return n.some((u) => /Line3DView-.*\.js/.test(u)) && n.some((u) => /\/line3d-.*\.js/.test(u)); }, null, { timeout: 20000 }).then(() => true, () => false);
+  ok("3D chunks preloaded on idle after the Dashboard shows", pre);
   const cdp = await p.context().newCDPSession(p);
   await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
-  const firstMs = await p.evaluate(() => new Promise((res) => {
-    const t0 = performance.now();
+  const tm = await p.evaluate(() => new Promise((res) => {
+    const t0 = performance.now(); let poster = -1;
     document.querySelector('[data-line-views] [data-view="3d"]').click();
-    const tick = () => { if (window.__dash3d && window.__dash3d.frames > 0) res(Math.round(performance.now() - t0)); else if (document.querySelector("[data-line-3d-note]") || performance.now() - t0 > 60000) res(-1); else requestAnimationFrame(tick); };
-    requestAnimationFrame(tick);
+    const tick = () => {
+      const now = performance.now();
+      if (poster < 0 && document.querySelector("[data-3d-poster], [data-floor-3d] canvas")) poster = Math.round(now - t0);
+      if (window.__dash3d && window.__dash3d.frames > 0) {
+        const at = (n) => { const m = performance.getEntriesByName(n).pop(); return m ? Math.round(m.startTime - t0) : -1; };
+        res({ poster, env: at("dash3d-env"), scene: at("dash3d-scene"), built: at("dash3d-built"), programs: window.__dash3d.info().programs, compiled: at("dash3d-compiled"), first: at("dash3d-first") });
+      } else if (document.querySelector("[data-line-3d-note]") || now - t0 > 60000) res({ poster, first: -1 });
+      else requestAnimationFrame(tick);
+    };
+    tick();
   }));
-  ok(`4x CPU: first 3D frame drawn (${firstMs} ms after the tap)`, firstMs > 0, `${firstMs} ms`);
+  const firstMs = tm.first;
+  console.log(`MEASURE phases-4x ${JSON.stringify(tm)}`);
+  ok(`4x CPU: something useful on screen <= 300 ms after the tap (poster at ${tm.poster} ms)`, tm.poster >= 0 && tm.poster <= 300, JSON.stringify(tm));
+  ok(`4x CPU: first 3D frame drawn (${firstMs} ms after the tap)`, firstMs > 0, JSON.stringify(tm));
   console.log(`MEASURE first-frame-4x ${firstMs}ms`);
   await settle(p, 1500);
   if (firstMs > 0) {
