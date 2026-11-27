@@ -133,6 +133,13 @@ const nav = async (p, mobile, label) => {
   await chip("All").click(); await p.waitForTimeout(400);
   const cat = p.locator("select[aria-label=Category]");
   await gate("1440 Item Master: Category select", p, async () => { await cat.focus(); await p.keyboard.press("ArrowDown"); }, async () => { await cat.focus(); await p.keyboard.press("ArrowUp"); });
+  // Sidebar page switch: the highlight paints at once, the page follows as a
+  // React transition (perf/inp-nav). Each page was opened once above or here first.
+  for (const page of ["Settings", "Audit Trail", "Vendors", "Inward"]) { await nav(p, false, page); await settle(p, 1500, 300); }
+  for (const [from, to] of [["Inward", "Item Master"], ["Item Master", "Machine Tracker"], ["Machine Tracker", "Dashboard"], ["Dashboard", "Settings"]]) {
+    await gate(`1440 Sidebar: ${from} → ${to}`, p, () => nav(p, false, to), async () => { await nav(p, false, from); await settle(p, 1500, 300); });
+    await settle(p, 1500, 300);
+  }
   ok("1440: no browser errors", errs.length === 0, errs.join(" ; "));
   await ctx.close();
 }
